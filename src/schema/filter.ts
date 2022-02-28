@@ -1,4 +1,4 @@
-import { assert } from "console";
+import assert from 'assert';
 import { assign, cloneDeep, intersection, keys } from "lodash";
 import { DeduceFilter, EntityDef, EntityShape } from "../types/Entity";
 import { TriggerEntityShape } from "../types/Trigger";
