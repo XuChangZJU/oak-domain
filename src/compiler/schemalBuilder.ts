@@ -1,4 +1,5 @@
 import assert from 'assert';
+import { execSync } from 'child_process';
 import { writeFileSync, readdirSync, mkdirSync, fstat } from 'fs';
 import { emptydirSync } from 'fs-extra';
 import { assign, cloneDeep, identity, intersection, keys, uniq, uniqBy } from 'lodash';
@@ -204,6 +205,7 @@ function getStringTextFromUnionStringLiterals(moduleName: string, filename: stri
 const RESERVED_ACTION_NAMES = ['GenericAction', 'ParticularAction'];
 import { genericActions } from '../actions/action';
 import { unIndexedTypes } from '../types/DataType';
+import path from 'path';
 function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program, schemaAttrs: ts.TypeElement[]) {
     const ActionDict: Record<string, string> = {};
     const actionss = [{
@@ -3301,18 +3303,12 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
     statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
-            undefined,
-            factory.createIdentifier("ES"),
+            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+            factory.createIdentifier("EntityDict"),
             undefined,
             factory.createTypeLiteralNode(
                 propertySignatures
             )
-        ),
-        factory.createExportAssignment(
-            undefined,
-            undefined,
-            undefined,
-            factory.createIdentifier("ES")
         )
     );
 
@@ -4055,6 +4051,33 @@ function addReverseRelationship() {
     }
 }
 
+function outputPackageJson(outputDir: string) {
+    const pj = {        
+        "name": "oak-app-domain",
+        "main": "index.ts"
+    };
+
+    const indexTs = `export * from './EntityDict';
+    export * from './Storage';
+    `;
+    let filename = path.join(outputDir, 'index.ts');
+    writeFileSync(filename, indexTs, { flag: 'w' });
+
+
+    filename = path.join(outputDir, 'package.json');    
+    writeFileSync(filename, JSON.stringify(pj), { flag: 'w' });
+
+    // 执行npm link
+    try {
+        execSync('npm link', {
+            cwd: outputDir,
+        });
+    }
+    catch(err) {
+        console.error(err);
+    }
+}
+
 export default function buildSchema(inputDir: string, outputDir: string = OUTPUT_PATH): void {
     const files = readdirSync(inputDir);
     const fullFilenames = files.map(
@@ -4083,4 +4106,5 @@ export default function buildSchema(inputDir: string, outputDir: string = OUTPUT
     outputAction(outputDir, printer);
     outputEntityDict(outputDir, printer);
     outputStorage(outputDir, printer);
+    outputPackageJson(outputDir);
 }
