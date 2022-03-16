@@ -4,7 +4,7 @@ export declare const EXPRESSION_PREFIX = "$expr";
 export declare type NodeId = `node-${number}`;
 export declare type ExpressionKey = '$expr' | '$expr1' | '$expr2' | '$expr3' | '$expr4' | '$expr5' | '$expr6' | '$expr7' | '$expr8' | '$expr9' | '$expr10' | '$expr11' | '$expr12' | '$expr13' | '$expr14' | '$expr15' | '$expr16' | '$expr17' | '$expr18' | '$expr19' | '$expr20';
 export declare type ExprOp<A> = {
-    [K in ExpressionKey]?: RefOrExpression<A>;
+    [K in ExpressionKey]: RefOrExpression<A>;
 };
 export declare type Q_NumberComparisonValue = number | OneOf<{
     $gt: number;

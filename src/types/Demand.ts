@@ -9,7 +9,7 @@ export type ExpressionKey = '$expr' | '$expr1' | '$expr2' | '$expr3' | '$expr4' 
 | '$expr16' | '$expr17' | '$expr18' | '$expr19' | '$expr20';
 
 export type ExprOp<A> = {
-    [K in ExpressionKey]?: RefOrExpression<A>;
+    [K in ExpressionKey]: RefOrExpression<A>;
 };
 
 // query

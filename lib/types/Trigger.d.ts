@@ -1,8 +1,8 @@
 import { Context } from "./Context";
 import { EntityDef, EntityShape, OperationResult } from "./Entity";
-export interface Trigger<E extends string, ED extends {
-    [K in E]: EntityDef<E, ED, K, SH>;
-}, T extends E, SH extends TriggerEntityShape = TriggerEntityShape> {
+export interface Trigger<ED extends {
+    [E: string]: EntityDef;
+}, T extends keyof ED> {
     name: string;
     action: ED[T]['Action'];
     attributes?: keyof ED[T]['OpSchema'] | Array<keyof ED[T]['OpSchema']>;
@@ -12,11 +12,11 @@ export interface Trigger<E extends string, ED extends {
     strict?: 'takeEasy' | 'makeSure';
     fn: (event: {
         operation: ED[T]['Operation'];
-        result?: OperationResult<E, ED, SH>;
-    }, context: Context<E, ED, SH>, params?: Object) => Promise<number>;
+        result?: OperationResult<ED>;
+    }, context: Context<ED>, params?: Object) => Promise<number>;
 }
-export declare type DataAttr = '$$triggerData$$';
-export declare type TimestampAttr = '$$triggerTimestamp$$';
+export declare type TriggerDataAttribute = '$$triggerData$$';
+export declare type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 export interface TriggerEntityShape extends EntityShape {
     $$triggerData$$?: {
         name: string;
@@ -24,13 +24,13 @@ export interface TriggerEntityShape extends EntityShape {
     };
     $$triggerTimestamp$$?: number;
 }
-export declare abstract class Executor<E extends string, ED extends {
-    [K in E]: EntityDef<E, ED, K, SH>;
-}, SH extends TriggerEntityShape = TriggerEntityShape> {
-    static dataAttr: DataAttr;
-    static timestampAttr: TimestampAttr;
-    abstract registerTrigger<T extends E>(trigger: Trigger<E, ED, T, SH>): void;
-    abstract preOperation<T extends E>(entity: T, operation: ED[T]['Operation'], context: Context<E, ED, SH>): Promise<void>;
-    abstract postOperation<T extends E>(entity: T, operation: ED[T]['Operation'], context: Context<E, ED, SH>): Promise<void>;
-    abstract checkpoint(context: Context<E, ED, SH>, timestamp: number): Promise<number>;
+export declare abstract class Executor<ED extends {
+    [E: string]: EntityDef;
+}> {
+    static dataAttr: TriggerDataAttribute;
+    static timestampAttr: TriggerTimestampAttribute;
+    abstract registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T>): void;
+    abstract preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Context<ED>): Promise<void>;
+    abstract postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Context<ED>): Promise<void>;
+    abstract checkpoint(context: Context<ED>, timestamp: number): Promise<number>;
 }

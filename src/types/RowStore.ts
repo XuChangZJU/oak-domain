@@ -3,39 +3,39 @@ import { Context } from './Context';
 import { StorageSchema } from './Storage';
 import { OakErrorDefDict } from '../OakError';
 
-export abstract class RowStore<E extends string, ED extends {
-    [K in E]: EntityDef<E, ED, K, SH>;
-}, SH extends EntityShape = EntityShape> {
+export abstract class RowStore<ED extends {
+    [E: string]: EntityDef;
+}> {
     static $$LEVEL = 'store';
     static $$CODES: OakErrorDefDict = {
         primaryKeyConfilict: [1, '主键重复'],
         expressionUnresolved: [2, '表达式无法计算完成'],
         nodeIdRepeated: [3, '查询或投影中的nodeId重复'],
     };
-    protected storageSchema: StorageSchema;
+    protected storageSchema: StorageSchema<ED>;
     // store实现CRUD动作的统一入口定义
-    abstract operate<T extends E>(
+    abstract operate<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'],
-        context: Context<E, ED, SH>,
+        context: Context<ED>,
         params?: Object
-    ): Promise<void>;
+    ): Promise<OperationResult<ED>>;
 
-    abstract select<T extends E> (
+    abstract select<T extends keyof ED> (
         entity: T,
         selection: ED[T]['Selection'],
-        context: Context<E, ED, SH>,
+        context: Context<ED>,
         params?: Object
-    ): Promise<SelectionResult<E, ED, T, SH>>;
+    ): Promise<SelectionResult<ED, T>>;
 
-    abstract count<T extends E> (
+    abstract count<T extends keyof ED> (
         entity: T,
         selection: Omit<ED[T]['Selection'], 'data' | 'sorter' | 'action'>,
-        context: Context<E, ED, SH>,
+        context: Context<ED>,
         params?: Object
     ): Promise<number>;
 
-    constructor(storageSchema: StorageSchema) {
+    constructor(storageSchema: StorageSchema<ED>) {
         this.storageSchema = storageSchema;
     }
 }

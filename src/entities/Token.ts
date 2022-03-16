@@ -4,6 +4,7 @@ import { Schema as Application } from './Application';
 import { AbleAction } from '../actions/action';
 
 export type Schema = {
+    application: Application;
     entity: String<32>;
     entityId: String<64>;
     user?: User;

@@ -1,1 +1,2 @@
-export default function buildSchema(inputDir: string, outputDir?: string): void;
+export declare function analyzeEntities(inputDir: string): void;
+export declare function buildSchema(outputDir: string): void;

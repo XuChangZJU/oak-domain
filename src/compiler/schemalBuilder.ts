@@ -1,3 +1,4 @@
+import path from 'path';
 import assert from 'assert';
 import { execSync } from 'child_process';
 import { writeFileSync, readdirSync, mkdirSync, fstat } from 'fs';
@@ -6,16 +7,17 @@ import { assign, cloneDeep, identity, intersection, keys, uniq, uniqBy } from 'l
 import * as ts from 'typescript';
 const { factory } = ts;
 import {
-    LIB_OAK_DOMAIN,
     ENTITY_PATH_IN_OAK_DOMAIN,
     ACTION_CONSTANT_IN_OAK_DOMAIN,
-    OUTPUT_PATH,
+    TYPE_PATH_IN_OAK_DOMAIN,
     RESERVED_ENTITIES,
     STRING_LITERAL_MAX_LENGTH,
     NUMERICAL_LITERL_DEFAULT_PRECISION,
     NUMERICAL_LITERL_DEFAULT_SCALE,
 } from './env';
 import { firstLetterLowerCase } from './utils';
+
+const EntitiesInOakDomain: string[] = [];
 
 
 const Schema: Record<string, {
@@ -30,7 +32,7 @@ const ManyToOne: Record<string, Array<[string, string]>> = {};
 const ReversePointerEntities: Record<string, 1> = {};
 const ReversePointerRelations: Record<string, string[]> = {};
 
-const ActionImportStatements = [
+const ActionImportStatements = () => [
     factory.createImportDeclaration(
         undefined,
         undefined,
@@ -43,7 +45,7 @@ const ActionImportStatements = [
                 factory.createIdentifier("ActionDef")
             )])
         ),
-        factory.createStringLiteral("oak-domain/src/types/Action"),
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Action`),
         undefined
     ),
     factory.createImportDeclaration(
@@ -58,7 +60,7 @@ const ActionImportStatements = [
                 factory.createIdentifier("GenericAction")
             )])
         ),
-        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN),
+        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN(2)),
         undefined
     )
 ];
@@ -114,7 +116,7 @@ function pushStatementIntoActionAst(
     else {
         assign(ActionAsts, {
             [moduleName]: {
-                statements: [...ActionImportStatements, node],
+                statements: [...ActionImportStatements(), node],
                 sourceFile,
                 importedFrom: {},
             }
@@ -153,10 +155,10 @@ function addActionSource(moduleName: string, name: ts.Identifier, node: ts.Impor
 
     // 目前应该只会引用oak-domain/src/actions/action里的公共action
     assert(ts.isStringLiteral(moduleSpecifier) &&
-        (moduleSpecifier.text === ACTION_CONSTANT_IN_OAK_DOMAIN
-            || (process.env.IN_OAK_DOMAIN && moduleSpecifier.text === '../actions/action')));
+        (moduleSpecifier.text === ACTION_CONSTANT_IN_OAK_DOMAIN(1)
+            || (EntitiesInOakDomain.includes(moduleName) && moduleSpecifier.text === '../actions/action')));
     assign(ast.importedFrom, {
-        [name.text]: ACTION_CONSTANT_IN_OAK_DOMAIN,
+        [name.text]: ACTION_CONSTANT_IN_OAK_DOMAIN(2),
     });
 }
 
@@ -205,7 +207,6 @@ function getStringTextFromUnionStringLiterals(moduleName: string, filename: stri
 const RESERVED_ACTION_NAMES = ['GenericAction', 'ParticularAction'];
 import { genericActions } from '../actions/action';
 import { unIndexedTypes } from '../types/DataType';
-import path from 'path';
 function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program, schemaAttrs: ts.TypeElement[]) {
     const ActionDict: Record<string, string> = {};
     const actionss = [{
@@ -279,11 +280,11 @@ function getEntityImported(declaration: ts.ImportDeclaration, filename: string) 
     const { moduleSpecifier, importClause } = declaration;
     let entityImported: string | undefined;
     if (ts.isStringLiteral(moduleSpecifier)) {
-        if (moduleSpecifier.text.startsWith('./')) {
+        if (moduleSpecifier.text.startsWith('./') && process.env.COMPILING_BASE_DOMAIN) {
             entityImported = moduleSpecifier.text.slice(2);
         }
-        else if (moduleSpecifier.text.startsWith(ENTITY_PATH_IN_OAK_DOMAIN)) {
-            entityImported = moduleSpecifier.text.slice(ENTITY_PATH_IN_OAK_DOMAIN.length);
+        else if (moduleSpecifier.text.startsWith(ENTITY_PATH_IN_OAK_DOMAIN()) && !process.env.COMPILING_BASE_DOMAIN) {
+            entityImported = moduleSpecifier.text.slice(ENTITY_PATH_IN_OAK_DOMAIN().length);
         }
     }
 
@@ -719,12 +720,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
             factory.createIdentifier('id'),
             undefined,
             factory.createTypeReferenceNode(
-                factory.createIdentifier('String'),
-                [
-                    factory.createLiteralTypeNode(
-                        factory.createNumericLiteral(64)
-                    )
-                ]
+                factory.createIdentifier('PrimaryKey'),
             )
         ),
         // $$createAt$$: Datetime
@@ -790,10 +786,10 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                             factory.createIdentifier(foreignKey),
                             questionToken,
                             factory.createTypeReferenceNode(
-                                factory.createIdentifier('String'),
+                                factory.createIdentifier('ForeignKey'),
                                 [
                                     factory.createLiteralTypeNode(
-                                        factory.createNumericLiteral(64)
+                                        factory.createStringLiteral(firstLetterLowerCase(text2))
                                     )
                                 ]
                             )
@@ -1438,12 +1434,17 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
         }
     }
 
-    const fnCallNode = factory.createTypeReferenceNode(
-        factory.createIdentifier("ExprOp"),
+    const exprNode = factory.createTypeReferenceNode(
+        factory.createIdentifier("Partial"),
         [
             factory.createTypeReferenceNode(
-                factory.createIdentifier("OpAttr"),
-                undefined
+                factory.createIdentifier("ExprOp"),
+                [
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("OpAttr"),
+                        undefined
+                    )
+                ]
             )
         ]
     );
@@ -1480,7 +1481,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                         )
                     )
                 ),
-                fnCallNode,
+                exprNode,
             ])
         )
     );
@@ -1507,7 +1508,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                         )
                     )
                 ),
-                fnCallNode,
+                exprNode,
             ])
         )
     );
@@ -2999,7 +3000,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     );
 }
 
-const initialStatements = [
+const initialStatements = () => [
     // import { String, Text, Int, SpecificKey } from 'oak-domain/types/DataType';
     factory.createImportDeclaration(
         undefined,
@@ -3054,10 +3055,20 @@ const initialStatements = [
                         undefined,
                         factory.createIdentifier('Image')
                     ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier('PrimaryKey')
+                    ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier('ForeignKey')
+                    ),
                 ]
             )
         ),
-        factory.createStringLiteral(`${LIB_OAK_DOMAIN}/src/types/DataType`)
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}DataType`)
     ),
 
     /* import {
@@ -3126,7 +3137,7 @@ const initialStatements = [
                 ]
             )
         ),
-        factory.createStringLiteral(`${LIB_OAK_DOMAIN}/src/types/Demand`)
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Demand`)
     ),
     factory.createImportDeclaration(
         undefined,
@@ -3147,7 +3158,7 @@ const initialStatements = [
                 )
             ])
         ),
-        factory.createStringLiteral(`${LIB_OAK_DOMAIN}/src/types/Polyfill`)
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Polyfill`)
     ),
     // import * as SubQuery from '../_SubQuery';
     factory.createImportDeclaration(
@@ -3175,7 +3186,7 @@ const initialStatements = [
                 )
             ])
         ),
-        factory.createStringLiteral("oak-domain/src/types/Entity"),
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Entity`),
         undefined
     )
 ];
@@ -3263,7 +3274,7 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
         resultFile
     );
 
-    const fileName = `${outputDir}/_SubQuery.ts`;
+    const fileName = path.join(outputDir, '_SubQuery.ts');
     writeFileSync(fileName, result, { flag: 'w' });
 }
 
@@ -3320,13 +3331,13 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
         resultFile
     );
 
-    const fileName = `${outputDir}/EntityDict.ts`;
+    const fileName = path.join(outputDir, 'EntityDict.ts');
     writeFileSync(fileName, result, { flag: 'w' });
 }
 
 function outputSchema(outputDir: string, printer: ts.Printer) {
     for (const entity in Schema) {
-        const statements: ts.Statement[] = cloneDeep(initialStatements);
+        const statements: ts.Statement[] = initialStatements();
         // const { schemaAttrs } = Schema[entity];
         if (ActionAsts[entity]) {
             const importedSourceDict: {
@@ -3433,7 +3444,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                             factory.createIdentifier("GenericAction")
                         )])
                     ),
-                    factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN),
+                    factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN(2)),
                     undefined
                 )
             );
@@ -3517,7 +3528,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         )
 
         const result = printer.printList(ts.ListFormat.SourceFileStatements, factory.createNodeArray(statements), Schema[entity].sourceFile);
-        const fileName = `${outputDir}/${entity}/Schema.ts`;
+        const fileName = path.join(outputDir, entity, 'Schema.ts');
         writeFileSync(fileName, result, { flag: 'w' });
     }
 }
@@ -3562,7 +3573,7 @@ function outputAction(outputDir: string, printer: ts.Printer) {
             ts.ListFormat.SourceFileStatements,
             factory.createNodeArray(importStatements.concat(statements)),
             sourceFile);
-        const filename = `${outputDir}/${entity}/Action.ts`;
+        const filename = path.join(outputDir, entity, 'Action.ts');
         writeFileSync(filename, result, { flag: 'w' });
     }
 }
@@ -3576,6 +3587,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
         (attr) => {
             const attrAssignments: ts.PropertyAssignment[] = [];
             const { name, type } = attr;
+            let name2 = name;
 
             if (ts.isTypeReferenceNode(type!)) {
                 const { typeName, typeArguments } = type;
@@ -3737,6 +3749,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                             );
                             if (manyToOneItem) {
                                 // 外键
+                                name2 = factory.createIdentifier(`${(<ts.Identifier>name).text}Id`);
                                 attrAssignments.push(
                                     factory.createPropertyAssignment(
                                         factory.createIdentifier("type"),
@@ -3871,7 +3884,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
 
             result.push(
                 factory.createPropertyAssignment(
-                    name,
+                    name2,
                     factory.createObjectLiteralExpression(attrAssignments, true)
                 )
             );
@@ -3895,7 +3908,22 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                     factory.createIdentifier("StorageSchema")
                 )])
             ),
-            factory.createStringLiteral("oak-domain/src/types/Storage"),
+            factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(1)}Storage`),
+            undefined
+        ),
+        factory.createImportDeclaration(
+            undefined,
+            undefined,
+            factory.createImportClause(
+                false,
+                undefined,
+                factory.createNamedImports([factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("EntityDict")
+                )])
+            ),
+            factory.createStringLiteral("./EntityDict"),
             undefined
         )
     ];
@@ -3917,7 +3945,22 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                         factory.createIdentifier("StorageDesc")
                     )])
                 ),
-                factory.createStringLiteral("oak-domain/src/types/Storage"),
+                factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Storage`),
+                undefined
+            ),
+            factory.createImportDeclaration(
+                undefined,
+                undefined,
+                factory.createImportClause(
+                    false,
+                    undefined,
+                    factory.createNamedImports([factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier("OpSchema")
+                    )])
+                ),
+                factory.createStringLiteral("./Schema"),
                 undefined
             )
         ];
@@ -3957,7 +4000,12 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                         undefined,
                         factory.createTypeReferenceNode(
                             factory.createIdentifier("StorageDesc"),
-                            undefined
+                            [
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier("OpSchema"),
+                                    undefined
+                                )
+                            ]
                         ),
                         factory.createObjectLiteralExpression(
                             propertyAssignments,
@@ -3973,7 +4021,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
             ts.ListFormat.SourceFileStatements,
             factory.createNodeArray(statements),
             sourceFile);
-        const filename = `${outputDir}/${entity}/Storage.ts`;
+        const filename = path.join(outputDir, entity, 'Storage.ts');
         writeFileSync(filename, result, { flag: 'w' });
 
         importStatements.push(
@@ -4012,7 +4060,9 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                     undefined,
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("StorageSchema"),
-                        undefined
+                        [
+                            factory.createTypeReferenceNode('EntityDict')
+                        ]
                     ),
                     factory.createObjectLiteralExpression(
                         entityAssignments,
@@ -4028,7 +4078,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
         ts.ListFormat.SourceFileStatements,
         factory.createNodeArray(importStatements),
         ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS));
-    const filename = `${outputDir}Storage.ts`;
+    const filename = path.join(outputDir, 'Storage.ts');
     writeFileSync(filename, result, { flag: 'w' });
 }
 
@@ -4052,7 +4102,7 @@ function addReverseRelationship() {
 }
 
 function outputPackageJson(outputDir: string) {
-    const pj = {        
+    const pj = {
         "name": "oak-app-domain",
         "main": "index.ts"
     };
@@ -4064,7 +4114,7 @@ function outputPackageJson(outputDir: string) {
     writeFileSync(filename, indexTs, { flag: 'w' });
 
 
-    filename = path.join(outputDir, 'package.json');    
+    filename = path.join(outputDir, 'package.json');
     writeFileSync(filename, JSON.stringify(pj), { flag: 'w' });
 
     // 执行npm link
@@ -4073,12 +4123,12 @@ function outputPackageJson(outputDir: string) {
             cwd: outputDir,
         });
     }
-    catch(err) {
+    catch (err) {
         console.error(err);
     }
 }
 
-export default function buildSchema(inputDir: string, outputDir: string = OUTPUT_PATH): void {
+export function analyzeEntities(inputDir: string) {
     const files = readdirSync(inputDir);
     const fullFilenames = files.map(
         ele => {
@@ -4094,11 +4144,16 @@ export default function buildSchema(inputDir: string, outputDir: string = OUTPUT
 
     files.forEach(
         (filename) => {
+            if (process.env.COMPILING_BASE_DOMAIN) {
+                EntitiesInOakDomain.push(filename.split('.')[0]);
+            }
             analyzeEntity(filename, inputDir, program);
         }
     );
-    addReverseRelationship();
+}
 
+export function buildSchema(outputDir: string): void {    
+    addReverseRelationship();
     const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
     resetOutputDir(outputDir);
     outputSchema(outputDir, printer);
@@ -4106,5 +4161,8 @@ export default function buildSchema(inputDir: string, outputDir: string = OUTPUT
     outputAction(outputDir, printer);
     outputEntityDict(outputDir, printer);
     outputStorage(outputDir, printer);
-    outputPackageJson(outputDir);
+    
+    if (!process.env.TARGET_IN_OAK_DOMAIN) {
+        outputPackageJson(outputDir);
+    }
 }

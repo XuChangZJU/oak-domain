@@ -8,28 +8,28 @@ import { addFilterSegment } from "./filter";
 import { judgeRelation } from "./relation";
 
 /**这个用来处理级联的select和update，对不同能力的 */
-export abstract class CascadeStore<E extends string, ED extends {
-    [K in E]: EntityDef<E, ED, K, SH>;
-}, SH extends EntityShape = EntityShape> extends RowStore<E, ED, SH> {
-    constructor(storageSchema: StorageSchema) {
+export abstract class CascadeStore<ED extends {
+    [E: string]: EntityDef;
+}> extends RowStore<ED> {
+    constructor(storageSchema: StorageSchema<ED>) {
         super(storageSchema);
     }
-    protected abstract selectAbjointRow<T extends E>(
+    protected abstract selectAbjointRow<T extends keyof ED>(
         entity: T,
         selection: Omit<ED[T]['Selection'], 'indexFrom' | 'count' | 'data' | 'sorter'>,
-        context: Context<E, ED, SH>,
-        params?: Object): Promise<SelectionResult<E, ED, T, SH>>;
+        context: Context<ED>,
+        params?: Object): Promise<SelectionResult<ED, T>['result']>;
 
-    protected abstract updateAbjointRow<T extends E>(
+    protected abstract updateAbjointRow<T extends keyof ED>(
         entity: T,
-        operation: DeduceCreateSingleOperation<E, ED, T, SH> | DeduceUpdateOperation<E, ED, T, SH> | DeduceRemoveOperation<E, ED, T, SH>,
-        context: Context<E, ED, SH>,
+        operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
+        context: Context<ED>,
         params?: Object): Promise<void>;
 
-    protected async cascadeSelect<T extends E>(
+    protected async cascadeSelect<T extends keyof ED>(
         entity: T,
         selection: ED[T]['Selection'],
-        context: Context<E, ED, SH>, params?: Object): Promise<SelectionResult<E, ED, T, SH>> {
+        context: Context<ED>, params?: Object): Promise<SelectionResult<ED, T>['result']> {
         const { data } = selection;
 
         const projection: ED[T]['Selection']['data'] = {};
@@ -87,23 +87,23 @@ export abstract class CascadeStore<E extends string, ED extends {
 
         for (const row of rows) {
             for (const attr in manyToOne) {
-                const [ row2 ] = await this.cascadeSelect(manyToOne[attr] as E, {
-                    data: data[attr] as any,
-                    filter: {
-                        id: (row as any)[`${attr}Id`],
-                    }
+                const row2 = await this.cascadeSelect(manyToOne[attr], {
+                    data: data[attr],                    
+                    filter: {                        
+                        id: row[`${attr}Id`] as string,
+                    } as any
                 }, context, params);
                 assign(row, {
                     [attr]: row2,
                 });
             }
             for (const attr in manyToOneOnEntity) {
-                if ((row as any).entity === attr) {
-                    const [ row2 ] = await this.cascadeSelect(attr as E, {
-                        data: data[attr] as any,
+                if (row.entity === attr) {
+                    const row2 = await this.cascadeSelect(attr, {
+                        data: data[attr],
                         filter: {
-                            id: (row as any)[`entityId`],
-                        }
+                            id: row[`entityId`],
+                        } as any
                     }, context, params);
                     assign(row, {
                         [attr]: row2,
@@ -112,8 +112,8 @@ export abstract class CascadeStore<E extends string, ED extends {
             }
             for (const attr in oneToMany) {
                 const { entity: entity2, foreignKey } = oneToMany[attr];
-                const filter2 = data[attr] as DeduceSelection<E, ED, E, SH>;
-                const rows2 = await this.cascadeSelect(entity2 as E, assign({}, filter2, {
+                const filter2 = data[attr];
+                const rows2 = await this.cascadeSelect(entity2, assign({}, filter2, {
                     filter: addFilterSegment({
                         [`${foreignKey}Id`]: row.id,
                     } as any, filter2.filter),
@@ -123,8 +123,8 @@ export abstract class CascadeStore<E extends string, ED extends {
                 });
             }
             for (const attr in oneToManyOnEntity) {
-                const filter2 = data[attr] as DeduceSelection<E, ED, E, SH>;
-                const rows2 = await this.cascadeSelect(oneToManyOnEntity[attr] as E, assign({}, filter2, {
+                const filter2 = data[attr];
+                const rows2 = await this.cascadeSelect(oneToManyOnEntity[attr], assign({}, filter2, {
                     filter: addFilterSegment({
                         entityId: row.id,
                         entity,
@@ -162,10 +162,10 @@ export abstract class CascadeStore<E extends string, ED extends {
      * @param context 
      * @param params 
      */
-    protected async cascadeUpdate<T extends E>(
+    protected async cascadeUpdate<T extends keyof ED>(
         entity: T,
-        operation: DeduceCreateOperation<E, ED, T, SH> | DeduceUpdateOperation<E, ED, T, SH> | DeduceRemoveOperation<E, ED, T, SH>,
-        context: Context<E, ED, SH>,
+        operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
+        context: Context<ED>,
         params?: Object): Promise<void> {
         const { action, data, filter } = operation;
         const opData = {};
@@ -180,7 +180,7 @@ export abstract class CascadeStore<E extends string, ED extends {
             return;
         }
 
-        const data2 = data as (DeduceCreateSingleOperation<E, ED, T, SH> | DeduceUpdateOperation<E, ED, T, SH> | DeduceRemoveOperation<E, ED, T, SH>)['data'];
+        const data2 = data as (DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>)['data'];
         for (const attr in data2) {
             const relation = judgeRelation(this.storageSchema, entity, attr);
             if (relation === 1) {
@@ -190,7 +190,7 @@ export abstract class CascadeStore<E extends string, ED extends {
             }
             else if (relation === 2) {
                 // 基于entity/entityId的many-to-one
-                const operationMto = data2[attr] as DeduceCreateSingleOperation<E, ED, E, SH> | DeduceUpdateOperation<E, ED, E, SH> | DeduceRemoveOperation<E, ED, E, SH>;
+                const operationMto = data2[attr];
                 const { action: actionMto, data: dataMto, filter: filterMto } = operationMto;
                 if (actionMto === 'create') {
                     assign(opData, {
@@ -204,7 +204,7 @@ export abstract class CascadeStore<E extends string, ED extends {
                     assign(operationMto, {
                         filter: addFilterSegment({
                             id: fkId,
-                        } as DeduceFilter<E, ED, E, SH>), filterMto,
+                        }), filterMto,
                     });
                     assign(opData, {
                         entity: attr,
@@ -225,15 +225,15 @@ export abstract class CascadeStore<E extends string, ED extends {
                                     } as any, filter),
                                 }
                             },
-                        } as DeduceFilter<E, ED, E, SH>, filterMto),
+                        }, filterMto),
                     });
                 }
 
-                await this.cascadeUpdate(attr as E, operationMto, context, params);
+                await this.cascadeUpdate(attr, operationMto, context, params);
             }
             else if (typeof relation === 'string') {
                 // 基于attr的外键的many-to-one
-                const operationMto = data2[attr] as DeduceCreateSingleOperation<E, ED, E, SH> | DeduceUpdateOperation<E, ED, E, SH> | DeduceRemoveOperation<E, ED, E, SH>;
+                const operationMto = data2[attr];
                 const { action: actionMto, data: dataMto, filter: filterMto } = operationMto;
                 if (actionMto === 'create') {
                     assign(opData, {
@@ -246,7 +246,7 @@ export abstract class CascadeStore<E extends string, ED extends {
                     assign(operationMto, {
                         filter: addFilterSegment(filterMto || {}, {
                             id: fkId,
-                        } as DeduceFilter<E, ED, E, SH>),
+                        }),
                     });
                 }
                 else {
@@ -262,14 +262,14 @@ export abstract class CascadeStore<E extends string, ED extends {
                                     filter,
                                 }
                             },
-                        } as unknown as DeduceFilter<E, ED, E, SH>),
+                        }),
                     });
                 }
 
-                await this.cascadeUpdate(relation as E, operationMto, context, params);
+                await this.cascadeUpdate(relation, operationMto, context, params);
             }
             else {
-                const operationOtm = data2[attr] as DeduceCreateOperation<E, ED, E, SH> | DeduceUpdateOperation<E, ED, E, SH> | DeduceRemoveOperation<E, ED, E, SH>;
+                const operationOtm = data2[attr];
                 const { action: actionOtm, data: dataOtm, filter: filterOtm } = operationOtm;
                 assert(relation instanceof Array);
                 const [entityOtm, foreignKey] = relation;
@@ -324,7 +324,7 @@ export abstract class CascadeStore<E extends string, ED extends {
                                         filter,
                                     }
                                 }
-                            } as DeduceFilter<E, ED, E, SH>, filterOtm),
+                            }, filterOtm),
                         });
                         if (action === 'remove' && actionOtm === 'update') {
                             assign(dataOtm, {
@@ -380,7 +380,7 @@ export abstract class CascadeStore<E extends string, ED extends {
                                         filter,
                                     }
                                 }
-                            } as unknown as DeduceFilter<E, ED, E, SH>, filterOtm),
+                            }, filterOtm),
                         });
                         if (action === 'remove' && actionOtm === 'update') {
                             assign(dataOtm, {
@@ -390,12 +390,12 @@ export abstract class CascadeStore<E extends string, ED extends {
                     }
                 }
 
-                await this.cascadeUpdate(entityOtm! as E, operationOtm, context, params);
+                await this.cascadeUpdate(entityOtm!, operationOtm, context, params);
             }
         }
 
-        const operation2: DeduceCreateSingleOperation<E, ED, T, SH> | DeduceUpdateOperation<E, ED, T, SH> | DeduceRemoveOperation<E, ED, T, SH> =
-            assign({}, operation as DeduceCreateSingleOperation<E, ED, T, SH> | DeduceUpdateOperation<E, ED, T, SH> | DeduceRemoveOperation<E, ED, T, SH>, {
+        const operation2: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']> =
+            assign({}, operation as DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, {
                 data: opData as ED[T]['OpSchema'],
             });
 

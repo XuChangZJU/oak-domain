@@ -41,7 +41,7 @@ const UserActionDef: ActionDef<UserAction, UserState> = {
 
 type Action = UserAction | IdAction;
 
-const indexes: Index[] = [
+const indexes: Index<Schema>[] = [
     {
         name: 'index_test2',
         attributes: [

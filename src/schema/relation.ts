@@ -1,5 +1,6 @@
 import assert from "assert";
 import { EXPRESSION_PREFIX } from "../types/Demand";
+import { EntityDef } from "../types/Entity";
 import { StorageSchema } from "../types/Storage";
 
 /**
@@ -10,7 +11,9 @@ import { StorageSchema } from "../types/Storage";
  * @param row 
  * @returns 
  */
-export function judgeRelation(schema: StorageSchema, entity: string, attr: string) {
+export function judgeRelation<ED extends {
+    [E: string]: EntityDef;
+}>(schema: StorageSchema<ED>, entity: keyof ED, attr: string) {
     const { [entity]: { attributes } } = schema;
 
     if (attr.startsWith(EXPRESSION_PREFIX) || attr.startsWith('#')) {

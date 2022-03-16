@@ -10,6 +10,8 @@ export type Image = string;
 export type File = string;
 export type Datetime = number | Date;
 export type Boolean = boolean;
+export type PrimaryKey = string;
+export type ForeignKey<E extends string> = string;
 
 export type DataTypes = number | string | Datetime | Geo | object;
 

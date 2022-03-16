@@ -1,15 +1,15 @@
-import { EntityDef, SelectionResult, EntityShape } from './Entity';
+import { EntityDef, OperationResult, SelectionResult } from './Entity';
 import { Context } from './Context';
 import { StorageSchema } from './Storage';
 import { OakErrorDefDict } from '../OakError';
-export declare abstract class RowStore<E extends string, ED extends {
-    [K in E]: EntityDef<E, ED, K, SH>;
-}, SH extends EntityShape = EntityShape> {
+export declare abstract class RowStore<ED extends {
+    [E: string]: EntityDef;
+}> {
     static $$LEVEL: string;
     static $$CODES: OakErrorDefDict;
-    protected storageSchema: StorageSchema;
-    abstract operate<T extends E>(entity: T, operation: ED[T]['Operation'], context: Context<E, ED, SH>, params?: Object): Promise<void>;
-    abstract select<T extends E>(entity: T, selection: ED[T]['Selection'], context: Context<E, ED, SH>, params?: Object): Promise<SelectionResult<E, ED, T, SH>>;
-    abstract count<T extends E>(entity: T, selection: Omit<ED[T]['Selection'], 'data' | 'sorter' | 'action'>, context: Context<E, ED, SH>, params?: Object): Promise<number>;
-    constructor(storageSchema: StorageSchema);
+    protected storageSchema: StorageSchema<ED>;
+    abstract operate<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Context<ED>, params?: Object): Promise<OperationResult<ED>>;
+    abstract select<T extends keyof ED>(entity: T, selection: ED[T]['Selection'], context: Context<ED>, params?: Object): Promise<SelectionResult<ED, T>>;
+    abstract count<T extends keyof ED>(entity: T, selection: Omit<ED[T]['Selection'], 'data' | 'sorter' | 'action'>, context: Context<ED>, params?: Object): Promise<number>;
+    constructor(storageSchema: StorageSchema<ED>);
 }

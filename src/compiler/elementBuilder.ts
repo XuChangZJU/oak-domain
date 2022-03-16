@@ -6,7 +6,6 @@ import * as ts from 'typescript';
 const { factory } = ts;
 import {
     ELEMENT_PATH_IN_OAK_DOMAIN,
-    OUTPUT_PATH,
 } from './env';
 
 /**
@@ -308,7 +307,7 @@ function makeElementFile(inputDir: string, filename: string, outputDir: string, 
     );
 }
 
-export default function buildElements(inputDir: string, outputDir: string = OUTPUT_PATH) {
+export default function buildElements(inputDir: string, outputDir: string) {
     const files = fs.readdirSync(inputDir);
 
     if (!process.env.IN_OAK_DOMAIN) {

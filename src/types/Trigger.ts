@@ -2,9 +2,9 @@ import { GenericAction } from "../actions/action";
 import { Context } from "./Context";
 import { EntityDef, EntityShape, OperationResult, SelectionResult } from "./Entity";
 
-export interface Trigger<E extends string, ED extends {
-    [K in E]: EntityDef<E, ED, K, SH>;
-}, T extends E, SH extends TriggerEntityShape = TriggerEntityShape> {
+export interface Trigger<ED extends {
+    [E: string]: EntityDef;
+}, T extends keyof ED> {
     name: string;
     action: ED[T]['Action'];
     attributes?: keyof ED[T]['OpSchema'] | Array<keyof ED[T]['OpSchema']>;
@@ -14,12 +14,12 @@ export interface Trigger<E extends string, ED extends {
     strict?: 'takeEasy' | 'makeSure';
     fn: (event: {
         operation: ED[T]['Operation'];
-        result?: OperationResult<E, ED, SH>;
-    }, context: Context<E, ED, SH>, params?: Object) => Promise<number>;
+        result?: OperationResult<ED>;
+    }, context: Context<ED>, params?: Object) => Promise<number>;
 };
 
-export type DataAttr = '$$triggerData$$';
-export type TimestampAttr = '$$triggerTimestamp$$';
+export type TriggerDataAttribute = '$$triggerData$$';
+export type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 
 export interface TriggerEntityShape extends EntityShape {
     $$triggerData$$?: {
@@ -29,25 +29,25 @@ export interface TriggerEntityShape extends EntityShape {
     $$triggerTimestamp$$?: number;
 };
 
-export abstract class Executor<E extends string, ED extends {
-    [K in E]: EntityDef<E, ED, K, SH>;
-}, SH extends TriggerEntityShape = TriggerEntityShape> {
-    static dataAttr: DataAttr = '$$triggerData$$';
-    static timestampAttr: TimestampAttr = '$$triggerTimestamp$$';
+export abstract class Executor<ED extends {
+    [E: string]: EntityDef;
+}> {
+    static dataAttr: TriggerDataAttribute = '$$triggerData$$';
+    static timestampAttr: TriggerTimestampAttribute = '$$triggerTimestamp$$';
 
-    abstract registerTrigger<T extends E>(trigger: Trigger<E, ED, T, SH>): void;
+    abstract registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T>): void;
 
-    abstract preOperation<T extends E>(
+    abstract preOperation<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'],
-        context: Context<E, ED, SH>
+        context: Context<ED>
     ): Promise<void>;
 
-    abstract postOperation<T extends E>(
+    abstract postOperation<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'],
-        context: Context<E, ED, SH>
+        context: Context<ED>
     ): Promise<void>;
     
-    abstract checkpoint(context: Context<E, ED, SH>, timestamp: number): Promise<number>;    // 将所有在timestamp之前存在不一致的数据进行恢复
+    abstract checkpoint(context: Context<ED>, timestamp: number): Promise<number>;    // 将所有在timestamp之前存在不一致的数据进行恢复
 }
