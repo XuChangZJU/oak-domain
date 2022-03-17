@@ -3311,17 +3311,68 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
         );
     }
 
-    statements.push(
-        factory.createTypeAliasDeclaration(
-            undefined,
-            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-            factory.createIdentifier("EntityDict"),
-            undefined,
-            factory.createTypeLiteralNode(
-                propertySignatures
+    if (/* process.env.TARGET_IN_OAK_DOMAIN */false) {
+        statements.push(
+            factory.createImportDeclaration(
+                undefined,
+                undefined,
+                factory.createImportClause(
+                    false,
+                    undefined,
+                    factory.createNamedImports([factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier("EntityDef")
+                    )])
+                ),
+                factory.createStringLiteral("../types/Entity"),
+                undefined
+            ),
+            factory.createTypeAliasDeclaration(
+                undefined,
+                [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                factory.createIdentifier("EntityDict"),
+                undefined,
+                factory.createIntersectionTypeNode([
+                    factory.createTypeLiteralNode(
+                        propertySignatures
+                    ),
+                    factory.createTypeLiteralNode([
+                        factory.createIndexSignature(
+                            undefined,
+                            undefined,
+                            [factory.createParameterDeclaration(
+                                undefined,
+                                undefined,
+                                undefined,
+                                factory.createIdentifier("E"),
+                                undefined,
+                                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                undefined
+                            )],
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("EntityDef"),
+                                undefined
+                            )
+                        )
+                    ])
+                ])
             )
-        )
-    );
+        );
+    }
+    else {
+        statements.push(
+            factory.createTypeAliasDeclaration(
+                undefined,
+                [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                factory.createIdentifier("EntityDict"),
+                undefined,
+                factory.createTypeLiteralNode(
+                    propertySignatures
+                )
+            )
+        );
+    }
 
     const resultFile = ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS);
     const result = printer.printNode(
@@ -4152,7 +4203,7 @@ export function analyzeEntities(inputDir: string) {
     );
 }
 
-export function buildSchema(outputDir: string): void {    
+export function buildSchema(outputDir: string): void {
     addReverseRelationship();
     const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
     resetOutputDir(outputDir);
@@ -4161,7 +4212,7 @@ export function buildSchema(outputDir: string): void {
     outputAction(outputDir, printer);
     outputEntityDict(outputDir, printer);
     outputStorage(outputDir, printer);
-    
+
     if (!process.env.TARGET_IN_OAK_DOMAIN) {
         outputPackageJson(outputDir);
     }

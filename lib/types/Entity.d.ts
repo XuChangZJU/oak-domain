@@ -42,6 +42,9 @@ export interface EntityDef {
     Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
     Operation: DeduceOperation<this['Schema']>;
 }
+export interface EntityDict {
+    [E: string]: EntityDef;
+}
 declare type DeduceProjection<SH extends EntityShape> = Partial<{
     '#id': NodeId;
 } & {
@@ -72,9 +75,7 @@ export declare type DeduceRemoveOperationData<SH extends EntityShape> = {
 };
 export declare type DeduceRemoveOperation<SH extends EntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>>;
 export declare type DeduceOperation<SH extends EntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
-export interface OperationResult<ED extends {
-    [K: string]: EntityDef;
-}> {
+export interface OperationResult<ED extends EntityDict> {
     operations?: {
         [T in keyof ED]?: Array<ED[keyof ED]['Operation']>;
     };
@@ -85,9 +86,7 @@ export interface OperationResult<ED extends {
         message: string;
     }>;
 }
-export declare type SelectionResult<ED extends {
-    [K: string]: EntityDef;
-}, T extends keyof ED> = {
+export declare type SelectionResult<ED extends EntityDict, T extends keyof ED> = {
     result: Array<Partial<ED[T]['Schema'] & {
         [A in ExpressionKey]?: any;
     }>>;

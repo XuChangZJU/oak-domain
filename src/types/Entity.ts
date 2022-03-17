@@ -53,6 +53,10 @@ export interface EntityDef {
     Operation: DeduceOperation<this['Schema']>;
 };
 
+export interface EntityDict {
+    [E: string]: EntityDef;
+};
+
 type DeduceProjection<SH extends EntityShape> = Partial<{
     '#id': NodeId;
 } & {
@@ -98,9 +102,7 @@ export type DeduceRemoveOperation<SH extends EntityShape> = Operation<'remove', 
 
 export type DeduceOperation<SH extends EntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
 
-export interface OperationResult<ED extends {
-    [K: string]: EntityDef;
-}> {
+export interface OperationResult<ED extends EntityDict> {
     operations?: {                                          // cud返回的结果，select返回create
         [T in keyof ED]?: Array<ED[keyof ED]['Operation']>;
     };      // create/update/remove返回的动作结果
@@ -112,9 +114,7 @@ export interface OperationResult<ED extends {
     }>;
 };
 
-export type SelectionResult<ED extends {
-    [K: string]: EntityDef;
-}, T extends keyof ED> = {
+export type SelectionResult<ED extends EntityDict, T extends keyof ED> = {
     result: Array<Partial<ED[T]['Schema'] & {
         [A in ExpressionKey]?: any;
     }>>;
