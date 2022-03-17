@@ -1,4 +1,4 @@
-import { EntityDef, EntityShape } from './Entity';
+import { EntityDict, EntityShape } from './Entity';
 import { DataType, DataTypeParams } from './schema/DataTypes';
 import { TriggerDataAttribute, TriggerTimestampAttribute } from './Trigger';
 export declare type Ref = 'ref';
@@ -45,10 +45,7 @@ export interface StorageDesc<SH extends EntityShape> {
     config?: EntityConfig;
     view?: true;
 }
-declare type EntityDomain = {
-    [K: string]: EntityDef;
-};
-export declare type StorageSchema<ED extends EntityDomain> = {
+export declare type StorageSchema<ED extends EntityDict> = {
     [K in keyof ED]: StorageDesc<ED[K]['OpSchema']>;
 };
 export {};

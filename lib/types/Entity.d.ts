@@ -75,10 +75,29 @@ export declare type DeduceRemoveOperationData<SH extends EntityShape> = {
 };
 export declare type DeduceRemoveOperation<SH extends EntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>>;
 export declare type DeduceOperation<SH extends EntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
+declare type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
+    a: 'c';
+    e: T;
+    d: ED[T]['OpSchema'];
+};
+declare type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
+    a: 'u';
+    e: T;
+    d: ED[T]['OpSchema'];
+    f?: DeduceFilter<ED[T]>;
+};
+declare type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
+    a: 'r';
+    e: T;
+    f?: DeduceFilter<ED[T]>;
+};
+declare type SelectOpResult<ED extends EntityDict, T extends keyof ED> = {
+    a: 's';
+    e: T;
+    d: Array<ED[T]['OpSchema']>;
+};
 export interface OperationResult<ED extends EntityDict> {
-    operations?: {
-        [T in keyof ED]?: Array<ED[keyof ED]['Operation']>;
-    };
+    operations: Array<CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED, keyof ED>>;
     ids?: string[];
     stats?: 'todo';
     errors?: Array<{

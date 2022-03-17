@@ -102,10 +102,33 @@ export type DeduceRemoveOperation<SH extends EntityShape> = Operation<'remove', 
 
 export type DeduceOperation<SH extends EntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
 
+type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
+    a: 'c';
+    e: T;
+    d: ED[T]['OpSchema'];
+};
+
+type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
+    a: 'u',
+    e: T;
+    d: ED[T]['OpSchema'];
+    f?: DeduceFilter<ED[T]>;
+};
+
+type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
+    a: 'r',
+    e: T;
+    f?: DeduceFilter<ED[T]>;
+};
+
+type SelectOpResult<ED extends EntityDict, T extends keyof ED> = {
+    a: 's',
+    e: T;
+    d: Array<ED[T]['OpSchema']>;
+}
+
 export interface OperationResult<ED extends EntityDict> {
-    operations?: {                                          // cud返回的结果，select返回create
-        [T in keyof ED]?: Array<ED[keyof ED]['Operation']>;
-    };      // create/update/remove返回的动作结果
+    operations: Array<CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED, keyof ED>>;      // create/update/remove返回的动作结果
     ids?: string[];
     stats?: 'todo';
     errors?: Array<{
