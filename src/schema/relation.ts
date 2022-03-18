@@ -1,7 +1,7 @@
 import assert from "assert";
 import { EXPRESSION_PREFIX } from "../types/Demand";
 import { EntityDef } from "../types/Entity";
-import { StorageSchema } from "../types/Storage";
+import { initinctiveAttributes, StorageSchema } from "../types/Storage";
 
 /**
  * 判断对象和属性之间的关系
@@ -23,9 +23,6 @@ export function judgeRelation<ED extends {
 
     if (attributes.hasOwnProperty(attr)) {
         // 原生属性
-        if (attributes[attr].type === 'ref') {
-            return attributes[attr].ref!;       // 直接外键关联
-        }
         return 1;
     }
 
@@ -39,11 +36,11 @@ export function judgeRelation<ED extends {
             // 基于反指对象的反向关联
             return [entity2];
         }
-        else if (attributes2.hasOwnProperty(foreignKey)
-            && attributes2[foreignKey].type === 'ref'
-            && attributes2[foreignKey].ref === entity) {
+        else if (attributes2.hasOwnProperty(`${foreignKey}Id`)
+            && attributes2[`${foreignKey}Id`].type === 'ref'
+            && attributes2[`${foreignKey}Id`].ref === entity) {
             // 基于外键的反向关联
-            return [entity2, foreignKey];
+            return [entity2, `${foreignKey}Id`];
         }
         else {
             // 这种情况应该不会跑到
@@ -56,8 +53,13 @@ export function judgeRelation<ED extends {
         // 反向指针的外键
         return 2;
     }
+    else if ((attributes.hasOwnProperty(`${attr}Id`))){
+        const { type, ref } = attributes[`${attr}Id`];
+        assert (type === 'ref');
+        return ref!;
+    }
     else {
-        // 派生属性
+        assert(initinctiveAttributes.includes(attr), `${attr}属性找不到`);
         return 1;
     }
 }

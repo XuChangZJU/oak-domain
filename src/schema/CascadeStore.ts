@@ -1,7 +1,7 @@
 import assert from "assert";
 import { assign } from "lodash";
 import { Context } from '../types/Context';
-import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection, DeduceUpdateOperation, EntityDef, EntityShape, SelectionResult } from "../types/Entity";
+import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection, DeduceUpdateOperation, EntityDef, EntityShape, OperateParams, SelectionResult } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 import { addFilterSegment } from "./filter";
@@ -24,7 +24,7 @@ export abstract class CascadeStore<ED extends {
         entity: T,
         operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Context<ED>,
-        params?: Object): Promise<void>;
+        params?: OperateParams): Promise<void>;
 
     protected async cascadeSelect<T extends keyof ED>(
         entity: T,
@@ -115,7 +115,7 @@ export abstract class CascadeStore<ED extends {
                 const filter2 = data[attr];
                 const rows2 = await this.cascadeSelect(entity2, assign({}, filter2, {
                     filter: addFilterSegment({
-                        [`${foreignKey}Id`]: row.id,
+                        [foreignKey]: row.id,
                     } as any, filter2.filter),
                 }), context, params);
                 assign(row, {
@@ -166,7 +166,7 @@ export abstract class CascadeStore<ED extends {
         entity: T,
         operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Context<ED>,
-        params?: Object): Promise<void> {
+        params?: OperateParams): Promise<void> {
         const { action, data, filter } = operation;
         const opData = {};
 
@@ -341,13 +341,13 @@ export abstract class CascadeStore<ED extends {
                         if (dataOtm instanceof Array) {
                             dataOtm.forEach(
                                 ele => assign(ele, {
-                                    [`${foreignKey}Id`]: id,
+                                    [foreignKey]: id,
                                 })
                             );
                         }
                         else {
                             assign(dataOtm, {
-                                [`${foreignKey}Id`]: id,
+                                [foreignKey]: id,
                             });
                         }
                     }
@@ -358,20 +358,20 @@ export abstract class CascadeStore<ED extends {
                         if (dataOtm instanceof Array) {
                             dataOtm.forEach(
                                 ele => assign(ele, {
-                                    [`${foreignKey}Id`]: id,
+                                    [foreignKey]: id,
                                 })
                             );
                         }
                         else {
                             assign(dataOtm, {
-                                [`${foreignKey}Id`]: id,
+                                [foreignKey]: id,
                             });
                         }
                     }
                     else {
                         assign(operationOtm, {
                             filter: addFilterSegment({
-                                [`${foreignKey}Id`]: {
+                                [foreignKey]: {
                                     $in: {
                                         entity,
                                         data: {
@@ -384,7 +384,7 @@ export abstract class CascadeStore<ED extends {
                         });
                         if (action === 'remove' && actionOtm === 'update') {
                             assign(dataOtm, {
-                                [`${foreignKey}Id`]: null,
+                                [foreignKey]: null,
                             });
                         }
                     }

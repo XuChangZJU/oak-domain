@@ -10,6 +10,9 @@ declare type SelectOption = {
     forUpdate?: true;
     usingIndex?: 'todo';
 };
+export declare type OperateParams = {
+    notCollect?: boolean;
+};
 export declare type FormUpdateData<SH extends EntityShape> = {
     [A in keyof SH]?: any;
 } & {
@@ -84,12 +87,12 @@ declare type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'u';
     e: T;
     d: ED[T]['OpSchema'];
-    f?: DeduceFilter<ED[T]>;
+    f?: DeduceFilter<ED[T]['Schema']>;
 };
 declare type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'r';
     e: T;
-    f?: DeduceFilter<ED[T]>;
+    f?: DeduceFilter<ED[T]['Schema']>;
 };
 declare type SelectOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 's';

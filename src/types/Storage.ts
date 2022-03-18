@@ -5,6 +5,7 @@ export type Ref = 'ref';
 
 type PrimaryKeyAttribute = 'id';
 type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$removeAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
+export const initinctiveAttributes = ['id', '$$createAt$$', '$$updateAt$$', '$$removeAt$$', '$$triggerData$$', '$$triggerTimestamp$$'];
 
 export interface Column<SH extends EntityShape> {
     name: keyof SH,

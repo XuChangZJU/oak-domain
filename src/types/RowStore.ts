@@ -1,4 +1,4 @@
-import { EntityDef, OperationResult, SelectionResult, EntityShape } from './Entity';
+import { EntityDef, OperationResult, SelectionResult, EntityShape, OperateParams } from './Entity';
 import { Context } from './Context';
 import { StorageSchema } from './Storage';
 import { OakErrorDefDict } from '../OakError';
@@ -18,7 +18,7 @@ export abstract class RowStore<ED extends {
         entity: T,
         operation: ED[T]['Operation'],
         context: Context<ED>,
-        params?: Object
+        params?: OperateParams
     ): Promise<OperationResult<ED>>;
 
     abstract select<T extends keyof ED> (

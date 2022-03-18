@@ -4,6 +4,7 @@ import { TriggerDataAttribute, TriggerTimestampAttribute } from './Trigger';
 export declare type Ref = 'ref';
 declare type PrimaryKeyAttribute = 'id';
 declare type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$removeAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
+export declare const initinctiveAttributes: string[];
 export interface Column<SH extends EntityShape> {
     name: keyof SH;
     size?: number;

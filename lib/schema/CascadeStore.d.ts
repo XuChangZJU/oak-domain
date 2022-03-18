@@ -1,5 +1,5 @@
 import { Context } from '../types/Context';
-import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDef, SelectionResult } from "../types/Entity";
+import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDef, OperateParams, SelectionResult } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 /**这个用来处理级联的select和update，对不同能力的 */
@@ -8,7 +8,7 @@ export declare abstract class CascadeStore<ED extends {
 }> extends RowStore<ED> {
     constructor(storageSchema: StorageSchema<ED>);
     protected abstract selectAbjointRow<T extends keyof ED>(entity: T, selection: Omit<ED[T]['Selection'], 'indexFrom' | 'count' | 'data' | 'sorter'>, context: Context<ED>, params?: Object): Promise<SelectionResult<ED, T>['result']>;
-    protected abstract updateAbjointRow<T extends keyof ED>(entity: T, operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, context: Context<ED>, params?: Object): Promise<void>;
+    protected abstract updateAbjointRow<T extends keyof ED>(entity: T, operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, context: Context<ED>, params?: OperateParams): Promise<void>;
     protected cascadeSelect<T extends keyof ED>(entity: T, selection: ED[T]['Selection'], context: Context<ED>, params?: Object): Promise<SelectionResult<ED, T>['result']>;
     /**
      * 级联更新
@@ -33,5 +33,5 @@ export declare abstract class CascadeStore<ED extends {
      * @param context
      * @param params
      */
-    protected cascadeUpdate<T extends keyof ED>(entity: T, operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, context: Context<ED>, params?: Object): Promise<void>;
+    protected cascadeUpdate<T extends keyof ED>(entity: T, operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, context: Context<ED>, params?: OperateParams): Promise<void>;
 }
