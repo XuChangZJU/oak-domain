@@ -94,7 +94,7 @@ export abstract class CascadeStore<ED extends {
                     } as any
                 }, context, params);
                 assign(row, {
-                    [attr]: row2,
+                    [attr]: row2[0],
                 });
             }
             for (const attr in manyToOneOnEntity) {
@@ -106,7 +106,7 @@ export abstract class CascadeStore<ED extends {
                         } as any
                     }, context, params);
                     assign(row, {
-                        [attr]: row2,
+                        [attr]: row2[0],
                     });
                 }
             }

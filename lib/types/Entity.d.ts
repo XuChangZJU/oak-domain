@@ -94,13 +94,16 @@ declare type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
     e: T;
     f?: DeduceFilter<ED[T]['Schema']>;
 };
-declare type SelectOpResult<ED extends EntityDict, T extends keyof ED> = {
+declare type SelectOpResult<ED extends EntityDict> = {
     a: 's';
-    e: T;
-    d: Array<ED[T]['OpSchema']>;
+    d: {
+        [T in keyof ED]?: {
+            [ID: string]: ED[T]['OpSchema'];
+        };
+    };
 };
 export interface OperationResult<ED extends EntityDict> {
-    operations: Array<CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED, keyof ED>>;
+    operations: Array<CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED>>;
     ids?: string[];
     stats?: 'todo';
     errors?: Array<{
