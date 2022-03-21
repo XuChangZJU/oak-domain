@@ -1,7 +1,7 @@
 import assert from "assert";
 import { EXPRESSION_PREFIX } from "../types/Demand";
-import { EntityDef } from "../types/Entity";
-import { initinctiveAttributes, StorageSchema } from "../types/Storage";
+import { EntityDef, initinctiveAttributes } from "../types/Entity";
+import { StorageSchema } from "../types/Storage";
 
 /**
  * 判断对象和属性之间的关系

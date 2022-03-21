@@ -1,6 +1,11 @@
 import { GenericAction } from '../actions/action';
 import { ExpressionKey, ExprOp, MakeFilter, NodeId } from './Demand';
 import { OneOf } from './Polyfill';
+export declare type TriggerDataAttribute = '$$triggerData$$';
+export declare type TriggerTimestampAttribute = '$$triggerTimestamp$$';
+declare type PrimaryKeyAttribute = 'id';
+export declare type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$removeAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
+export declare const initinctiveAttributes: string[];
 export declare type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
     indexFrom?: A extends 'create' ? undefined : number;
@@ -13,21 +18,9 @@ declare type SelectOption = {
 export declare type OperateParams = {
     notCollect?: boolean;
 };
-export declare type FormUpdateData<SH extends EntityShape> = {
-    [A in keyof SH]?: any;
-} & {
-    id?: undefined;
-    $$createAt$$?: undefined;
-    $$updateAt$$?: undefined;
-    $$removeAt$$?: undefined;
-};
-export declare type FormCreateData<SH extends EntityShape> = {
-    [A in keyof SH]?: any;
-} & {
+export declare type FormUpdateData<SH extends EntityShape> = Partial<Omit<SH, InstinctiveAttributes>>;
+export declare type FormCreateData<SH extends EntityShape> = Omit<SH, InstinctiveAttributes> & {
     id: string;
-    $$createAt$$?: undefined;
-    $$updateAt$$?: undefined;
-    $$removeAt$$?: undefined;
 };
 export declare type Operation<A extends GenericAction | string, DATA extends Object, FILTER extends Object | undefined = undefined, SORTER extends Object | undefined = undefined> = {
     action: A;
@@ -84,23 +77,23 @@ export declare type DeduceRemoveOperationData<SH extends EntityShape> = {
 };
 export declare type DeduceRemoveOperation<SH extends EntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>>;
 export declare type DeduceOperation<SH extends EntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
-declare type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
+export declare type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'c';
     e: T;
     d: ED[T]['OpSchema'];
 };
-declare type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
+export declare type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'u';
     e: T;
-    d: ED[T]['OpSchema'];
+    d: FormUpdateData<ED[T]['OpSchema']>;
     f?: DeduceFilter<ED[T]['Schema']>;
 };
-declare type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
+export declare type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'r';
     e: T;
     f?: DeduceFilter<ED[T]['Schema']>;
 };
-declare type SelectOpResult<ED extends EntityDict> = {
+export declare type SelectOpResult<ED extends EntityDict> = {
     a: 's';
     d: {
         [T in keyof ED]?: {

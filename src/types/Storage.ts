@@ -1,11 +1,8 @@
-import { EntityDict, EntityShape } from './Entity';
+import { EntityDict, EntityShape, InstinctiveAttributes } from './Entity';
 import { DataType, DataTypeParams } from './schema/DataTypes';
-import { TriggerDataAttribute, TriggerTimestampAttribute } from './Trigger';
+
 export type Ref = 'ref';
 
-type PrimaryKeyAttribute = 'id';
-type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$removeAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
-export const initinctiveAttributes = ['id', '$$createAt$$', '$$updateAt$$', '$$removeAt$$', '$$triggerData$$', '$$triggerTimestamp$$'];
 
 export interface Column<SH extends EntityShape> {
     name: keyof SH,

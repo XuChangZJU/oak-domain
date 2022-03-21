@@ -1,5 +1,5 @@
 import { Context } from "./Context";
-import { EntityDef, EntityShape } from "./Entity";
+import { EntityDef, EntityShape, TriggerDataAttribute, TriggerTimestampAttribute } from "./Entity";
 export interface Trigger<ED extends {
     [E: string]: EntityDef;
 }, T extends keyof ED> {
@@ -14,8 +14,6 @@ export interface Trigger<ED extends {
         operation: ED[T]['Operation'];
     }, context: Context<ED>, params?: Object) => Promise<number>;
 }
-export declare type TriggerDataAttribute = '$$triggerData$$';
-export declare type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 export interface TriggerEntityShape extends EntityShape {
     $$triggerData$$?: {
         name: string;

@@ -1,6 +1,6 @@
 import { GenericAction } from "../actions/action";
 import { Context } from "./Context";
-import { EntityDef, EntityShape, OperationResult, SelectionResult } from "./Entity";
+import { EntityDef, EntityShape, OperationResult, SelectionResult, TriggerDataAttribute, TriggerTimestampAttribute } from "./Entity";
 
 export interface Trigger<ED extends {
     [E: string]: EntityDef;
@@ -16,9 +16,6 @@ export interface Trigger<ED extends {
         operation: ED[T]['Operation'];
     }, context: Context<ED>, params?: Object) => Promise<number>;
 };
-
-export type TriggerDataAttribute = '$$triggerData$$';
-export type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 
 export interface TriggerEntityShape extends EntityShape {
     $$triggerData$$?: {

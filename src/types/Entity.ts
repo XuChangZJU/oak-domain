@@ -2,6 +2,13 @@ import { GenericAction } from '../actions/action';
 import { ExpressionKey, ExprOp, FulltextFilter, MakeFilter, NodeId, Q_BooleanValue, Q_NumberValue, Q_StringValue } from './Demand';
 import { OneOf } from './Polyfill';
 
+export type TriggerDataAttribute = '$$triggerData$$';
+export type TriggerTimestampAttribute = '$$triggerTimestamp$$';
+
+type PrimaryKeyAttribute = 'id';
+export type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$removeAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
+export const initinctiveAttributes = ['id', '$$createAt$$', '$$updateAt$$', '$$removeAt$$', '$$triggerData$$', '$$triggerTimestamp$$'];
+
 export type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
     indexFrom?: A extends 'create' ? undefined : number;
@@ -17,13 +24,9 @@ export type OperateParams = {
     notCollect?: boolean;
 };
 
-export type FormUpdateData<SH extends EntityShape> = {
-    [A in keyof SH]?: any;
-} & { id?: undefined, $$createAt$$?: undefined, $$updateAt$$?: undefined, $$removeAt$$?: undefined };
+export type FormUpdateData<SH extends EntityShape> = Partial<Omit<SH, InstinctiveAttributes>>;
 
-export type FormCreateData<SH extends EntityShape> = {
-    [A in keyof SH]?: any;
-} & { id: string, $$createAt$$?: undefined, $$updateAt$$?: undefined, $$removeAt$$?: undefined };
+export type FormCreateData<SH extends EntityShape> = Omit<SH, InstinctiveAttributes> & { id: string };
 
 export type Operation<A extends GenericAction | string,
     DATA extends Object,
@@ -106,27 +109,27 @@ export type DeduceRemoveOperation<SH extends EntityShape> = Operation<'remove', 
 
 export type DeduceOperation<SH extends EntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
 
-type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
+export type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'c';
     e: T;
     d: ED[T]['OpSchema'];
 };
 
-type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
+export type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'u',
     e: T;
-    d: ED[T]['OpSchema'];
+    d: FormUpdateData<ED[T]['OpSchema']>;
     f?: DeduceFilter<ED[T]['Schema']>;
 };
 
-type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
+export type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'r',
     e: T;
     f?: DeduceFilter<ED[T]['Schema']>;
 };
 
 // Select的级联可以去重，压缩返回的数据大小
-type SelectOpResult<ED extends EntityDict> = {
+export type SelectOpResult<ED extends EntityDict> = {
     a: 's',
     d: {
         [T in keyof ED]?: {
