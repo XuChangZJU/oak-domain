@@ -17,11 +17,17 @@ export declare type FormUpdateData<SH extends EntityShape> = {
     [A in keyof SH]?: any;
 } & {
     id?: undefined;
+    $$createAt$$?: undefined;
+    $$updateAt$$?: undefined;
+    $$removeAt$$?: undefined;
 };
 export declare type FormCreateData<SH extends EntityShape> = {
     [A in keyof SH]?: any;
 } & {
     id: string;
+    $$createAt$$?: undefined;
+    $$updateAt$$?: undefined;
+    $$removeAt$$?: undefined;
 };
 export declare type Operation<A extends GenericAction | string, DATA extends Object, FILTER extends Object | undefined = undefined, SORTER extends Object | undefined = undefined> = {
     action: A;
@@ -31,15 +37,15 @@ export declare type Operation<A extends GenericAction | string, DATA extends Obj
 } & Filter<A, FILTER>;
 export declare type Selection<DATA extends Object, FILTER extends Object | undefined = undefined, SORT extends Object | undefined = undefined> = Operation<'select', DATA, FILTER, SORT>;
 export interface EntityShape {
-    id?: string;
-    $$createAt$$?: number | Date;
-    $$updateAt$$?: number | Date;
+    id: string;
+    $$createAt$$: number | Date;
+    $$updateAt$$: number | Date;
     $$removeAt$$?: number | Date;
     [K: string]: any;
 }
 export interface EntityDef {
     Schema: EntityShape;
-    OpSchema: Partial<this['Schema']>;
+    OpSchema: EntityShape;
     Action: string;
     ParticularAction?: string;
     Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
@@ -102,23 +108,13 @@ declare type SelectOpResult<ED extends EntityDict> = {
         };
     };
 };
-export interface OperationResult<ED extends EntityDict> {
-    operations: Array<CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED>>;
+export declare type OpRecord<ED extends EntityDict> = CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED>;
+export interface OperationResult {
     ids?: string[];
-    stats?: 'todo';
-    errors?: Array<{
-        code?: number;
-        message: string;
-    }>;
 }
-export declare type SelectionResult<ED extends EntityDict, T extends keyof ED> = {
+export interface SelectionResult<ED extends EntityDict, T extends keyof ED> {
     result: Array<Partial<ED[T]['Schema'] & {
         [A in ExpressionKey]?: any;
     }>>;
-    stats?: 'todo';
-    errors?: Array<{
-        code?: number;
-        message: string;
-    }>;
-};
+}
 export {};

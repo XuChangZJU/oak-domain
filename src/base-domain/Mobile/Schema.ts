@@ -2,14 +2,14 @@ import { String, Int, Float, Double, Boolean, Text, Datetime, File, Image, Prima
 import { Q_DateValue, Q_BooleanValue, Q_NumberValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, FulltextFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf, ValueOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
-import { Operation as OakOperation } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, Operation as OakOperation } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
 import * as User from "../User/Schema";
 import * as Token from "../Token/Schema";
 export type OpSchema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     mobile: String<16>;
     userId: ForeignKey<"user">;
@@ -17,8 +17,8 @@ export type OpSchema = {
 export type OpAttr = keyof OpSchema;
 export type Schema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     mobile: String<16>;
     userId: ForeignKey<"user">;
@@ -78,7 +78,7 @@ export type Sorter = SortNode[];
 export type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-type CreateOperationData = Omit<OpSchema, "userId"> & ({
+type CreateOperationData = FormCreateData<Omit<OpSchema, "userId"> & ({
     user?: User.CreateSingleOperation | (User.UpdateOperation & {
         id: String<64>;
     });
@@ -88,11 +88,11 @@ type CreateOperationData = Omit<OpSchema, "userId"> & ({
     userId?: String<64>;
 }) & {
     token$entity?: Token.CreateOperation | Token.UpdateOperation;
-};
+}>;
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-type UpdateOperationData = Partial<Omit<OpSchema, "id" | "userId">> & ({
+type UpdateOperationData = FormUpdateData<Omit<OpSchema, "userId">> & ({
     user?: User.CreateSingleOperation | Omit<User.UpdateOperation, "id" | "ids" | "filter">;
     userId?: undefined;
 } | {

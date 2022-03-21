@@ -1,7 +1,5 @@
 import { RunningContext } from "./Context";
-import { EntityDef } from "./Entity";
-export interface Aspect<ED extends {
-    [E: string]: EntityDef;
-}> {
-    (params: any, context: RunningContext<ED>): any;
+import { EntityDict } from "./Entity";
+export interface Aspect<ED extends EntityDict> {
+    (params: any, context: RunningContext<ED>): Promise<any>;
 }

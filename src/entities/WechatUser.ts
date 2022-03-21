@@ -1,8 +1,9 @@
 import { String, Int, Datetime, Image, Boolean } from '../types/DataType';
 import { Schema as User } from './User';
 import { Schema as Application } from './Application';
+import { EntityShape } from '../types/Entity';
 
-export type Schema = {
+export interface Schema extends EntityShape {
     origin: 'mp' | 'public';
     openId?: String<32>;
     unionId?: String<32>;

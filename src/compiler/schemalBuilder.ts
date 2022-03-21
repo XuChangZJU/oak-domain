@@ -316,12 +316,13 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             }
         }
 
-        if (ts.isTypeAliasDeclaration(node)) {
+        if (ts.isInterfaceDeclaration(node)) {
             // schema 定义
             if (node.name.text === 'Schema') {
                 let hasEntityAttr = false;
                 let hasEntityIdAttr = false;
-                const { members } = <ts.TypeLiteralNode>(node.type);
+                const { members, heritageClauses } = node;
+                assert((<ts.Identifier>heritageClauses![0].types![0].expression).text === 'EntityShape');
                 members.forEach(
                     (attrNode) => {
                         const { type, name } = <ts.PropertySignature>attrNode;
@@ -403,7 +404,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                     });
                 }
             }
+        }
 
+        if (ts.isTypeAliasDeclaration(node)) {
             // action 定义
             if (node.name.text === 'Action') {
                 const modifiers = [factory.createModifier(ts.SyntaxKind.ExportKeyword)];
@@ -727,7 +730,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
         factory.createPropertySignature(
             undefined,
             factory.createIdentifier('$$createAt$$'),
-            factory.createToken(ts.SyntaxKind.QuestionToken),
+            undefined,
             factory.createTypeReferenceNode(
                 factory.createIdentifier('Datetime'),
             )
@@ -736,7 +739,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
         factory.createPropertySignature(
             undefined,
             factory.createIdentifier('$$updateAt$$'),
-            factory.createToken(ts.SyntaxKind.QuestionToken),
+            undefined,
             factory.createTypeReferenceNode(
                 factory.createIdentifier('Datetime'),
             )
@@ -2487,7 +2490,12 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             undefined,
             factory.createIdentifier("CreateOperationData"),
             undefined,
-            factory.createIntersectionTypeNode(adNodes)
+            factory.createTypeReferenceNode(
+                factory.createIdentifier("FormCreateData"),
+                [
+                    factory.createIntersectionTypeNode(adNodes)
+                ]
+            )
         )
     );
 
@@ -2549,25 +2557,26 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     // UpdateOperationData
     adNodes = [
         factory.createTypeReferenceNode(
-            factory.createIdentifier("Partial"),
-            [factory.createTypeReferenceNode(
-                factory.createIdentifier("Omit"),
-                [
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("OpSchema"),
-                        undefined
-                    ),
-                    manyToOneSet ? factory.createUnionTypeNode(
-                        [
-                            factory.createLiteralTypeNode(factory.createStringLiteral("id")),
-                        ].concat(
+            factory.createIdentifier("FormUpdateData"),
+            [
+                manyToOneSet ? factory.createTypeReferenceNode(
+                    factory.createIdentifier("Omit"),
+                    [
+                        factory.createTypeReferenceNode(
+                            factory.createIdentifier("OpSchema"),
+                            undefined
+                        ),
+                        factory.createUnionTypeNode(
                             manyToOneSet.map(ele => factory.createLiteralTypeNode(
                                 factory.createStringLiteral(`${ele[1]}Id`))
                             )
                         )
-                    ) : factory.createLiteralTypeNode(factory.createStringLiteral("id")),
-                ]
-            )]
+                    ]
+                ): factory.createTypeReferenceNode(
+                    factory.createIdentifier("OpSchema"),
+                    undefined
+                )
+            ]
         )
     ];
     if (manyToOneSet) {
@@ -3179,6 +3188,16 @@ const initialStatements = () => [
             false,
             undefined,
             factory.createNamedImports([
+                factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("FormCreateData")
+                ),
+                factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("FormUpdateData")
+                ),
                 factory.createImportSpecifier(
                     false,
                     factory.createIdentifier("Operation"),

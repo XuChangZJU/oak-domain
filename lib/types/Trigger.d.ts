@@ -1,5 +1,5 @@
 import { Context } from "./Context";
-import { EntityDef, EntityShape, OperationResult } from "./Entity";
+import { EntityDef, EntityShape } from "./Entity";
 export interface Trigger<ED extends {
     [E: string]: EntityDef;
 }, T extends keyof ED> {
@@ -12,7 +12,6 @@ export interface Trigger<ED extends {
     strict?: 'takeEasy' | 'makeSure';
     fn: (event: {
         operation: ED[T]['Operation'];
-        result?: OperationResult<ED>;
     }, context: Context<ED>, params?: Object) => Promise<number>;
 }
 export declare type TriggerDataAttribute = '$$triggerData$$';

@@ -2,7 +2,7 @@ import { String, Int, Float, Double, Boolean, Text, Datetime, File, Image, Prima
 import { Q_DateValue, Q_BooleanValue, Q_NumberValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, FulltextFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf, ValueOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
-import { Operation as OakOperation } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, Operation as OakOperation } from "../../types/Entity";
 import { UserState, IdState, ParticularAction, Action } from "./Action";
 import * as Mobile from "../Mobile/Schema";
 import * as UserSystem from "../UserSystem/Schema";
@@ -11,8 +11,8 @@ import * as WechatUser from "../WechatUser/Schema";
 import * as ExtraFile from "../ExtraFile/Schema";
 export type OpSchema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     name: String<16>;
     nickname?: String<64>;
@@ -29,8 +29,8 @@ export type OpSchema = {
 export type OpAttr = keyof OpSchema;
 export type Schema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     name: String<16>;
     nickname?: String<64>;
@@ -151,7 +151,7 @@ export type Sorter = SortNode[];
 export type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-type CreateOperationData = Omit<OpSchema, "refId"> & ({
+type CreateOperationData = FormCreateData<Omit<OpSchema, "refId"> & ({
     ref?: CreateSingleOperation | (UpdateOperation & {
         id: String<64>;
     });
@@ -167,11 +167,11 @@ type CreateOperationData = Omit<OpSchema, "refId"> & ({
     user$ref?: CreateOperation | UpdateOperation;
     wechatUser$user?: WechatUser.CreateOperation | WechatUser.UpdateOperation;
     extraFile$entity?: ExtraFile.CreateOperation | ExtraFile.UpdateOperation;
-};
+}>;
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-type UpdateOperationData = Partial<Omit<OpSchema, "id" | "refId">> & ({
+type UpdateOperationData = FormUpdateData<Omit<OpSchema, "refId">> & ({
     ref?: CreateSingleOperation | Omit<UpdateOperation, "id" | "ids" | "filter">;
     refId?: undefined;
 } | {

@@ -19,7 +19,7 @@ export abstract class RowStore<ED extends {
         operation: ED[T]['Operation'],
         context: Context<ED>,
         params?: OperateParams
-    ): Promise<OperationResult<ED>>;
+    ): Promise<OperationResult>;
 
     abstract select<T extends keyof ED> (
         entity: T,

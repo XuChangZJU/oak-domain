@@ -2,8 +2,9 @@ import { String, Int, Text, Image, Datetime } from '../types/DataType';
 import { ActionDef } from '../types/Action';
 import { Index } from '../types/Storage';
 import { Schema as ExtraFile } from './ExtraFile';
+import { EntityShape } from '../types/Entity';
 
-export type Schema = {
+export interface Schema extends EntityShape {
     name: String<16>;
     nickname?: String<64>;
     password?: Text;

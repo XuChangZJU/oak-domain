@@ -2,13 +2,13 @@ import { String, Boolean, Text, Datetime, PrimaryKey, ForeignKey } from "../../t
 import { Q_DateValue, Q_BooleanValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
-import { Operation as OakOperation } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, Operation as OakOperation } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
 import * as Area from "../Area/Schema";
 export declare type OpSchema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     detail: String<32>;
     areaId: ForeignKey<"area">;
@@ -20,8 +20,8 @@ export declare type OpSchema = {
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     detail: String<32>;
     areaId: ForeignKey<"area">;
@@ -98,7 +98,7 @@ export declare type Sorter = SortNode[];
 export declare type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export declare type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-declare type CreateOperationData = Omit<OpSchema, "areaId"> & ({
+declare type CreateOperationData = FormCreateData<Omit<OpSchema, "areaId"> & ({
     area?: Area.CreateSingleOperation | (Area.UpdateOperation & {
         id: String<64>;
     });
@@ -106,11 +106,11 @@ declare type CreateOperationData = Omit<OpSchema, "areaId"> & ({
 } | {
     area?: undefined;
     areaId?: String<64>;
-});
+})>;
 export declare type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export declare type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export declare type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-declare type UpdateOperationData = Partial<Omit<OpSchema, "id" | "areaId">> & ({
+declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "areaId">> & ({
     area?: Area.CreateSingleOperation | Omit<Area.UpdateOperation, "id" | "ids" | "filter">;
     areaId?: undefined;
 } | {

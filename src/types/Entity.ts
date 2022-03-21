@@ -19,11 +19,11 @@ export type OperateParams = {
 
 export type FormUpdateData<SH extends EntityShape> = {
     [A in keyof SH]?: any;
-} & { id?: undefined };
+} & { id?: undefined, $$createAt$$?: undefined, $$updateAt$$?: undefined, $$removeAt$$?: undefined };
 
 export type FormCreateData<SH extends EntityShape> = {
     [A in keyof SH]?: any;
-} & { id: string };
+} & { id: string, $$createAt$$?: undefined, $$updateAt$$?: undefined, $$removeAt$$?: undefined };
 
 export type Operation<A extends GenericAction | string,
     DATA extends Object,
@@ -40,9 +40,9 @@ export type Selection<DATA extends Object,
     SORT extends Object | undefined = undefined> = Operation<'select', DATA, FILTER, SORT>;
 
 export interface EntityShape {
-    id?: string;
-    $$createAt$$?: number | Date;
-    $$updateAt$$?: number | Date;
+    id: string;
+    $$createAt$$: number | Date;
+    $$updateAt$$: number | Date;
     $$removeAt$$?: number | Date;
     [K: string]: any;
 }
@@ -50,7 +50,7 @@ export interface EntityShape {
 export interface EntityDef {
     // Name: E;
     Schema: EntityShape;
-    OpSchema: Partial<this['Schema']>;
+    OpSchema: EntityShape;
     Action: string;
     ParticularAction?: string;
     Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
@@ -135,23 +135,14 @@ type SelectOpResult<ED extends EntityDict> = {
     };
 }
 
-export interface OperationResult<ED extends EntityDict> {
-    operations: Array<CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED>>;      // create/update/remove返回的动作结果
+export type OpRecord<ED extends EntityDict> = CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED>;      // create/update/remove返回的动作结果
+
+export interface OperationResult {
     ids?: string[];
-    stats?: 'todo';
-    errors?: Array<{
-        code?: number;
-        message: string;
-    }>;
 };
 
-export type SelectionResult<ED extends EntityDict, T extends keyof ED> = {
+export interface SelectionResult<ED extends EntityDict, T extends keyof ED> {
     result: Array<Partial<ED[T]['Schema'] & {
         [A in ExpressionKey]?: any;
     }>>;
-    stats?: 'todo';
-    errors?: Array<{
-        code?: number;
-        message: string;
-    }>;
 }

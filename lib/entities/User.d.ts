@@ -1,6 +1,7 @@
 import { String, Text, Image, Datetime } from '../types/DataType';
 import { Schema as ExtraFile } from './ExtraFile';
-export declare type Schema = {
+import { EntityShape } from '../types/Entity';
+export interface Schema extends EntityShape {
     name: String<16>;
     nickname?: String<64>;
     password?: Text;
@@ -11,4 +12,4 @@ export declare type Schema = {
     idNumber?: String<32>;
     ref?: Schema;
     files: Array<ExtraFile>;
-};
+}

@@ -1,5 +1,6 @@
 import { String, Text } from '../types/DataType';
-export declare type Schema = {
+import { EntityShape } from '../types/Entity';
+export interface Schema extends EntityShape {
     origin: 'qiniu';
     type: 'image' | 'pdf' | 'video' | 'audio' | 'file';
     bucket: String<16>;
@@ -10,4 +11,4 @@ export declare type Schema = {
     md5: Text;
     entity: String<32>;
     entityId: String<64>;
-};
+}

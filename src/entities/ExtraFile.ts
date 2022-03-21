@@ -1,6 +1,7 @@
 import { String, Int, Text, Image } from '../types/DataType';
+import { EntityShape } from '../types/Entity';
 
-export type Schema = {
+export interface Schema extends EntityShape {
     origin: 'qiniu';
     type: 'image' | 'pdf' | 'video' | 'audio' | 'file';
     bucket: String<16>;

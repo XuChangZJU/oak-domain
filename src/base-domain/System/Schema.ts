@@ -2,14 +2,14 @@ import { String, Int, Float, Double, Boolean, Text, Datetime, File, Image, Prima
 import { Q_DateValue, Q_BooleanValue, Q_NumberValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, FulltextFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf, ValueOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
-import { Operation as OakOperation } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, Operation as OakOperation } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
 import * as Application from "../Application/Schema";
 import * as UserSystem from "../UserSystem/Schema";
 export type OpSchema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     name: String<32>;
     description: Text;
@@ -18,8 +18,8 @@ export type OpSchema = {
 export type OpAttr = keyof OpSchema;
 export type Schema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     name: String<32>;
     description: Text;
@@ -77,14 +77,14 @@ export type Sorter = SortNode[];
 export type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-type CreateOperationData = OpSchema & {
+type CreateOperationData = FormCreateData<OpSchema & {
     application$system?: Application.CreateOperation | Application.UpdateOperation;
     userSystem$system?: UserSystem.CreateOperation | UserSystem.UpdateOperation;
-};
+}>;
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-type UpdateOperationData = Partial<Omit<OpSchema, "id">> & {
+type UpdateOperationData = FormUpdateData<OpSchema> & {
     applications$system?: Application.CreateOperation | Omit<Application.UpdateOperation, "id" | "ids" | "filter">;
     userSystems$system?: UserSystem.CreateOperation | Omit<UserSystem.UpdateOperation, "id" | "ids" | "filter">;
 };

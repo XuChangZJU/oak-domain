@@ -1,7 +1,8 @@
 import { String, Datetime, Boolean } from '../types/DataType';
 import { Schema as User } from './User';
 import { Schema as Application } from './Application';
-export declare type Schema = {
+import { EntityShape } from '../types/Entity';
+export interface Schema extends EntityShape {
     origin: 'mp' | 'public';
     openId?: String<32>;
     unionId?: String<32>;
@@ -12,4 +13,4 @@ export declare type Schema = {
     unsubscribedAt?: Datetime;
     user?: User;
     application: Application;
-};
+}

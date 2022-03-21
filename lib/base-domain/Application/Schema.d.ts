@@ -2,7 +2,7 @@ import { String, Text, Datetime, PrimaryKey, ForeignKey } from "../../types/Data
 import { Q_DateValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
-import { Operation as OakOperation } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, Operation as OakOperation } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
 import * as System from "../System/Schema";
 import * as Token from "../Token/Schema";
@@ -10,8 +10,8 @@ import * as WechatUser from "../WechatUser/Schema";
 import * as ExtraFile from "../ExtraFile/Schema";
 export declare type OpSchema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     name: String<32>;
     description: Text;
@@ -21,8 +21,8 @@ export declare type OpSchema = {
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     name: String<32>;
     description: Text;
@@ -98,7 +98,7 @@ export declare type Sorter = SortNode[];
 export declare type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export declare type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-declare type CreateOperationData = Omit<OpSchema, "systemId"> & ({
+declare type CreateOperationData = FormCreateData<Omit<OpSchema, "systemId"> & ({
     system?: System.CreateSingleOperation | (System.UpdateOperation & {
         id: String<64>;
     });
@@ -110,11 +110,11 @@ declare type CreateOperationData = Omit<OpSchema, "systemId"> & ({
     token$application?: Token.CreateOperation | Token.UpdateOperation;
     wechatUser$application?: WechatUser.CreateOperation | WechatUser.UpdateOperation;
     extraFile$entity?: ExtraFile.CreateOperation | ExtraFile.UpdateOperation;
-};
+}>;
 export declare type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export declare type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export declare type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-declare type UpdateOperationData = Partial<Omit<OpSchema, "id" | "systemId">> & ({
+declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "systemId">> & ({
     system?: System.CreateSingleOperation | Omit<System.UpdateOperation, "id" | "ids" | "filter">;
     systemId?: undefined;
 } | {

@@ -2,7 +2,7 @@ import { String, Int, Float, Double, Boolean, Text, Datetime, File, Image, Prima
 import { Q_DateValue, Q_BooleanValue, Q_NumberValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, FulltextFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf, ValueOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
-import { Operation as OakOperation } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, Operation as OakOperation } from "../../types/Entity";
 import { AbleState } from "../../actions/action";
 import { ParticularAction, Action } from "./Action";
 import * as Application from "../Application/Schema";
@@ -10,8 +10,8 @@ import * as User from "../User/Schema";
 import * as Mobile from "../Mobile/Schema";
 export type OpSchema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     applicationId: ForeignKey<"application">;
     entity: "mobile";
@@ -23,8 +23,8 @@ export type OpSchema = {
 export type OpAttr = keyof OpSchema;
 export type Schema = {
     id: PrimaryKey;
-    $$createAt$$?: Datetime;
-    $$updateAt$$?: Datetime;
+    $$createAt$$: Datetime;
+    $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     applicationId: ForeignKey<"application">;
     entity: "mobile";
@@ -122,7 +122,7 @@ export type Sorter = SortNode[];
 export type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-type CreateOperationData = Omit<OpSchema, "applicationId" | "userId" | "playerId" | "entityId"> & ({
+type CreateOperationData = FormCreateData<Omit<OpSchema, "applicationId" | "userId" | "playerId" | "entityId"> & ({
     entity: "mobile";
     entityId: String<64>;
     mobile?: undefined;
@@ -133,11 +133,11 @@ type CreateOperationData = Omit<OpSchema, "applicationId" | "userId" | "playerId
     mobile: Mobile.CreateSingleOperation | (Mobile.UpdateOperation & {
         id: String<64>;
     });
-}>));
+}>))>;
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-type UpdateOperationData = Partial<Omit<OpSchema, "id" | "applicationId" | "userId" | "playerId" | "entityId">> & ({
+type UpdateOperationData = FormUpdateData<Omit<OpSchema, "applicationId" | "userId" | "playerId" | "entityId">> & ({
     entity?: "mobile";
     entityId?: String<64>;
     mobile?: undefined;

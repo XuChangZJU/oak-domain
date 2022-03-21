@@ -14,7 +14,6 @@ export interface Trigger<ED extends {
     strict?: 'takeEasy' | 'makeSure';
     fn: (event: {
         operation: ED[T]['Operation'];
-        result?: OperationResult<ED>;
     }, context: Context<ED>, params?: Object) => Promise<number>;
 };
 

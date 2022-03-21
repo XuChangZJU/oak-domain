@@ -1,8 +1,9 @@
 import { String, Int, Datetime, Image, Boolean, Text } from '../types/DataType';
 import { Schema as System } from './System';
 import { Schema as ExtraFile } from './ExtraFile';
+import { EntityShape } from '../types/Entity';
 
-export type Schema = {
+export interface Schema extends EntityShape {
     name: String<32>;
     description: Text;
     type: 'web' | 'wechatPublic' | 'weChatMp';
