@@ -63,6 +63,7 @@ type AttrFilter = {
 export type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr>>;
 export type Projection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id: 1;
     $$createAt$$?: 1;
     $$updateAt$$?: 1;
@@ -81,6 +82,7 @@ export type Projection = {
 } & Partial<ExprOp<OpAttr>>;
 export type ExportProjection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id?: string;
     $$createAt$$?: string;
     $$updateAt$$?: string;
@@ -131,7 +133,7 @@ export type Sorter = SortNode[];
 export type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-type CreateOperationData = FormCreateData<Omit<OpSchema, "userId" | "applicationId"> & ({
+type CreateOperationData = FormCreateData<Omit<OpSchema, "userId" | "applicationId" | "user" | "application"> & ({
     user?: User.CreateSingleOperation | (User.UpdateOperation & {
         id: String<64>;
     });
@@ -147,11 +149,13 @@ type CreateOperationData = FormCreateData<Omit<OpSchema, "userId" | "application
 } | {
     application?: undefined;
     applicationId?: String<64>;
-})>;
+}) & {
+    [k: string]: any;
+}>;
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-type UpdateOperationData = FormUpdateData<Omit<OpSchema, "userId" | "applicationId">> & ({
+type UpdateOperationData = FormUpdateData<Omit<OpSchema, "userId" | "applicationId" | "user" | "application">> & ({
     user?: User.CreateSingleOperation | Omit<User.UpdateOperation, "id" | "ids" | "filter">;
     userId?: undefined;
 } | {
@@ -163,11 +167,15 @@ type UpdateOperationData = FormUpdateData<Omit<OpSchema, "userId" | "application
 } | {
     application?: undefined;
     applicationId?: String<64>;
-});
+}) & {
+    [k: string]: any;
+};
 export type UpdateOperation = OakOperation<"update", UpdateOperationData, Filter>;
 type RemoveOperationData = {} & {
     user?: Omit<User.UpdateOperation | User.RemoveOperation, "id" | "ids" | "filter">;
     application?: Omit<Application.UpdateOperation | Application.RemoveOperation, "id" | "ids" | "filter">;
+} & {
+    [k: string]: any;
 };
 export type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter>;
 export type Operation = CreateOperation | UpdateOperation | RemoveOperation | SelectOperation;

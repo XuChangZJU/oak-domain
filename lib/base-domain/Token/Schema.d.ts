@@ -14,7 +14,7 @@ export declare type OpSchema = {
     $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     applicationId: ForeignKey<"application">;
-    entity: "mobile";
+    entity: "mobile" | string;
     entityId: String<64>;
     userId?: ForeignKey<"user">;
     playerId?: ForeignKey<"user">;
@@ -27,7 +27,7 @@ export declare type Schema = {
     $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     applicationId: ForeignKey<"application">;
-    entity: "mobile";
+    entity: "mobile" | string;
     entityId: String<64>;
     userId?: ForeignKey<"user">;
     playerId?: ForeignKey<"user">;
@@ -39,7 +39,7 @@ export declare type Schema = {
 } & {
     [A in ExpressionKey]?: any;
 };
-declare type AttrFilter<E = Q_EnumValue<"mobile">> = {
+declare type AttrFilter<E> = {
     id: Q_StringValue | SubQuery.TokenIdSubQuery;
     $$createAt$$: Q_DateValue;
     $$updateAt$$: Q_DateValue;
@@ -53,9 +53,10 @@ declare type AttrFilter<E = Q_EnumValue<"mobile">> = {
     player: User.Filter;
     ableState: Q_EnumValue<AbleState>;
 };
-export declare type Filter<E = Q_EnumValue<"mobile">> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr>>;
+export declare type Filter<E = Q_EnumValue<"mobile" | string>> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr>>;
 export declare type Projection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id: 1;
     $$createAt$$?: 1;
     $$updateAt$$?: 1;
@@ -72,6 +73,7 @@ export declare type Projection = {
 } & Partial<ExprOp<OpAttr>>;
 export declare type ExportProjection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id?: string;
     $$createAt$$?: string;
     $$updateAt$$?: string;
@@ -113,6 +115,7 @@ export declare type SortAttr = OneOf<{
     player: User.SortAttr;
     ableState: 1;
     mobile: Mobile.SortAttr;
+    [k: string]: any;
 } & ExprOp<OpAttr>>;
 export declare type SortNode = {
     $attr: SortAttr;
@@ -122,10 +125,9 @@ export declare type Sorter = SortNode[];
 export declare type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export declare type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-declare type CreateOperationData = FormCreateData<Omit<OpSchema, "applicationId" | "userId" | "playerId" | "entityId"> & ({
-    entity: "mobile";
+declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "entityId"> & ({
+    entity: "mobile" | string;
     entityId: String<64>;
-    mobile?: undefined;
 } | ({
     entity?: undefined;
     entityId?: undefined;
@@ -133,12 +135,15 @@ declare type CreateOperationData = FormCreateData<Omit<OpSchema, "applicationId"
     mobile: Mobile.CreateSingleOperation | (Mobile.UpdateOperation & {
         id: String<64>;
     });
-}>))>;
+    [K: string]: any;
+}>)) & {
+    [k: string]: any;
+}>;
 export declare type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export declare type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export declare type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "applicationId" | "userId" | "playerId" | "entityId">> & ({
-    entity?: "mobile";
+declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity" | "entityId">> & ({
+    entity?: "mobile" | string;
     entityId?: String<64>;
     mobile?: undefined;
 } | ({
@@ -146,11 +151,17 @@ declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "applicationId"
     entityId?: undefined;
 } & OneOf<{
     mobile: Mobile.CreateSingleOperation | Omit<Mobile.UpdateOperation, "id" | "ids" | "filter">;
-}>));
+    [K: string]: any;
+}>)) & {
+    [k: string]: any;
+};
 export declare type UpdateOperation = OakOperation<ParticularAction | "update", UpdateOperationData, Filter>;
 declare type RemoveOperationData = {} & OneOf<{
     mobile?: Omit<Mobile.UpdateOperation | Mobile.RemoveOperation, "id" | "ids" | "filter">;
-}>;
+    [K: string]: any;
+}> & {
+    [k: string]: any;
+};
 export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter>;
 export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation | SelectOperation;
 export declare type ApplicationIdSubQuery = Selection<ApplicationIdProjection>;

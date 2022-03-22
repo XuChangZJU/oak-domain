@@ -48,6 +48,7 @@ declare type AttrFilter = {
 export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr>>;
 export declare type Projection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id: 1;
     $$createAt$$?: 1;
     $$updateAt$$?: 1;
@@ -62,6 +63,7 @@ export declare type Projection = {
 } & Partial<ExprOp<OpAttr>>;
 export declare type ExportProjection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id?: string;
     $$createAt$$?: string;
     $$updateAt$$?: string;
@@ -98,7 +100,7 @@ export declare type Sorter = SortNode[];
 export declare type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export declare type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-declare type CreateOperationData = FormCreateData<Omit<OpSchema, "systemId"> & ({
+declare type CreateOperationData = FormCreateData<Omit<OpSchema, "systemId" | "system"> & ({
     system?: System.CreateSingleOperation | (System.UpdateOperation & {
         id: String<64>;
     });
@@ -107,6 +109,7 @@ declare type CreateOperationData = FormCreateData<Omit<OpSchema, "systemId"> & (
     system?: undefined;
     systemId?: String<64>;
 }) & {
+    [k: string]: any;
     token$application?: Token.CreateOperation | Token.UpdateOperation;
     wechatUser$application?: WechatUser.CreateOperation | WechatUser.UpdateOperation;
     extraFile$entity?: ExtraFile.CreateOperation | ExtraFile.UpdateOperation;
@@ -114,13 +117,14 @@ declare type CreateOperationData = FormCreateData<Omit<OpSchema, "systemId"> & (
 export declare type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export declare type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export declare type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "systemId">> & ({
+declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "systemId" | "system">> & ({
     system?: System.CreateSingleOperation | Omit<System.UpdateOperation, "id" | "ids" | "filter">;
     systemId?: undefined;
 } | {
     system?: undefined;
     systemId?: String<64>;
 }) & {
+    [k: string]: any;
     tokens$application?: Token.CreateOperation | Omit<Token.UpdateOperation, "id" | "ids" | "filter">;
     wechatUsers$application?: WechatUser.CreateOperation | Omit<WechatUser.UpdateOperation, "id" | "ids" | "filter">;
     extraFiles$entity?: ExtraFile.CreateOperation | Omit<ExtraFile.UpdateOperation, "id" | "ids" | "filter">;
@@ -129,6 +133,7 @@ export declare type UpdateOperation = OakOperation<"update", UpdateOperationData
 declare type RemoveOperationData = {} & {
     system?: Omit<System.UpdateOperation | System.RemoveOperation, "id" | "ids" | "filter">;
 } & {
+    [k: string]: any;
     tokens$application?: Omit<Token.UpdateOperation | Token.RemoveOperation, "id" | "ids" | "filter">;
     wechatUsers$application?: Omit<WechatUser.UpdateOperation | WechatUser.RemoveOperation, "id" | "ids" | "filter">;
     extraFiles$entity?: Omit<ExtraFile.UpdateOperation | ExtraFile.RemoveOperation, "id" | "ids" | "filter">;

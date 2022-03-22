@@ -44,6 +44,7 @@ type AttrFilter = {
 export type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr>>;
 export type Projection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id: 1;
     $$createAt$$?: 1;
     $$updateAt$$?: 1;
@@ -57,6 +58,7 @@ export type Projection = {
 } & Partial<ExprOp<OpAttr>>;
 export type ExportProjection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id?: string;
     $$createAt$$?: string;
     $$updateAt$$?: string;
@@ -90,7 +92,7 @@ export type Sorter = SortNode[];
 export type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-type CreateOperationData = FormCreateData<Omit<OpSchema, "parentId"> & ({
+type CreateOperationData = FormCreateData<Omit<OpSchema, "parentId" | "parent"> & ({
     parent?: CreateSingleOperation | (UpdateOperation & {
         id: String<64>;
     });
@@ -99,19 +101,21 @@ type CreateOperationData = FormCreateData<Omit<OpSchema, "parentId"> & ({
     parent?: undefined;
     parentId?: String<64>;
 }) & {
+    [k: string]: any;
     address$area?: Address.CreateOperation | Address.UpdateOperation;
     area$parent?: CreateOperation | UpdateOperation;
 }>;
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-type UpdateOperationData = FormUpdateData<Omit<OpSchema, "parentId">> & ({
+type UpdateOperationData = FormUpdateData<Omit<OpSchema, "parentId" | "parent">> & ({
     parent?: CreateSingleOperation | Omit<UpdateOperation, "id" | "ids" | "filter">;
     parentId?: undefined;
 } | {
     parent?: undefined;
     parentId?: String<64>;
 }) & {
+    [k: string]: any;
     addresss$area?: Address.CreateOperation | Omit<Address.UpdateOperation, "id" | "ids" | "filter">;
     areas$parent?: CreateOperation | Omit<UpdateOperation, "id" | "ids" | "filter">;
 };
@@ -119,6 +123,7 @@ export type UpdateOperation = OakOperation<"update", UpdateOperationData, Filter
 type RemoveOperationData = {} & {
     parent?: Omit<UpdateOperation | RemoveOperation, "id" | "ids" | "filter">;
 } & {
+    [k: string]: any;
     addresss$area?: Omit<Address.UpdateOperation | Address.RemoveOperation, "id" | "ids" | "filter">;
     areas$parent?: Omit<UpdateOperation | RemoveOperation, "id" | "ids" | "filter">;
 };

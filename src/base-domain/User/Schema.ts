@@ -74,6 +74,7 @@ type AttrFilter = {
 export type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr> & FulltextFilter>;
 export type Projection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id: 1;
     $$createAt$$?: 1;
     $$updateAt$$?: 1;
@@ -99,6 +100,7 @@ export type Projection = {
 } & Partial<ExprOp<OpAttr>>;
 export type ExportProjection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id?: string;
     $$createAt$$?: string;
     $$updateAt$$?: string;
@@ -151,7 +153,7 @@ export type Sorter = SortNode[];
 export type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-type CreateOperationData = FormCreateData<Omit<OpSchema, "refId"> & ({
+type CreateOperationData = FormCreateData<Omit<OpSchema, "refId" | "ref"> & ({
     ref?: CreateSingleOperation | (UpdateOperation & {
         id: String<64>;
     });
@@ -160,6 +162,7 @@ type CreateOperationData = FormCreateData<Omit<OpSchema, "refId"> & ({
     ref?: undefined;
     refId?: String<64>;
 }) & {
+    [k: string]: any;
     mobile$user?: Mobile.CreateOperation | Mobile.UpdateOperation;
     userSystem$user?: UserSystem.CreateOperation | UserSystem.UpdateOperation;
     token$user?: Token.CreateOperation | Token.UpdateOperation;
@@ -171,13 +174,14 @@ type CreateOperationData = FormCreateData<Omit<OpSchema, "refId"> & ({
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-type UpdateOperationData = FormUpdateData<Omit<OpSchema, "refId">> & ({
+type UpdateOperationData = FormUpdateData<Omit<OpSchema, "refId" | "ref">> & ({
     ref?: CreateSingleOperation | Omit<UpdateOperation, "id" | "ids" | "filter">;
     refId?: undefined;
 } | {
     ref?: undefined;
     refId?: String<64>;
 }) & {
+    [k: string]: any;
     mobiles$user?: Mobile.CreateOperation | Omit<Mobile.UpdateOperation, "id" | "ids" | "filter">;
     userSystems$user?: UserSystem.CreateOperation | Omit<UserSystem.UpdateOperation, "id" | "ids" | "filter">;
     tokens$user?: Token.CreateOperation | Omit<Token.UpdateOperation, "id" | "ids" | "filter">;
@@ -190,6 +194,7 @@ export type UpdateOperation = OakOperation<ParticularAction | "update", UpdateOp
 type RemoveOperationData = {} & {
     ref?: Omit<UpdateOperation | RemoveOperation, "id" | "ids" | "filter">;
 } & {
+    [k: string]: any;
     mobiles$user?: Omit<Mobile.UpdateOperation | Mobile.RemoveOperation, "id" | "ids" | "filter">;
     userSystems$user?: Omit<UserSystem.UpdateOperation | UserSystem.RemoveOperation, "id" | "ids" | "filter">;
     tokens$user?: Omit<Token.UpdateOperation | Token.RemoveOperation, "id" | "ids" | "filter">;

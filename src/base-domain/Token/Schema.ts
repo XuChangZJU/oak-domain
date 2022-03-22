@@ -14,7 +14,7 @@ export type OpSchema = {
     $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     applicationId: ForeignKey<"application">;
-    entity: "mobile";
+    entity: "mobile" | string;
     entityId: String<64>;
     userId?: ForeignKey<"user">;
     playerId?: ForeignKey<"user">;
@@ -27,7 +27,7 @@ export type Schema = {
     $$updateAt$$: Datetime;
     $$removeAt$$?: Datetime;
     applicationId: ForeignKey<"application">;
-    entity: "mobile";
+    entity: "mobile" | string;
     entityId: String<64>;
     userId?: ForeignKey<"user">;
     playerId?: ForeignKey<"user">;
@@ -39,7 +39,7 @@ export type Schema = {
 } & {
     [A in ExpressionKey]?: any;
 };
-type AttrFilter<E = Q_EnumValue<"mobile">> = {
+type AttrFilter<E> = {
     id: Q_StringValue | SubQuery.TokenIdSubQuery;
     $$createAt$$: Q_DateValue;
     $$updateAt$$: Q_DateValue;
@@ -53,9 +53,10 @@ type AttrFilter<E = Q_EnumValue<"mobile">> = {
     player: User.Filter;
     ableState: Q_EnumValue<AbleState>;
 };
-export type Filter<E = Q_EnumValue<"mobile">> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr>>;
+export type Filter<E = Q_EnumValue<"mobile" | string>> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr>>;
 export type Projection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id: 1;
     $$createAt$$?: 1;
     $$updateAt$$?: 1;
@@ -72,6 +73,7 @@ export type Projection = {
 } & Partial<ExprOp<OpAttr>>;
 export type ExportProjection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id?: string;
     $$createAt$$?: string;
     $$updateAt$$?: string;
@@ -113,6 +115,7 @@ export type SortAttr = OneOf<{
     player: User.SortAttr;
     ableState: 1;
     mobile: Mobile.SortAttr;
+    [k: string]: any;
 } & ExprOp<OpAttr>>;
 export type SortNode = {
     $attr: SortAttr;
@@ -122,10 +125,9 @@ export type Sorter = SortNode[];
 export type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, Sorter>;
 export type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
-type CreateOperationData = FormCreateData<Omit<OpSchema, "applicationId" | "userId" | "playerId" | "entityId"> & ({
-    entity: "mobile";
+type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "entityId"> & ({
+    entity: "mobile" | string;
     entityId: String<64>;
-    mobile?: undefined;
 } | ({
     entity?: undefined;
     entityId?: undefined;
@@ -133,12 +135,15 @@ type CreateOperationData = FormCreateData<Omit<OpSchema, "applicationId" | "user
     mobile: Mobile.CreateSingleOperation | (Mobile.UpdateOperation & {
         id: String<64>;
     });
-}>))>;
+    [K: string]: any;
+}>)) & {
+    [k: string]: any;
+}>;
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-type UpdateOperationData = FormUpdateData<Omit<OpSchema, "applicationId" | "userId" | "playerId" | "entityId">> & ({
-    entity?: "mobile";
+type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity" | "entityId">> & ({
+    entity?: "mobile" | string;
     entityId?: String<64>;
     mobile?: undefined;
 } | ({
@@ -146,11 +151,17 @@ type UpdateOperationData = FormUpdateData<Omit<OpSchema, "applicationId" | "user
     entityId?: undefined;
 } & OneOf<{
     mobile: Mobile.CreateSingleOperation | Omit<Mobile.UpdateOperation, "id" | "ids" | "filter">;
-}>));
+    [K: string]: any;
+}>)) & {
+    [k: string]: any;
+};
 export type UpdateOperation = OakOperation<ParticularAction | "update", UpdateOperationData, Filter>;
 type RemoveOperationData = {} & OneOf<{
     mobile?: Omit<Mobile.UpdateOperation | Mobile.RemoveOperation, "id" | "ids" | "filter">;
-}>;
+    [K: string]: any;
+}> & {
+    [k: string]: any;
+};
 export type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter>;
 export type Operation = CreateOperation | UpdateOperation | RemoveOperation | SelectOperation;
 export type ApplicationIdSubQuery = Selection<ApplicationIdProjection>;

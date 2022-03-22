@@ -39,6 +39,7 @@ type AttrFilter = {
 export type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr>>;
 export type Projection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id: 1;
     $$createAt$$?: 1;
     $$updateAt$$?: 1;
@@ -50,6 +51,7 @@ export type Projection = {
 } & Partial<ExprOp<OpAttr>>;
 export type ExportProjection = {
     "#id"?: NodeId;
+    [k: string]: any;
     id?: string;
     $$createAt$$?: string;
     $$updateAt$$?: string;
@@ -78,6 +80,7 @@ export type SelectOperation<P = Projection> = OakOperation<"select", P, Filter, 
 export type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
 type CreateOperationData = FormCreateData<OpSchema & {
+    [k: string]: any;
     application$system?: Application.CreateOperation | Application.UpdateOperation;
     userSystem$system?: UserSystem.CreateOperation | UserSystem.UpdateOperation;
 }>;
@@ -85,11 +88,13 @@ export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
 type UpdateOperationData = FormUpdateData<OpSchema> & {
+    [k: string]: any;
     applications$system?: Application.CreateOperation | Omit<Application.UpdateOperation, "id" | "ids" | "filter">;
     userSystems$system?: UserSystem.CreateOperation | Omit<UserSystem.UpdateOperation, "id" | "ids" | "filter">;
 };
 export type UpdateOperation = OakOperation<"update", UpdateOperationData, Filter>;
 type RemoveOperationData = {} & {
+    [k: string]: any;
     applications$system?: Omit<Application.UpdateOperation | Application.RemoveOperation, "id" | "ids" | "filter">;
     userSystems$system?: Omit<UserSystem.UpdateOperation | UserSystem.RemoveOperation, "id" | "ids" | "filter">;
 };
