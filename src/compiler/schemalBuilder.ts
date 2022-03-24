@@ -4406,14 +4406,14 @@ function outputPackageJson(outputDir: string) {
     writeFileSync(filename, JSON.stringify(pj), { flag: 'w' });
 
     // 执行npm link
-    try {
+    /* try {
         execSync('npm link', {
             cwd: outputDir,
         });
     }
     catch (err) {
         console.error(err);
-    }
+    } */
 }
 
 export function analyzeEntities(inputDir: string) {
