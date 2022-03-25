@@ -1,10 +1,8 @@
 import assert from 'assert';
 import { assign, cloneDeep, intersection, keys } from "lodash";
-import { DeduceFilter, EntityDef, EntityShape } from "../types/Entity";
+import { DeduceFilter, EntityDict } from "../types/Entity";
 
-export function addFilterSegment<ED extends {
-    [E: string]: EntityDef;
-}, T extends keyof ED>(segment: DeduceFilter<ED[T]['Schema']>, filter2?: DeduceFilter<ED[T]['Schema']>) {
+export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(segment: DeduceFilter<ED[T]['Schema']>, filter2?: DeduceFilter<ED[T]['Schema']>) {
     const filter: DeduceFilter<ED[T]['Schema']> = filter2 ? cloneDeep(filter2) : {}; 
     assert(segment);
     if (intersection(keys(filter), keys(segment)).length > 0) {
@@ -22,4 +20,8 @@ export function addFilterSegment<ED extends {
     }
 
     return filter;
+}
+
+export function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<DeduceFilter<ED[T]['Schema']>>) {
+    return filters.reduce(addFilterSegment);
 }
