@@ -33,7 +33,7 @@ export interface EntityShape {
     id: string;
     $$createAt$$: number | Date;
     $$updateAt$$: number | Date;
-    $$removeAt$$?: number | Date;
+    $$removeAt$$?: number | Date | null;
     [K: string]: any;
 }
 export interface EntityDef {

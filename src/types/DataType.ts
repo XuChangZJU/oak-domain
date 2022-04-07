@@ -12,6 +12,7 @@ export type Datetime = number | Date;
 export type Boolean = boolean;
 export type PrimaryKey = string;
 export type ForeignKey<E extends string> = string;
+export { Geo } from './Geo';
 
 export type DataTypes = number | string | Datetime | Geo | object;
 

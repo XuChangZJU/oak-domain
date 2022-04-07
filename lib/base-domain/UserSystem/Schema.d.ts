@@ -10,7 +10,7 @@ export declare type OpSchema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     userId: ForeignKey<"user">;
     systemId: ForeignKey<"system">;
     relation: 'owner';
@@ -20,7 +20,7 @@ export declare type Schema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     userId: ForeignKey<"user">;
     systemId: ForeignKey<"system">;
     relation: 'owner';

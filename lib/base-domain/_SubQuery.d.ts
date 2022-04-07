@@ -3,6 +3,8 @@ import * as Application from "./Application/Schema";
 import * as Area from "./Area/Schema";
 import * as ExtraFile from "./ExtraFile/Schema";
 import * as Mobile from "./Mobile/Schema";
+import * as UserRole from "./UserRole/Schema";
+import * as Role from "./Role/Schema";
 import * as UserSystem from "./UserSystem/Schema";
 import * as System from "./System/Schema";
 import * as Token from "./Token/Schema";
@@ -41,6 +43,18 @@ export declare type MobileIdSubQuery = {
         entity: "mobile";
     }) | any;
 };
+export declare type UserRoleIdSubQuery = {
+    [K in "$in" | "$nin"]?: (UserRole.UserRoleIdSubQuery & {
+        entity: "userRole";
+    }) | any;
+};
+export declare type RoleIdSubQuery = {
+    [K in "$in" | "$nin"]?: (UserRole.RoleIdSubQuery & {
+        entity: "userRole";
+    }) | (Role.RoleIdSubQuery & {
+        entity: "role";
+    }) | any;
+};
 export declare type UserSystemIdSubQuery = {
     [K in "$in" | "$nin"]?: (UserSystem.UserSystemIdSubQuery & {
         entity: "userSystem";
@@ -63,6 +77,8 @@ export declare type TokenIdSubQuery = {
 export declare type UserIdSubQuery = {
     [K in "$in" | "$nin"]?: (Mobile.UserIdSubQuery & {
         entity: "mobile";
+    }) | (UserRole.UserIdSubQuery & {
+        entity: "userRole";
     }) | (UserSystem.UserIdSubQuery & {
         entity: "userSystem";
     }) | (Token.UserIdSubQuery & {

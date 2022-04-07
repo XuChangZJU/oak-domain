@@ -1,4 +1,4 @@
-import { String, Datetime, PrimaryKey, ForeignKey } from "../../types/DataType";
+import { String, Datetime, PrimaryKey, ForeignKey, Geo } from "../../types/DataType";
 import { Q_DateValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
@@ -9,23 +9,25 @@ export declare type OpSchema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     name: String<32>;
-    level: 'province' | 'city' | 'district' | 'street';
-    parentId: ForeignKey<"area">;
+    level: 'province' | 'city' | 'district' | 'street' | 'country';
+    parentId?: ForeignKey<"area"> | null;
     code: String<12>;
+    center: Geo;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     name: String<32>;
-    level: 'province' | 'city' | 'district' | 'street';
-    parentId: ForeignKey<"area">;
+    level: 'province' | 'city' | 'district' | 'street' | 'country';
+    parentId?: ForeignKey<"area"> | null;
     code: String<12>;
-    parent: Schema;
+    center: Geo;
+    parent?: Schema | null;
     address$area?: Array<Address.Schema>;
     area$parent?: Array<Schema>;
 } & {
@@ -36,7 +38,7 @@ declare type AttrFilter = {
     $$createAt$$: Q_DateValue;
     $$updateAt$$: Q_DateValue;
     name: Q_StringValue;
-    level: Q_EnumValue<'province' | 'city' | 'district' | 'street'>;
+    level: Q_EnumValue<'province' | 'city' | 'district' | 'street' | 'country'>;
     parentId: Q_StringValue | SubQuery.AreaIdSubQuery;
     parent: Filter;
     code: Q_StringValue;
@@ -53,6 +55,7 @@ export declare type Projection = {
     parentId?: 1;
     parent?: Projection;
     code?: 1;
+    center?: 1;
     address$area?: Address.Selection;
     area$parent?: Selection;
 } & Partial<ExprOp<OpAttr>>;
@@ -67,6 +70,7 @@ export declare type ExportProjection = {
     parentId?: string;
     parent?: ExportProjection;
     code?: string;
+    center?: string;
     address$area?: Address.Exportation;
     area$parent?: Exportation;
 } & Partial<ExprOp<OpAttr>>;
@@ -83,6 +87,7 @@ export declare type SortAttr = OneOf<{
     parentId: 1;
     parent: SortAttr;
     code: 1;
+    center: 1;
 } & ExprOp<OpAttr>>;
 export declare type SortNode = {
     $attr: SortAttr;

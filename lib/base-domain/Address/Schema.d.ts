@@ -9,7 +9,7 @@ export declare type OpSchema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     detail: String<32>;
     areaId: ForeignKey<"area">;
     phone: String<12>;
@@ -22,7 +22,7 @@ export declare type Schema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     detail: String<32>;
     areaId: ForeignKey<"area">;
     phone: String<12>;

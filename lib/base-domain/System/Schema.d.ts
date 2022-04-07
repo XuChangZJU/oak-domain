@@ -10,7 +10,7 @@ export declare type OpSchema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     name: String<32>;
     description: Text;
     config: Object;
@@ -20,7 +20,7 @@ export declare type Schema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     name: String<32>;
     description: Text;
     config: Object;

@@ -749,9 +749,12 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
             undefined,
             factory.createIdentifier('$$removeAt$$'),
             factory.createToken(ts.SyntaxKind.QuestionToken),
-            factory.createTypeReferenceNode(
-                factory.createIdentifier('Datetime'),
-            )
+            factory.createUnionTypeNode([
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier('Datetime'),
+                ),
+                factory.createLiteralTypeNode(factory.createNull())
+            ])
         )
     ];
     const members2: Array<ts.TypeElement> = [];
@@ -777,7 +780,12 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                             undefined,
                             name,
                             questionToken,
-                            factory.createTypeReferenceNode(
+                            questionToken ? factory.createUnionTypeNode([
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, text2, 'Schema')
+                                ),
+                                factory.createLiteralTypeNode(factory.createNull())
+                            ]) : factory.createTypeReferenceNode(
                                 createForeignRef(entity, text2, 'Schema')
                             )
                         )
@@ -788,7 +796,17 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                             undefined,
                             factory.createIdentifier(foreignKey),
                             questionToken,
-                            factory.createTypeReferenceNode(
+                            questionToken ? factory.createUnionTypeNode([
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier('ForeignKey'),
+                                    [
+                                        factory.createLiteralTypeNode(
+                                            factory.createStringLiteral(firstLetterLowerCase(text2))
+                                        )
+                                    ]
+                                ),
+                                factory.createLiteralTypeNode(factory.createNull())
+                            ]) : factory.createTypeReferenceNode(
                                 factory.createIdentifier('ForeignKey'),
                                 [
                                     factory.createLiteralTypeNode(
@@ -820,7 +838,12 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                                 undefined,
                                 name,
                                 questionToken,
-                                factory.createUnionTypeNode(
+                                questionToken ? factory.createUnionTypeNode([
+                                    factory.createUnionTypeNode(
+                                        entityUnionTypeNode
+                                    ),
+                                    factory.createLiteralTypeNode(factory.createNull())
+                                ]) : factory.createUnionTypeNode(
                                     entityUnionTypeNode
                                 )
                             )
@@ -832,7 +855,10 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                                 undefined,
                                 name,
                                 questionToken,
-                                type
+                                questionToken ? factory.createUnionTypeNode([
+                                    type,
+                                    factory.createLiteralTypeNode(factory.createNull())
+                                ]) : type
                             )
                         );
                     }
@@ -850,7 +876,10 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                     undefined,
                     name,
                     questionToken,
-                    type
+                    questionToken ? factory.createUnionTypeNode([
+                        type,
+                        factory.createLiteralTypeNode(factory.createNull())
+                    ]) : type
                 )
             );
         }
@@ -1127,6 +1156,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                         );
                         break;
                     }
+                    case 'Geo':
                     case 'Object': {
                         // object类型暂不支持查询
                         break;
@@ -1327,6 +1357,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                     case 'Datetime':
                     case 'Image':
                     case 'File':
+                    case 'Geo':
                     case 'Object': {
                         properties.push(
                             [name, false]
@@ -2871,7 +2902,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         }
     }
 
-    
+
     const propertySignatures2: ts.TypeElement[] = [];
     if (process.env.TARGET_IN_OAK_DOMAIN) {
         propertySignatures2.push(
@@ -2928,7 +2959,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             );
         }
     }
-    if (propertySignatures2.length > 0) {        
+    if (propertySignatures2.length > 0) {
         adNodes.push(
             factory.createTypeLiteralNode(
                 propertySignatures2
@@ -2979,7 +3010,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         factory.createTypeLiteralNode([])
     ];
     if (manyToOneSet) {
-        if (ReversePointerRelations[entity]) {            
+        if (ReversePointerRelations[entity]) {
             const manyToOnePropertySignatures: ts.TypeElement[] = ReversePointerRelations[entity].map(
                 (ele) => factory.createPropertySignature(
                     undefined,
@@ -3071,8 +3102,8 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         }
     }
 
-    
-    
+
+
     const propertySignatures3: ts.TypeElement[] = [];
     if (process.env.TARGET_IN_OAK_DOMAIN) {
         propertySignatures3.push(
@@ -3129,14 +3160,14 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             );
         }
     }
-    if (propertySignatures3.length > 0) {        
+    if (propertySignatures3.length > 0) {
         adNodes.push(
             factory.createTypeLiteralNode(
                 propertySignatures3
             )
         );
     }
-    
+
     statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
@@ -3264,6 +3295,11 @@ const initialStatements = () => [
                         undefined,
                         factory.createIdentifier('ForeignKey')
                     ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier('Geo')
+                    )
                 ]
             )
         ),
@@ -4016,6 +4052,16 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                 factory.createPropertyAssignment(
                                     factory.createIdentifier("type"),
                                     factory.createStringLiteral("datetime")
+                                ),
+                            );
+                            break;
+                        }
+                        case 'Geo': {
+                            // object类型暂不支持查询
+                            attrAssignments.push(
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("type"),
+                                    factory.createStringLiteral("geometry")
                                 ),
                             );
                             break;

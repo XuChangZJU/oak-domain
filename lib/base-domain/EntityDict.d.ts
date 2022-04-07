@@ -3,6 +3,8 @@ import { EntityDef as Application } from "./Application/Schema";
 import { EntityDef as Area } from "./Area/Schema";
 import { EntityDef as ExtraFile } from "./ExtraFile/Schema";
 import { EntityDef as Mobile } from "./Mobile/Schema";
+import { EntityDef as UserRole } from "./UserRole/Schema";
+import { EntityDef as Role } from "./Role/Schema";
 import { EntityDef as UserSystem } from "./UserSystem/Schema";
 import { EntityDef as System } from "./System/Schema";
 import { EntityDef as Token } from "./Token/Schema";
@@ -14,6 +16,8 @@ export declare type EntityDict = {
     area: Area;
     extraFile: ExtraFile;
     mobile: Mobile;
+    userRole: UserRole;
+    role: Role;
     userSystem: UserSystem;
     system: System;
     token: Token;

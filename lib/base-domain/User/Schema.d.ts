@@ -5,6 +5,7 @@ import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, Operation as OakOperation } from "../../types/Entity";
 import { UserState, IdState, ParticularAction, Action } from "./Action";
 import * as Mobile from "../Mobile/Schema";
+import * as UserRole from "../UserRole/Schema";
 import * as UserSystem from "../UserSystem/Schema";
 import * as Token from "../Token/Schema";
 import * as WechatUser from "../WechatUser/Schema";
@@ -13,38 +14,39 @@ export declare type OpSchema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     name: String<16>;
-    nickname?: String<64>;
-    password?: Text;
-    birth?: Datetime;
-    gender?: 'male' | 'female';
-    avatar?: Image;
-    idCardType?: 'ID-Card' | 'passport' | 'Mainland-passport';
-    idNumber?: String<32>;
-    refId?: ForeignKey<"user">;
-    userState?: UserState;
-    idState?: IdState;
+    nickname?: String<64> | null;
+    password?: Text | null;
+    birth?: Datetime | null;
+    gender?: ('male' | 'female') | null;
+    avatar?: Image | null;
+    idCardType?: ('ID-Card' | 'passport' | 'Mainland-passport') | null;
+    idNumber?: String<32> | null;
+    refId?: ForeignKey<"user"> | null;
+    userState?: UserState | null;
+    idState?: IdState | null;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     name: String<16>;
-    nickname?: String<64>;
-    password?: Text;
-    birth?: Datetime;
-    gender?: 'male' | 'female';
-    avatar?: Image;
-    idCardType?: 'ID-Card' | 'passport' | 'Mainland-passport';
-    idNumber?: String<32>;
-    refId?: ForeignKey<"user">;
-    userState?: UserState;
-    idState?: IdState;
-    ref?: Schema;
+    nickname?: String<64> | null;
+    password?: Text | null;
+    birth?: Datetime | null;
+    gender?: ('male' | 'female') | null;
+    avatar?: Image | null;
+    idCardType?: ('ID-Card' | 'passport' | 'Mainland-passport') | null;
+    idNumber?: String<32> | null;
+    refId?: ForeignKey<"user"> | null;
+    userState?: UserState | null;
+    idState?: IdState | null;
+    ref?: Schema | null;
     mobile$user?: Array<Mobile.Schema>;
+    userRole$user?: Array<UserRole.Schema>;
     userSystem$user?: Array<UserSystem.Schema>;
     token$user?: Array<Token.Schema>;
     token$player?: Array<Token.Schema>;
@@ -91,6 +93,7 @@ export declare type Projection = {
     userState?: 1;
     idState?: 1;
     mobile$user?: Mobile.Selection;
+    userRole$user?: UserRole.Selection;
     userSystem$user?: UserSystem.Selection;
     token$user?: Token.Selection;
     token$player?: Token.Selection;
@@ -117,6 +120,7 @@ export declare type ExportProjection = {
     userState?: string;
     idState?: string;
     mobile$user?: Mobile.Exportation;
+    userRole$user?: UserRole.Exportation;
     userSystem$user?: UserSystem.Exportation;
     token$user?: Token.Exportation;
     token$player?: Token.Exportation;
@@ -164,6 +168,7 @@ declare type CreateOperationData = FormCreateData<Omit<OpSchema, "refId" | "ref"
 }) & {
     [k: string]: any;
     mobile$user?: Mobile.CreateOperation | Mobile.UpdateOperation;
+    userRole$user?: UserRole.CreateOperation | UserRole.UpdateOperation;
     userSystem$user?: UserSystem.CreateOperation | UserSystem.UpdateOperation;
     token$user?: Token.CreateOperation | Token.UpdateOperation;
     token$player?: Token.CreateOperation | Token.UpdateOperation;
@@ -183,6 +188,7 @@ declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "refId" | "ref"
 }) & {
     [k: string]: any;
     mobiles$user?: Mobile.CreateOperation | Omit<Mobile.UpdateOperation, "id" | "ids" | "filter">;
+    userRoles$user?: UserRole.CreateOperation | Omit<UserRole.UpdateOperation, "id" | "ids" | "filter">;
     userSystems$user?: UserSystem.CreateOperation | Omit<UserSystem.UpdateOperation, "id" | "ids" | "filter">;
     tokens$user?: Token.CreateOperation | Omit<Token.UpdateOperation, "id" | "ids" | "filter">;
     tokens$player?: Token.CreateOperation | Omit<Token.UpdateOperation, "id" | "ids" | "filter">;
@@ -196,6 +202,7 @@ declare type RemoveOperationData = {} & {
 } & {
     [k: string]: any;
     mobiles$user?: Omit<Mobile.UpdateOperation | Mobile.RemoveOperation, "id" | "ids" | "filter">;
+    userRoles$user?: Omit<UserRole.UpdateOperation | UserRole.RemoveOperation, "id" | "ids" | "filter">;
     userSystems$user?: Omit<UserSystem.UpdateOperation | UserSystem.RemoveOperation, "id" | "ids" | "filter">;
     tokens$user?: Omit<Token.UpdateOperation | Token.RemoveOperation, "id" | "ids" | "filter">;
     tokens$player?: Omit<Token.UpdateOperation | Token.RemoveOperation, "id" | "ids" | "filter">;
@@ -207,7 +214,7 @@ export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData
 export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation | SelectOperation;
 export declare type UserIdSubQuery = Selection<UserIdProjection>;
 export declare type NativeAttr = OpAttr | `ref.${OpAttr}` | `ref.ref.${OpAttr}` | `ref.ref.ref.${OpAttr}`;
-export declare type FullAttr = NativeAttr | `mobiles$${number}.${Mobile.NativeAttr}` | `userSystems$${number}.${UserSystem.NativeAttr}` | `tokens$user$${number}.${Token.NativeAttr}` | `tokens$player$${number}.${Token.NativeAttr}` | `users$${number}.${NativeAttr}` | `wechatUsers$${number}.${WechatUser.NativeAttr}` | `extraFiles$${number}.${ExtraFile.NativeAttr}`;
+export declare type FullAttr = NativeAttr | `mobiles$${number}.${Mobile.NativeAttr}` | `userRoles$${number}.${UserRole.NativeAttr}` | `userSystems$${number}.${UserSystem.NativeAttr}` | `tokens$user$${number}.${Token.NativeAttr}` | `tokens$player$${number}.${Token.NativeAttr}` | `users$${number}.${NativeAttr}` | `wechatUsers$${number}.${WechatUser.NativeAttr}` | `extraFiles$${number}.${ExtraFile.NativeAttr}`;
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;

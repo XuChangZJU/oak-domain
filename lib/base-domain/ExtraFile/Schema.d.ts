@@ -10,7 +10,7 @@ export declare type OpSchema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     origin: 'qiniu';
     type: 'image' | 'pdf' | 'video' | 'audio' | 'file';
     bucket: String<16>;
@@ -27,7 +27,7 @@ export declare type Schema = {
     id: PrimaryKey;
     $$createAt$$: Datetime;
     $$updateAt$$: Datetime;
-    $$removeAt$$?: Datetime;
+    $$removeAt$$?: Datetime | null;
     origin: 'qiniu';
     type: 'image' | 'pdf' | 'video' | 'audio' | 'file';
     bucket: String<16>;
