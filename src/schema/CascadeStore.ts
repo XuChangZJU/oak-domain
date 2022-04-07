@@ -401,4 +401,8 @@ export abstract class CascadeStore<ED extends {
 
         await this.updateAbjointRow(entity, operation2, context, params);
     }
+    
+    judgeRelation(entity: keyof ED, attr: string) {
+        return judgeRelation(this.storageSchema, entity, attr);
+    }
 }

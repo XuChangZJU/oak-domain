@@ -34,4 +34,5 @@ export declare abstract class CascadeStore<ED extends {
      * @param params
      */
     protected cascadeUpdate<T extends keyof ED>(entity: T, operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, context: Context<ED>, params?: OperateParams): Promise<void>;
+    judgeRelation(entity: keyof ED, attr: string): string | string[] | 1 | 0 | 2;
 }
