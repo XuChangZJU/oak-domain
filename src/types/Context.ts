@@ -1,7 +1,5 @@
 import { EntityDict, OpRecord } from './Entity';
 import { RowStore } from './RowStore';
-import { Schema as Application } from '../base-domain/Application/Schema';
-import { Schema as Token } from '../base-domain/Token/Schema';
 
 
 export interface Context<ED extends EntityDict>{
@@ -13,7 +11,3 @@ export interface Context<ED extends EntityDict>{
     rollback():Promise<void>;
 };
 
-export interface RunningContext<ED extends EntityDict> extends Context<ED> {
-    getApplication: () => Application;
-    getToken: () => Token | undefined;
-};

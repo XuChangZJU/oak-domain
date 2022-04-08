@@ -2,8 +2,7 @@
     "name": "oak-domain",
     "version": "1.0.0",
     "scripts": {
-        "build": "tsc && ts-node scripts/removeBaseDomain.ts",
-        "prebuild": "ts-node scripts/buildBaseDomain.ts"        
+        "build": "tsc"    
     },
     "devDependencies": {
         "@babel/cli": "^7.12.13",

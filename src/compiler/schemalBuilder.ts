@@ -7,7 +7,7 @@ import { assign, cloneDeep, identity, intersection, keys, uniq, uniqBy } from 'l
 import * as ts from 'typescript';
 const { factory } = ts;
 import {
-    ENTITY_PATH_IN_OAK_DOMAIN,
+    ENTITY_PATH_IN_OAK_GENERAL_BUSINESS,
     ACTION_CONSTANT_IN_OAK_DOMAIN,
     TYPE_PATH_IN_OAK_DOMAIN,
     RESERVED_ENTITIES,
@@ -16,9 +16,6 @@ import {
     NUMERICAL_LITERL_DEFAULT_SCALE,
 } from './env';
 import { firstLetterLowerCase } from './utils';
-
-const EntitiesInOakDomain: string[] = [];
-
 
 const Schema: Record<string, {
     schemaAttrs: Array<ts.PropertySignature>;
@@ -45,7 +42,7 @@ const ActionImportStatements = () => [
                 factory.createIdentifier("ActionDef")
             )])
         ),
-        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Action`),
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}Action`),
         undefined
     ),
     factory.createImportDeclaration(
@@ -60,7 +57,7 @@ const ActionImportStatements = () => [
                 factory.createIdentifier("GenericAction")
             )])
         ),
-        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN(2)),
+        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
         undefined
     )
 ];
@@ -154,11 +151,9 @@ function addActionSource(moduleName: string, name: ts.Identifier, node: ts.Impor
     const { moduleSpecifier } = node;
 
     // 目前应该只会引用oak-domain/src/actions/action里的公共action
-    assert(ts.isStringLiteral(moduleSpecifier) &&
-        (moduleSpecifier.text === ACTION_CONSTANT_IN_OAK_DOMAIN(1)
-            || (EntitiesInOakDomain.includes(moduleName) && moduleSpecifier.text === '../actions/action')));
+    assert(ts.isStringLiteral(moduleSpecifier) && moduleSpecifier.text === ACTION_CONSTANT_IN_OAK_DOMAIN());
     assign(ast.importedFrom, {
-        [name.text]: ACTION_CONSTANT_IN_OAK_DOMAIN(2),
+        [name.text]: ACTION_CONSTANT_IN_OAK_DOMAIN(),
     });
 }
 
@@ -280,11 +275,11 @@ function getEntityImported(declaration: ts.ImportDeclaration, filename: string) 
     const { moduleSpecifier, importClause } = declaration;
     let entityImported: string | undefined;
     if (ts.isStringLiteral(moduleSpecifier)) {
-        if (moduleSpecifier.text.startsWith('./') && process.env.COMPILING_BASE_DOMAIN) {
+        if (moduleSpecifier.text.startsWith('./')) {
             entityImported = moduleSpecifier.text.slice(2);
         }
-        else if (moduleSpecifier.text.startsWith(ENTITY_PATH_IN_OAK_DOMAIN()) && !process.env.COMPILING_BASE_DOMAIN) {
-            entityImported = moduleSpecifier.text.slice(ENTITY_PATH_IN_OAK_DOMAIN().length);
+        else if (moduleSpecifier.text.startsWith(ENTITY_PATH_IN_OAK_GENERAL_BUSINESS())) {
+            entityImported = moduleSpecifier.text.slice(ENTITY_PATH_IN_OAK_GENERAL_BUSINESS().length);
         }
     }
 
@@ -827,7 +822,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                             )
                         );
 
-                        if (process.env.TARGET_IN_OAK_DOMAIN) {
+                        if (process.env.COMPLING_BASE_ENTITY_DICT) {
                             // 如果是建立 base-domain，还要容纳可能的其它对象引用
                             entityUnionTypeNode.push(
                                 factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
@@ -1242,7 +1237,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
             factory.createStringLiteral(firstLetterLowerCase(ele))
         )
     );
-    if (process.env.TARGET_IN_OAK_DOMAIN) {
+    if (process.env.COMPLING_BASE_ENTITY_DICT) {
         eumUnionTypeNode && eumUnionTypeNode.push(
             factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
         );
@@ -1495,7 +1490,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
             )
         )
     ];
-    if (process.env.TARGET_IN_OAK_DOMAIN) {
+    if (process.env.COMPLING_BASE_ENTITY_DICT) {
         MetaPropertySignaturs.push(
             factory.createIndexSignature(
                 undefined,
@@ -1873,7 +1868,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 );
             }
         );
-        if (process.env.TARGET_IN_OAK_DOMAIN) {
+        if (process.env.COMPLING_BASE_ENTITY_DICT) {
             members.push(
                 factory.createIndexSignature(
                     undefined,
@@ -2368,7 +2363,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     factory.createStringLiteral(`${firstLetterLowerCase(ele)}`)
                 )
             );
-            if (process.env.TARGET_IN_OAK_DOMAIN) {
+            if (process.env.COMPLING_BASE_ENTITY_DICT) {
                 entityUnionTypeNode.push(
                     factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
                 );
@@ -2401,7 +2396,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     ])
                 )
             );
-            if (process.env.TARGET_IN_OAK_DOMAIN) {
+            if (process.env.COMPLING_BASE_ENTITY_DICT) {
                 manyToOnePropertySignatures.push(
                     factory.createIndexSignature(
                         undefined,
@@ -2556,7 +2551,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
 
     // 一对多
     const propertySignatures: ts.TypeElement[] = [];
-    if (process.env.TARGET_IN_OAK_DOMAIN) {
+    if (process.env.COMPLING_BASE_ENTITY_DICT) {
         propertySignatures.push(
             factory.createIndexSignature(
                 undefined,
@@ -2611,7 +2606,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
-            undefined,
+            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("CreateOperationData"),
             undefined,
             factory.createTypeReferenceNode(
@@ -2718,7 +2713,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     factory.createStringLiteral(`${firstLetterLowerCase(ele)}`)
                 )
             );
-            if (process.env.TARGET_IN_OAK_DOMAIN) {
+            if (process.env.COMPLING_BASE_ENTITY_DICT) {
                 entityUnionTypeNode.push(
                     factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
                 );
@@ -2750,7 +2745,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     ])
                 )
             );
-            if (process.env.TARGET_IN_OAK_DOMAIN) {
+            if (process.env.COMPLING_BASE_ENTITY_DICT) {
                 manyToOnePropertySignatures.push(
                     factory.createIndexSignature(
                         undefined,
@@ -2904,7 +2899,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
 
 
     const propertySignatures2: ts.TypeElement[] = [];
-    if (process.env.TARGET_IN_OAK_DOMAIN) {
+    if (process.env.COMPLING_BASE_ENTITY_DICT) {
         propertySignatures2.push(
             factory.createIndexSignature(
                 undefined,
@@ -2969,7 +2964,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
-            undefined,
+            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("UpdateOperationData"),
             undefined,
             factory.createIntersectionTypeNode(adNodes)
@@ -3038,7 +3033,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     )
                 )
             );
-            if (process.env.TARGET_IN_OAK_DOMAIN) {
+            if (process.env.COMPLING_BASE_ENTITY_DICT) {
                 manyToOnePropertySignatures.push(
                     factory.createIndexSignature(
                         undefined,
@@ -3105,7 +3100,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
 
 
     const propertySignatures3: ts.TypeElement[] = [];
-    if (process.env.TARGET_IN_OAK_DOMAIN) {
+    if (process.env.COMPLING_BASE_ENTITY_DICT) {
         propertySignatures3.push(
             factory.createIndexSignature(
                 undefined,
@@ -3171,7 +3166,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
-            undefined,
+            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("RemoveOperationData"),
             undefined,
             factory.createIntersectionTypeNode(adNodes)
@@ -3303,7 +3298,7 @@ const initialStatements = () => [
                 ]
             )
         ),
-        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}DataType`)
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}DataType`)
     ),
 
     /* import {
@@ -3372,7 +3367,7 @@ const initialStatements = () => [
                 ]
             )
         ),
-        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Demand`)
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}Demand`)
     ),
     factory.createImportDeclaration(
         undefined,
@@ -3393,7 +3388,7 @@ const initialStatements = () => [
                 )
             ])
         ),
-        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Polyfill`)
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}Polyfill`)
     ),
     // import * as SubQuery from '../_SubQuery';
     factory.createImportDeclaration(
@@ -3431,14 +3426,14 @@ const initialStatements = () => [
                 )
             ])
         ),
-        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Entity`),
+        factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}Entity`),
         undefined
     )
 ];
 
 function outputSubQuery(outputDir: string, printer: ts.Printer) {
     const statements: ts.Statement[] = [];
-    if (process.env.TARGET_IN_OAK_DOMAIN) {
+    if (process.env.COMPLING_BASE_ENTITY_DICT) {
         statements.push(
             factory.createImportDeclaration(
                 undefined,
@@ -3452,7 +3447,7 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
                         factory.createIdentifier("Selection")
                     )])
                 ),
-                factory.createStringLiteral("../types/Entity"),
+                factory.createStringLiteral("oak-domain/lib/types/Entity"),
                 undefined
             )
         );
@@ -3505,7 +3500,7 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
             )
         );
 
-        if (process.env.TARGET_IN_OAK_DOMAIN) {
+        if (process.env.COMPLING_BASE_ENTITY_DICT) {
             // 如果是建立 base，这里要加上额外可能的对象信息
             inUnionTypeNode.push(
                 factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
@@ -3584,7 +3579,7 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
         );
     }
 
-    if (/* process.env.TARGET_IN_OAK_DOMAIN */false) {
+    if (/* process.env.COMPLING_BASE_ENTITY_DICT */false) {
         statements.push(
             factory.createImportDeclaration(
                 undefined,
@@ -3768,7 +3763,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                             factory.createIdentifier("GenericAction")
                         )])
                     ),
-                    factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN(2)),
+                    factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
                     undefined
                 )
             );
@@ -4242,7 +4237,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                     factory.createIdentifier("StorageSchema")
                 )])
             ),
-            factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(1)}Storage`),
+            factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}Storage`),
             undefined
         ),
         factory.createImportDeclaration(
@@ -4279,7 +4274,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                         factory.createIdentifier("StorageDesc")
                     )])
                 ),
-                factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(2)}Storage`),
+                factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}Storage`),
                 undefined
             ),
             factory.createImportDeclaration(
@@ -4478,9 +4473,6 @@ export function analyzeEntities(inputDir: string) {
 
     files.forEach(
         (filename) => {
-            if (process.env.COMPILING_BASE_DOMAIN) {
-                EntitiesInOakDomain.push(filename.split('.')[0]);
-            }
             analyzeEntity(filename, inputDir, program);
         }
     );
@@ -4496,7 +4488,7 @@ export function buildSchema(outputDir: string): void {
     outputEntityDict(outputDir, printer);
     outputStorage(outputDir, printer);
 
-    if (!process.env.TARGET_IN_OAK_DOMAIN) {
+    if (!process.env.COMPLING_BASE_ENTITY_DICT) {
         outputPackageJson(outputDir);
     }
 }
