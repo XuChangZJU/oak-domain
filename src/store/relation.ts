@@ -21,7 +21,7 @@ export function judgeRelation<ED extends {
         return 0;
     }
 
-    if (attributes.hasOwnProperty(attr)) {
+    if (attributes.hasOwnProperty(attr) || initinctiveAttributes.includes(attr)) {
         // 原生属性
         return 1;
     }
