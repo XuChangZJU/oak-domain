@@ -63,7 +63,7 @@
     /* Advanced Options */
     "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */
   },
-  "include": ["src/**/*" ],
+  "include": ["src/**/*", "../oak-general-business/src/utils/TriggerExecutor.ts", "../oak-general-business/src/types/Trigger.ts" ],
   "exclude": [
     "node_modules",
     "**/*.spec.ts",
