@@ -1,7 +1,8 @@
 import assert from "assert";
 import { assign } from "lodash";
 import { Context } from '../types/Context';
-import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection, DeduceUpdateOperation, EntityDef, EntityShape, OperateParams, SelectionResult } from "../types/Entity";
+import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection,
+     DeduceUpdateOperation, EntityDef, EntityShape, OperateParams, SelectionResult2 } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 import { addFilterSegment } from "./filter";
@@ -18,7 +19,7 @@ export abstract class CascadeStore<ED extends {
         entity: T,
         selection: Omit<ED[T]['Selection'], 'indexFrom' | 'count' | 'data' | 'sorter'>,
         context: Context<ED>,
-        params?: Object): Promise<SelectionResult<ED, T>['result']>;
+        params?: Object): Promise<Array<ED[T]['OpSchema']>>;
 
     protected abstract updateAbjointRow<T extends keyof ED>(
         entity: T,
@@ -29,7 +30,7 @@ export abstract class CascadeStore<ED extends {
     protected async cascadeSelect<T extends keyof ED>(
         entity: T,
         selection: ED[T]['Selection'],
-        context: Context<ED>, params?: Object): Promise<SelectionResult<ED, T>['result']> {
+        context: Context<ED>, params?: Object): Promise<Array<ED[T]['Schema']>> {
         const { data } = selection;
 
         const projection: ED[T]['Selection']['data'] = {};

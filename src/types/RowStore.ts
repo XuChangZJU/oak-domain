@@ -1,11 +1,9 @@
-import { EntityDef, OperationResult, SelectionResult, EntityShape, OperateParams } from './Entity';
+import { OperationResult, OperateParams, EntityDict, SelectionResult2 } from './Entity';
 import { Context } from './Context';
 import { StorageSchema } from './Storage';
 import { OakErrorDefDict } from '../OakError';
 
-export abstract class RowStore<ED extends {
-    [E: string]: EntityDef;
-}> {
+export abstract class RowStore<ED extends EntityDict> {
     static $$LEVEL = 'store';
     static $$CODES: OakErrorDefDict = {
         primaryKeyConfilict: [1, '主键重复'],
@@ -21,12 +19,12 @@ export abstract class RowStore<ED extends {
         params?: OperateParams
     ): Promise<OperationResult>;
 
-    abstract select<T extends keyof ED> (
+    abstract select<T extends keyof ED, S extends ED[T]['Selection']> (
         entity: T,
-        selection: ED[T]['Selection'],
+        selection: S,
         context: Context<ED>,
         params?: Object
-    ): Promise<SelectionResult<ED, T>>;
+    ): Promise<SelectionResult2<ED[T]['Schema'], S['data']>>;
 
     abstract count<T extends keyof ED> (
         entity: T,
