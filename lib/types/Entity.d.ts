@@ -54,7 +54,7 @@ declare type DeduceProjection<SH extends GeneralEntityShape> = Partial<{
 } & {
     [K in keyof SH]: 1 | any;
 } & ExprOp<keyof SH>>;
-declare type AttrFilter<SH extends GeneralEntityShape> = {
+export declare type AttrFilter<SH extends GeneralEntityShape> = {
     [K in keyof SH]: any;
 };
 export declare type DeduceFilter<SH extends GeneralEntityShape> = MakeFilter<AttrFilter<SH> & ExprOp<keyof SH>>;

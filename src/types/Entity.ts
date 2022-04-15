@@ -73,7 +73,7 @@ type DeduceProjection<SH extends GeneralEntityShape> = Partial<{
     [K in keyof SH]: 1 | any;
 } & ExprOp<keyof SH>>;
 
-type AttrFilter<SH extends GeneralEntityShape> = {
+export type AttrFilter<SH extends GeneralEntityShape> = {
     [K in keyof SH]: any;
 }
 

@@ -3,6 +3,10 @@ import { Context } from './Context';
 import { StorageSchema } from './Storage';
 import { OakErrorDefDict } from '../OakError';
 
+export type TxnOption = {
+    isolationLevel: 'repeatable read' | 'serializable';
+};
+
 export abstract class RowStore<ED extends EntityDict> {
     static $$LEVEL = 'store';
     static $$CODES: OakErrorDefDict = {
@@ -36,4 +40,10 @@ export abstract class RowStore<ED extends EntityDict> {
     constructor(storageSchema: StorageSchema<ED>) {
         this.storageSchema = storageSchema;
     }
+
+    abstract begin(option?: TxnOption): Promise<string>;
+
+    abstract commit(txnId: string): Promise<void>;
+
+    abstract rollback(txnId: string): Promise<void>;
 }
