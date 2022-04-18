@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { assign, pull } from "lodash";
+import { assign, pull, unset } from "lodash";
 import { addFilterSegment } from "../store/filter";
 import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict } from "../types/Entity";
 import { Logger } from "../types/Logger";
@@ -100,6 +100,7 @@ export class TriggerExecutor<ED extends EntityDict> extends Executor<ED> {
         const triggers = this.triggerMap[trigger.entity] && this.triggerMap[trigger.entity]![action];
         if (triggers) {
             pull(triggers!, trigger);
+            unset(this.triggerNameMap, trigger.name);
         }
     }
 
