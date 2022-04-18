@@ -19,7 +19,7 @@ export abstract class CascadeStore<ED extends {
         entity: T,
         selection: Omit<ED[T]['Selection'], 'indexFrom' | 'count' | 'data' | 'sorter'>,
         context: Context<ED>,
-        params?: Object): Promise<Array<ED[T]['OpSchema']>>;
+        params?: OperateParams): Promise<Array<ED[T]['OpSchema']>>;
 
     protected abstract updateAbjointRow<T extends keyof ED>(
         entity: T,
@@ -30,7 +30,7 @@ export abstract class CascadeStore<ED extends {
     protected async cascadeSelect<T extends keyof ED>(
         entity: T,
         selection: ED[T]['Selection'],
-        context: Context<ED>, params?: Object): Promise<Array<ED[T]['Schema']>> {
+        context: Context<ED>, params?: OperateParams): Promise<Array<ED[T]['Schema']>> {
         const { data } = selection;
 
         const projection: ED[T]['Selection']['data'] = {};

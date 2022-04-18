@@ -17,6 +17,7 @@ declare type SelectOption = {
 };
 export declare type OperateParams = {
     notCollect?: boolean;
+    obscure?: boolean;
 };
 export declare type FormUpdateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>>;
 export declare type FormCreateData<SH extends GeneralEntityShape> = Omit<SH, InstinctiveAttributes> & {

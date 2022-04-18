@@ -127,5 +127,5 @@ export declare function isCompareExpression<A>(expression: any): expression is C
 export declare function isMathExpression<A>(expression: any): expression is MathExpression<A>;
 export declare function isExpression<A>(expression: any): expression is Expression<A>;
 export declare function opMultipleParams(op: string): boolean;
-export declare function execOp(op: string, params: any): ExpressionConstant;
+export declare function execOp(op: string, params: any, obscure?: boolean): ExpressionConstant;
 export {};

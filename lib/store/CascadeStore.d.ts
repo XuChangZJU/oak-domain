@@ -7,9 +7,9 @@ export declare abstract class CascadeStore<ED extends {
     [E: string]: EntityDef;
 }> extends RowStore<ED> {
     constructor(storageSchema: StorageSchema<ED>);
-    protected abstract selectAbjointRow<T extends keyof ED>(entity: T, selection: Omit<ED[T]['Selection'], 'indexFrom' | 'count' | 'data' | 'sorter'>, context: Context<ED>, params?: Object): Promise<Array<ED[T]['OpSchema']>>;
+    protected abstract selectAbjointRow<T extends keyof ED>(entity: T, selection: Omit<ED[T]['Selection'], 'indexFrom' | 'count' | 'data' | 'sorter'>, context: Context<ED>, params?: OperateParams): Promise<Array<ED[T]['OpSchema']>>;
     protected abstract updateAbjointRow<T extends keyof ED>(entity: T, operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, context: Context<ED>, params?: OperateParams): Promise<void>;
-    protected cascadeSelect<T extends keyof ED>(entity: T, selection: ED[T]['Selection'], context: Context<ED>, params?: Object): Promise<Array<ED[T]['Schema']>>;
+    protected cascadeSelect<T extends keyof ED>(entity: T, selection: ED[T]['Selection'], context: Context<ED>, params?: OperateParams): Promise<Array<ED[T]['Schema']>>;
     /**
      * 级联更新
      * A --> B

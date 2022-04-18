@@ -22,6 +22,7 @@ type SelectOption = {
 
 export type OperateParams = {
     notCollect?: boolean;
+    obscure?: boolean;      // 如果为置为true，则在filter过程中因数据不完整而不能判断为真的时候都假设为真（前端缓存）
 };
 
 export type FormUpdateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>>;

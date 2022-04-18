@@ -214,7 +214,10 @@ export function opMultipleParams(op: string) {
         '$dayOfWeek', '$dayOfYear', '$not', '$true', '$false', '$abs', '$round', '$floor', '$ceil'].includes(op);
 }
 
-export function execOp(op: string, params: any): ExpressionConstant {
+export function execOp(op: string, params: any, obscure?: boolean): ExpressionConstant {
+    if (obscure && (params === undefined || params.includes(undefined))) {
+        return true;
+    }
     switch (op) {
         case '$gt': {
             return params[0] > params[1];
