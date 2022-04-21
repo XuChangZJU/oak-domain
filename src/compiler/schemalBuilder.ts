@@ -4488,7 +4488,7 @@ export function buildSchema(outputDir: string): void {
     outputEntityDict(outputDir, printer);
     outputStorage(outputDir, printer);
 
-    if (!process.env.COMPLING_BASE_ENTITY_DICT) {
+    //if (!process.env.COMPLING_BASE_ENTITY_DICT) {
         outputPackageJson(outputDir);
-    }
+    //}
 }
