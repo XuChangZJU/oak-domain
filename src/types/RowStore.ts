@@ -1,4 +1,4 @@
-import { OperationResult, OperateParams, EntityDict, SelectionResult2 } from './Entity';
+import { OperationResult, OperateParams, EntityDict, SelectionResult } from './Entity';
 import { Context } from './Context';
 import { StorageSchema } from './Storage';
 import { OakErrorDefDict } from '../OakError';
@@ -28,7 +28,7 @@ export abstract class RowStore<ED extends EntityDict> {
         selection: S,
         context: Context<ED>,
         params?: Object
-    ): Promise<SelectionResult2<ED[T]['Schema'], S['data']>>;
+    ): Promise<SelectionResult<ED[T]['Schema'], S['data']>>;
 
     abstract count<T extends keyof ED> (
         entity: T,

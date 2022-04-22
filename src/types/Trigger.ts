@@ -1,6 +1,6 @@
 import { GenericAction } from "../actions/action";
 import { DeduceCreateOperation, DeduceRemoveOperation, DeduceSelection, DeduceUpdateOperation, EntityDict } from "../types/Entity";
-import { EntityDef, EntityShape, OperationResult, SelectionResult2, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
+import { EntityDef, EntityShape, OperationResult, SelectionResult, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { Context } from "./Context";
 
 export interface CreateTriggerBase<ED extends EntityDict, T extends keyof ED> {
@@ -83,7 +83,7 @@ export interface SelectTriggerAfter<ED extends EntityDict, T extends keyof ED> e
     when: 'after',
     fn: <S extends ED[T]['Selection']>(event: { 
         operation: S;
-        result: SelectionResult2<ED[T]['Schema'], S['data']>;
+        result: SelectionResult<ED[T]['Schema'], S['data']>;
     }, context: Context<ED>, params?: Object) => Promise<number>;
 };
 

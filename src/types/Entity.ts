@@ -158,6 +158,6 @@ export type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProject
     [K in keyof P]: K extends ExpressionKey ? any : K extends keyof E ? P[K] extends 1 ? E[K]: E[K] extends Array<any> ? Array<SelectRowShape<E[K][0], P[K]['data']>> : SelectRowShape<E[K], P[K]> : any;
 }
 
-export type SelectionResult2<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
+export type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
     result: Array<SelectRowShape<E, P>>;
 }

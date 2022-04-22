@@ -2,7 +2,7 @@ import assert from "assert";
 import { assign } from "lodash";
 import { Context } from '../types/Context';
 import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection,
-     DeduceUpdateOperation, EntityDef, EntityShape, OperateParams, SelectionResult2 } from "../types/Entity";
+     DeduceUpdateOperation, EntityDef, EntityShape, OperateParams, SelectionResult } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 import { addFilterSegment } from "./filter";
