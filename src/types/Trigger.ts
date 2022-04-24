@@ -26,7 +26,7 @@ export type CreateTrigger<ED extends EntityDict, T extends keyof ED> = CreateTri
 export interface UpdateTriggerBase<ED extends EntityDict, T extends keyof ED> {
     entity: T;
     name: string;
-    action: Exclude<ED[T]['Action'], GenericAction> | 'update',
+    action: Exclude<ED[T]['Action'], GenericAction> | 'update' | Array<Exclude<ED[T]['Action'], GenericAction> | 'update'>,
     attributes?: keyof ED[T]['OpSchema'] | Array<keyof ED[T]['OpSchema']>;
     check?: (operation: DeduceUpdateOperation<ED[T]['Schema']>) => boolean;
     fn: (event: { operation: DeduceUpdateOperation<ED[T]['Schema']> }, context: Context<ED>, params?: Object) => Promise<number>;

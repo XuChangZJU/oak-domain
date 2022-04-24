@@ -3,6 +3,9 @@ import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Context } from '../types/Context';
 import { Trigger, Executor } from "../types/Trigger";
+/**
+ * update可能会传入多种不同的action，此时都需要检查update trigger
+ */
 export declare class TriggerExecutor<ED extends EntityDict> extends Executor<ED> {
     private triggerMap;
     private triggerNameMap;

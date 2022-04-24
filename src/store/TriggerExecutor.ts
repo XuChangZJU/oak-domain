@@ -10,14 +10,14 @@ import { Trigger, Executor, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerI
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
  */
-const UnifiedActionMatrix: Record<string, string> = {
+/* const UnifiedActionMatrix: Record<string, string> = {
     'create': 'create',
     'remove': 'remove',
     'select': 'select',
     'download': 'select',
     'count': 'select',
     'stat': 'select',
-};
+}; */
 
 export class TriggerExecutor<ED extends EntityDict> extends Executor<ED> {
     private triggerMap: {
@@ -46,7 +46,7 @@ export class TriggerExecutor<ED extends EntityDict> extends Executor<ED> {
             'create': '创建',
             'remove': '删除',
         };
-        let triggerAction = ActionNameMatrix[action] || '更新';
+        let triggerAction = (typeof action === 'string' && ActionNameMatrix[action]) || '更新';
         const triggerName = `${entity}${triggerAction}权限检查`;
 
         const trigger = {
@@ -68,23 +68,31 @@ export class TriggerExecutor<ED extends EntityDict> extends Executor<ED> {
             [trigger.name]: trigger,
         });
 
-        const action = UnifiedActionMatrix[trigger.action] || 'update';
-
-        const triggers = this.triggerMap[trigger.entity] && this.triggerMap[trigger.entity]![action];
-        if (triggers) {
-            triggers.push(trigger);
-        }
-        else if (this.triggerMap[trigger.entity]) {
-            assign(this.triggerMap[trigger.entity], {
-                [action]: [trigger],
-            });
+        const addTrigger = (action: string) => {
+            const triggers = this.triggerMap[trigger.entity] && this.triggerMap[trigger.entity]![action];
+            if (triggers) {
+                triggers.push(trigger);
+            }
+            else if (this.triggerMap[trigger.entity]) {
+                assign(this.triggerMap[trigger.entity], {
+                    [action]: [trigger],
+                });
+            }
+            else {
+                assign(this.triggerMap, {
+                    [trigger.entity]: {
+                        [action]: [trigger],
+                    }
+                });
+            }
+        };
+        if (typeof trigger.action === 'string') {
+            addTrigger(trigger.action);
         }
         else {
-            assign(this.triggerMap, {
-                [trigger.entity]: {
-                    [action]: [trigger],
-                }
-            });
+            trigger.action.forEach(
+                ele => addTrigger(ele)
+            )
         }
 
         if (trigger.when === 'commit' && trigger.strict === 'makeSure') {
@@ -95,12 +103,23 @@ export class TriggerExecutor<ED extends EntityDict> extends Executor<ED> {
     }
 
     unregisterTrigger<T extends keyof ED>(trigger: Trigger<ED, T>): void {
-        assert(trigger.when !== 'commit' || trigger.strict !== 'makeSure');        
-        const action = UnifiedActionMatrix[trigger.action] || 'update';
-        const triggers = this.triggerMap[trigger.entity] && this.triggerMap[trigger.entity]![action];
-        if (triggers) {
-            pull(triggers!, trigger);
-            unset(this.triggerNameMap, trigger.name);
+        assert(trigger.when !== 'commit' || trigger.strict !== 'makeSure', 'could not remove strict volatile triggers');
+
+        const removeTrigger = (action: string) => {
+            const triggers = this.triggerMap[trigger.entity] && this.triggerMap[trigger.entity]![action];
+            if (triggers) {
+                pull(triggers!, trigger);
+                unset(this.triggerNameMap, trigger.name);
+            }
+        };
+
+        if (typeof trigger.action === 'string') {
+            removeTrigger(trigger.action);
+        }
+        else {
+            trigger.action.forEach(
+                ele => removeTrigger(ele)
+            );
         }
     }
 
@@ -162,8 +181,10 @@ export class TriggerExecutor<ED extends EntityDict> extends Executor<ED> {
         operation: ED[T]['Operation'],
         context: Context<ED>
     ): Promise<void> {
-        const action = UnifiedActionMatrix[operation.action] || 'update';
-        const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action];
+        const { action } = operation;
+        const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action].filter(
+            trigger => typeof trigger.action === 'string' && trigger.action === operation.action || (trigger.action).includes(operation.action as any)
+        );
         if (triggers) {
             const preTriggers = triggers.filter(
                 ele => ele.when === 'before' && (!(ele as CreateTrigger<ED, T>).check || (ele as CreateTrigger<ED, T>).check!(operation as DeduceCreateOperation<ED[T]['Schema']>))
@@ -242,7 +263,7 @@ export class TriggerExecutor<ED extends EntityDict> extends Executor<ED> {
         operation: ED[T]['Operation'],
         context: Context<ED>
     ): Promise<void> {
-        const action = UnifiedActionMatrix[operation.action] || 'update';
+        const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action];
         if (triggers) {
             const postTriggers = triggers.filter(
