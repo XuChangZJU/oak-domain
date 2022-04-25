@@ -6,19 +6,20 @@ import { Trigger, Executor } from "../types/Trigger";
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
  */
-export declare class TriggerExecutor<ED extends EntityDict> extends Executor<ED> {
+export declare class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> extends Executor<ED, Cxt> {
     private triggerMap;
     private triggerNameMap;
     private volatileEntities;
     private logger;
-    constructor(logger?: Logger);
-    registerChecker<T extends keyof ED>(checker: Checker<ED, T>): void;
-    registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T>): void;
-    unregisterTrigger<T extends keyof ED>(trigger: Trigger<ED, T>): void;
+    private contextBuilder;
+    constructor(contextBuilder: () => Cxt, logger?: Logger);
+    registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void;
+    registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
+    unregisterTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
     private preCommitTrigger;
-    preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Context<ED>): Promise<void>;
+    preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt): Promise<void>;
     private onCommit;
     private postCommitTrigger;
-    postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Context<ED>): Promise<void>;
-    checkpoint(context: Context<ED>, timestamp: number): Promise<number>;
+    postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt): Promise<void>;
+    checkpoint(context: Cxt, timestamp: number): Promise<number>;
 }

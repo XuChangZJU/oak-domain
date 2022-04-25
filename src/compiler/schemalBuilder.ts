@@ -70,6 +70,13 @@ const ActionAsts: {
     };
 } = {};
 
+const SchemaAsts: {
+    [module: string]: {
+        statements: Array<ts.Statement>;
+        sourceFile: ts.SourceFile;
+    };
+} = {};
+
 function addRelationship(many: string, one: string, key: string) {
     const { [many]: manySet } = ManyToOne;
     const one2 = one === 'Schema' ? many : one;
@@ -105,7 +112,7 @@ function createForeignRef(entity: string, foreignKey: string, ref: string) {
 
 function pushStatementIntoActionAst(
     moduleName: string,
-    node: ts.TypeAliasDeclaration | ts.VariableStatement,
+    node: ts.Statement,
     sourceFile: ts.SourceFile) {
     if (ActionAsts[moduleName]) {
         ActionAsts[moduleName].statements.push(node);
@@ -116,6 +123,20 @@ function pushStatementIntoActionAst(
                 statements: [...ActionImportStatements(), node],
                 sourceFile,
                 importedFrom: {},
+            }
+        });
+    }
+}
+
+function pushStatementIntoSchemaAst(moduleName: string, statement: ts.Statement, sourceFile: ts.SourceFile) {
+    if (SchemaAsts[moduleName]) {
+        SchemaAsts[moduleName].statements.push(statement);
+    }
+    else {
+        assign(SchemaAsts, {
+            [moduleName]: {
+                statements: [statement],
+                sourceFile,
             }
         });
     }
@@ -303,6 +324,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     const schemaAttrs: ts.TypeElement[] = [];
     let hasFulltextIndex: boolean = false;
     let indexes: ts.ArrayLiteralExpression;
+    let beforeSchema = true;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
             const entityImported = getEntityImported(node, filename);
@@ -398,6 +420,11 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                         [moduleName]: 1,
                     });
                 }
+                beforeSchema = false;
+            }
+            else if (beforeSchema) {
+                // 本地规定的一些形状定义，直接使用
+                pushStatementIntoSchemaAst(moduleName, node, sourceFile!);                
             }
         }
 
@@ -439,8 +466,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 );
                 dealWithActions(moduleName, filename, node.type, program, schemaAttrs);
             }
-
-            if (node.name.text === 'Relation') {
+            else if (node.name.text === 'Relation') {
                 // 增加userXXX对象的描述
                 if (ts.isLiteralTypeNode(node.type)) {
                     assert(ts.isStringLiteral(node.type.literal));
@@ -491,6 +517,10 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 });
                 addRelationship(relationEntityName, 'User', 'user');
                 addRelationship(relationEntityName, moduleName, entityLc);
+            }
+            else if (beforeSchema) {
+                // 本地规定的一些形状定义，直接使用
+                pushStatementIntoSchemaAst(moduleName, node, sourceFile!);
             }
         }
 
@@ -958,6 +988,11 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
         }
     );
 
+    // 在这里把需要直接拷贝过来的语句写入
+    if (SchemaAsts[entity]) {
+        statements.push(...SchemaAsts[entity].statements);
+    }
+
     // if (keys(foreignKeySet).length > 0) {
     //     for (const fkItem in foreignKeySet) {
     //         const entityLc = fkItem.slice(0, 1).toLowerCase().concat(fkItem.slice(1));
@@ -1212,9 +1247,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                 }
             }
         }
-        else {
-            assert(ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) || ts.isLiteralTypeNode(type!));
-
+        else if (ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) || ts.isLiteralTypeNode(type!)) {
             members.push(
                 factory.createPropertySignature(
                     undefined,
@@ -1228,6 +1261,9 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                     )
                 )
             );
+        }
+        else {
+            // 此时应当是引用本地定义的shape
         }
     }
 
@@ -1398,7 +1434,8 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
             }
         }
         else {
-            assert(ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) || ts.isLiteralTypeNode(type!));
+            // 增加了本身object的shape定义
+            // assert(ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) || ts.isLiteralTypeNode(type!));
             properties.push(
                 [name, false, undefined]
             )
@@ -1840,8 +1877,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 }
             }
         }
-        else {
-            assert(ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) || ts.isLiteralTypeNode(type!));
+        else if (ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) || ts.isLiteralTypeNode(type!)) {
             members.push(
                 factory.createPropertySignature(
                     undefined,
@@ -1850,6 +1886,9 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                     factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
                 )
             );
+        }
+        else {
+            // 本地规定的shape，非结构化属性不参与排序
         }
     }
 
@@ -4118,94 +4157,114 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
             }
             else {
                 if (ts.isUnionTypeNode(type!)) {
-                    assert(ts.isLiteralTypeNode(type.types[0]));
-                    if (ts.isStringLiteral(type.types[0].literal)) {
-                        attrAssignments.push(
-                            factory.createPropertyAssignment(
-                                factory.createIdentifier("type"),
-                                factory.createStringLiteral("varchar")
-                            ),
-                            factory.createPropertyAssignment(
-                                factory.createIdentifier("params"),
-                                factory.createObjectLiteralExpression(
-                                    [factory.createPropertyAssignment(
-                                        factory.createIdentifier("length"),
-                                        factory.createNumericLiteral(STRING_LITERAL_MAX_LENGTH)
-                                    )],
-                                    true
+                    if (ts.isLiteralTypeNode(type.types[0])) {
+                        if (ts.isStringLiteral(type.types[0].literal)) {
+                            attrAssignments.push(
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("type"),
+                                    factory.createStringLiteral("varchar")
+                                ),
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("params"),
+                                    factory.createObjectLiteralExpression(
+                                        [factory.createPropertyAssignment(
+                                            factory.createIdentifier("length"),
+                                            factory.createNumericLiteral(STRING_LITERAL_MAX_LENGTH)
+                                        )],
+                                        true
+                                    )
                                 )
-                            )
-                        );
+                            );
+                        }
+                        else {
+                            assert(ts.isNumericLiteral(type.types[0].literal));
+                            attrAssignments.push(
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("type"),
+                                    factory.createStringLiteral("int")
+                                ),
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("params"),
+                                    factory.createObjectLiteralExpression(
+                                        [
+                                            factory.createPropertyAssignment(
+                                                factory.createIdentifier("precision"),
+                                                factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_PRECISION)
+                                            ),
+                                            factory.createPropertyAssignment(
+                                                factory.createIdentifier("scale"),
+                                                factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_SCALE)
+                                            )
+                                        ],
+                                        true
+                                    )
+                                )
+                            );
+                        }
                     }
                     else {
-                        assert(ts.isNumericLiteral(type.types[0].literal));
+                        // 否则是本地规定的shape，直接用object
                         attrAssignments.push(
                             factory.createPropertyAssignment(
                                 factory.createIdentifier("type"),
-                                factory.createStringLiteral("int")
+                                factory.createStringLiteral("object")
                             ),
-                            factory.createPropertyAssignment(
-                                factory.createIdentifier("params"),
-                                factory.createObjectLiteralExpression(
-                                    [
-                                        factory.createPropertyAssignment(
-                                            factory.createIdentifier("precision"),
-                                            factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_PRECISION)
-                                        ),
-                                        factory.createPropertyAssignment(
-                                            factory.createIdentifier("scale"),
-                                            factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_SCALE)
-                                        )
-                                    ],
-                                    true
-                                )
-                            )
                         );
                     }
                 }
                 else {
-                    assert(ts.isLiteralTypeNode(type!), `${entity}中的属性${(<ts.Identifier>name).text}有非法的属性类型定义`);
-                    if (ts.isStringLiteral(type.literal)) {
-                        attrAssignments.push(
-                            factory.createPropertyAssignment(
-                                factory.createIdentifier("type"),
-                                factory.createStringLiteral("varchar")
-                            ),
-                            factory.createPropertyAssignment(
-                                factory.createIdentifier("params"),
-                                factory.createObjectLiteralExpression(
-                                    [factory.createPropertyAssignment(
-                                        factory.createIdentifier("length"),
-                                        factory.createNumericLiteral(STRING_LITERAL_MAX_LENGTH)
-                                    )],
-                                    true
+                    if (ts.isLiteralTypeNode(type!)) {
+                        if (ts.isStringLiteral(type.literal)) {
+                            attrAssignments.push(
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("type"),
+                                    factory.createStringLiteral("varchar")
+                                ),
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("params"),
+                                    factory.createObjectLiteralExpression(
+                                        [factory.createPropertyAssignment(
+                                            factory.createIdentifier("length"),
+                                            factory.createNumericLiteral(STRING_LITERAL_MAX_LENGTH)
+                                        )],
+                                        true
+                                    )
                                 )
-                            )
-                        );
+                            );
+                        }
+                        else {
+                            assert(ts.isNumericLiteral(type.literal));
+                            attrAssignments.push(
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("type"),
+                                    factory.createStringLiteral("precision")
+                                ),
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("params"),
+                                    factory.createObjectLiteralExpression(
+                                        [
+                                            factory.createPropertyAssignment(
+                                                factory.createIdentifier("precision"),
+                                                factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_PRECISION)
+                                            ),
+                                            factory.createPropertyAssignment(
+                                                factory.createIdentifier("scale"),
+                                                factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_SCALE)
+                                            )
+                                        ],
+                                        true
+                                    )
+                                )
+                            );
+                        }
                     }
                     else {
-                        assert(ts.isNumericLiteral(type.literal));
+                        // 否则是本地规定的shape，直接用object
                         attrAssignments.push(
                             factory.createPropertyAssignment(
                                 factory.createIdentifier("type"),
-                                factory.createStringLiteral("precision")
+                                factory.createStringLiteral("object")
                             ),
-                            factory.createPropertyAssignment(
-                                factory.createIdentifier("params"),
-                                factory.createObjectLiteralExpression(
-                                    [
-                                        factory.createPropertyAssignment(
-                                            factory.createIdentifier("precision"),
-                                            factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_PRECISION)
-                                        ),
-                                        factory.createPropertyAssignment(
-                                            factory.createIdentifier("scale"),
-                                            factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_SCALE)
-                                        )
-                                    ],
-                                    true
-                                )
-                            )
                         );
                     }
                 }
@@ -4489,6 +4548,6 @@ export function buildSchema(outputDir: string): void {
     outputStorage(outputDir, printer);
 
     //if (!process.env.COMPLING_BASE_ENTITY_DICT) {
-        outputPackageJson(outputDir);
+    outputPackageJson(outputDir);
     //}
 }

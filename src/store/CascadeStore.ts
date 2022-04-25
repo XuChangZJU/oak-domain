@@ -2,35 +2,33 @@ import assert from "assert";
 import { assign } from "lodash";
 import { Context } from '../types/Context';
 import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection,
-     DeduceUpdateOperation, EntityDef, EntityShape, OperateParams, SelectionResult } from "../types/Entity";
+     DeduceUpdateOperation, EntityDict, EntityShape, OperateParams, SelectionResult } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 import { addFilterSegment } from "./filter";
 import { judgeRelation } from "./relation";
 
 /**这个用来处理级联的select和update，对不同能力的 */
-export abstract class CascadeStore<ED extends {
-    [E: string]: EntityDef;
-}> extends RowStore<ED> {
+export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
     constructor(storageSchema: StorageSchema<ED>) {
         super(storageSchema);
     }
     protected abstract selectAbjointRow<T extends keyof ED>(
         entity: T,
         selection: Omit<ED[T]['Selection'], 'indexFrom' | 'count' | 'data' | 'sorter'>,
-        context: Context<ED>,
+        context: Cxt,
         params?: OperateParams): Promise<Array<ED[T]['OpSchema']>>;
 
     protected abstract updateAbjointRow<T extends keyof ED>(
         entity: T,
         operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
-        context: Context<ED>,
+        context: Cxt,
         params?: OperateParams): Promise<void>;
 
     protected async cascadeSelect<T extends keyof ED>(
         entity: T,
         selection: ED[T]['Selection'],
-        context: Context<ED>, params?: OperateParams): Promise<Array<ED[T]['Schema']>> {
+        context: Cxt, params?: OperateParams): Promise<Array<ED[T]['Schema']>> {
         const { data } = selection;
 
         const projection: ED[T]['Selection']['data'] = {};
@@ -166,7 +164,7 @@ export abstract class CascadeStore<ED extends {
     protected async cascadeUpdate<T extends keyof ED>(
         entity: T,
         operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
-        context: Context<ED>,
+        context: Cxt,
         params?: OperateParams): Promise<void> {
         const { action, data, filter } = operation;
         const opData = {};

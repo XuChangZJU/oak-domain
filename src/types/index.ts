@@ -12,3 +12,4 @@ export * from './Polyfill';
 export * from './RowStore';
 export * from './Storage';
 export * from './Trigger';
+export * from './Exception';

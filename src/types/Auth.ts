@@ -1,35 +1,23 @@
 import { EntityDict } from "../types/Entity";
+import { Context } from "./Context";
 import { CreateTriggerBase, RemoveTriggerBase, UpdateTriggerBase } from "./Trigger";
 
-export class AttrIllegalError extends Error {
-    private attributes: string[];
-    constructor(attributes: string[], message?: string) {
-        super(message);
-        this.attributes = attributes;
-    }
-
-    getAttributes() {
-        return this.attributes;
-    }
-};
-
-
-export type CreateChecker<ED extends EntityDict, T extends keyof ED> = {
+export type CreateChecker<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = {
     action: 'create';
     entity: T;
-    checker: CreateTriggerBase<ED, T>['fn'],
+    checker: CreateTriggerBase<ED, T, Cxt>['fn'],
 };
 
-export type UpdateChecker<ED extends EntityDict, T extends keyof ED> = {
-    action: UpdateTriggerBase<ED, T>['action'];
+export type UpdateChecker<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = {
+    action: UpdateTriggerBase<ED, T, Cxt>['action'];
     entity: T;
-    checker: UpdateTriggerBase<ED, T>['fn'],
+    checker: UpdateTriggerBase<ED, T, Cxt>['fn'],
 };
 
-export type RemoveChecker<ED extends EntityDict, T extends keyof ED> = {
+export type RemoveChecker<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = {
     action: 'remove';
     entity: T;
-    checker: RemoveTriggerBase<ED, T>['fn'],
+    checker: RemoveTriggerBase<ED, T, Cxt>['fn'],
 };
 
-export type Checker<ED extends EntityDict, T extends keyof ED> = CreateChecker<ED, T> | UpdateChecker<ED, T> | RemoveChecker<ED, T>;
+export type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = CreateChecker<ED, T, Cxt> | UpdateChecker<ED, T, Cxt> | RemoveChecker<ED, T, Cxt>;

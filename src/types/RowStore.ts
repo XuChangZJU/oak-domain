@@ -7,7 +7,7 @@ export type TxnOption = {
     isolationLevel: 'repeatable read' | 'serializable';
 };
 
-export abstract class RowStore<ED extends EntityDict> {
+export abstract class RowStore<ED extends EntityDict, Cxt extends Context<ED>> {
     static $$LEVEL = 'store';
     static $$CODES: OakErrorDefDict = {
         primaryKeyConfilict: [1, '主键重复'],
@@ -19,21 +19,21 @@ export abstract class RowStore<ED extends EntityDict> {
     abstract operate<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'],
-        context: Context<ED>,
+        context: Cxt,
         params?: OperateParams
     ): Promise<OperationResult>;
 
     abstract select<T extends keyof ED, S extends ED[T]['Selection']> (
         entity: T,
         selection: S,
-        context: Context<ED>,
+        context: Cxt,
         params?: Object
     ): Promise<SelectionResult<ED[T]['Schema'], S['data']>>;
 
     abstract count<T extends keyof ED> (
         entity: T,
         selection: Omit<ED[T]['Selection'], 'data' | 'sorter' | 'action'>,
-        context: Context<ED>,
+        context: Cxt,
         params?: Object
     ): Promise<number>;
 
