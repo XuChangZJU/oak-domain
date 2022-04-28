@@ -108,9 +108,10 @@ export declare type OpRecord<ED extends EntityDict> = CreateOpResult<ED, keyof E
 export interface OperationResult {
     ids?: string[];
 }
-export declare type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
-    [K in keyof P]: K extends ExpressionKey ? any : K extends keyof E ? P[K] extends 1 ? E[K] : E[K] extends Array<any> ? Array<SelectRowShape<E[K][0], P[K]['data']>> : SelectRowShape<E[K], P[K]> : any;
-};
+/* export declare type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
+    [K in keyof P]: K extends ExpressionKey ? any : (K extends keyof E ? (P[K] extends 1 ? E[K] : (E[K] extends Array<any> ? Array<SelectRowShape<E[K][0], P[K]['data']>> : SelectRowShape<E[K], P[K]>)) : any);
+}; */
+export declare type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = Pick<E, keyof P>;
 export declare type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
     result: Array<SelectRowShape<E, P>>;
 };
