@@ -24,8 +24,8 @@ const Schema: Record<string, {
     states: string[];
     sourceFile: ts.SourceFile;
 }> = {};
-const OneToMany: Record<string, Array<[string, string]>> = {};
-const ManyToOne: Record<string, Array<[string, string]>> = {};
+const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
+const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
 const ReversePointerEntities: Record<string, 1> = {};
 const ReversePointerRelations: Record<string, string[]> = {};
 
@@ -77,25 +77,25 @@ const SchemaAsts: {
     };
 } = {};
 
-function addRelationship(many: string, one: string, key: string) {
+function addRelationship(many: string, one: string, key: string, notNull: boolean) {
     const { [many]: manySet } = ManyToOne;
     const one2 = one === 'Schema' ? many : one;
     if (manySet) {
-        manySet.push([one2, key]);
+        manySet.push([one2, key, notNull]);
     }
     else {
         assign(ManyToOne, {
-            [many]: [[one2, key]],
+            [many]: [[one2, key, notNull]],
         });
     }
 
     const { [one2]: oneSet } = OneToMany;
     if (oneSet) {
-        oneSet.push([many, key]);
+        oneSet.push([many, key, notNull]);
     }
     else {
         assign(OneToMany, {
-            [one2]: [[many, key]],
+            [one2]: [[many, key, notNull]],
         });
     }
 }
@@ -342,12 +342,12 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 assert((<ts.Identifier>heritageClauses![0].types![0].expression).text === 'EntityShape');
                 members.forEach(
                     (attrNode) => {
-                        const { type, name } = <ts.PropertySignature>attrNode;
+                        const { type, name, questionToken } = <ts.PropertySignature>attrNode;
                         const attrName = (<ts.Identifier>name).text;
                         if (ts.isTypeReferenceNode(type!)
                             && ts.isIdentifier(type.typeName)) {
                             if ((referencedSchemas.includes(type.typeName.text) || type.typeName.text === 'Schema')) {
-                                addRelationship(moduleName, type.typeName.text, attrName);
+                                addRelationship(moduleName, type.typeName.text, attrName, !!questionToken);
                                 schemaAttrs.push(attrNode);
                             }
                             else if (type.typeName.text === 'Array') {
@@ -424,7 +424,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
-                pushStatementIntoSchemaAst(moduleName, node, sourceFile!);                
+                pushStatementIntoSchemaAst(moduleName, node, sourceFile!);
             }
         }
 
@@ -515,8 +515,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                         sourceFile,
                     },
                 });
-                addRelationship(relationEntityName, 'User', 'user');
-                addRelationship(relationEntityName, moduleName, entityLc);
+                addRelationship(relationEntityName, 'User', 'user', true);
+                addRelationship(relationEntityName, moduleName, entityLc, true);
             }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
@@ -852,7 +852,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                             )
                         );
 
-                        if (process.env.COMPLING_BASE_ENTITY_DICT) {
+                        if (process.env.COMPLING_AS_LIB) {
                             // 如果是建立 base-domain，还要容纳可能的其它对象引用
                             entityUnionTypeNode.push(
                                 factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
@@ -1222,16 +1222,20 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                             );
                         }
                         else {
-                            assert(text.endsWith('State'));
-                            type2 = factory.createTypeReferenceNode(
-                                factory.createIdentifier('Q_EnumValue'),
-                                [
-                                    factory.createTypeReferenceNode(
-                                        factory.createIdentifier(text),
-                                        undefined
-                                    )
-                                ]
-                            );
+                            if (text.endsWith('State')) {
+                                type2 = factory.createTypeReferenceNode(
+                                    factory.createIdentifier('Q_EnumValue'),
+                                    [
+                                        factory.createTypeReferenceNode(
+                                            factory.createIdentifier(text),
+                                            undefined
+                                        )
+                                    ]
+                                );
+                            }
+                            else {
+                                // 引用的本地定义的shape
+                            }
                         }
                     }
                 }
@@ -1273,7 +1277,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
             factory.createStringLiteral(firstLetterLowerCase(ele))
         )
     );
-    if (process.env.COMPLING_BASE_ENTITY_DICT) {
+    if (process.env.COMPLING_AS_LIB) {
         eumUnionTypeNode && eumUnionTypeNode.push(
             factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
         );
@@ -1421,10 +1425,14 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                         }
                         else {
                             // todo 此处是对State的专门处理
-                            assert(text.endsWith('State'));
-                            properties.push(
-                                [name, false, undefined]
-                            )
+                            if (text.endsWith('State')) {
+                                properties.push(
+                                    [name, false, undefined]
+                                );
+                            }
+                            else {
+                                // 引用的shape
+                            }
                         }
                     }
                 }
@@ -1527,7 +1535,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
             )
         )
     ];
-    if (process.env.COMPLING_BASE_ENTITY_DICT) {
+    if (process.env.COMPLING_AS_LIB) {
         MetaPropertySignaturs.push(
             factory.createIndexSignature(
                 undefined,
@@ -1907,7 +1915,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 );
             }
         );
-        if (process.env.COMPLING_BASE_ENTITY_DICT) {
+        if (process.env.COMPLING_AS_LIB) {
             members.push(
                 factory.createIndexSignature(
                     undefined,
@@ -2364,225 +2372,180 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         }
     }
     // CreateOperationData
+    let foreignKeyAttrNode: ts.TypeNode[] = [];
+    if (manyToOneSet) {
+        for (const one of manyToOneSet) {
+            if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[1])) {
+                foreignKeyAttrNode.push(factory.createLiteralTypeNode(factory.createStringLiteral(`${one[1]}Id`)));
+            }
+        }
+        if (ReversePointerRelations[entity]) {
+            foreignKeyAttrNode.push(
+                factory.createLiteralTypeNode(factory.createStringLiteral('entity')),
+                factory.createLiteralTypeNode(factory.createStringLiteral('entityId'))
+            );
+        }
+    }
     let adNodes: ts.TypeNode[] = [
-        manyToOneSet
-            ? factory.createTypeReferenceNode(
-                factory.createIdentifier("Omit"),
-                [
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("OpSchema"),
-                        undefined
-                    ),
-                    factory.createUnionTypeNode(
-                        !ReversePointerRelations[entity] ? manyToOneSet.map(
-                            (ele) => factory.createLiteralTypeNode(factory.createStringLiteral(`${ele[1]}Id`))
-                        ).concat(
-                            manyToOneSet.map(
-                                (ele) => factory.createLiteralTypeNode(factory.createStringLiteral(ele[1]))
-                            )
-                        ) : [
-                            factory.createLiteralTypeNode(factory.createStringLiteral('entity')),
-                            factory.createLiteralTypeNode(factory.createStringLiteral('entityId'))
+        factory.createTypeReferenceNode(
+            factory.createIdentifier("FormCreateData"),
+            [
+                foreignKeyAttrNode.length > 0
+                    ? factory.createTypeReferenceNode(
+                        factory.createIdentifier("Omit"),
+                        [
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("OpSchema"),
+                                undefined
+                            ),
+                            factory.createUnionTypeNode(foreignKeyAttrNode)
                         ]
                     )
-                ]
-            )
-            : factory.createTypeReferenceNode(
-                factory.createIdentifier("OpSchema"),
-                undefined
-            )
+                    : factory.createTypeReferenceNode(
+                        factory.createIdentifier("OpSchema"),
+                        undefined
+                    )
+            ]
+        )
     ];
 
 
     if (manyToOneSet) {
-        if (ReversePointerRelations[entity]) {
-            // 反指对象特殊处理，应当是要么传{ entity, entityId }, 要么直接传反接对象之一
-            const entityUnionTypeNode: ts.TypeNode[] = ReversePointerRelations[entity].map(
-                ele => factory.createLiteralTypeNode(
-                    factory.createStringLiteral(`${firstLetterLowerCase(ele)}`)
-                )
-            );
-            if (process.env.COMPLING_BASE_ENTITY_DICT) {
-                entityUnionTypeNode.push(
-                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+        /**
+         * create的多对一有两种case
+         * 如果关联对象是create，则对象的外键由关联对象的id决定
+         * 如果关联对象是update，则关联对象的filter由对象决定其主键
+         * 见cascadeStore
+         */
+        const upsertOneNodes: ts.TypeNode[] = [];
+        for (const one of manyToOneSet) {
+            if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[0])) {
+                upsertOneNodes.push(
+                    factory.createUnionTypeNode(
+                        [
+                            factory.createTypeLiteralNode(
+                                [
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(one[1]),
+                                        one[2] ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                                        factory.createTypeReferenceNode(
+                                            createForeignRef(entity, one[0], 'CreateSingleOperation')
+                                        )
+                                    )
+                                ]
+                            ),
+                            factory.createTypeLiteralNode(
+                                [
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(`${one[1]}Id`),
+                                        one[2] ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
+                                        factory.createTypeReferenceNode(
+                                            factory.createIdentifier("String"),
+                                            [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
+                                        )
+                                    ),
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(one[1]),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createTypeReferenceNode(
+                                            createForeignRef(entity, one[0], 'UpdateOperation')
+                                        )
+                                    )
+                                ]
+                            )
+                        ]
+                    )
                 );
             }
-            const manyToOnePropertySignatures: ts.TypeElement[] = ReversePointerRelations[entity].map(
-                (ele) => factory.createPropertySignature(
-                    undefined,
-                    factory.createIdentifier(`${firstLetterLowerCase(ele)}`),
-                    undefined,
-                    factory.createUnionTypeNode([
-                        factory.createTypeReferenceNode(
-                            createForeignRef(entity, ele, 'CreateSingleOperation'),
-                            undefined
-                        ),
-                        factory.createParenthesizedType(factory.createIntersectionTypeNode([
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, ele, 'UpdateOperation'),
-                                undefined
-                            ),
-                            factory.createTypeLiteralNode([factory.createPropertySignature(
+        }
+
+        const reverseOneNodes: ts.TypeNode[] = [];
+        if (ReversePointerRelations[entity]) {
+            for (const one of ReversePointerRelations[entity]) {
+                reverseOneNodes.push(
+                    factory.createTypeLiteralNode(
+                        [
+                            factory.createPropertySignature(
                                 undefined,
-                                factory.createIdentifier("id"),
+                                factory.createIdentifier(firstLetterLowerCase(one)),
+                                undefined,          // 反向指针好像不能为空，以后或许会有特例  by Xc
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'CreateSingleOperation')
+                                )
+                            )
+                        ]
+                    ),
+                    factory.createTypeLiteralNode(
+                        [
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier('entity'),
+                                undefined,          // 反向指针好像不能为空，以后或许会有特例  by Xc
+                                factory.createLiteralTypeNode(factory.createStringLiteral(`${firstLetterLowerCase(one)}`)
+                                )
+                            ),
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier('entityId'),
+                                undefined,           // 反向指针好像不能为空，以后或许会有特例  by Xc
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier("String"),
+                                    [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
+                                )
+                            ),
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier(firstLetterLowerCase(one)),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'UpdateOperation')
+                                )
+                            )
+                        ]
+                    )
+                );
+            }
+
+            if (process.env.COMPLING_AS_LIB) {
+                // 如果是base，要包容更多可能的反指
+                reverseOneNodes.push(
+                    factory.createTypeLiteralNode(
+                        [
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier('entity'),
+                                undefined,
+                                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                            ),
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier('entityId'),
                                 undefined,
                                 factory.createTypeReferenceNode(
                                     factory.createIdentifier("String"),
                                     [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
                                 )
-                            )])
-                        ]))
-                    ])
-                )
-            );
-            if (process.env.COMPLING_BASE_ENTITY_DICT) {
-                manyToOnePropertySignatures.push(
-                    factory.createIndexSignature(
-                        undefined,
-                        undefined,
-                        [factory.createParameterDeclaration(
-                            undefined,
-                            undefined,
-                            undefined,
-                            factory.createIdentifier("K"),
-                            undefined,
-                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                            undefined
-                        )],
-                        factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
+                            ),
+                        ]
                     )
-                )
+                );
             }
+        }
+
+        if (upsertOneNodes.length > 0) {
             adNodes.push(
-                factory.createUnionTypeNode(
-                    [
-                        factory.createTypeLiteralNode(
-                            [
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier('entity'),
-                                    undefined,
-                                    factory.createUnionTypeNode(
-                                        entityUnionTypeNode
-                                    )
-                                ),
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier('entityId'),
-                                    undefined,
-                                    factory.createTypeReferenceNode(
-                                        factory.createIdentifier("String"),
-                                        [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
-                                    )
-                                )
-                            ]/* .concat(
-                                ReversePointerRelations[entity].map(
-                                    (ele) => factory.createPropertySignature(
-                                        undefined,
-                                        factory.createIdentifier(`${firstLetterLowerCase(ele)}`),
-                                        factory.createToken(ts.SyntaxKind.QuestionToken),
-                                        factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                    )
-                                )
-                            ) */ // 感觉这里是不需要的
-                        ),
-                        factory.createParenthesizedType(
-                            factory.createIntersectionTypeNode(
-                                [
-                                    factory.createTypeLiteralNode(
-                                        [
-                                            factory.createPropertySignature(
-                                                undefined,
-                                                factory.createIdentifier('entity'),
-                                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                                factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                            ),
-                                            factory.createPropertySignature(
-                                                undefined,
-                                                factory.createIdentifier('entityId'),
-                                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                                factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                            )
-                                        ]
-                                    ),
-                                    factory.createTypeReferenceNode(
-                                        factory.createIdentifier("OneOf"),
-                                        [
-                                            factory.createTypeLiteralNode(
-                                                manyToOnePropertySignatures
-                                            )
-                                        ]
-                                    )
-                                ]
-                            )
-                        )
-                    ]
+                factory.createIntersectionTypeNode(
+                    upsertOneNodes
                 )
             );
         }
-        else {
+        if (reverseOneNodes.length > 0) {
             adNodes.push(
-                ...manyToOneSet.map(
-                    ([refEntity, attr]) => factory.createParenthesizedType(
-                        factory.createUnionTypeNode(
-                            [
-                                factory.createTypeLiteralNode(
-                                    [
-                                        factory.createPropertySignature(
-                                            undefined,
-                                            factory.createIdentifier(attr),
-                                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                                            factory.createUnionTypeNode([
-                                                factory.createTypeReferenceNode(
-                                                    createForeignRef(entity, refEntity, 'CreateSingleOperation')
-                                                ),
-                                                factory.createIntersectionTypeNode([
-                                                    factory.createTypeReferenceNode(
-                                                        createForeignRef(entity, refEntity, 'UpdateOperation'),
-                                                        undefined
-                                                    ),
-                                                    factory.createTypeLiteralNode([factory.createPropertySignature(
-                                                        undefined,
-                                                        factory.createIdentifier("id"),
-                                                        undefined,
-                                                        factory.createTypeReferenceNode(
-                                                            factory.createIdentifier("String"),
-                                                            [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
-                                                        )
-                                                    )])
-                                                ])
-                                            ])
-                                        ),
-                                        factory.createPropertySignature(
-                                            undefined,
-                                            factory.createIdentifier(`${attr}Id`),
-                                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                                            factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                        )
-                                    ]
-                                ),
-                                factory.createTypeLiteralNode(
-                                    [
-                                        factory.createPropertySignature(
-                                            undefined,
-                                            factory.createIdentifier(attr),
-                                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                                            factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                        ),
-                                        factory.createPropertySignature(
-                                            undefined,
-                                            factory.createIdentifier(`${attr}Id`),
-                                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                                            factory.createTypeReferenceNode(
-                                                factory.createIdentifier("String"),
-                                                [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
-                                            )
-                                        )
-                                    ]
-                                )
-                            ]
-                        )
-                    )
+                factory.createUnionTypeNode(
+                    reverseOneNodes
                 )
             );
         }
@@ -2590,7 +2553,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
 
     // 一对多
     const propertySignatures: ts.TypeElement[] = [];
-    if (process.env.COMPLING_BASE_ENTITY_DICT) {
+    if (process.env.COMPLING_AS_LIB) {
         propertySignatures.push(
             factory.createIndexSignature(
                 undefined,
@@ -2648,12 +2611,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("CreateOperationData"),
             undefined,
-            factory.createTypeReferenceNode(
-                factory.createIdentifier("FormCreateData"),
-                [
-                    factory.createIntersectionTypeNode(adNodes)
-                ]
-            )
+            factory.createIntersectionTypeNode(adNodes)
         )
     );
 
@@ -2713,11 +2671,25 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     );
 
     // UpdateOperationData
+    foreignKeyAttrNode = [];
+    if (manyToOneSet) {
+        for (const one of manyToOneSet) {
+            if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[1])) {
+                foreignKeyAttrNode.push(factory.createLiteralTypeNode(factory.createStringLiteral(`${one[1]}Id`)));
+            }
+        }
+        if (ReversePointerRelations[entity]) {
+            foreignKeyAttrNode.push(
+                factory.createLiteralTypeNode(factory.createStringLiteral('entity')),
+                factory.createLiteralTypeNode(factory.createStringLiteral('entityId'))
+            );
+        }
+    }
     adNodes = [
         factory.createTypeReferenceNode(
             factory.createIdentifier("FormUpdateData"),
             [
-                manyToOneSet ? factory.createTypeReferenceNode(
+                foreignKeyAttrNode.length > 0 ? factory.createTypeReferenceNode(
                     factory.createIdentifier("Omit"),
                     [
                         factory.createTypeReferenceNode(
@@ -2725,16 +2697,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                             undefined
                         ),
                         factory.createUnionTypeNode(
-                            !ReversePointerRelations[entity] ? manyToOneSet.map(
-                                (ele) => factory.createLiteralTypeNode(factory.createStringLiteral(`${ele[1]}Id`))
-                            ).concat(
-                                manyToOneSet.map(
-                                    (ele) => factory.createLiteralTypeNode(factory.createStringLiteral(ele[1]))
-                                )
-                            ) : [
-                                factory.createLiteralTypeNode(factory.createStringLiteral('entity')),
-                                factory.createLiteralTypeNode(factory.createStringLiteral('entityId'))
-                            ]
+                            foreignKeyAttrNode
                         )
                     ]
                 ) : factory.createTypeReferenceNode(
@@ -2745,123 +2708,154 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         )
     ];
     if (manyToOneSet) {
+        /**
+         * update的多对一有三种case
+         * 如果关联对象是create，则对象的外键由关联对象的id决定
+         * 如果关联对象是update或者remove，则关联对象的filter由对象(的原行！注意这里的外键是不能变的!)决定其主键
+         * 见cascadeStore
+         */
+        const upsertOneNodes: ts.TypeNode[] = [];
+        for (const one of manyToOneSet) {
+            if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[0])) {
+                upsertOneNodes.push(
+                    factory.createUnionTypeNode(
+                        [
+                            factory.createTypeLiteralNode(
+                                [
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(one[1]),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createTypeReferenceNode(
+                                            createForeignRef(entity, one[0], 'CreateSingleOperation')
+                                        )
+                                    )
+                                ]
+                            ),
+                            factory.createTypeLiteralNode(
+                                [
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(one[1]),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createTypeReferenceNode(
+                                            createForeignRef(entity, one[0], 'UpdateOperation')
+                                        )
+                                    )
+                                ]
+                            ),
+                            factory.createTypeLiteralNode(
+                                [
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(one[1]),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createTypeReferenceNode(
+                                            createForeignRef(entity, one[0], 'RemoveOperation')
+                                        )
+                                    )
+                                ]
+                            ),
+                            factory.createTypeLiteralNode(
+                                [
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(`${one[1]}Id`),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createUnionTypeNode(
+                                            [
+                                                factory.createTypeReferenceNode(
+                                                    factory.createIdentifier("String"),
+                                                    [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
+                                                ),
+                                                factory.createLiteralTypeNode(factory.createNull())
+                                            ]
+                                        )
+                                    ),
+                                ]
+                            )
+                        ]
+                    )
+                );
+            }
+        }
+
+        const reverseOneNodes: ts.TypeNode[] = [];
         if (ReversePointerRelations[entity]) {
-            // 反指对象特殊处理，应当是要么传{ entity, entityId }, 要么直接传反接对象之一
-            const entityUnionTypeNode: ts.TypeNode[] = ReversePointerRelations[entity].map(
-                ele => factory.createLiteralTypeNode(
-                    factory.createStringLiteral(`${firstLetterLowerCase(ele)}`)
-                )
-            );
-            if (process.env.COMPLING_BASE_ENTITY_DICT) {
-                entityUnionTypeNode.push(
+            const refEntityLitrals: (ts.TypeNode)[] = [];
+            for (const one of ReversePointerRelations[entity]) {
+                refEntityLitrals.push(factory.createLiteralTypeNode(factory.createStringLiteral(`${firstLetterLowerCase(one)}`)));
+                reverseOneNodes.push(
+                    factory.createTypeLiteralNode(
+                        [
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier(firstLetterLowerCase(one)),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'CreateSingleOperation')
+                                )
+                            )
+                        ]
+                    ),
+                    factory.createTypeLiteralNode(
+                        [
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier(firstLetterLowerCase(one)),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'UpdateOperation')
+                                )
+                            )
+                        ]
+                    ),
+                    factory.createTypeLiteralNode(
+                        [
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier(firstLetterLowerCase(one)),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'RemoveOperation')
+                                )
+                            )
+                        ]
+                    )
+                );
+            }
+            if (process.env.COMPLING_AS_LIB) {
+                // 如果是base，要包容更多可能的反指
+                refEntityLitrals.push(
                     factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
                 );
             }
-            const manyToOnePropertySignatures: ts.TypeElement[] = ReversePointerRelations[entity].map(
-                (ele) => factory.createPropertySignature(
-                    undefined,
-                    factory.createIdentifier(`${firstLetterLowerCase(ele)}`),
-                    undefined,
-                    factory.createUnionTypeNode([
-                        factory.createTypeReferenceNode(
-                            createForeignRef(entity, ele, 'CreateSingleOperation'),
-                            undefined
-                        ),
-                        factory.createTypeReferenceNode(
-                            factory.createIdentifier("Omit"),
-                            [
-                                factory.createTypeReferenceNode(
-                                    createForeignRef(entity, ele, 'UpdateOperation'),
-                                    undefined
-                                ),
-                                factory.createUnionTypeNode([
-                                    factory.createLiteralTypeNode(factory.createStringLiteral("id")),
-                                    factory.createLiteralTypeNode(factory.createStringLiteral("ids")),
-                                    factory.createLiteralTypeNode(factory.createStringLiteral("filter"))
-                                ])
-                            ]
-                        )
-                    ])
-                )
-            );
-            if (process.env.COMPLING_BASE_ENTITY_DICT) {
-                manyToOnePropertySignatures.push(
-                    factory.createIndexSignature(
-                        undefined,
-                        undefined,
-                        [factory.createParameterDeclaration(
-                            undefined,
-                            undefined,
-                            undefined,
-                            factory.createIdentifier("K"),
-                            undefined,
-                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                            undefined
-                        )],
-                        factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
-                    )
-                )
-            }
-            adNodes.push(
-                factory.createUnionTypeNode(
+
+            reverseOneNodes.push(
+                factory.createTypeLiteralNode(
                     [
-                        factory.createTypeLiteralNode(
-                            [
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier('entity'),
-                                    factory.createToken(ts.SyntaxKind.QuestionToken),
-                                    factory.createUnionTypeNode(
-                                        entityUnionTypeNode
-                                    )
-                                ),
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier('entityId'),
-                                    factory.createToken(ts.SyntaxKind.QuestionToken),
+                        factory.createPropertySignature(
+                            undefined,
+                            factory.createIdentifier('entity'),
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
+                            factory.createUnionTypeNode(
+                                [
+                                    factory.createUnionTypeNode(refEntityLitrals),
+                                    factory.createLiteralTypeNode(factory.createNull())
+                                ]
+                            )
+                        ),
+                        factory.createPropertySignature(
+                            undefined,
+                            factory.createIdentifier('entityId'),
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
+                            factory.createUnionTypeNode(
+                                [
                                     factory.createTypeReferenceNode(
                                         factory.createIdentifier("String"),
                                         [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
-                                    )
-                                )
-                            ].concat(
-                                ReversePointerRelations[entity].map(
-                                    (ele) => factory.createPropertySignature(
-                                        undefined,
-                                        factory.createIdentifier(`${firstLetterLowerCase(ele)}`),
-                                        factory.createToken(ts.SyntaxKind.QuestionToken),
-                                        factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                    )
-                                )
-                            )
-                        ),
-                        factory.createParenthesizedType(
-                            factory.createIntersectionTypeNode(
-                                [
-                                    factory.createTypeLiteralNode(
-                                        [
-                                            factory.createPropertySignature(
-                                                undefined,
-                                                factory.createIdentifier('entity'),
-                                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                                factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                            ),
-                                            factory.createPropertySignature(
-                                                undefined,
-                                                factory.createIdentifier('entityId'),
-                                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                                factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                            )
-                                        ]
                                     ),
-                                    factory.createTypeReferenceNode(
-                                        factory.createIdentifier("OneOf"),
-                                        [
-                                            factory.createTypeLiteralNode(
-                                                manyToOnePropertySignatures
-                                            )
-                                        ]
-                                    )
+                                    factory.createLiteralTypeNode(factory.createNull())
                                 ]
                             )
                         )
@@ -2869,68 +2863,18 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 )
             );
         }
-        else {
+
+        if (upsertOneNodes.length > 0) {
             adNodes.push(
-                ...manyToOneSet.map(
-                    ([refEntity, attr]) => factory.createParenthesizedType(
-                        factory.createUnionTypeNode(
-                            [
-                                factory.createTypeLiteralNode(
-                                    [
-                                        factory.createPropertySignature(
-                                            undefined,
-                                            factory.createIdentifier(attr),
-                                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                                            factory.createUnionTypeNode([
-                                                factory.createTypeReferenceNode(
-                                                    createForeignRef(entity, refEntity, 'CreateSingleOperation')
-                                                ),
-                                                factory.createTypeReferenceNode(
-                                                    factory.createIdentifier("Omit"),
-                                                    [
-                                                        factory.createTypeReferenceNode(
-                                                            createForeignRef(entity, refEntity, 'UpdateOperation'),
-                                                            undefined
-                                                        ),
-                                                        factory.createUnionTypeNode([
-                                                            factory.createLiteralTypeNode(factory.createStringLiteral("id")),
-                                                            factory.createLiteralTypeNode(factory.createStringLiteral("ids")),
-                                                            factory.createLiteralTypeNode(factory.createStringLiteral("filter"))
-                                                        ])
-                                                    ]
-                                                ),
-                                            ])
-                                        ),
-                                        factory.createPropertySignature(
-                                            undefined,
-                                            factory.createIdentifier(`${attr}Id`),
-                                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                                            factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                        )
-                                    ]
-                                ),
-                                factory.createTypeLiteralNode(
-                                    [
-                                        factory.createPropertySignature(
-                                            undefined,
-                                            factory.createIdentifier(attr),
-                                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                                            factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-                                        ),
-                                        factory.createPropertySignature(
-                                            undefined,
-                                            factory.createIdentifier(`${attr}Id`),
-                                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                                            factory.createTypeReferenceNode(
-                                                factory.createIdentifier("String"),
-                                                [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
-                                            )
-                                        )
-                                    ]
-                                )
-                            ]
-                        )
-                    )
+                factory.createIntersectionTypeNode(
+                    upsertOneNodes
+                )
+            );
+        }
+        if (reverseOneNodes.length > 0) {
+            adNodes.push(
+                factory.createUnionTypeNode(
+                    reverseOneNodes
                 )
             );
         }
@@ -2938,7 +2882,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
 
 
     const propertySignatures2: ts.TypeElement[] = [];
-    if (process.env.COMPLING_BASE_ENTITY_DICT) {
+    if (process.env.COMPLING_AS_LIB) {
         propertySignatures2.push(
             factory.createIndexSignature(
                 undefined,
@@ -3044,102 +2988,99 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         factory.createTypeLiteralNode([])
     ];
     if (manyToOneSet) {
-        if (ReversePointerRelations[entity]) {
-            const manyToOnePropertySignatures: ts.TypeElement[] = ReversePointerRelations[entity].map(
-                (ele) => factory.createPropertySignature(
-                    undefined,
-                    factory.createIdentifier(firstLetterLowerCase(ele)),
-                    factory.createToken(ts.SyntaxKind.QuestionToken),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("Omit"),
+        /**
+         * remove的多对一有两种case         
+         * 如果关联对象动作是update或者remove，则关联对象的filter由对象(的原行！注意这里的外键是不能变的!)决定其主键
+         * 见cascadeStore
+         */
+        const upsertOneNodes: ts.TypeNode[] = [];
+        for (const one of manyToOneSet) {
+            if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[0])) {
+                upsertOneNodes.push(
+                    factory.createUnionTypeNode(
                         [
-                            factory.createUnionTypeNode([
-                                factory.createTypeReferenceNode(
-                                    createForeignRef(entity, ele, 'UpdateOperation'),
-                                    undefined
-                                ),
-                                factory.createTypeReferenceNode(
-                                    createForeignRef(entity, ele, 'RemoveOperation'),
-                                    undefined
-                                )
-                            ]),
-                            factory.createUnionTypeNode([
-                                factory.createLiteralTypeNode(factory.createStringLiteral("id")),
-                                factory.createLiteralTypeNode(factory.createStringLiteral("ids")),
-                                factory.createLiteralTypeNode(factory.createStringLiteral("filter"))
-                            ])
-                        ]
-                    )
-                )
-            );
-            if (process.env.COMPLING_BASE_ENTITY_DICT) {
-                manyToOnePropertySignatures.push(
-                    factory.createIndexSignature(
-                        undefined,
-                        undefined,
-                        [factory.createParameterDeclaration(
-                            undefined,
-                            undefined,
-                            undefined,
-                            factory.createIdentifier("K"),
-                            undefined,
-                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                            undefined
-                        )],
-                        factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
-                    )
-                )
-            }
-            adNodes.push(
-                factory.createTypeReferenceNode(
-                    'OneOf',
-                    [
-                        factory.createTypeLiteralNode(
-                            manyToOnePropertySignatures
-                        )
-                    ]
-                )
-            )
-        }
-        else {
-            adNodes.push(
-                factory.createTypeLiteralNode(
-                    manyToOneSet.map(
-                        ([refEntity, attr]) => factory.createPropertySignature(
-                            undefined,
-                            factory.createIdentifier(attr),
-                            factory.createToken(ts.SyntaxKind.QuestionToken),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Omit"),
+                            factory.createTypeLiteralNode(
                                 [
-                                    factory.createUnionTypeNode([
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(one[1]),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
                                         factory.createTypeReferenceNode(
-                                            createForeignRef(entity, refEntity, 'UpdateOperation'),
-                                            undefined
-                                        ),
-                                        factory.createTypeReferenceNode(
-                                            createForeignRef(entity, refEntity, 'RemoveOperation'),
-                                            undefined
+                                            createForeignRef(entity, one[0], 'UpdateOperation')
                                         )
-                                    ]),
-                                    factory.createUnionTypeNode([
-                                        factory.createLiteralTypeNode(factory.createStringLiteral("id")),
-                                        factory.createLiteralTypeNode(factory.createStringLiteral("ids")),
-                                        factory.createLiteralTypeNode(factory.createStringLiteral("filter"))
-                                    ])
+                                    )
+                                ]
+                            ),
+                            factory.createTypeLiteralNode(
+                                [
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(one[1]),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createTypeReferenceNode(
+                                            createForeignRef(entity, one[0], 'RemoveOperation')
+                                        )
+                                    )
                                 ]
                             )
-                        )
+                        ]
                     )
+                );
+            }
+        }
+
+        const reverseOneNodes: ts.TypeNode[] = [];
+        if (ReversePointerRelations[entity]) {
+            const refEntityLitrals: (ts.TypeNode)[] = [];
+            for (const one of ReversePointerRelations[entity]) {
+                refEntityLitrals.push(factory.createLiteralTypeNode(factory.createStringLiteral(`${firstLetterLowerCase(one)}`)));
+                reverseOneNodes.push(
+                    factory.createTypeLiteralNode(
+                        [
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier(firstLetterLowerCase(one)),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'UpdateOperation')
+                                )
+                            )
+                        ]
+                    ),
+                    factory.createTypeLiteralNode(
+                        [
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier(firstLetterLowerCase(one)),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'RemoveOperation')
+                                )
+                            )
+                        ]
+                    )
+                );
+            }
+        }
+
+        if (upsertOneNodes.length > 0) {
+            adNodes.push(
+                factory.createIntersectionTypeNode(
+                    upsertOneNodes
+                )
+            );
+        }
+        if (reverseOneNodes.length > 0) {
+            adNodes.push(
+                factory.createUnionTypeNode(
+                    reverseOneNodes
                 )
             );
         }
     }
 
-
-
     const propertySignatures3: ts.TypeElement[] = [];
-    if (process.env.COMPLING_BASE_ENTITY_DICT) {
+    if (process.env.COMPLING_AS_LIB) {
         propertySignatures3.push(
             factory.createIndexSignature(
                 undefined,
@@ -3472,7 +3413,7 @@ const initialStatements = () => [
 
 function outputSubQuery(outputDir: string, printer: ts.Printer) {
     const statements: ts.Statement[] = [];
-    if (process.env.COMPLING_BASE_ENTITY_DICT) {
+    if (process.env.COMPLING_AS_LIB) {
         statements.push(
             factory.createImportDeclaration(
                 undefined,
@@ -3539,7 +3480,7 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
             )
         );
 
-        if (process.env.COMPLING_BASE_ENTITY_DICT) {
+        if (process.env.COMPLING_AS_LIB) {
             // 如果是建立 base，这里要加上额外可能的对象信息
             inUnionTypeNode.push(
                 factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
@@ -3618,7 +3559,7 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
         );
     }
 
-    if (/* process.env.COMPLING_BASE_ENTITY_DICT */false) {
+    if (/* process.env.COMPLING_AS_LIB */false) {
         statements.push(
             factory.createImportDeclaration(
                 undefined,
@@ -4130,23 +4071,33 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                 );
                             }
                             else {
-                                assert(text.endsWith('State'));
-                                attrAssignments.push(
-                                    factory.createPropertyAssignment(
-                                        factory.createIdentifier("type"),
-                                        factory.createStringLiteral("varchar")
-                                    ),
-                                    factory.createPropertyAssignment(
-                                        factory.createIdentifier("params"),
-                                        factory.createObjectLiteralExpression(
-                                            [factory.createPropertyAssignment(
-                                                factory.createIdentifier("length"),
-                                                factory.createNumericLiteral(STRING_LITERAL_MAX_LENGTH)
-                                            )],
-                                            true
+                                if (text.endsWith('State')) {
+                                    attrAssignments.push(
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("type"),
+                                            factory.createStringLiteral("varchar")
+                                        ),
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("params"),
+                                            factory.createObjectLiteralExpression(
+                                                [factory.createPropertyAssignment(
+                                                    factory.createIdentifier("length"),
+                                                    factory.createNumericLiteral(STRING_LITERAL_MAX_LENGTH)
+                                                )],
+                                                true
+                                            )
                                         )
-                                    )
-                                );
+                                    );
+                                }
+                                else {
+                                    // 引用的shape                                    
+                                    attrAssignments.push(
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("type"),
+                                            factory.createStringLiteral("object")
+                                        ),
+                                    );
+                                }
                             }
                         }
                     }
@@ -4484,7 +4435,7 @@ function addReverseRelationship() {
             throw new Error(`「${reverseEntity}」被引用为一个反指对象，但其定义中的entity和entityId不符合要求`);
         }
         for (const one of ReversePointerRelations[reverseEntity]) {
-            addRelationship(reverseEntity, one, 'entity');
+            addRelationship(reverseEntity, one, 'entity', false);
         }
     }
 }
@@ -4547,7 +4498,7 @@ export function buildSchema(outputDir: string): void {
     outputEntityDict(outputDir, printer);
     outputStorage(outputDir, printer);
 
-    //if (!process.env.COMPLING_BASE_ENTITY_DICT) {
+    //if (!process.env.COMPLING_AS_LIB) {
     outputPackageJson(outputDir);
     //}
 }
