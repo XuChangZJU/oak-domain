@@ -12,9 +12,9 @@ export class OakUserException extends OakException {
  * 数据不一致异常，系统认为现有的数据不允许相应的动作时抛此异常
  * 
  */
- export class OakDataInconsistencyException<ED extends EntityDict> extends OakUserException {
-    private data: OpRecord<ED>;
-    constructor(data: OpRecord<ED>, message?: string) {
+ export class OakRowInconsistencyException<ED extends EntityDict> extends OakUserException {
+    private data?: OpRecord<ED>;
+    constructor(data?: OpRecord<ED>, message?: string) {
         super(message);
         this.data = data;
     }

@@ -2,14 +2,16 @@ import { GenericAction } from "../actions/action";
 import { DeduceCreateOperation, DeduceRemoveOperation, DeduceSelection, DeduceUpdateOperation, EntityDict } from "../types/Entity";
 import { EntityShape, SelectionResult, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { Context } from "./Context";
+export declare type CheckerType = 'user' | 'row' | 'data';
 export interface CreateTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> {
+    checkerType?: CheckerType;
     entity: T;
     name: string;
     action: 'create';
     check?: (operation: DeduceCreateOperation<ED[T]['Schema']>) => boolean;
     fn: (event: {
         operation: DeduceCreateOperation<ED[T]['Schema']>;
-    }, context: Context<ED>, params?: Object) => Promise<number>;
+    }, context: Cxt, params?: Object) => Promise<number>;
 }
 export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends CreateTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
@@ -20,6 +22,7 @@ export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED
 }
 export declare type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = CreateTriggerInTxn<ED, T, Cxt> | CreateTriggerCrossTxn<ED, T, Cxt>;
 export interface UpdateTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> {
+    checkerType?: CheckerType;
     entity: T;
     name: string;
     action: Exclude<ED[T]['Action'], GenericAction> | 'update' | Array<Exclude<ED[T]['Action'], GenericAction> | 'update'>;
@@ -38,6 +41,7 @@ export interface UpdateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED
 }
 export declare type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = UpdateTriggerInTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt>;
 export interface RemoveTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> {
+    checkerType?: CheckerType;
     entity: T;
     name: string;
     action: 'remove';
@@ -55,6 +59,7 @@ export interface RemoveTriggerCrossTxn<ED extends EntityDict, T extends keyof ED
 }
 export declare type RemoveTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = RemoveTriggerInTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;
 export interface SelectTriggerBase<ED extends EntityDict, T extends keyof ED> {
+    checkerType?: undefined;
     entity: T;
     name: string;
     action: 'select';

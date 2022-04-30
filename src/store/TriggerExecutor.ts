@@ -20,6 +20,7 @@ import { Trigger, Executor, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerI
 }; */
 
 export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> extends Executor<ED, Cxt> {
+    private counter: number;
     private triggerMap: {
         [T in keyof ED]?: {
             [A: string]: Array<Trigger<ED, T, Cxt>>;
@@ -40,18 +41,15 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
         this.triggerMap = {};
         this.triggerNameMap = {};
         this.volatileEntities = [];
+        this.counter = 0;
     }
 
     registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void {
-        const { entity, action, checker: checkFn } = checker;
-        const ActionNameMatrix: Record<string, string> = {
-            'create': '创建',
-            'remove': '删除',
-        };
-        let triggerAction = (typeof action === 'string' && ActionNameMatrix[action]) || '更新';
-        const triggerName = `${entity}${triggerAction}权限检查`;
+        const { entity, action, checker: checkFn, type } = checker;
+        const triggerName = `${entity}${action}权限检查-${this.counter ++}`;
 
         const trigger = {
+            checkerType: type,
             name: triggerName,
             entity,
             action,
@@ -184,7 +182,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
         context: Cxt
     ): Promise<void> {
         const { action } = operation;
-        const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action].filter(
+        const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
             trigger => typeof trigger.action === 'string' && trigger.action === operation.action || (trigger.action).includes(operation.action as any)
         );
         if (triggers) {
@@ -267,7 +265,9 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
         context: Cxt
     ): Promise<void> {
         const { action } = operation;
-        const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action];
+        const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
+            trigger => typeof trigger.action === 'string' && trigger.action === operation.action || (trigger.action).includes(operation.action as any)
+        );
         if (triggers) {
             const postTriggers = triggers.filter(
                 ele => ele.when === 'after' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as DeduceCreateOperation<ED[T]['Schema']>))

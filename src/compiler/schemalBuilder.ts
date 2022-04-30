@@ -3,7 +3,7 @@ import assert from 'assert';
 import { execSync } from 'child_process';
 import { writeFileSync, readdirSync, mkdirSync, fstat } from 'fs';
 import { emptydirSync } from 'fs-extra';
-import { assign, cloneDeep, identity, intersection, keys, uniq, uniqBy } from 'lodash';
+import { assign, cloneDeep, difference, identity, intersection, keys, uniq, uniqBy } from 'lodash';
 import * as ts from 'typescript';
 const { factory } = ts;
 import {
@@ -15,7 +15,7 @@ import {
     NUMERICAL_LITERL_DEFAULT_PRECISION,
     NUMERICAL_LITERL_DEFAULT_SCALE,
 } from './env';
-import { firstLetterLowerCase } from './utils';
+import { firstLetterLowerCase, firstLetterUpperCase } from './utils';
 
 const Schema: Record<string, {
     schemaAttrs: Array<ts.PropertySignature>;
@@ -66,7 +66,9 @@ const ActionAsts: {
     [module: string]: {
         statements: Array<ts.Statement>;
         sourceFile: ts.SourceFile;
-        importedFrom: Record<string, string>;
+        importedFrom: Record<string, ts.ImportDeclaration | 'local'>;
+        actionNames: string[];
+        actionDefNames: string[];
     };
 } = {};
 
@@ -114,8 +116,49 @@ function pushStatementIntoActionAst(
     moduleName: string,
     node: ts.Statement,
     sourceFile: ts.SourceFile) {
+
+    let actionNames;
+    let actionDefName;
+    if (ts.isTypeAliasDeclaration(node) && node.name.text === 'ParticularAction') {
+        const { type } = node;
+        if (ts.isUnionTypeNode(type)) {
+            actionNames = type.types.map(
+                (ele) => {
+                    assert(ts.isTypeReferenceNode(ele));
+                    const text = (<ts.Identifier>ele.typeName).text;
+                    assert(text.endsWith('Action'));
+                    return firstLetterLowerCase(text.slice(0, text.length - 6));
+                }
+            )
+        }
+        else {
+            assert(ts.isTypeReferenceNode(type));
+            const text = (<ts.Identifier>type.typeName).text;
+            assert(text.endsWith('Action'));
+            actionNames = [firstLetterLowerCase(text.slice(0, text.length - 6))];
+        }
+    }
+
+    if (ts.isVariableStatement(node)) {
+        const { declarationList: { declarations } } = node;
+        declarations.forEach(
+            (declaration) => {
+                if (ts.isIdentifier(declaration.name) && declaration.name.text.endsWith('ActionDef')) {
+                    const { text } = declaration.name;
+                    actionDefName = firstLetterLowerCase(text.slice(0, text.length - 9));
+                }
+            }
+        );
+    }
+
     if (ActionAsts[moduleName]) {
         ActionAsts[moduleName].statements.push(node);
+        if (actionNames) {
+            ActionAsts[moduleName].actionNames = actionNames;
+        }
+        if (actionDefName) {
+            ActionAsts[moduleName].actionDefNames.push(actionDefName);
+        }
     }
     else {
         assign(ActionAsts, {
@@ -123,6 +166,8 @@ function pushStatementIntoActionAst(
                 statements: [...ActionImportStatements(), node],
                 sourceFile,
                 importedFrom: {},
+                actionNames,
+                actionDefNames: actionDefName ? [actionDefName] : [],
             }
         });
     }
@@ -174,7 +219,7 @@ function addActionSource(moduleName: string, name: ts.Identifier, node: ts.Impor
     // 目前应该只会引用oak-domain/src/actions/action里的公共action
     assert(ts.isStringLiteral(moduleSpecifier) && moduleSpecifier.text === ACTION_CONSTANT_IN_OAK_DOMAIN());
     assign(ast.importedFrom, {
-        [name.text]: ACTION_CONSTANT_IN_OAK_DOMAIN(),
+        [name.text]: node,
     });
 }
 
@@ -528,43 +573,45 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             const { declarationList: { declarations } } = node;
             declarations.forEach(
                 (declaration) => {
-                    if (declaration.type && ts.isTypeReferenceNode(declaration.type) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ActionDef') {
-                        // actionDef定义
-                        checkActionDefNameConsistent(filename, declaration);
-                        const { typeArguments } = declaration.type;
-                        assert(typeArguments!.length === 2);
-                        const [actionNode, stateNode] = typeArguments!;
+                    if (ts.isIdentifier(declaration.name) && declaration.name.text.endsWith('ActionDef')) {
+                        if (declaration.type && ts.isTypeReferenceNode(declaration.type) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ActionDef') {
+                            // 是显示的actionDef定义
+                            checkActionDefNameConsistent(filename, declaration);
+                            const { typeArguments } = declaration.type;
+                            assert(typeArguments!.length === 2);
+                            const [actionNode, stateNode] = typeArguments!;
 
-                        const checker = program.getTypeChecker();
-                        let symbol = checker.getSymbolAtLocation((<ts.TypeReferenceNode>actionNode).typeName);
+                            const checker = program.getTypeChecker();
+                            let symbol = checker.getSymbolAtLocation((<ts.TypeReferenceNode>actionNode).typeName);
 
-                        let declaration2 = symbol!.getDeclarations()![0];
-                        if (declaration2.getSourceFile() === sourceFile) {
-                            pushStatementIntoActionAst(moduleName, <ts.TypeAliasDeclaration>declaration2, sourceFile);
-                        }
+                            let declaration2 = symbol!.getDeclarations()![0];
+                            if (declaration2.getSourceFile() === sourceFile) {
+                                pushStatementIntoActionAst(moduleName, <ts.TypeAliasDeclaration>declaration2, sourceFile);
+                            }
 
-                        symbol = checker.getSymbolAtLocation((<ts.TypeReferenceNode>stateNode).typeName);
+                            symbol = checker.getSymbolAtLocation((<ts.TypeReferenceNode>stateNode).typeName);
 
-                        declaration2 = symbol!.getDeclarations()![0];
-                        if (declaration2.getSourceFile() === sourceFile) {
-                            // 检查state的定义合法
-                            assert(ts.isTypeAliasDeclaration(declaration2) && ts.isUnionTypeNode(declaration2.type), `「${filename}」State「${(<ts.TypeAliasDeclaration>declaration2).name}」的定义只能是或结点`);
-                            declaration2.type.types.forEach(
-                                (type) => {
-                                    assert(ts.isLiteralTypeNode(type) && ts.isStringLiteral(type.literal), `「${filename}」State「${(<ts.TypeAliasDeclaration>declaration2).name}」的定义只能是字符串`);
-                                    assert(type.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」State「${type.literal.text}」的长度大于「${STRING_LITERAL_MAX_LENGTH}」`);
-                                }
-                            );
-                            pushStatementIntoActionAst(moduleName,
-                                factory.updateTypeAliasDeclaration(
-                                    declaration2,
-                                    declaration2.decorators,
-                                    [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-                                    declaration2.name,
-                                    declaration2.typeParameters,
-                                    declaration2.type
-                                ),
-                                sourceFile);
+                            declaration2 = symbol!.getDeclarations()![0];
+                            if (declaration2.getSourceFile() === sourceFile) {
+                                // 检查state的定义合法
+                                assert(ts.isTypeAliasDeclaration(declaration2) && ts.isUnionTypeNode(declaration2.type), `「${filename}」State「${(<ts.TypeAliasDeclaration>declaration2).name}」的定义只能是或结点`);
+                                declaration2.type.types.forEach(
+                                    (type) => {
+                                        assert(ts.isLiteralTypeNode(type) && ts.isStringLiteral(type.literal), `「${filename}」State「${(<ts.TypeAliasDeclaration>declaration2).name}」的定义只能是字符串`);
+                                        assert(type.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」State「${type.literal.text}」的长度大于「${STRING_LITERAL_MAX_LENGTH}」`);
+                                    }
+                                );
+                                pushStatementIntoActionAst(moduleName,
+                                    factory.updateTypeAliasDeclaration(
+                                        declaration2,
+                                        declaration2.decorators,
+                                        [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                                        declaration2.name,
+                                        declaration2.typeParameters,
+                                        declaration2.type
+                                    ),
+                                    sourceFile);
+                            }
                         }
 
                         pushStatementIntoActionAst(moduleName, node, sourceFile!);
@@ -1432,6 +1479,9 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                             }
                             else {
                                 // 引用的shape
+                                properties.push(
+                                    [name, false, undefined]
+                                );
                             }
                         }
                     }
@@ -3639,95 +3689,58 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         const statements: ts.Statement[] = initialStatements();
         // const { schemaAttrs } = Schema[entity];
         if (ActionAsts[entity]) {
-            const importedSourceDict: {
-                [k: string]: string[];
-            } = {};
             const { importedFrom } = ActionAsts[entity];
+            const localActions: string[] = ['Action', 'ParticularAction'];
             for (const a in importedFrom) {
                 assert(a.endsWith('Action'));
                 const s = a.slice(0, a.length - 6).concat('State');
-                let source;
                 if (importedFrom[a] === 'local') {
-                    source = './Action';
+                    localActions.push(s);
                 }
                 else {
-                    source = importedFrom[a];
-                }
-                if (importedSourceDict.hasOwnProperty(source)) {
-                    importedSourceDict[source].push(s);
-                }
-                else {
-                    assign(importedSourceDict, {
-                        [source]: [s],
-                    });
-                }
-            }
-            let importParticularAction = false;
-            for (const source in importedSourceDict) {
-                const namedImports = importedSourceDict[source].map(
-                    s => factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier(s)
-                    )
-                );
-                if (source === './Action') {
-                    namedImports.push(
-                        factory.createImportSpecifier(
-                            false,
+                    const { moduleSpecifier } = importedFrom[a] as ts.ImportDeclaration;
+                    statements.push(
+                        factory.createImportDeclaration(
                             undefined,
-                            factory.createIdentifier('ParticularAction')
-                        ),
-                        factory.createImportSpecifier(
-                            false,
                             undefined,
-                            factory.createIdentifier('Action')
+                            factory.createImportClause(
+                                false,
+                                undefined,
+                                factory.createNamedImports(
+                                    [
+                                        factory.createImportSpecifier(
+                                            false,
+                                            undefined,
+                                            factory.createIdentifier(s)
+                                        )
+                                    ]
+                                )
+                            ),
+                            moduleSpecifier,
+                            undefined
                         )
                     );
-                    importParticularAction = true;
                 }
-                statements.push(
-                    factory.createImportDeclaration(
-                        undefined,
-                        undefined,
-                        factory.createImportClause(
-                            false,
-                            undefined,
-                            factory.createNamedImports(namedImports)
-                        ),
-                        factory.createStringLiteral(source),
-                        undefined
-                    )
-                );
             }
-            if (!importParticularAction) {
-                statements.push(
-                    factory.createImportDeclaration(
+            statements.push(
+                factory.createImportDeclaration(
+                    undefined,
+                    undefined,
+                    factory.createImportClause(
+                        false,
                         undefined,
-                        undefined,
-                        factory.createImportClause(
-                            false,
-                            undefined,
-                            factory.createNamedImports(
-                                [
-                                    factory.createImportSpecifier(
-                                        false,
-                                        undefined,
-                                        factory.createIdentifier('ParticularAction')
-                                    ),
-                                    factory.createImportSpecifier(
-                                        false,
-                                        undefined,
-                                        factory.createIdentifier('Action')
-                                    )
-                                ]
+                        factory.createNamedImports(localActions.map(
+                            ele => factory.createImportSpecifier(
+                                false,
+                                undefined,
+                                factory.createIdentifier(ele)
                             )
-                        ),
-                        factory.createStringLiteral('./Action'),
-                        undefined
-                    )
+                        ))
+                    ),
+                    factory.createStringLiteral('./Action'),
+                    undefined
                 )
-            }
+            );
         }
         else {
             statements.push(
@@ -3833,33 +3846,45 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
 }
 
 function outputAction(outputDir: string, printer: ts.Printer) {
+    const actionDictStatements: ts.Statement[] = [];
+    const propertyAssignments: ts.PropertyAssignment[] = [];
     for (const entity in ActionAsts) {
-        const { sourceFile, statements, importedFrom } = ActionAsts[entity];
+        const { sourceFile, statements, importedFrom, actionDefNames, actionNames } = ActionAsts[entity];
         const importStatements: ts.Statement[] = [];
         for (const k in importedFrom) {
             assert(k.endsWith('Action'));
             if (importedFrom[k] !== 'local') {
                 importStatements.push(
-                    factory.createImportDeclaration(
-                        undefined,
-                        undefined,
-                        factory.createImportClause(
-                            false,
-                            undefined,
-                            factory.createNamedImports([
-                                factory.createImportSpecifier(
-                                    false,
-                                    undefined,
-                                    factory.createIdentifier(k)
-                                )
-                            ])
-                        ),
-                        factory.createStringLiteral(importedFrom[k]),
-                        undefined
-                    )
+                    importedFrom[k] as ts.ImportDeclaration
                 );
             }
         }
+        const actionDiff = difference(actionNames, actionDefNames);
+        if (actionDiff.length > 0) {
+            throw new Error(`action not conform to actionDef: ${actionDiff.join(',')}, entity: ${entity}`);
+        }
+        statements.push(
+            factory.createVariableStatement(
+                [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                factory.createVariableDeclarationList(
+                    [factory.createVariableDeclaration(
+                        factory.createIdentifier("ActionDefDict"),
+                        undefined,
+                        undefined,
+                        factory.createObjectLiteralExpression(
+                            actionDefNames.map(
+                                ele => factory.createPropertyAssignment(
+                                    factory.createIdentifier(`${ele}State`),
+                                    factory.createIdentifier(`${firstLetterUpperCase(ele)}ActionDef`)
+                                )
+                            ),
+                            true
+                        )
+                    )],
+                    ts.NodeFlags.Const
+                )
+            )
+        );
         /*  const result = printer.printNode(
              ts.EmitHint.Unspecified,
              factory.createSourceFile(statements,
@@ -3874,7 +3899,59 @@ function outputAction(outputDir: string, printer: ts.Printer) {
             sourceFile);
         const filename = path.join(outputDir, entity, 'Action.ts');
         writeFileSync(filename, result, { flag: 'w' });
+
+        actionDictStatements.push(
+            factory.createImportDeclaration(
+                undefined,
+                undefined,
+                factory.createImportClause(
+                    false,
+                    undefined,
+                    factory.createNamedImports([factory.createImportSpecifier(
+                        false,
+                        factory.createIdentifier("ActionDefDict"),
+                        factory.createIdentifier(entity)
+                    )])
+                ),
+                factory.createStringLiteral(`./${entity}/Action`)
+            )
+        );
+        propertyAssignments.push(
+            factory.createPropertyAssignment(
+                factory.createIdentifier(firstLetterLowerCase(entity)),
+                factory.createIdentifier(entity)
+            )
+        );
     }
+
+    actionDictStatements.push(
+        factory.createVariableStatement(
+            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+            factory.createVariableDeclarationList(
+                [factory.createVariableDeclaration(
+                    factory.createIdentifier("ActionDefDict"),
+                    undefined,
+                    undefined,
+                    factory.createObjectLiteralExpression(
+                        propertyAssignments,
+                        true
+                    )
+                )],
+                ts.NodeFlags.Const
+            )
+        )
+    );
+
+    const resultFile = ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS);
+    const result = printer.printNode(
+        ts.EmitHint.Unspecified,
+        factory.createSourceFile(actionDictStatements, factory.createToken(ts.SyntaxKind.EndOfFileToken),
+            ts.NodeFlags.None),
+        resultFile
+    );
+
+    const fileName = path.join(outputDir, 'ActionDefDict.ts');
+    writeFileSync(fileName, result, { flag: 'w' });
 }
 
 function constructAttributes(entity: string): ts.PropertyAssignment[] {
@@ -4448,6 +4525,7 @@ function outputPackageJson(outputDir: string) {
 
     const indexTs = `export * from './EntityDict';
     export * from './Storage';
+    export * from './ActionDefDict';
     `;
     let filename = path.join(outputDir, 'index.ts');
     writeFileSync(filename, indexTs, { flag: 'w' });

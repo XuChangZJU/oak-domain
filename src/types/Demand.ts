@@ -76,7 +76,7 @@ export type FulltextFilter = {
 };
 
 type Q_LogicKey = '$and' | '$or';
-
+type Q_LinearLogicKey = '$not';
 /* // 这里不能递归引用自身，做个三层的应该够用了
 export type MakeFilter<F extends Object> = Partial<F & {
     [Q in Q_LogicKey]: Array<Partial<F & {
@@ -87,6 +87,8 @@ export type MakeFilter<F extends Object> = Partial<F & {
 }> */
 export type MakeFilterWrapper<F extends Object> = {
     [Q in Q_LogicKey]?: Array<MakeFilterWrapper<F>>;
+} & {
+    [Q in Q_LinearLogicKey]?: MakeFilterWrapper<F>;    
 } & Partial<F>;
 
 export type MakeFilter<F extends Object> = {

@@ -4,9 +4,10 @@ export const genericActions = ['create', 'update', 'remove', 'count', 'stat', 'd
 
 export type AbleAction = 'enable' | 'disable';
 export type AbleState = 'enabled' | 'disabled';
-export const AbleActionDef: ActionDef<AbleAction, AbleState> = {
+export const makeAbleActionDef: (initialState?: AbleState) => ActionDef<AbleAction, AbleState> = (initialState) => ({
     stm: {
         enable: ['disabled', 'enabled'],
         disable: ['enabled', 'disabled'],
     },
-}
+    is: initialState,
+});

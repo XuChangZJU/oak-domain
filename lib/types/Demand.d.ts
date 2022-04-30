@@ -58,8 +58,11 @@ export declare type FulltextFilter = {
     [F in Q_FullTextKey]?: Q_FullTextValue;
 };
 declare type Q_LogicKey = '$and' | '$or';
+declare type Q_LinearLogicKey = '$not';
 export declare type MakeFilterWrapper<F extends Object> = {
     [Q in Q_LogicKey]?: Array<MakeFilterWrapper<F>>;
+} & {
+    [Q in Q_LinearLogicKey]?: MakeFilterWrapper<F>;
 } & Partial<F>;
 export declare type MakeFilter<F extends Object> = {
     '#id'?: NodeId;
