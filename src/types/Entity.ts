@@ -68,10 +68,14 @@ export interface EntityDict {
     [E: string]: EntityDef;
 };
 
+export interface OtmSubProjection extends Omit<DeduceSelection<any>, 'action'> {
+    $entity: string;
+};
+
 type DeduceProjection<SH extends GeneralEntityShape> = Partial<{
     '#id': NodeId;
 } & {
-    [K in keyof SH]: 1 | any;
+    [K in keyof SH]: 1 | OtmSubProjection | any;
 } & ExprOp<keyof SH>>;
 
 export type AttrFilter<SH extends GeneralEntityShape> = {
@@ -155,7 +159,7 @@ export interface OperationResult {
 } */
 
 export type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
-    [K in keyof P]: K extends ExpressionKey ? any : K extends keyof E ? P[K] extends 1 ? E[K]: E[K] extends Array<any> ? Array<SelectRowShape<E[K][0], P[K]['data']>> : SelectRowShape<E[K], P[K]> : any;
+    [K in keyof P]: K extends ExpressionKey ? any : K extends keyof E ? P[K] extends 1 | OtmSubProjection ? E[K]: SelectRowShape<E[K], P[K]> : any;
 }
 
 export type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {

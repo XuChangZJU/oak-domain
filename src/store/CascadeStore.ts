@@ -198,18 +198,16 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                     });
                 }
                 else if (action === 'create') {
-                    const { entityId: fkId } = data2;
-                    assert(typeof fkId === 'string');
+                    const { entityId: fkId, entity } = data2;
+                    assert(typeof fkId === 'string' || entity === attr);        // A中data的entityId作为B中filter的主键
                     assign(operationMto, {
                         filter: addFilterSegment({
                             id: fkId,
                         }), filterMto,
                     });
-                    assign(opData, {
-                        entity: attr,
-                    });
                 }
                 else {
+                    // 剩下三种情况都是B中的filter的id来自A中row的entityId
                     assert(!data2.hasOwnProperty('entityId') && !data2.hasOwnProperty('entity'));
                     assign(operationMto, {
                         filter: addFilterSegment({
@@ -268,128 +266,127 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 await this.cascadeUpdate(relation, operationMto, context, params);
             }
             else {
-                const operationOtm = data2[attr];
-                const { action: actionOtm, data: dataOtm, filter: filterOtm } = operationOtm;
                 assert(relation instanceof Array);
                 const [entityOtm, foreignKey] = relation;
-                if (!foreignKey) {
-                    // 基于entity/entityId的one-to-many
-                    if (action === 'create') {
-                        const { id } = data2;
-                        if (dataOtm instanceof Array) {
-                            dataOtm.forEach(
-                                ele => assign(ele, {
+                const otmOperations = data2[attr];
+                const dealWithOneToMany = async (otm: DeduceUpdateOperation<ED[keyof ED]['Schema']>) => {
+                    const { action: actionOtm, data: dataOtm, filter: filterOtm } = otm;
+                    if (!foreignKey) {
+                        // 基于entity/entityId的one-to-many
+                        if (action === 'create') {
+                            const { id } = data2;
+                            if (dataOtm instanceof Array) {
+                                dataOtm.forEach(
+                                    ele => assign(ele, {
+                                        entity,
+                                        entityId: id,
+                                    })
+                                );
+                            }
+                            else {
+                                assign(dataOtm, {
                                     entity,
                                     entityId: id,
-                                })
-                            );
+                                });
+                            }
                         }
-                        else {
-                            assign(dataOtm, {
-                                entity,
-                                entityId: id,
-                            });
-                        }
-                    }
-                    else if (actionOtm === 'create') {
-                        // 这里先假设filter上一定有id，复杂的情况后面再处理
-                        const { id } = filter!;
-                        assert(typeof id === 'string');
-                        if (dataOtm instanceof Array) {
-                            dataOtm.forEach(
-                                ele => assign(ele, {
+                        else if (actionOtm === 'create') {
+                            // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
+                            const { id } = filter!;
+                            assert(typeof id === 'string');
+                            if (dataOtm instanceof Array) {
+                                dataOtm.forEach(
+                                    ele => assign(ele, {
+                                        entity,
+                                        entityId: id,
+                                    })
+                                );
+                            }
+                            else {
+                                assign(dataOtm, {
                                     entity,
                                     entityId: id,
-                                })
-                            );
+                                });
+                            }
                         }
                         else {
-                            assign(dataOtm, {
-                                entity,
-                                entityId: id,
+                            // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
+                            const { id } = filter!;
+                            assign(otm, {
+                                filter: addFilterSegment({
+                                    entity,
+                                    entityId: id,
+                                }, filterOtm),
                             });
+                            if (action === 'remove' && actionOtm === 'update') {
+                                assign(dataOtm, {
+                                    entity: null,
+                                    entityId: null,
+                                });
+                            }
                         }
                     }
                     else {
-                        assign(operationOtm, {
-                            filter: addFilterSegment({
-                                entity,
-                                entityId: {
-                                    $in: {
-                                        entity,
-                                        data: {
-                                            id: 1,
-                                        },
-                                        filter,
-                                    }
-                                }
-                            }, filterOtm),
-                        });
-                        if (action === 'remove' && actionOtm === 'update') {
-                            assign(dataOtm, {
-                                entity: null,
-                                entityId: null,
-                            });
+                        // 基于foreignKey的one-to-many
+                        if (action === 'create') {
+                            const { id } = data2;
+                            if (dataOtm instanceof Array) {
+                                dataOtm.forEach(
+                                    ele => assign(ele, {
+                                        [foreignKey]: id,
+                                    })
+                                );
+                            }
+                            else {
+                                assign(dataOtm, {
+                                    [foreignKey]: id,
+                                });
+                            }
                         }
+                        else if (actionOtm === 'create') {
+                            // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
+                            const { id } = filter!;
+                            assert(typeof id === 'string');
+                            if (dataOtm instanceof Array) {
+                                dataOtm.forEach(
+                                    ele => assign(ele, {
+                                        [foreignKey]: id,
+                                    })
+                                );
+                            }
+                            else {
+                                assign(dataOtm, {
+                                    [foreignKey]: id,
+                                });
+                            }
+                        }
+                        else {
+                            // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
+                            const { id } = filter!;
+                            assign(otm, {
+                                filter: addFilterSegment({
+                                    [foreignKey]: id,
+                                }, filterOtm),
+                            });
+                            if (action === 'remove' && actionOtm === 'update') {
+                                assign(dataOtm, {
+                                    [foreignKey]: null,
+                                });
+                            }
+                        }
+                    }
+    
+                    await this.cascadeUpdate(entityOtm!, otm, context, params);
+                };
+
+                if (otmOperations instanceof Array) {
+                    for (const oper of otmOperations) {
+                        await dealWithOneToMany(oper);
                     }
                 }
                 else {
-                    // 基于foreignKey的one-to-many
-                    if (action === 'create') {
-                        const { id } = data2;
-                        if (dataOtm instanceof Array) {
-                            dataOtm.forEach(
-                                ele => assign(ele, {
-                                    [foreignKey]: id,
-                                })
-                            );
-                        }
-                        else {
-                            assign(dataOtm, {
-                                [foreignKey]: id,
-                            });
-                        }
-                    }
-                    else if (actionOtm === 'create') {
-                        // 这里先假设filter上一定有id，复杂的情况后面再处理
-                        const { id } = filter!;
-                        assert(typeof id === 'string');
-                        if (dataOtm instanceof Array) {
-                            dataOtm.forEach(
-                                ele => assign(ele, {
-                                    [foreignKey]: id,
-                                })
-                            );
-                        }
-                        else {
-                            assign(dataOtm, {
-                                [foreignKey]: id,
-                            });
-                        }
-                    }
-                    else {
-                        assign(operationOtm, {
-                            filter: addFilterSegment({
-                                [foreignKey]: {
-                                    $in: {
-                                        entity,
-                                        data: {
-                                            id: 1,
-                                        },
-                                        filter,
-                                    }
-                                }
-                            }, filterOtm),
-                        });
-                        if (action === 'remove' && actionOtm === 'update') {
-                            assign(dataOtm, {
-                                [foreignKey]: null,
-                            });
-                        }
-                    }
+                    await dealWithOneToMany(otmOperations);
                 }
-
-                await this.cascadeUpdate(entityOtm!, operationOtm, context, params);
             }
         }
 

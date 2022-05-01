@@ -1545,14 +1545,34 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                     const identifier = `${entityNameLc}$${foreignKey}`;
                     properties.push(
                         [identifier, false,
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, entityName, 'Selection'),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, entityName, 'Exportation'),
-                                undefined
-                            )
+                            factory.createIntersectionTypeNode([
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, entityName, 'Selection'),
+                                    undefined
+                                ),
+                                factory.createTypeLiteralNode([
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier("$entity"),
+                                        undefined,
+                                        factory.createLiteralTypeNode(factory.createStringLiteral(firstLetterLowerCase(entityName)))
+                                    )
+                                ])
+                            ]),
+                            factory.createIntersectionTypeNode([
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, entityName, 'Exportation'),
+                                    undefined
+                                ),
+                                factory.createTypeLiteralNode([
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier("$entity"),
+                                        undefined,
+                                        factory.createLiteralTypeNode(factory.createStringLiteral(firstLetterLowerCase(entityName)))
+                                    )
+                                ])
+                            ])
                         ]
                     );
                 }
@@ -2627,19 +2647,74 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             foreignKeySet[entityName].forEach(
                 (foreignKey) => {
                     const identifier = `${entityNameLc}$${foreignKey}`;
+                    const otmCreateOperationDataNode = factory.createTypeReferenceNode(
+                        factory.createIdentifier("Omit"),
+                        [
+                            factory.createTypeReferenceNode(
+                                createForeignRef(entity, entityName, 'CreateOperationData'),
+                                undefined
+                            ),
+                            factory.createUnionTypeNode(foreignKey === 'entity' ? [
+                                factory.createLiteralTypeNode(factory.createStringLiteral("entity")),
+                                factory.createLiteralTypeNode(factory.createStringLiteral("entityId"))
+                            ] : [
+                                factory.createLiteralTypeNode(factory.createStringLiteral(foreignKey)),
+                                factory.createLiteralTypeNode(factory.createStringLiteral(`${foreignKey}Id`))
+                            ])
+                        ]
+                    );
+                    const otmCreateOperationNode = factory.createTypeReferenceNode(
+                        factory.createIdentifier("OakOperation"),
+                        [
+                            factory.createLiteralTypeNode(factory.createStringLiteral("create")),
+                            factory.createUnionTypeNode([
+                                otmCreateOperationDataNode,
+                                factory.createArrayTypeNode(
+                                    otmCreateOperationDataNode
+                                )
+                            ])
+                        ]
+                    );
+                    const otmUpdateOperationNode = factory.createTypeReferenceNode(
+                        factory.createIdentifier("OakOperation"),
+                        [
+                            factory.createLiteralTypeNode(factory.createStringLiteral("update")),
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("Omit"),
+                                [
+                                    factory.createTypeReferenceNode(
+                                        createForeignRef(entity, entityName, 'UpdateOperationData'),
+                                        undefined
+                                    ),
+                                    factory.createUnionTypeNode(foreignKey === 'entity' ? [
+                                        factory.createLiteralTypeNode(factory.createStringLiteral("entity")),
+                                        factory.createLiteralTypeNode(factory.createStringLiteral("entityId"))
+                                    ] : [
+                                        factory.createLiteralTypeNode(factory.createStringLiteral(foreignKey)),
+                                        factory.createLiteralTypeNode(factory.createStringLiteral(`${foreignKey}Id`))
+                                    ])
+                                ]
+                            ),
+                            factory.createTypeReferenceNode(
+                                createForeignRef(entity, entityName, 'Filter'),
+                                undefined
+                            )
+                        ]
+                    );
+
                     propertySignatures.push(
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier(identifier),
                             factory.createToken(ts.SyntaxKind.QuestionToken),
                             factory.createUnionTypeNode([
+                                otmUpdateOperationNode,
                                 factory.createTypeReferenceNode(
-                                    createForeignRef(entity, entityName, 'CreateOperation'),
-                                    undefined
-                                ),
-                                factory.createTypeReferenceNode(
-                                    createForeignRef(entity, entityName, 'UpdateOperation'),
-                                    undefined
+                                    factory.createIdentifier("Array"),
+                                    [factory.createUnionTypeNode([
+                                        otmCreateOperationNode,
+                                        otmUpdateOperationNode
+                                    ])]
                                 )
                             ])
                         )
@@ -2677,8 +2752,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 [
                     factory.createLiteralTypeNode(factory.createStringLiteral("create")),
                     factory.createTypeReferenceNode(
-                        factory.createIdentifier("CreateOperationData"),
-                        undefined
+                        factory.createIdentifier("CreateOperationData")
                     )
                 ]
             )
@@ -2695,8 +2769,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("Array"),
                         [factory.createTypeReferenceNode(
-                            factory.createIdentifier("CreateOperationData"),
-                            undefined
+                            factory.createIdentifier("CreateOperationData")
                         )]
                     )
                 ]
@@ -2709,12 +2782,10 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             undefined,
             factory.createUnionTypeNode([
                 factory.createTypeReferenceNode(
-                    factory.createIdentifier("CreateSingleOperation"),
-                    undefined
+                    factory.createIdentifier("CreateSingleOperation")
                 ),
                 factory.createTypeReferenceNode(
-                    factory.createIdentifier("CreateMultipleOperation"),
-                    undefined
+                    factory.createIdentifier("CreateMultipleOperation")
                 )
             ])
         )
@@ -2776,10 +2847,24 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                                         undefined,
                                         factory.createIdentifier(one[1]),
                                         factory.createToken(ts.SyntaxKind.QuestionToken),
-                                        factory.createTypeReferenceNode(
-                                            createForeignRef(entity, one[0], 'CreateSingleOperation')
-                                        )
-                                    )
+                                        factory.createUnionTypeNode([
+                                            factory.createTypeReferenceNode(
+                                                createForeignRef(entity, one[0], 'CreateSingleOperation')
+                                            ),
+                                            factory.createTypeReferenceNode(
+                                                createForeignRef(entity, one[0], 'UpdateOperation')
+                                            ),
+                                            factory.createTypeReferenceNode(
+                                                createForeignRef(entity, one[0], 'RemoveOperation')
+                                            )
+                                        ])
+                                    ),
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(`${one[1]}Id`),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
+                                    ),
                                 ]
                             ),
                             factory.createTypeLiteralNode(
@@ -2788,26 +2873,8 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                                         undefined,
                                         factory.createIdentifier(one[1]),
                                         factory.createToken(ts.SyntaxKind.QuestionToken),
-                                        factory.createTypeReferenceNode(
-                                            createForeignRef(entity, one[0], 'UpdateOperation')
-                                        )
-                                    )
-                                ]
-                            ),
-                            factory.createTypeLiteralNode(
-                                [
-                                    factory.createPropertySignature(
-                                        undefined,
-                                        factory.createIdentifier(one[1]),
-                                        factory.createToken(ts.SyntaxKind.QuestionToken),
-                                        factory.createTypeReferenceNode(
-                                            createForeignRef(entity, one[0], 'RemoveOperation')
-                                        )
-                                    )
-                                ]
-                            ),
-                            factory.createTypeLiteralNode(
-                                [
+                                        factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
+                                    ),
                                     factory.createPropertySignature(
                                         undefined,
                                         factory.createIdentifier(`${one[1]}Id`),
@@ -2829,6 +2896,13 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 );
             }
         }
+        if (upsertOneNodes.length > 0) {
+            adNodes.push(
+                factory.createIntersectionTypeNode(
+                    upsertOneNodes
+                )
+            );
+        }
 
         const reverseOneNodes: ts.TypeNode[] = [];
         if (ReversePointerRelations[entity]) {
@@ -2842,36 +2916,32 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                                 undefined,
                                 factory.createIdentifier(firstLetterLowerCase(one)),
                                 factory.createToken(ts.SyntaxKind.QuestionToken),
-                                factory.createTypeReferenceNode(
-                                    createForeignRef(entity, one, 'CreateSingleOperation')
-                                )
+                                factory.createUnionTypeNode([
+                                    factory.createTypeReferenceNode(
+                                        createForeignRef(entity, one, 'CreateSingleOperation')
+                                    ),
+                                    factory.createTypeReferenceNode(
+                                        createForeignRef(entity, one, 'UpdateOperation')
+                                    ),
+                                    factory.createTypeReferenceNode(
+                                        createForeignRef(entity, one, 'RemoveOperation')
+                                    )
+                                ])
+                            ),
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier('entityId'),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
+                            ),
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier('entity'),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
                             )
                         ]
                     ),
-                    factory.createTypeLiteralNode(
-                        [
-                            factory.createPropertySignature(
-                                undefined,
-                                factory.createIdentifier(firstLetterLowerCase(one)),
-                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                factory.createTypeReferenceNode(
-                                    createForeignRef(entity, one, 'UpdateOperation')
-                                )
-                            )
-                        ]
-                    ),
-                    factory.createTypeLiteralNode(
-                        [
-                            factory.createPropertySignature(
-                                undefined,
-                                factory.createIdentifier(firstLetterLowerCase(one)),
-                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                factory.createTypeReferenceNode(
-                                    createForeignRef(entity, one, 'RemoveOperation')
-                                )
-                            )
-                        ]
-                    )
                 );
             }
             if (process.env.COMPLING_AS_LIB) {
@@ -2914,13 +2984,6 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             );
         }
 
-        if (upsertOneNodes.length > 0) {
-            adNodes.push(
-                factory.createIntersectionTypeNode(
-                    upsertOneNodes
-                )
-            );
-        }
         if (reverseOneNodes.length > 0) {
             adNodes.push(
                 factory.createUnionTypeNode(
@@ -2956,6 +3019,35 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             foreignKeySet[entityName].forEach(
                 (foreignKey) => {
                     const identifier = `${entityNameLc}s$${foreignKey}`;
+                    
+                    const otmCreateOperationDataNode = factory.createTypeReferenceNode(
+                        factory.createIdentifier("Omit"),
+                        [
+                            factory.createTypeReferenceNode(
+                                createForeignRef(entity, entityName, 'CreateOperationData'),
+                                undefined
+                            ),
+                            factory.createUnionTypeNode(foreignKey === 'entity' ? [
+                                factory.createLiteralTypeNode(factory.createStringLiteral("entity")),
+                                factory.createLiteralTypeNode(factory.createStringLiteral("entityId"))
+                            ] : [
+                                factory.createLiteralTypeNode(factory.createStringLiteral(foreignKey)),
+                                factory.createLiteralTypeNode(factory.createStringLiteral(`${foreignKey}Id`))
+                            ])
+                        ]
+                    );
+                    const otmCreateOperationNode = factory.createTypeReferenceNode(
+                        factory.createIdentifier("OakOperation"),
+                        [
+                            factory.createLiteralTypeNode(factory.createStringLiteral("create")),
+                            factory.createUnionTypeNode([
+                                otmCreateOperationDataNode,
+                                factory.createArrayTypeNode(
+                                    otmCreateOperationDataNode
+                                )
+                            ])
+                        ]
+                    );
                     propertySignatures2.push(
                         factory.createPropertySignature(
                             undefined,
@@ -2963,22 +3055,26 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                             factory.createToken(ts.SyntaxKind.QuestionToken),
                             factory.createUnionTypeNode([
                                 factory.createTypeReferenceNode(
-                                    createForeignRef(entity, entityName, 'CreateOperation'),
+                                    createForeignRef(entity, entityName, 'UpdateOperation'),
                                     undefined
                                 ),
                                 factory.createTypeReferenceNode(
-                                    factory.createIdentifier("Omit"),
-                                    [
+                                    createForeignRef(entity, entityName, 'RemoveOperation'),
+                                    undefined
+                                ),
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier("Array"),
+                                    [factory.createUnionTypeNode([
+                                        otmCreateOperationNode,
                                         factory.createTypeReferenceNode(
                                             createForeignRef(entity, entityName, 'UpdateOperation'),
                                             undefined
                                         ),
-                                        factory.createUnionTypeNode([
-                                            factory.createLiteralTypeNode(factory.createStringLiteral("id")),
-                                            factory.createLiteralTypeNode(factory.createStringLiteral("ids")),
-                                            factory.createLiteralTypeNode(factory.createStringLiteral("filter"))
-                                        ])
-                                    ]
+                                        factory.createTypeReferenceNode(
+                                            createForeignRef(entity, entityName, 'RemoveOperation'),
+                                            undefined
+                                        )
+                                    ])]
                                 )
                             ])
                         )
@@ -3021,8 +3117,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         ]) :
                         factory.createLiteralTypeNode(factory.createStringLiteral("update")),
                     factory.createTypeReferenceNode(
-                        factory.createIdentifier("UpdateOperationData"),
-                        undefined
+                        factory.createIdentifier("UpdateOperationData")
                     ),
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("Filter"),
@@ -3129,7 +3224,12 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         }
     }
 
-    const propertySignatures3: ts.TypeElement[] = [];
+    /**
+     *  remove的同时进行cascade update或者cascade remove，感觉用触发器会更自然，因为在用户界面上似乎不会有对应的操作。
+     *  这部分代码暂时封闭 by Xc 20220501
+     **/
+
+    /* const propertySignatures3: ts.TypeElement[] = [];
     if (process.env.COMPLING_AS_LIB) {
         propertySignatures3.push(
             factory.createIndexSignature(
@@ -3159,10 +3259,18 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                             undefined,
                             factory.createIdentifier(identifier),
                             factory.createToken(ts.SyntaxKind.QuestionToken),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Omit"),
-                                [
-                                    factory.createUnionTypeNode([
+                            factory.createUnionTypeNode([
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, entityName, 'UpdateOperation'),
+                                    undefined
+                                ),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, entityName, 'RemoveOperation'),
+                                    undefined
+                                ),
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier("Array"),
+                                    [factory.createUnionTypeNode([
                                         factory.createTypeReferenceNode(
                                             createForeignRef(entity, entityName, 'UpdateOperation'),
                                             undefined
@@ -3171,14 +3279,9 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                                             createForeignRef(entity, entityName, 'RemoveOperation'),
                                             undefined
                                         )
-                                    ]),
-                                    factory.createUnionTypeNode([
-                                        factory.createLiteralTypeNode(factory.createStringLiteral("id")),
-                                        factory.createLiteralTypeNode(factory.createStringLiteral("ids")),
-                                        factory.createLiteralTypeNode(factory.createStringLiteral("filter"))
-                                    ])
-                                ]
-                            )
+                                    ])]
+                                )
+                            ])
                         )
                     );
                 }
@@ -3191,7 +3294,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 propertySignatures3
             )
         );
-    }
+    } */
 
     statements.push(
         factory.createTypeAliasDeclaration(
