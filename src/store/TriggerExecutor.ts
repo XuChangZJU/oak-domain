@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { assign, pull, unset } from "lodash";
 import { addFilterSegment } from "../store/filter";
-import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict } from "../types/Entity";
+import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict, OperateParams } from "../types/Entity";
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Context } from '../types/Context';
@@ -127,7 +127,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
         entity: T,
         operation: ED[T]['Operation'],
         trigger: Trigger<ED, T, Cxt>,
-        context: Cxt,
+        context: Cxt
     ) {
         assert(trigger.action !== 'select');
         if ((trigger as CreateTriggerCrossTxn<ED, T, Cxt>).strict === 'makeSure') {
@@ -179,7 +179,8 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
     async preOperation<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'],
-        context: Cxt
+        context: Cxt,
+        params?: OperateParams
     ): Promise<void> {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
@@ -191,7 +192,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
             );
 
             for (const trigger of preTriggers) {
-                const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as DeduceCreateOperation<ED[T]['Schema']> }, context);
+                const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as DeduceCreateOperation<ED[T]['Schema']> }, context, params);
                 if (number > 0) {
                     this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
                 }
@@ -208,13 +209,13 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
     }
 
     private onCommit<T extends keyof ED>(
-        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation']) {
+        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'], params?: OperateParams) {
         return async () => {
             const context = this.contextBuilder();
             await context.begin();
             const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({
                 operation: operation as DeduceCreateOperation<ED[T]['Schema']>,
-            }, context);
+            }, context, params);
             const { rowStore } = context;
             if ((trigger as CreateTriggerCrossTxn<ED, T, Cxt>).strict === 'makeSure') {
                 // 如果是必须完成的trigger，在完成成功后要把trigger相关的属性置null;
@@ -254,15 +255,17 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
     private async postCommitTrigger<T extends keyof ED>(
         operation: ED[T]['Operation'],
         trigger: Trigger<ED, T, Cxt>,
-        context: Cxt
+        context: Cxt,
+        params?: OperateParams,
     ) {
-        context.on('commit', this.onCommit(trigger, operation));
+        context.on('commit', this.onCommit(trigger, operation, params));
     }
 
     async postOperation<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'],
-        context: Cxt
+        context: Cxt,
+        params?: OperateParams,
     ): Promise<void> {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
@@ -274,7 +277,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
             );
 
             for (const trigger of postTriggers) {
-                const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as DeduceCreateOperation<ED[T]['Schema']> }, context);
+                const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as DeduceCreateOperation<ED[T]['Schema']> }, context, params);
                 if (number > 0) {
                     this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
                 }
@@ -285,7 +288,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
             );
 
             for (const trigger of commitTriggers) {
-                await this.postCommitTrigger(operation, trigger, context);
+                await this.postCommitTrigger(operation, trigger, context, params);
             }
         }
     }
