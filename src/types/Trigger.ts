@@ -10,8 +10,8 @@ export interface CreateTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     entity: T;
     name: string;
     action: 'create',
-    check?: (operation: DeduceCreateOperation<ED[T]['Schema']>) => boolean;
-    fn: (event: { operation: DeduceCreateOperation<ED[T]['Schema']>; }, context: Cxt, params?: OperateParams) => Promise<number>;
+    check?: (operation: DeduceCreateOperation<ED[T]['OpSchema']>) => boolean;
+    fn: (event: { operation: DeduceCreateOperation<ED[T]['OpSchema']>; }, context: Cxt, params?: OperateParams) => Promise<number>;
 };
 
 export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends CreateTriggerBase<ED, T, Cxt> {
@@ -32,8 +32,8 @@ export interface UpdateTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     name: string;
     action: Exclude<ED[T]['Action'], GenericAction> | 'update' | Array<Exclude<ED[T]['Action'], GenericAction> | 'update'>,
     attributes?: keyof ED[T]['OpSchema'] | Array<keyof ED[T]['OpSchema']>;
-    check?: (operation: DeduceUpdateOperation<ED[T]['Schema']>) => boolean;
-    fn: (event: { operation: DeduceUpdateOperation<ED[T]['Schema']> }, context: Cxt, params?: OperateParams) => Promise<number>;
+    check?: (operation: DeduceUpdateOperation<ED[T]['OpSchema']>) => boolean;
+    fn: (event: { operation: DeduceUpdateOperation<ED[T]['OpSchema']> }, context: Cxt, params?: OperateParams) => Promise<number>;
 };
 
 export interface UpdateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
@@ -53,8 +53,8 @@ export interface RemoveTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     entity: T;
     name: string;
     action: 'remove',
-    check?: (operation: DeduceRemoveOperation<ED[T]['Schema']>) => boolean;
-    fn: (event: { operation: DeduceRemoveOperation<ED[T]['Schema']> }, context: Cxt, params?: OperateParams) => Promise<number>;
+    check?: (operation: DeduceRemoveOperation<ED[T]['OpSchema']>) => boolean;
+    fn: (event: { operation: DeduceRemoveOperation<ED[T]['OpSchema']> }, context: Cxt, params?: OperateParams) => Promise<number>;
 };
 
 export interface RemoveTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends RemoveTriggerBase<ED, T, Cxt> {

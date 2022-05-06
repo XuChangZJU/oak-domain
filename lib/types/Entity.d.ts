@@ -45,7 +45,7 @@ export interface EntityDef {
     Action: string;
     ParticularAction?: string;
     Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
-    Operation: DeduceOperation<this['Schema']>;
+    Operation: DeduceOperation<this['OpSchema']>;
 }
 export interface EntityDict {
     [E: string]: EntityDef;
@@ -70,11 +70,15 @@ export declare type DeduceSorter<SH extends GeneralEntityShape> = Array<{
     $direction?: "asc" | "desc";
 }>;
 export declare type DeduceSelection<SH extends GeneralEntityShape> = Selection<DeduceProjection<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
-export declare type DeduceCreateOperationData<SH extends GeneralEntityShape> = FormCreateData<SH>;
+export declare type DeduceCreateOperationData<SH extends GeneralEntityShape> = FormCreateData<SH> & {
+    [k: string]: any;
+};
 export declare type DeduceCreateSingleOperation<SH extends GeneralEntityShape> = Operation<'create', DeduceCreateOperationData<SH>>;
 export declare type DeduceCreateMultipleOperation<SH extends GeneralEntityShape> = Operation<'create', Array<DeduceCreateOperationData<SH>>>;
 export declare type DeduceCreateOperation<SH extends GeneralEntityShape> = DeduceCreateSingleOperation<SH> | DeduceCreateMultipleOperation<SH>;
-export declare type DeduceUpdateOperationData<SH extends GeneralEntityShape> = FormUpdateData<SH>;
+export declare type DeduceUpdateOperationData<SH extends GeneralEntityShape> = FormUpdateData<SH> & {
+    [k: string]: any;
+};
 export declare type DeduceUpdateOperation<SH extends GeneralEntityShape> = Operation<'update' | string, DeduceUpdateOperationData<SH>, DeduceFilter<SH>>;
 export declare type DeduceRemoveOperationData<SH extends GeneralEntityShape> = {
     [A in keyof SH]?: any;

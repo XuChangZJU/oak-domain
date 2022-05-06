@@ -61,7 +61,7 @@ export interface EntityDef {
     Action: string;
     ParticularAction?: string;
     Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
-    Operation: DeduceOperation<this['Schema']>;
+    Operation: DeduceOperation<this['OpSchema']>;
 };
 
 export interface EntityDict {
@@ -95,7 +95,9 @@ export type DeduceSorter<SH extends GeneralEntityShape> = Array<{
 
 export type DeduceSelection<SH extends GeneralEntityShape> = Selection<DeduceProjection<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 
-export type DeduceCreateOperationData<SH extends GeneralEntityShape> = FormCreateData<SH>;
+export type DeduceCreateOperationData<SH extends GeneralEntityShape> = FormCreateData<SH> & {
+    [k: string]: any;
+};
 
 export type DeduceCreateSingleOperation<SH extends GeneralEntityShape> = Operation<'create', DeduceCreateOperationData<SH>>;
 
@@ -103,7 +105,9 @@ export type DeduceCreateMultipleOperation<SH extends GeneralEntityShape> = Opera
 
 export type DeduceCreateOperation<SH extends GeneralEntityShape> = DeduceCreateSingleOperation<SH> | DeduceCreateMultipleOperation<SH>;
 
-export type DeduceUpdateOperationData<SH extends GeneralEntityShape> = FormUpdateData<SH>;
+export type DeduceUpdateOperationData<SH extends GeneralEntityShape> = FormUpdateData<SH> & {
+    [k: string]: any;
+};
 
 export type DeduceUpdateOperation<SH extends GeneralEntityShape> = Operation<
     'update' | string,
