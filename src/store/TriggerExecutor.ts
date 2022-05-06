@@ -32,9 +32,9 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
     private volatileEntities: Array<keyof ED>;
 
     private logger: Logger;
-    private contextBuilder: () => Cxt;
+    private contextBuilder: (scene: string) => Cxt;
 
-    constructor(contextBuilder: () => Cxt, logger: Logger = console) {
+    constructor(contextBuilder: (scene: string) => Cxt, logger: Logger = console) {
         super();
         this.contextBuilder = contextBuilder;
         this.logger = logger;
@@ -211,7 +211,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
     private onCommit<T extends keyof ED>(
         trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'], params?: OperateParams) {
         return async () => {
-            const context = this.contextBuilder();
+            const context = this.contextBuilder('triggerExecutor: onCommit');
             await context.begin();
             const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({
                 operation: operation as DeduceCreateOperation<ED[T]['Schema']>,

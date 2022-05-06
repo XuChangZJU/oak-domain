@@ -47,16 +47,16 @@ export function judgeRelation<ED extends {
             assert(false);
         }
     }
+    else if ((attributes.hasOwnProperty(`${attr}Id`))){
+        const { type, ref } = attributes[`${attr}Id`];
+        assert (type === 'ref');
+        return ref!;
+    }
     else if (attributes.hasOwnProperty('entity')
         && attributes.hasOwnProperty('entityId')
         && schema.hasOwnProperty(attr)) {
         // 反向指针的外键
         return 2;
-    }
-    else if ((attributes.hasOwnProperty(`${attr}Id`))){
-        const { type, ref } = attributes[`${attr}Id`];
-        assert (type === 'ref');
-        return ref!;
     }
     else {
         assert(initinctiveAttributes.includes(attr), `${attr}属性找不到`);

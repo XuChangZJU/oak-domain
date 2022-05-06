@@ -3,9 +3,9 @@ import { assign, cloneDeep, intersection, keys } from "lodash";
 import { StorageSchema } from '../types';
 import { DeduceFilter, EntityDict } from "../types/Entity";
 
-export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(segment: ED[T]['Selection']['filter'], filter2?: ED[T]['Selection']['filter']) {
-    const filter: ED[T]['Selection']['filter'] = filter2 ? cloneDeep(filter2) : {}; 
-    assert(segment);
+export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(segment2: ED[T]['Selection']['filter'], filter2?: ED[T]['Selection']['filter']) {
+    const filter: ED[T]['Selection']['filter'] = filter2 ? cloneDeep(filter2) : {};
+    const segment: ED[T]['Selection']['filter'] = segment2 ? cloneDeep(segment2) : {};
     if (intersection(keys(filter), keys(segment)).length > 0) {
         if (filter!.hasOwnProperty('$and')) {
             filter!.$and!.push(segment!);
