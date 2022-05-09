@@ -27,7 +27,7 @@ export class OakUserException extends OakException {
 /**
  * 当输入的数据非法时抛此异常，attributes表示非法的属性
  */
-export class OakInputIllegalException extends Error {
+export class OakInputIllegalException extends OakUserException {
     private attributes: string[];
     constructor(attributes: string[], message?: string) {
         super(message);
@@ -48,7 +48,7 @@ export class OakInputIllegalException extends Error {
 /**
  * 用户权限不够时抛的异常
  */
-export class OakUserUnpermittedException extends Error {
+export class OakUserUnpermittedException extends OakUserException {
 
 };
 

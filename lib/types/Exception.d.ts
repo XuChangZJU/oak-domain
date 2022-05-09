@@ -15,7 +15,7 @@ export declare class OakRowInconsistencyException<ED extends EntityDict> extends
 /**
  * 当输入的数据非法时抛此异常，attributes表示非法的属性
  */
-export declare class OakInputIllegalException extends Error {
+export declare class OakInputIllegalException extends OakUserException {
     private attributes;
     constructor(attributes: string[], message?: string);
     getAttributes(): string[];
@@ -24,5 +24,5 @@ export declare class OakInputIllegalException extends Error {
 /**
  * 用户权限不够时抛的异常
  */
-export declare class OakUserUnpermittedException extends Error {
+export declare class OakUserUnpermittedException extends OakUserException {
 }
