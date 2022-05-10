@@ -18,4 +18,6 @@ export declare const isPhone: ValidatorFunction;
 export declare const isNumber: ValidatorFunction;
 export declare const isMoney: ValidatorMoneyFunction;
 export declare const isVehicleNumber: ValidatorFunction;
+export declare function checkAttributesNotNull<T extends Record<string, any>>(data: T, attributes: Array<keyof T>, allowEmpty?: true): void;
+export declare function checkAttributesScope<T extends Record<string, any>>(data: T, attributes: Array<keyof T>): void;
 export {};

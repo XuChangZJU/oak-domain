@@ -16,4 +16,5 @@ export declare abstract class RowStore<ED extends EntityDict, Cxt extends Contex
     abstract begin(option?: TxnOption): Promise<string>;
     abstract commit(txnId: string): Promise<void>;
     abstract rollback(txnId: string): Promise<void>;
+    getSchema(): StorageSchema<ED>;
 }

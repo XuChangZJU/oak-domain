@@ -46,4 +46,8 @@ export abstract class RowStore<ED extends EntityDict, Cxt extends Context<ED>> {
     abstract commit(txnId: string): Promise<void>;
 
     abstract rollback(txnId: string): Promise<void>;
+
+    getSchema () {
+        return this.storageSchema;
+    }
 }

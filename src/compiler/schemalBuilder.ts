@@ -67,7 +67,7 @@ const ActionAsts: {
         statements: Array<ts.Statement>;
         sourceFile: ts.SourceFile;
         importedFrom: Record<string, ts.ImportDeclaration | 'local'>;
-        actionNames: string[];
+        // actionNames: string[];
         actionDefNames: string[];
     };
 } = {};
@@ -117,9 +117,9 @@ function pushStatementIntoActionAst(
     node: ts.Statement,
     sourceFile: ts.SourceFile) {
 
-    let actionNames;
+    // let actionNames;
     let actionDefName;
-    if (ts.isTypeAliasDeclaration(node) && node.name.text === 'ParticularAction') {
+    /* if (ts.isTypeAliasDeclaration(node) && node.name.text === 'ParticularAction') {
         const { type } = node;
         if (ts.isUnionTypeNode(type)) {
             actionNames = type.types.map(
@@ -137,7 +137,7 @@ function pushStatementIntoActionAst(
             assert(text.endsWith('Action'));
             actionNames = [firstLetterLowerCase(text.slice(0, text.length - 6))];
         }
-    }
+    } */
 
     if (ts.isVariableStatement(node)) {
         const { declarationList: { declarations } } = node;
@@ -153,9 +153,9 @@ function pushStatementIntoActionAst(
 
     if (ActionAsts[moduleName]) {
         ActionAsts[moduleName].statements.push(node);
-        if (actionNames) {
+        /* if (actionNames) {
             ActionAsts[moduleName].actionNames = actionNames;
-        }
+        } */
         if (actionDefName) {
             ActionAsts[moduleName].actionDefNames.push(actionDefName);
         }
@@ -166,7 +166,7 @@ function pushStatementIntoActionAst(
                 statements: [...ActionImportStatements(), node],
                 sourceFile,
                 importedFrom: {},
-                actionNames,
+                // actionNames,
                 actionDefNames: actionDefName ? [actionDefName] : [],
             }
         });
@@ -226,54 +226,64 @@ function addActionSource(moduleName: string, name: ts.Identifier, node: ts.Impor
 function getStringTextFromUnionStringLiterals(moduleName: string, filename: string, node: ts.TypeReferenceNode, program: ts.Program) {
     const checker = program.getTypeChecker();
     const symbol = checker.getSymbolAtLocation(node.typeName);
-    const typee = checker.getDeclaredTypeOfSymbol(symbol!);
+    let declaration = symbol?.getDeclarations()![0]!;
+    let isImport = false;
+    /* const typee = checker.getDeclaredTypeOfSymbol(symbol!);
 
-    // const [symbol] = checker.getSymbolsInScope(node.typeName, ts.SymbolFlags.Type | ts.SymbolFlags.TypeAlias);
-    const declaration = typee.aliasSymbol!.getDeclarations()![0];
+    const declaration = typee.aliasSymbol!.getDeclarations()![0]; */
+    if (ts.isImportSpecifier(declaration)) {
+        isImport = true;
+        const typee = checker.getDeclaredTypeOfSymbol(symbol!);
+        declaration = typee.aliasSymbol!.getDeclarations()![0];
+    }
 
     assert(ts.isTypeAliasDeclaration(declaration));
     const { type, name } = declaration;
-    assert(ts.isUnionTypeNode(type!), `${filename}中引用的action「${(<ts.Identifier>name).text}」的定义不是union类型`);
+    // assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${filename}中引用的action「${(<ts.Identifier>name).text}」的定义不是union和stringLiteral类型`);
 
     // 如果这个action是从外部导入的，在这里要记下来此entity和这个导入之间的关系
-    if (ts.isImportSpecifier(symbol!.getDeclarations()![0]!)) {
+    if (isImport) {
         const importDeclartion = symbol!.getDeclarations()![0]!.parent.parent.parent;
 
         assert(ts.isImportDeclaration(importDeclartion));
         addActionSource(moduleName, name, importDeclartion);
     }
     else {
-        assert(ts.isTypeAliasDeclaration(symbol!.getDeclarations()![0]!));
         const ast = ActionAsts[moduleName];
         assign(ast.importedFrom, {
             [name.text]: 'local',
         });
     }
 
-    const actions = type!.types!.map(
-        ele => {
-            assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `${filename}中引用的action${(<ts.Identifier>name).text}中存在不是stringliteral的类型`);
-            assert(!ele.literal.text.includes('$'), `${filename}中引用的action${(<ts.Identifier>name).text}中的action「${ele.literal.text}」包含非法字符$`);
-            assert(ele.literal.text.length > 0, `${filename}中引用的action${(<ts.Identifier>name).text}中的action「${ele.literal.text}」长度非法`);
-            assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `${filename}中引用的action${(<ts.Identifier>name).text}中的action「${ele.literal.text}」长度过长`);
-            return ele.literal.text;
-        }
-    );
-    return {
-        name: name.text,
-        actions,
-    };
+    const getStringLiteral = (ele: ts.TypeNode) => {
+        assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `${filename}中引用的action${(<ts.Identifier>name).text}中存在不是stringliteral的类型`);
+        assert(!ele.literal.text.includes('$'), `${filename}中引用的action${(<ts.Identifier>name).text}中的action「${ele.literal.text}」包含非法字符$`);
+        assert(ele.literal.text.length > 0, `${filename}中引用的action${(<ts.Identifier>name).text}中的action「${ele.literal.text}」长度非法`);
+        assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `${filename}中引用的action${(<ts.Identifier>name).text}中的action「${ele.literal.text}」长度过长`);
+        return ele.literal.text;
+    }
+
+    if (ts.isUnionTypeNode(type)) {
+        const actions = type.types!.map(
+            ele => getStringLiteral(ele)
+        );
+
+        return actions;
+    }
+    else {
+        assert(ts.isLiteralTypeNode(type!), `${filename}中引用的action「${(<ts.Identifier>name).text}」的定义不是union和stringLiteral类型`);
+        const action = getStringLiteral(type);
+        return [action];
+    }
 }
 
 const RESERVED_ACTION_NAMES = ['GenericAction', 'ParticularAction'];
 import { genericActions } from '../actions/action';
 import { unIndexedTypes } from '../types/DataType';
-function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program, schemaAttrs: ts.TypeElement[]) {
-    const ActionDict: Record<string, string> = {};
-    const actionss = [{
-        name: 'GenericAction',
-        actions: genericActions
-    }];
+function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program) {
+    const actionTexts = genericActions.map(
+        ele => ele
+    );
     if (ts.isUnionTypeNode(node)) {
         const actionNames = node.types.map(
             ele => {
@@ -287,54 +297,48 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
         assert(intersection(actionNames, RESERVED_ENTITIES).length === 0,
             `${filename}中的Action命名不能是「${RESERVED_ACTION_NAMES.join(',')}」之一`);
 
-        actionss.push(...node.types.map(
-            ele => getStringTextFromUnionStringLiterals(moduleName, filename, ele as ts.TypeReferenceNode, program)
-        ));
+        node.types.forEach(
+            ele => {
+                if (ts.isTypeReferenceNode(ele)) {
+                    actionTexts.push(...getStringTextFromUnionStringLiterals(moduleName, filename, ele, program));
+                }
+                else {
+                    assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `【${moduleName}】action的定义既非Type也不是string`);
+                    actionTexts.push(ele.literal.text);
+                }
+            }
+        );
     }
-    else {
-        assert(ts.isTypeReferenceNode(node));
+    else if (ts.isTypeReferenceNode(node)){
         if (ts.isIdentifier(node.typeName)) {
             assert(!RESERVED_ACTION_NAMES.includes(node.typeName.text),
                 `${filename}中的Action命名不能是「${RESERVED_ACTION_NAMES.join(',')}」之一`);
         }
-        actionss.push(getStringTextFromUnionStringLiterals(moduleName, filename, node, program));
+        actionTexts.push(...getStringTextFromUnionStringLiterals(moduleName, filename, node, program));
+    }
+    else {
+        assert(ts.isLiteralTypeNode(node) && ts.isStringLiteral(node.literal), `【${moduleName}】action的定义既非Type也不是string`);
+        actionTexts.push(node.literal.text);
     }
 
     // 所有的action定义不能有重名
-    actionss.forEach(
-        ({ actions, name }) => {
-            actions.forEach(
-                (action) => {
-                    assert(action.length <= STRING_LITERAL_MAX_LENGTH, `${filename}中的Action「${action}」命名长度大于${STRING_LITERAL_MAX_LENGTH}`);
-                    if (ActionDict.hasOwnProperty(action)) {
-                        throw new Error(`文件${filename}中，Action定义上的${name}和${ActionDict[action]}存在同名的action「${action}」`);
-                    }
-                    else {
-                        assign(ActionDict, {
-                            [action]: name,
-                        });
-                    }
-                }
-            );
+    const ActionDict = {};
+    actionTexts.forEach(
+        (action) => {
+            assert(action.length <= STRING_LITERAL_MAX_LENGTH, `${filename}中的Action「${action}」命名长度大于${STRING_LITERAL_MAX_LENGTH}`);
+            if (ActionDict.hasOwnProperty(action)) {
+                throw new Error(`文件${filename}中，Action定义上的【${action}】动作存在同名`);
+            }
+            else {
+                assign(ActionDict, {
+                    [action]: 1,
+                });
+            }
         }
     );
 
     // 为每个action在schema中建立相应的state域(除了genericState)
-    actionss.slice(1).forEach(
-        ({ name }) => {
-            const attr = name.slice(0, 1).toLowerCase().concat(name.slice(1, name.length - 6)).concat('State');
-            schemaAttrs.push(
-                factory.createPropertySignature(
-                    undefined,
-                    factory.createIdentifier(attr),
-                    factory.createToken(ts.SyntaxKind.QuestionToken),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier(attr.slice(0, 1).toUpperCase().concat(attr.slice(1))),
-                    )
-                )
-            );
-        }
-    );
+    // 放到actionDef的定义处去做。by Xc
 }
 
 function getEntityImported(declaration: ts.ImportDeclaration, filename: string) {
@@ -509,7 +513,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                     ),
                     sourceFile!
                 );
-                dealWithActions(moduleName, filename, node.type, program, schemaAttrs);
+                dealWithActions(moduleName, filename, node.type, program);
             }
             else if (node.name.text === 'Relation') {
                 // 增加userXXX对象的描述
@@ -563,6 +567,18 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 addRelationship(relationEntityName, 'User', 'user', true);
                 addRelationship(relationEntityName, moduleName, entityLc, true);
             }
+            else if (node.name.text.endsWith('Action') || node.name.text.endsWith('State')) {
+                pushStatementIntoActionAst(moduleName,
+                    factory.updateTypeAliasDeclaration(
+                        node,
+                        node.decorators,
+                        [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                        node.name,
+                        node.typeParameters,
+                        node.type
+                    ),
+                    sourceFile!);
+            }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
                 pushStatementIntoSchemaAst(moduleName, node, sourceFile!);
@@ -586,7 +602,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
                             let declaration2 = symbol!.getDeclarations()![0];
                             if (declaration2.getSourceFile() === sourceFile) {
-                                pushStatementIntoActionAst(moduleName, <ts.TypeAliasDeclaration>declaration2, sourceFile);
+                                // pushStatementIntoActionAst(moduleName, <ts.TypeAliasDeclaration>declaration2, sourceFile);
                             }
 
                             symbol = checker.getSymbolAtLocation((<ts.TypeReferenceNode>stateNode).typeName);
@@ -601,7 +617,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                                         assert(type.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」State「${type.literal.text}」的长度大于「${STRING_LITERAL_MAX_LENGTH}」`);
                                     }
                                 );
-                                pushStatementIntoActionAst(moduleName,
+                                /* pushStatementIntoActionAst(moduleName,
                                     factory.updateTypeAliasDeclaration(
                                         declaration2,
                                         declaration2.decorators,
@@ -610,11 +626,24 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                                         declaration2.typeParameters,
                                         declaration2.type
                                     ),
-                                    sourceFile);
+                                    sourceFile); */
                             }
                         }
 
                         pushStatementIntoActionAst(moduleName, node, sourceFile!);
+
+                        const adName = declaration.name.text.slice(0, declaration.name.text.length - 9);
+                        const attr = adName.concat('State');
+                        schemaAttrs.push(
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier(firstLetterLowerCase(attr)),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier(attr),
+                                )
+                            )
+                        );
                     }
                     else if (declaration.type && (ts.isArrayTypeNode(declaration.type!)
                         && ts.isTypeReferenceNode(declaration.type.elementType)
@@ -3019,7 +3048,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             foreignKeySet[entityName].forEach(
                 (foreignKey) => {
                     const identifier = `${entityNameLc}s$${foreignKey}`;
-                    
+
                     const otmCreateOperationDataNode = factory.createTypeReferenceNode(
                         factory.createIdentifier("Omit"),
                         [
@@ -3792,15 +3821,15 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         const statements: ts.Statement[] = initialStatements();
         // const { schemaAttrs } = Schema[entity];
         if (ActionAsts[entity]) {
-            const { importedFrom } = ActionAsts[entity];
+            const { importedFrom, actionDefNames } = ActionAsts[entity];
             const localActions: string[] = ['Action', 'ParticularAction'];
             for (const a in importedFrom) {
                 assert(a.endsWith('Action'));
                 const s = a.slice(0, a.length - 6).concat('State');
-                if (importedFrom[a] === 'local') {
+                if (importedFrom[a] === 'local' && actionDefNames.includes(firstLetterLowerCase(a.slice(0, a.length - 6)))) {
                     localActions.push(s);
                 }
-                else {
+                else if (actionDefNames.includes(firstLetterLowerCase(a.slice(0, a.length - 6)))){
                     const { moduleSpecifier } = importedFrom[a] as ts.ImportDeclaration;
                     statements.push(
                         factory.createImportDeclaration(
@@ -3952,7 +3981,7 @@ function outputAction(outputDir: string, printer: ts.Printer) {
     const actionDictStatements: ts.Statement[] = [];
     const propertyAssignments: ts.PropertyAssignment[] = [];
     for (const entity in ActionAsts) {
-        const { sourceFile, statements, importedFrom, actionDefNames, actionNames } = ActionAsts[entity];
+        const { sourceFile, statements, importedFrom, actionDefNames } = ActionAsts[entity];
         const importStatements: ts.Statement[] = [];
         for (const k in importedFrom) {
             assert(k.endsWith('Action'));
@@ -3962,10 +3991,10 @@ function outputAction(outputDir: string, printer: ts.Printer) {
                 );
             }
         }
-        const actionDiff = difference(actionNames, actionDefNames);
+        /* const actionDiff = difference(actionNames, actionDefNames);
         if (actionDiff.length > 0) {
             throw new Error(`action not conform to actionDef: ${actionDiff.join(',')}, entity: ${entity}`);
-        }
+        } */
         statements.push(
             factory.createVariableStatement(
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
