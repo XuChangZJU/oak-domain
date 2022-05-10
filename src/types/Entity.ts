@@ -88,10 +88,12 @@ export type DeduceSorterAttr<SH extends GeneralEntityShape> = OneOf<{
     [K: string]: 1 | object | undefined;
 } & ExprOp<keyof SH>>;
 
-export type DeduceSorter<SH extends GeneralEntityShape> = Array<{
+export type DeduceSorterItem<SH extends GeneralEntityShape> = {
     $attr: DeduceSorterAttr<SH>;
     $direction?: "asc" | "desc";
-}>;
+};
+
+export type DeduceSorter<SH extends GeneralEntityShape> = Array<DeduceSorterItem<SH>>;
 
 export type DeduceSelection<SH extends GeneralEntityShape> = Selection<DeduceProjection<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 

@@ -65,10 +65,11 @@ export declare type DeduceFilter<SH extends GeneralEntityShape> = MakeFilter<Att
 export declare type DeduceSorterAttr<SH extends GeneralEntityShape> = OneOf<{
     [K: string]: 1 | object | undefined;
 } & ExprOp<keyof SH>>;
-export declare type DeduceSorter<SH extends GeneralEntityShape> = Array<{
+export declare type DeduceSorterItem<SH extends GeneralEntityShape> = {
     $attr: DeduceSorterAttr<SH>;
     $direction?: "asc" | "desc";
-}>;
+};
+export declare type DeduceSorter<SH extends GeneralEntityShape> = Array<DeduceSorterItem<SH>>;
 export declare type DeduceSelection<SH extends GeneralEntityShape> = Selection<DeduceProjection<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 export declare type DeduceCreateOperationData<SH extends GeneralEntityShape> = FormCreateData<SH> & {
     [k: string]: any;

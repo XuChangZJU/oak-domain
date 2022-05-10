@@ -2,6 +2,7 @@ import assert from 'assert';
 import { RefAttr } from "./Demand";
 import { Geo } from "./Geo";
 import { DateTime, Interval } from 'luxon';
+import { getDistanceBetweenPoints } from '../utils/geo';
 
 
 export type RefOrExpression<A> = RefAttr<A> | Expression<A>;
@@ -409,11 +410,18 @@ export function execOp(op: string, params: any, obscure?: boolean): ExpressionCo
                 }
             }
         }
+        case '$distance': {
+            const [geo1, geo2] = params;
+            const { type: type1, coordinate: coordinate1 } = geo1;
+            const { type: type2, coordinate: coordinate2 } = geo2;
+            if (type1 !== 'point' || type2 !== 'point') {
+                throw new Error('目前只支持point类型的距离运算');
+            }
+
+            return getDistanceBetweenPoints(coordinate1[1], coordinate1[0], coordinate2[1], coordinate2[0]);
+        }
         case '$contains': {
 
-        }
-        case '$distance': {
-            
         }
         default: {
             assert(false, `不能识别的expression运算符：${op}`);
