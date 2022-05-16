@@ -23,6 +23,7 @@ const Schema: Record<string, {
     indexes?: ts.ArrayLiteralExpression;
     states: string[];
     sourceFile: ts.SourceFile;
+    isFileCarrier?: true;
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
 const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
@@ -371,6 +372,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
     const referencedSchemas: string[] = [];
     const schemaAttrs: ts.TypeElement[] = [];
+    let isFileCarrier = false;
     let hasFulltextIndex: boolean = false;
     let indexes: ts.ArrayLiteralExpression;
     let beforeSchema = true;
@@ -388,7 +390,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 let hasEntityAttr = false;
                 let hasEntityIdAttr = false;
                 const { members, heritageClauses } = node;
-                assert((<ts.Identifier>heritageClauses![0].types![0].expression).text === 'EntityShape');
+                assert(['EntityShape', 'FileCarrierEntityShape'].includes((<ts.Identifier>heritageClauses![0].types![0].expression).text));
+                isFileCarrier = 'FileCarrierEntityShape' === (<ts.Identifier>heritageClauses![0].types![0].expression).text;
                 members.forEach(
                     (attrNode) => {
                         const { type, name, questionToken } = <ts.PropertySignature>attrNode;
@@ -801,6 +804,11 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     if (indexes!) {
         assign(schema, {
             indexes,
+        });
+    }
+    if (isFileCarrier) {
+        assign(schema, {
+            isFileCarrier,
         });
     }
 
@@ -3819,7 +3827,7 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
 function outputSchema(outputDir: string, printer: ts.Printer) {
     for (const entity in Schema) {
         const statements: ts.Statement[] = initialStatements();
-        // const { schemaAttrs } = Schema[entity];
+        const { isFileCarrier } = Schema[entity];
         if (ActionAsts[entity]) {
             const { importedFrom, actionDefNames } = ActionAsts[entity];
             const localActions: string[] = ['Action', 'ParticularAction'];
@@ -3948,6 +3956,16 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 )
             ),
         ];
+        if (isFileCarrier) {
+            EntityDefAttrs.push(
+                factory.createPropertySignature(
+                    undefined,
+                    factory.createIdentifier("IsFileCarrier"),
+                    undefined,
+                    factory.createLiteralTypeNode(factory.createTrue())
+                )
+            );
+        }
         if (ActionAsts[entity]) {
             EntityDefAttrs.push(
                 factory.createPropertySignature(

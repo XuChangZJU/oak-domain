@@ -50,6 +50,9 @@ export interface EntityShape {
     $$removeAt$$?: number | Date | null;
 }
 
+export interface FileCarrierEntityShape extends EntityShape {
+};
+
 interface GeneralEntityShape extends EntityShape {
     [K: string]: any;
 }
@@ -62,6 +65,7 @@ export interface EntityDef {
     ParticularAction?: string;
     Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
     Operation: DeduceOperation<this['OpSchema']>;
+    IsFileCarrier?: true;
 };
 
 export interface EntityDict {
