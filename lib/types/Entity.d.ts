@@ -1,6 +1,6 @@
 import { GenericAction } from '../actions/action';
 import { ExpressionKey, ExprOp, MakeFilter, NodeId } from './Demand';
-import { OneOf } from './Polyfill';
+import { OneOf, OptionalKeys } from './Polyfill';
 export declare type TriggerDataAttribute = '$$triggerData$$';
 export declare type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 declare type PrimaryKeyAttribute = 'id';
@@ -120,7 +120,7 @@ export interface OperationResult {
     ids?: string[];
 }
 export declare type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
-    [K in keyof P]: K extends ExpressionKey ? any : K extends keyof E ? P[K] extends 1 | OtmSubProjection ? E[K] : SelectRowShape<E[K], P[K]> : any;
+    [K in keyof P]: K extends ExpressionKey ? any : (K extends keyof E ? (P[K] extends 1 | undefined ? E[K] : (P[K] extends OtmSubProjection ? SelectRowShape<Required<E>[K][0], P[K]['data']>[] | Array<never> : (K extends OptionalKeys<E> ? SelectRowShape<NonNullable<Required<E>[K]>, P[K]> | null : SelectRowShape<NonNullable<Required<E>[K]>, P[K]>))) : never);
 };
 export declare type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
     result: Array<SelectRowShape<E, P>>;

@@ -2621,21 +2621,20 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 reverseOneNodes.push(
                     factory.createTypeLiteralNode(
                         [
-                            factory.createPropertySignature(
+                            factory.createIndexSignature(
                                 undefined,
-                                factory.createIdentifier('entity'),
                                 undefined,
-                                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-                            ),
-                            factory.createPropertySignature(
-                                undefined,
-                                factory.createIdentifier('entityId'),
-                                undefined,
-                                factory.createTypeReferenceNode(
-                                    factory.createIdentifier("String"),
-                                    [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
-                                )
-                            ),
+                                [factory.createParameterDeclaration(
+                                    undefined,
+                                    undefined,
+                                    undefined,
+                                    factory.createIdentifier("K"),
+                                    undefined,
+                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                    undefined
+                                )],
+                                factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
+                            )
                         ]
                     )
                 );
@@ -3242,6 +3241,28 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         ]
                     )
                 );
+            }
+            if (process.env.COMPLING_AS_LIB) {
+                reverseOneNodes.push(
+                    factory.createTypeLiteralNode(
+                        [
+                            factory.createIndexSignature(
+                                undefined,
+                                undefined,
+                                [factory.createParameterDeclaration(
+                                    undefined,
+                                    undefined,
+                                    undefined,
+                                    factory.createIdentifier("k"),
+                                    undefined,
+                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                    undefined
+                                )],
+                                factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
+                            )
+                        ]
+                    )
+                )
             }
         }
 
