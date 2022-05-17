@@ -11,7 +11,9 @@ export function getFullProjection<ED extends EntityDict, T extends keyof ED>(ent
         $$removeAt$$: 1,
     };
     Object.keys(attributes).forEach(
-        (k) => assign(projection, 1)
+        (k) => assign(projection, {
+            [k]: 1,
+        })
     );
 
     return projection;
