@@ -310,7 +310,7 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
             }
         );
     }
-    else if (ts.isTypeReferenceNode(node)){
+    else if (ts.isTypeReferenceNode(node)) {
         if (ts.isIdentifier(node.typeName)) {
             assert(!RESERVED_ACTION_NAMES.includes(node.typeName.text),
                 `${filename}中的Action命名不能是「${RESERVED_ACTION_NAMES.join(',')}」之一`);
@@ -2534,6 +2534,15 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                                 [
                                     factory.createPropertySignature(
                                         undefined,
+                                        factory.createIdentifier(`${one[1]}Id`),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createUnionTypeNode([
+                                            factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword),
+                                            factory.createLiteralTypeNode(factory.createNull())
+                                        ])
+                                    ),
+                                    factory.createPropertySignature(
+                                        undefined,
                                         factory.createIdentifier(one[1]),
                                         one[2] ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
                                         factory.createTypeReferenceNode(
@@ -2575,6 +2584,18 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 reverseOneNodes.push(
                     factory.createTypeLiteralNode(
                         [
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier('entity'),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+                            ),
+                            factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier('entityId'),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+                            ),
                             factory.createPropertySignature(
                                 undefined,
                                 factory.createIdentifier(firstLetterLowerCase(one)),
@@ -3858,7 +3879,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 if (importedFrom[a] === 'local' && actionDefNames.includes(firstLetterLowerCase(a.slice(0, a.length - 6)))) {
                     localActions.push(s);
                 }
-                else if (actionDefNames.includes(firstLetterLowerCase(a.slice(0, a.length - 6)))){
+                else if (actionDefNames.includes(firstLetterLowerCase(a.slice(0, a.length - 6)))) {
                     const { moduleSpecifier } = importedFrom[a] as ts.ImportDeclaration;
                     statements.push(
                         factory.createImportDeclaration(
