@@ -1270,6 +1270,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                         );
                         break;
                     }
+                    case 'SingleGeo':
                     case 'Geo':
                     case 'Object': {
                         // object类型暂不支持查询
@@ -1476,6 +1477,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                     case 'Datetime':
                     case 'Image':
                     case 'File':
+                    case 'SingleGeo':
                     case 'Geo':
                     case 'Object': {
                         properties.push(
@@ -3506,6 +3508,11 @@ const initialStatements = () => [
                         false,
                         undefined,
                         factory.createIdentifier('Geo')
+                    ),                    
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier('SingleGeo')
                     )
                 ]
             )
@@ -4299,7 +4306,8 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                 ),
                             );
                             break;
-                        }
+                        }                        
+                        case 'SingleGeo':
                         case 'Geo': {
                             // object类型暂不支持查询
                             attrAssignments.push(
