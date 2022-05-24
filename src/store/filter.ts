@@ -51,3 +51,27 @@ export function contains<ED extends EntityDict, T extends keyof ED>(
     // todo
     return false;
 }
+
+
+/**
+ * 判断filter1和filter2是否相斥，即filter1和filter2查询的结果一定没有交集
+ * filter1 = {
+ *      a: 2
+ * },
+ * filter2 = {
+ *      a: 1
+ * }
+ * 则包含
+ * @param entity 
+ * @param schema 
+ * @param filter 
+ * @param conditionalFilter 
+ */
+export function repel<ED extends EntityDict, T extends keyof ED>(
+    entity: T,
+    schema: StorageSchema<ED>,
+    filter1: ED[T]['Selection']['filter'],
+    filter2: ED[T]['Selection']['filter']) {
+    // todo
+    return false;
+}

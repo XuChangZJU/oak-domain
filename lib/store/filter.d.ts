@@ -19,3 +19,18 @@ export declare function combineFilters<ED extends EntityDict, T extends keyof ED
  * @param conditionalFilter
  */
 export declare function contains<ED extends EntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filter: ED[T]['Selection']['filter'], conditionalFilter: ED[T]['Selection']['filter']): boolean;
+/**
+ * 判断filter1和filter2是否相斥，即filter1和filter2查询的结果一定没有交集
+ * filter1 = {
+ *      a: 2
+ * },
+ * filter2 = {
+ *      a: 1
+ * }
+ * 则包含
+ * @param entity
+ * @param schema
+ * @param filter
+ * @param conditionalFilter
+ */
+export declare function repel<ED extends EntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter']): boolean;
