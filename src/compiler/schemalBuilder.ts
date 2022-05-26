@@ -376,6 +376,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     let hasFulltextIndex: boolean = false;
     let indexes: ts.ArrayLiteralExpression;
     let beforeSchema = true;
+    let hasActionDef = false;
+    let hasActionTypeAliasDeclaration = false;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
             const entityImported = getEntityImported(node, filename);
@@ -483,6 +485,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
         if (ts.isTypeAliasDeclaration(node)) {
             // action 定义
             if (node.name.text === 'Action') {
+                hasActionTypeAliasDeclaration = true;
                 const modifiers = [factory.createModifier(ts.SyntaxKind.ExportKeyword)];
                 pushStatementIntoActionAst(
                     moduleName,
@@ -571,6 +574,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 addRelationship(relationEntityName, moduleName, entityLc, true);
             }
             else if (node.name.text.endsWith('Action') || node.name.text.endsWith('State')) {
+                hasActionDef = true;
                 pushStatementIntoActionAst(moduleName,
                     factory.updateTypeAliasDeclaration(
                         node,
@@ -791,6 +795,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             );
         }
     });
+    if (hasActionDef && !hasActionTypeAliasDeclaration) {
+        throw new Error(`${filename}中有Action定义，但没有定义名为Action的类型`);
+    }
     assert(schemaAttrs.length > 0);
     const schema = {
         schemaAttrs,
