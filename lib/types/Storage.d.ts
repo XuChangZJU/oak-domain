@@ -2,7 +2,7 @@ import { EntityDict, EntityShape, InstinctiveAttributes } from './Entity';
 import { DataType, DataTypeParams } from './schema/DataTypes';
 export declare type Ref = 'ref';
 export interface Column<SH extends EntityShape> {
-    name: keyof SH;
+    name: keyof SH | `${string}State`;
     size?: number;
     direction?: 'ASC' | 'DESC';
 }

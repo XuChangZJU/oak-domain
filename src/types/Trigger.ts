@@ -87,15 +87,15 @@ export interface SelectTriggerBefore<ED extends EntityDict, T extends keyof ED, 
 
 export interface SelectTriggerAfter<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends SelectTriggerBase<ED, T> {
     when: 'after',
-    fn: <S extends ED[T]['Selection']>(event: { 
-        operation: S;
-        result: SelectionResult<ED[T]['Schema'], S['data']>;
+    fn: (event: {
+        operation: ED[T]['Selection'];
+        result: ED[T]['Schema'][];
     }, context: Cxt, params?: Object) => Promise<number>;
 };
 
 export type SelectTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = SelectTriggerBefore<ED, T, Cxt> | SelectTriggerAfter<ED, T, Cxt>;
 
-export type Trigger<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = CreateTrigger<ED, T, Cxt> | UpdateTrigger<ED, T, Cxt> 
+export type Trigger<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = CreateTrigger<ED, T, Cxt> | UpdateTrigger<ED, T, Cxt>
     | RemoveTrigger<ED, T, Cxt> | SelectTrigger<ED, T, Cxt>;
 
 export interface TriggerEntityShape extends EntityShape {
@@ -125,6 +125,6 @@ export abstract class Executor<ED extends EntityDict, Cxt extends Context<ED>> {
         context: Cxt,
         params?: OperateParams
     ): Promise<void>;
-    
+
     abstract checkpoint(context: Cxt, timestamp: number): Promise<number>;    // 将所有在timestamp之前存在不一致的数据进行恢复
 }

@@ -21,6 +21,6 @@ export declare class TriggerExecutor<ED extends EntityDict, Cxt extends Context<
     preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams): Promise<void>;
     private onCommit;
     private postCommitTrigger;
-    postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams): Promise<void>;
+    postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams, result?: ED[T]['Schema'][]): Promise<void>;
     checkpoint(context: Cxt, timestamp: number): Promise<number>;
 }

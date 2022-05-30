@@ -5,7 +5,7 @@ import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict, OperatePa
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Context } from '../types/Context';
-import { Trigger, Executor, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn } from "../types/Trigger";
+import { Trigger, Executor, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter } from "../types/Trigger";
 
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
@@ -46,7 +46,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
 
     registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void {
         const { entity, action, checker: checkFn, type } = checker;
-        const triggerName = `${entity}${action}权限检查-${this.counter ++}`;
+        const triggerName = `${entity}${action}权限检查-${this.counter++}`;
 
         const trigger = {
             checkerType: type,
@@ -172,7 +172,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                     operation,
                 },
                 [Executor.timestampAttr]: Date.now(),
-            });        
+            });
         }
     }
 
@@ -236,7 +236,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                 else if (operation.filter) {
                     assign(filter, { filter: operation.filter });
                 }
-                
+
                 await rowStore.operate(trigger.entity, {
                     action: 'update',
                     data: {
@@ -266,6 +266,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
         operation: ED[T]['Operation'],
         context: Cxt,
         params?: OperateParams,
+        result?: ED[T]['Schema'][],
     ): Promise<void> {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
@@ -277,7 +278,10 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
             );
 
             for (const trigger of postTriggers) {
-                const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as DeduceCreateOperation<ED[T]['Schema']> }, context, params);
+                const number = await (trigger as SelectTriggerAfter<ED, T, Cxt>).fn({
+                    operation: operation as ED[T]['Selection'],
+                    result: result!,
+                }, context, params);
                 if (number > 0) {
                     this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
                 }
