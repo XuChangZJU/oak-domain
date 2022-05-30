@@ -52,3 +52,17 @@ export class OakUserUnpermittedException extends OakUserException {
 
 };
 
+/**
+ * 要插入行时，发现已经有相同的行数据
+ */
+export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> extends OakUserException {
+    private data: ED[T]['OpSchema'];
+    constructor(data: ED[T]['OpSchema'], message?: string) {
+        super(message);
+        this.data = data;
+    }
+
+    getData() {
+        return this.data;
+    }
+}

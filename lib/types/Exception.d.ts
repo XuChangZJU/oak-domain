@@ -26,3 +26,11 @@ export declare class OakInputIllegalException extends OakUserException {
  */
 export declare class OakUserUnpermittedException extends OakUserException {
 }
+/**
+ * 要插入行时，发现已经有相同的行数据
+ */
+export declare class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> extends OakUserException {
+    private data;
+    constructor(data: ED[T]['OpSchema'], message?: string);
+    getData(): ED[T]["OpSchema"];
+}
