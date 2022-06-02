@@ -2,6 +2,7 @@ import { OperationResult, OperateParams, EntityDict, SelectionResult } from './E
 import { Context } from './Context';
 import { StorageSchema } from './Storage';
 import { OakErrorDefDict } from '../OakError';
+import { get, set } from 'lodash';
 
 export type TxnOption = {
     isolationLevel: 'repeatable read' | 'serializable';
@@ -21,7 +22,7 @@ export abstract class RowStore<ED extends EntityDict, Cxt extends Context<ED>> {
         operation: ED[T]['Operation'],
         context: Cxt,
         params?: OperateParams
-    ): Promise<OperationResult>;
+    ): Promise<OperationResult<ED>>;
 
     abstract select<T extends keyof ED, S extends ED[T]['Selection']> (
         entity: T,
@@ -50,4 +51,20 @@ export abstract class RowStore<ED extends EntityDict, Cxt extends Context<ED>> {
     getSchema () {
         return this.storageSchema;
     }
+
+    
+    mergeOperationResult(result: OperationResult<ED>, toBeMerged: OperationResult<ED>) {
+        for (const entity in toBeMerged) {
+            for (const action in toBeMerged[entity]) {
+                const value = get(result, `${entity}.${action}`);
+                if (typeof value === 'number') {
+                    set(result, `${entity}.${action}`, value + toBeMerged[entity]![action]!);
+                }
+                else {
+                    set(result, `${entity}.${action}`, toBeMerged[entity]![action]!);
+                }
+            }
+        }
+    }
+
 }

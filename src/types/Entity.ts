@@ -64,8 +64,12 @@ export interface EntityDef {
     Action: string;
     ParticularAction?: string;
     Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
-    Operation: DeduceOperation<this['OpSchema']>;
-    IsFileCarrier?: true;
+    Operation: DeduceOperation<this['Schema']>;
+    Create: DeduceCreateOperation<this['Schema']>;
+    CreateSingle: DeduceCreateSingleOperation<this['Schema']>;
+    CreateMulti: DeduceCreateMultipleOperation<this['Schema']>;
+    Update: DeduceUpdateOperation<this['Schema']>;
+    Remove: DeduceRemoveOperation<this['Schema']>;
 };
 
 export interface EntityDict {
@@ -158,8 +162,10 @@ export type SelectOpResult<ED extends EntityDict> = {
 
 export type OpRecord<ED extends EntityDict> = CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED>;      // create/update/remove返回的动作结果
 
-export interface OperationResult {
-    ids?: string[];
+export type OperationResult<ED extends EntityDict> = {
+    [K in keyof ED]?: {
+        [A in ED[K]['Action']]?: number
+    };
 };
 
 /* export interface SelectionResult<ED extends EntityDict, T extends keyof ED> {

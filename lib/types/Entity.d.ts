@@ -47,8 +47,12 @@ export interface EntityDef {
     Action: string;
     ParticularAction?: string;
     Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
-    Operation: DeduceOperation<this['OpSchema']>;
-    IsFileCarrier?: true;
+    Operation: DeduceOperation<this['Schema']>;
+    Create: DeduceCreateOperation<this['Schema']>;
+    CreateSingle: DeduceCreateSingleOperation<this['Schema']>;
+    CreateMulti: DeduceCreateMultipleOperation<this['Schema']>;
+    Update: DeduceUpdateOperation<this['Schema']>;
+    Remove: DeduceRemoveOperation<this['Schema']>;
 }
 export interface EntityDict {
     [E: string]: EntityDef;
@@ -116,9 +120,11 @@ export declare type SelectOpResult<ED extends EntityDict> = {
     };
 };
 export declare type OpRecord<ED extends EntityDict> = CreateOpResult<ED, keyof ED> | UpdateOpResult<ED, keyof ED> | RemoveOpResult<ED, keyof ED> | SelectOpResult<ED>;
-export interface OperationResult {
-    ids?: string[];
-}
+export declare type OperationResult<ED extends EntityDict> = {
+    [K in keyof ED]?: {
+        [A in ED[K]['Action']]?: number;
+    };
+};
 export declare type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
     [K in keyof P]: K extends ExpressionKey ? any : (K extends keyof E ? (P[K] extends 1 | undefined ? E[K] : (P[K] extends OtmSubProjection ? SelectRowShape<Required<E>[K][0], P[K]['data']>[] | Array<never> : (K extends OptionalKeys<E> ? SelectRowShape<NonNullable<Required<E>[K]>, P[K]> | null : SelectRowShape<NonNullable<Required<E>[K]>, P[K]>))) : never);
 };

@@ -23,7 +23,6 @@ const Schema: Record<string, {
     indexes?: ts.ArrayLiteralExpression;
     states: string[];
     sourceFile: ts.SourceFile;
-    isFileCarrier?: true;
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
 const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
@@ -372,7 +371,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
     const referencedSchemas: string[] = [];
     const schemaAttrs: ts.TypeElement[] = [];
-    let isFileCarrier = false;
     let hasFulltextIndex: boolean = false;
     let indexes: ts.ArrayLiteralExpression;
     let beforeSchema = true;
@@ -393,7 +391,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 let hasEntityIdAttr = false;
                 const { members, heritageClauses } = node;
                 assert(['EntityShape', 'FileCarrierEntityShape'].includes((<ts.Identifier>heritageClauses![0].types![0].expression).text));
-                isFileCarrier = 'FileCarrierEntityShape' === (<ts.Identifier>heritageClauses![0].types![0].expression).text;
                 members.forEach(
                     (attrNode) => {
                         const { type, name, questionToken } = <ts.PropertySignature>attrNode;
@@ -813,11 +810,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             indexes,
         });
     }
-    if (isFileCarrier) {
-        assign(schema, {
-            isFileCarrier,
-        });
-    }
 
     assign(Schema, {
         [moduleName]: schema,
@@ -986,7 +978,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
             }
         }
         else {
-            assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${entity}中的属性${(<ts.Identifier>name).text}有非法的属性类型定义`);
+            assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${entity}有非法的属性类型定义${(<ts.Identifier>name).text}`);
             members.push(
                 factory.createPropertySignature(
                     undefined,
@@ -3883,7 +3875,6 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
 function outputSchema(outputDir: string, printer: ts.Printer) {
     for (const entity in Schema) {
         const statements: ts.Statement[] = initialStatements();
-        const { isFileCarrier } = Schema[entity];
         if (ActionAsts[entity]) {
             const { importedFrom, actionDefNames } = ActionAsts[entity];
             const localActions: string[] = ['Action', 'ParticularAction'];
@@ -4011,17 +4002,52 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     undefined
                 )
             ),
-        ];
-        if (isFileCarrier) {
-            EntityDefAttrs.push(
-                factory.createPropertySignature(
-                    undefined,
-                    factory.createIdentifier("IsFileCarrier"),
-                    undefined,
-                    factory.createLiteralTypeNode(factory.createTrue())
+            factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("Create"),
+                undefined,
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("CreateOperation"),
+                    undefined
                 )
-            );
-        }
+            ),
+            factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("Update"),
+                undefined,
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("UpdateOperation"),
+                    undefined
+                )
+            ),
+            factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("Remove"),
+                undefined,
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("RemoveOperation"),
+                    undefined
+                )
+            ),
+            factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("CreateSingle"),
+                undefined,
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("CreateSingleOperation"),
+                    undefined
+                )
+            ),
+            factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("CreateMulti"),
+                undefined,
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("CreateMultipleOperation"),
+                    undefined
+                )
+            ),
+        ];
         if (ActionAsts[entity]) {
             EntityDefAttrs.push(
                 factory.createPropertySignature(

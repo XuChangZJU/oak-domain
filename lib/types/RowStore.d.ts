@@ -9,7 +9,7 @@ export declare abstract class RowStore<ED extends EntityDict, Cxt extends Contex
     static $$LEVEL: string;
     static $$CODES: OakErrorDefDict;
     protected storageSchema: StorageSchema<ED>;
-    abstract operate<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams): Promise<OperationResult>;
+    abstract operate<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams): Promise<OperationResult<ED>>;
     abstract select<T extends keyof ED, S extends ED[T]['Selection']>(entity: T, selection: S, context: Cxt, params?: Object): Promise<SelectionResult<ED[T]['Schema'], S['data']>>;
     abstract count<T extends keyof ED>(entity: T, selection: Omit<ED[T]['Selection'], 'data' | 'sorter' | 'action'>, context: Cxt, params?: Object): Promise<number>;
     constructor(storageSchema: StorageSchema<ED>);
@@ -17,4 +17,5 @@ export declare abstract class RowStore<ED extends EntityDict, Cxt extends Contex
     abstract commit(txnId: string): Promise<void>;
     abstract rollback(txnId: string): Promise<void>;
     getSchema(): StorageSchema<ED>;
+    mergeOperationResult(result: OperationResult<ED>, toBeMerged: OperationResult<ED>): void;
 }

@@ -2,7 +2,7 @@ import assert from "assert";
 import { assign } from "lodash";
 import { Context } from '../types/Context';
 import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection,
-     DeduceUpdateOperation, EntityDict, EntityShape, OperateParams, SelectionResult } from "../types/Entity";
+     DeduceUpdateOperation, EntityDict, EntityShape, OperateParams, OperationResult, SelectionResult } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 import { addFilterSegment } from "./filter";
@@ -23,7 +23,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         entity: T,
         operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Cxt,
-        params?: OperateParams): Promise<void>;
+        params?: OperateParams): Promise<number>;
 
     protected async cascadeSelect<T extends keyof ED>(
         entity: T,
@@ -165,18 +165,20 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         entity: T,
         operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Cxt,
-        params?: OperateParams): Promise<void> {
+        params?: OperateParams): Promise<OperationResult<ED>> {
         const { action, data, filter } = operation;
         const opData = {};
+        const result: OperationResult<ED> = {};
 
         if (action === 'create' && data instanceof Array) {
             for (const dataEle of data) {
-                await this.cascadeUpdate(entity, {
+                const result2 = await this.cascadeUpdate(entity, {
                     action,
                     data: dataEle,
                 }, context, params);
+                this.mergeOperationResult(result, result2);
             }
-            return;
+            return result;
         }
 
         const data2 = data as (DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>)['data'];
@@ -226,7 +228,8 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                     });
                 }
 
-                await this.cascadeUpdate(attr, operationMto, context, params);
+                const result2 = await this.cascadeUpdate(attr, operationMto, context, params);
+                this.mergeOperationResult(result, result2);
             }
             else if (typeof relation === 'string') {
                 // 基于attr的外键的many-to-one
@@ -263,7 +266,8 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                     });
                 }
 
-                await this.cascadeUpdate(relation, operationMto, context, params);
+                const result2 = await this.cascadeUpdate(relation, operationMto, context, params);
+                this.mergeOperationResult(result, result2);
             }
             else {
                 assert(relation instanceof Array);
@@ -376,7 +380,8 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                         }
                     }
     
-                    await this.cascadeUpdate(entityOtm!, otm, context, params);
+                    const result2 = await this.cascadeUpdate(entityOtm!, otm, context, params);
+                    this.mergeOperationResult(result, result2);
                 };
 
                 if (otmOperations instanceof Array) {
@@ -395,7 +400,13 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 data: opData as ED[T]['OpSchema'],
             });
 
-        await this.updateAbjointRow(entity, operation2, context, params);
+        const count = await this.updateAbjointRow(entity, operation2, context, params);
+        this.mergeOperationResult(result, {
+            [entity]: {
+                [operation2.action]: count,
+            }
+        } as OperationResult<ED>);
+        return result;
     }
     
     judgeRelation(entity: keyof ED, attr: string) {
