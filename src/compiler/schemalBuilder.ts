@@ -23,6 +23,7 @@ const Schema: Record<string, {
     indexes?: ts.ArrayLiteralExpression;
     states: string[];
     sourceFile: ts.SourceFile;
+    locale: ts.ObjectLiteralExpression;
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
 const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
@@ -364,6 +365,43 @@ function getEntityImported(declaration: ts.ImportDeclaration, filename: string) 
     }
 }
 
+function checkLocaleEnumAttrs(node: ts.TypeLiteralNode, attrs: string[], filename: string) {
+    const { members } = node;
+    const memberKeys = members.map(
+        (ele) => {
+            assert(ts.isPropertySignature(ele) && ts.isIdentifier(ele.name));
+            return ele.name.text;
+        }
+    );
+
+    const lack = difference(attrs, memberKeys);
+    if (lack.length > 0) {
+        throw new Error(`${filename}中缺少了对${lack.join(',')}属性的locale定义`);
+    }
+}
+
+function checkLocaleExpressionPropertyExists(root: ts.ObjectLiteralExpression, attr: string, exists: boolean, filename: string) {
+    const { properties } = root;
+    properties.forEach(
+        (ele) => {
+            assert(ts.isPropertyAssignment(ele) && (ts.isIdentifier(ele.name) || ts.isStringLiteral(ele.name)) && ts.isObjectLiteralExpression(ele.initializer));
+            const { properties: p2 } = ele.initializer;
+            const pp = p2.find(
+                (ele2) => {
+                    assert(ts.isPropertyAssignment(ele2) && ts.isIdentifier(ele2.name));
+                    return ele2.name.text === attr;
+                }
+            );
+            if (exists && !pp) {
+                throw new Error(`${filename}中的locale定义中的${ele.name.text}中缺少了${attr}的定义`);
+            }
+            else if (!exists && pp) {
+                throw new Error(`${filename}中的locale定义中的${ele.name.text}中有多余的${attr}定义`);
+            }
+        }
+    )
+}
+
 function analyzeEntity(filename: string, path: string, program: ts.Program) {
     const fullPath = `${path}/${filename}`;
     const sourceFile = program.getSourceFile(fullPath);
@@ -375,7 +413,11 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     let indexes: ts.ArrayLiteralExpression;
     let beforeSchema = true;
     let hasActionDef = false;
+    let hasRelationDef = false;
     let hasActionTypeAliasDeclaration = false;
+    const enumStringAttrs: string[] = [];
+    const states: string[] = [];
+    let localeDef: ts.ObjectLiteralExpression | undefined = undefined;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
             const entityImported = getEntityImported(node, filename);
@@ -387,6 +429,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
         if (ts.isInterfaceDeclaration(node)) {
             // schema 定义
             if (node.name.text === 'Schema') {
+                assert(!localeDef, `【${filename}】locale定义须在Schema之后`);
                 let hasEntityAttr = false;
                 let hasEntityIdAttr = false;
                 const { members, heritageClauses } = node;
@@ -425,6 +468,12 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                         }
                         else {
                             schemaAttrs.push(attrNode);
+                            if (ts.isUnionTypeNode(type!)) {
+                                const { types } = type;
+                                if (ts.isLiteralTypeNode(types[0]) && ts.isStringLiteral(types[0].literal)) {
+                                    enumStringAttrs.push((<ts.Identifier>name).text);
+                                }
+                            }
                         }
 
                         if (attrName === 'entity'
@@ -482,6 +531,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
         if (ts.isTypeAliasDeclaration(node)) {
             // action 定义
             if (node.name.text === 'Action') {
+                assert(!localeDef, `【${filename}】locale定义须在Action之后`);
+                hasActionDef = true;
                 hasActionTypeAliasDeclaration = true;
                 const modifiers = [factory.createModifier(ts.SyntaxKind.ExportKeyword)];
                 pushStatementIntoActionAst(
@@ -519,6 +570,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 dealWithActions(moduleName, filename, node.type, program);
             }
             else if (node.name.text === 'Relation') {
+                assert(!localeDef, `【${filename}】locale定义须在Action之后`);
                 // 增加userXXX对象的描述
                 if (ts.isLiteralTypeNode(node.type)) {
                     assert(ts.isStringLiteral(node.type.literal));
@@ -569,9 +621,11 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 });
                 addRelationship(relationEntityName, 'User', 'user', true);
                 addRelationship(relationEntityName, moduleName, entityLc, true);
+
+                hasRelationDef = true;
             }
             else if (node.name.text.endsWith('Action') || node.name.text.endsWith('State')) {
-                hasActionDef = true;
+                assert(!localeDef, `【${filename}】locale定义须在Action/State之后`);
                 pushStatementIntoActionAst(moduleName,
                     factory.updateTypeAliasDeclaration(
                         node,
@@ -582,6 +636,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                         node.type
                     ),
                     sourceFile!);
+                if (node.name.text.endsWith('State')) {
+                    states.push(firstLetterLowerCase(node.name.text));
+                }
             }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
@@ -785,6 +842,62 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
                         indexes = declaration.initializer;
                     }
+                    else if (ts.isIdentifier(declaration.name) && declaration.name.text === 'locale') {
+                        // locale定义
+                        const { type, initializer } = declaration;
+
+                        assert(ts.isObjectLiteralExpression(initializer!));
+                        assert(ts.isTypeReferenceNode(type!) && ts.isIdentifier(type.typeName!) && type.typeName.text === 'LocaleDef', 'locale定义的类型必须是LocaleDef');
+                        const { properties } = initializer;
+                        assert(properties.length > 0, `${filename}至少需要有一种locale定义`);
+
+
+                        const allEnumStringAttrs = enumStringAttrs.concat(states);
+                        const { typeArguments } = type;
+                        assert(typeArguments &&
+                            ts.isTypeReferenceNode(typeArguments[0])
+                            && ts.isIdentifier(typeArguments[0].typeName) && typeArguments[0].typeName.text === 'Schema', `${filename}中缺少locale定义，或者locale类型定义的第一个参数不是Schema`);
+
+                        if (hasActionDef) {
+                            assert(ts.isTypeReferenceNode(typeArguments[1])
+                                && ts.isIdentifier(typeArguments[1].typeName) && typeArguments[1].typeName.text === 'Action', `${filename}中locale类型定义的第二个参数不是Action`);
+                            // 检查每种locale定义中都应该有'action'域
+                            checkLocaleExpressionPropertyExists(initializer, 'action', true, filename);
+                        }
+                        else {
+                            assert(ts.isLiteralTypeNode(typeArguments[1])
+                                && ts.isStringLiteral(typeArguments[1].literal), `${filename}中locale类型定义的第二个参数不是字符串`);
+                            checkLocaleExpressionPropertyExists(initializer, 'action', false, filename);
+                        }
+
+                        if (hasRelationDef) {
+                            assert(ts.isTypeReferenceNode(typeArguments[2])
+                                && ts.isIdentifier(typeArguments[2].typeName)
+                                && typeArguments[2].typeName.text === 'Relation', `${filename}中的locale类型定义的第三个参数不是Relation`);
+                            // 检查每种locale定义中都应该有'r'域
+                            checkLocaleExpressionPropertyExists(initializer, 'r', true, filename);
+                        }
+                        else {
+                            assert(ts.isLiteralTypeNode(typeArguments[2])
+                                && ts.isStringLiteral(typeArguments[2].literal), `${filename}中locale类型定义的第三个参数不是空字符串`);
+                            checkLocaleExpressionPropertyExists(initializer, 'r', false, filename);
+                        }
+
+                        if (allEnumStringAttrs.length > 0) {
+                            assert(ts.isTypeLiteralNode(typeArguments[3]), `${filename}中的locale类型定义的第四个参数不是{}`);
+                            checkLocaleEnumAttrs(typeArguments[3], allEnumStringAttrs, filename);
+                            // 检查每种locale定义中都应该有'v'域
+                            checkLocaleExpressionPropertyExists(initializer, 'v', true, filename);
+                        }
+                        else {
+                            assert(ts.isTypeLiteralNode(typeArguments[3]), `${filename}中的locale类型定义的第四个参数不是{}`);
+                            assert(typeArguments[3].members.length == 0, `${filename}中locale类型定义的第四个参数不应存在相应的v定义`)
+                            // 检查每种locale定义中都应该有'v'域
+                            checkLocaleExpressionPropertyExists(initializer, 'v', false, filename);
+                        }
+
+                        localeDef = initializer;
+                    }
                     else {
                         throw new Error(`不能理解的定义内容${declaration.name.getText()}`);
                     }
@@ -792,6 +905,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             );
         }
     });
+
     if (hasActionDef && !hasActionTypeAliasDeclaration) {
         throw new Error(`${filename}中有Action定义，但没有定义名为Action的类型`);
     }
@@ -808,6 +922,14 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     if (indexes!) {
         assign(schema, {
             indexes,
+        });
+    }
+    if (!localeDef) {
+        throw new Error(`${filename}中缺少了locale定义`);
+    }
+    else {
+        assign(schema, {
+            locale: localeDef,
         });
     }
 
@@ -3507,7 +3629,7 @@ const initialStatements = () => [
                         false,
                         undefined,
                         factory.createIdentifier('Geo')
-                    ),                    
+                    ),
                     factory.createImportSpecifier(
                         false,
                         undefined,
@@ -4339,7 +4461,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                 ),
                             );
                             break;
-                        }                        
+                        }
                         case 'SingleGeo':
                         case 'Geo': {
                             // object类型暂不支持查询
@@ -4543,6 +4665,90 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
     return result;
 }
 
+function outputLocale(outputDir: string, printer: ts.Printer) {
+    const locales: Record<string, string[]> = {};
+    const entities: string[] = [];
+    for (const entity in Schema) {
+        const { locale, sourceFile } = Schema[entity];
+        if (locale) {
+            const { properties } = locale;
+            properties.forEach(
+                (ele) => {
+                    assert(ts.isPropertyAssignment(ele) && (ts.isIdentifier(ele.name) || ts.isStringLiteral(ele.name)) && ts.isObjectLiteralExpression(ele.initializer));
+                    const lng = ele.name.text;
+    
+                    const result = printer.printList(
+                        ts.ListFormat.SourceFileStatements,
+                        factory.createNodeArray([
+                            factory.createExportAssignment(
+                                undefined,
+                                undefined,
+                                undefined,
+                                ele.initializer
+                            )
+                        ]),
+                        sourceFile);
+                    const filename = path.join(outputDir, entity, 'locales', `${lng}.ts`);
+                    writeFileSync(filename, result, { flag: 'w' });
+    
+                    if (locales[lng]) {
+                        locales[lng].push(entity);
+                    }
+                    else {
+                        locales[lng] = [entity];
+                    }
+                }
+            );
+            entities.push(entity);
+        }
+    }
+
+    for (const lng in locales) {
+        if (locales[lng].length < entities.length) {
+            const lack = difference(entities, locales[lng]);
+            throw new Error(`${lng}语言定义中缺少了对象${lack.join(',')}的定义，请检查相应的定义文件`);
+        }
+        const statements: ts.Statement[] = locales[lng].map(
+            (entity) => factory.createImportDeclaration(
+                undefined,
+                undefined,
+                factory.createImportClause(
+                    false,
+                    factory.createIdentifier(firstLetterLowerCase(entity)),
+                    undefined
+                ),
+                factory.createStringLiteral(`../${entity}/locales/${lng}`),
+                undefined
+            )
+        );
+
+        statements.push(
+            factory.createExportAssignment(
+                undefined,
+                undefined,
+                undefined,
+                factory.createObjectLiteralExpression(
+                    locales[lng].map(
+                        ele => factory.createShorthandPropertyAssignment(
+                            factory.createIdentifier(firstLetterLowerCase(ele)),
+                            undefined
+                        )
+                    ),
+                    true
+                )
+            )
+        );
+
+        const result = printer.printList(
+            ts.ListFormat.SourceFileStatements,
+            factory.createNodeArray(statements),
+            ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS));
+        const filename = path.join(outputDir, '_locales', `${lng}.ts`);
+        writeFileSync(filename, result, { flag: 'w' });
+
+    }
+}
+
 function outputStorage(outputDir: string, printer: ts.Printer) {
     const importStatements: ts.Statement[] = [
         factory.createImportDeclaration(
@@ -4735,8 +4941,10 @@ function resetOutputDir(outputDir: string) {
     emptydirSync(outputDir);
 
     for (const moduleName in Schema) {
-        mkdirSync(`${outputDir}/${moduleName}`);
+        mkdirSync(path.join(outputDir, moduleName));
+        mkdirSync(path.join(outputDir, moduleName, 'locales'));
     }
+    mkdirSync(path.join(outputDir, '_locales'))
 }
 
 function addReverseRelationship() {
@@ -4783,8 +4991,10 @@ export function analyzeEntities(inputDir: string) {
     const fullFilenames = files.map(
         ele => {
             const entity = ele.slice(0, ele.indexOf('.'))
-            if (RESERVED_ENTITIES.includes(entity)) {
-                throw new Error(`${ele}是系统保留字，请勿使用其当对象名`);
+            if (RESERVED_ENTITIES.includes(entity) || RESERVED_ENTITIES.find(
+                ele2 => entity.startsWith(ele2)
+            )) {
+                throw new Error(`${ele}是系统保留字，请勿使用其当对象名或对象名前缀`);
             }
             return `${inputDir}/${ele}`;
         }
@@ -4804,6 +5014,7 @@ export function buildSchema(outputDir: string): void {
     const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
     resetOutputDir(outputDir);
     outputSchema(outputDir, printer);
+    outputLocale(outputDir, printer);
     outputSubQuery(outputDir, printer);
     outputAction(outputDir, printer);
     outputEntityDict(outputDir, printer);
