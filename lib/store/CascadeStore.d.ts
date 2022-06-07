@@ -1,14 +1,14 @@
 import { Context } from '../types/Context';
-import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict, OperateParams, OperationResult } from "../types/Entity";
+import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict, OperateParams, OperationResult, SelectRowShape } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 /**这个用来处理级联的select和update，对不同能力的 */
 export declare abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
     constructor(storageSchema: StorageSchema<ED>);
     protected abstract supportManyToOneJoin(): boolean;
-    protected abstract selectAbjointRow<T extends keyof ED>(entity: T, selection: ED[T]['Selection'], context: Cxt, params?: OperateParams): Promise<Array<ED[T]['OpSchema']>>;
+    protected abstract selectAbjointRow<T extends keyof ED, S extends ED[T]['Selection']>(entity: T, selection: S, context: Cxt, params?: OperateParams): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
     protected abstract updateAbjointRow<T extends keyof ED>(entity: T, operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, context: Cxt, params?: OperateParams): Promise<number>;
-    protected cascadeSelect<T extends keyof ED>(entity: T, selection: ED[T]['Selection'], context: Cxt, params?: OperateParams): Promise<Array<ED[T]['Schema']>>;
+    protected cascadeSelect<T extends keyof ED, S extends ED[T]['Selection']>(entity: T, selection: S, context: Cxt, params?: OperateParams): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
     /**
      * 级联更新
      * A --> B

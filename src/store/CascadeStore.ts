@@ -3,7 +3,7 @@ import { assign, keys } from "lodash";
 import { Context } from '../types/Context';
 import {
     DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection,
-    DeduceUpdateOperation, EntityDict, EntityShape, OperateParams, OperationResult, SelectionResult
+    DeduceUpdateOperation, EntityDict, EntityShape, OperateParams, OperationResult, SelectionResult, SelectRowShape
 } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
@@ -16,11 +16,11 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         super(storageSchema);
     }
     protected abstract supportManyToOneJoin(): boolean;
-    protected abstract selectAbjointRow<T extends keyof ED>(
+    protected abstract selectAbjointRow<T extends keyof ED, S extends ED[T]['Selection']>(
         entity: T,
-        selection: ED[T]['Selection'],
+        selection: S,
         context: Cxt,
-        params?: OperateParams): Promise<Array<ED[T]['OpSchema']>>;
+        params?: OperateParams): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
 
     protected abstract updateAbjointRow<T extends keyof ED>(
         entity: T,
@@ -28,10 +28,10 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         context: Cxt,
         params?: OperateParams): Promise<number>;
 
-    protected async cascadeSelect<T extends keyof ED>(
+    protected async cascadeSelect<T extends keyof ED, S extends ED[T]['Selection']>(
         entity: T,
-        selection: ED[T]['Selection'],
-        context: Cxt, params?: OperateParams): Promise<Array<ED[T]['Schema']>> {
+        selection: S,
+        context: Cxt, params?: OperateParams): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]> {
         const { data } = selection;
 
         const projection: ED[T]['Selection']['data'] = {};
@@ -118,7 +118,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                 filter: {
                                     id: {
                                         $in: rows.map(
-                                            (row) => row[`${attr}Id`]
+                                            (row) => (row as Record<string, any>)[`${attr}Id`]
                                         )
                                     },
                                 } as any
@@ -127,7 +127,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                             rows.forEach(
                                 (row) => {
                                     const subRow = subRows.find(
-                                        ele => ele.id === row[`${attr}Id`]
+                                        ele => (ele as Record<string, any>).id === (row as Record<string, any>)[`${attr}Id`]
                                     );
                                     assign(row, {
                                         [attr]: subRow,
@@ -150,20 +150,20 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                     filter: {
                                         id: {
                                             $in: rows.filter(
-                                                row => row.entity === attr
+                                                row => (row as Record<string, any>).entity === attr
                                             ).map(
-                                                row => row.entityId
+                                                row => (row as Record<string, any>).entityId
                                             )
                                         },
                                     } as any
                                 }, context, params);
 
                                 rows.filter(
-                                    row => row.entity === attr
+                                    row => (row as Record<string, any>).entity === attr
                                 ).forEach(
                                     (row) => {
                                         const subRow = subRows.find(
-                                            ele => ele.id === row.entityId
+                                            ele => (ele as Record<string, any>).id === (row as Record<string, any>).entityId
                                         );
                                         assign(row, {
                                             [attr]: subRow,
@@ -187,7 +187,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                     const filter2 = data[attr];
                                     const rows2 = await this.cascadeSelect(entity2, assign({}, filter2, {
                                         filter: addFilterSegment({
-                                            [foreignKey]: row.id,
+                                            [foreignKey]: (row as Record<string, any>).id,
                                         } as any, filter2.filter),
                                     }), context, params);
                                     assign(row, {
@@ -210,7 +210,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                     const filter2 = data[attr];
                                     const rows2 = await this.cascadeSelect(oneToManyOnEntity[attr], assign({}, filter2, {
                                         filter: addFilterSegment({
-                                            entityId: row.id,
+                                            entityId: (row as Record<string, any>).id,
                                             entity,
                                         } as any, filter2.filter),
                                     }), context, params);
