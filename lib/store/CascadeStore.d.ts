@@ -5,7 +5,8 @@ import { StorageSchema } from '../types/Storage';
 /**这个用来处理级联的select和update，对不同能力的 */
 export declare abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
     constructor(storageSchema: StorageSchema<ED>);
-    protected abstract selectAbjointRow<T extends keyof ED>(entity: T, selection: Omit<ED[T]['Selection'], 'indexFrom' | 'count' | 'data' | 'sorter'>, context: Cxt, params?: OperateParams): Promise<Array<ED[T]['OpSchema']>>;
+    protected abstract supportManyToOneJoin(): boolean;
+    protected abstract selectAbjointRow<T extends keyof ED>(entity: T, selection: ED[T]['Selection'], context: Cxt, params?: OperateParams): Promise<Array<ED[T]['OpSchema']>>;
     protected abstract updateAbjointRow<T extends keyof ED>(entity: T, operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, context: Cxt, params?: OperateParams): Promise<number>;
     protected cascadeSelect<T extends keyof ED>(entity: T, selection: ED[T]['Selection'], context: Cxt, params?: OperateParams): Promise<Array<ED[T]['Schema']>>;
     /**

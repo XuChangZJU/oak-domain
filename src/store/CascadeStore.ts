@@ -1,8 +1,10 @@
 import assert from "assert";
-import { assign } from "lodash";
+import { assign, keys } from "lodash";
 import { Context } from '../types/Context';
-import { DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection,
-     DeduceUpdateOperation, EntityDict, EntityShape, OperateParams, OperationResult, SelectionResult } from "../types/Entity";
+import {
+    DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection,
+    DeduceUpdateOperation, EntityDict, EntityShape, OperateParams, OperationResult, SelectionResult
+} from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 import { addFilterSegment } from "./filter";
@@ -13,9 +15,10 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
     constructor(storageSchema: StorageSchema<ED>) {
         super(storageSchema);
     }
+    protected abstract supportManyToOneJoin(): boolean;
     protected abstract selectAbjointRow<T extends keyof ED>(
         entity: T,
-        selection: Omit<ED[T]['Selection'], 'indexFrom' | 'count' | 'data' | 'sorter'>,
+        selection: ED[T]['Selection'],
         context: Cxt,
         params?: OperateParams): Promise<Array<ED[T]['OpSchema']>>;
 
@@ -32,13 +35,18 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         const { data } = selection;
 
         const projection: ED[T]['Selection']['data'] = {};
-        const oneToMany:any = {};
-        const oneToManyOnEntity:any = {};
-        const manyToOne:any = {};
-        const manyToOneOnEntity:any = {};
+        const oneToMany: any = {};
+        const oneToManyOnEntity: any = {};
+        const manyToOne: any = {};
+        const manyToOneOnEntity: any = {};
+
+        const supportMtoJoin = this.supportManyToOneJoin();
         for (const attr in data) {
             const relation = judgeRelation(this.storageSchema, entity, attr);
             if (relation === 1 || relation == 0) {
+                assign(projection, {
+                    [`${attr}Id`]: 1,
+                });
                 assign(projection, {
                     [attr]: data[attr],
                 });
@@ -49,21 +57,35 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                     entity: 1,
                     entityId: 1,
                 });
-                assign(manyToOneOnEntity, {
-                    [attr]: 1,
-                });
+                if (supportMtoJoin) {
+                    assign(projection, {
+                        [attr]: data[attr],
+                    });
+                }
+                else {
+                    assign(manyToOneOnEntity, {
+                        [attr]: 1,
+                    });
+                }
             }
             else if (typeof relation === 'string') {
                 // 基于属性的多对一
-                assign(projection, {
-                    [`${attr}Id`]: 1,
-                });
-                assign(manyToOne, {
-                    [attr]: relation,
-                });
+                if (supportMtoJoin) {
+                    assign(projection, {
+                        [attr]: data[attr],
+                    });
+                }
+                else {
+                    assign(projection, {
+                        [`${attr}Id`]: 1,
+                    });
+                    assign(manyToOne, {
+                        [attr]: relation,
+                    });
+                }
             }
             else {
-                const [ entity2, foreignKey ] = relation;
+                const [entity2, foreignKey] = relation;
                 if (foreignKey) {
                     // 基于属性的一对多
                     assign(oneToMany, {
@@ -84,56 +106,125 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
 
         const rows = await this.selectAbjointRow(entity, selection, context, params);
 
-        for (const row of rows) {
-            for (const attr in manyToOne) {
-                const row2 = await this.cascadeSelect(manyToOne[attr], {
-                    data: data[attr],                    
-                    filter: {                        
-                        id: row[`${attr}Id`] as string,
-                    } as any
-                }, context, params);
-                assign(row, {
-                    [attr]: row2[0],
-                });
-            }
-            for (const attr in manyToOneOnEntity) {
-                if (row.entity === attr) {
-                    const row2 = await this.cascadeSelect(attr, {
-                        data: data[attr],
-                        filter: {
-                            id: row[`entityId`],
-                        } as any
-                    }, context, params);
-                    assign(row, {
-                        [attr]: row2[0],
-                    });
+        await Promise.all(
+            // manyToOne
+            (() => {
+                const attrs = keys(manyToOne);
+                if (attrs.length > 0) {
+                    return attrs.map(
+                        async (attr) => {
+                            const subRows = await this.cascadeSelect(manyToOne[attr] as keyof ED, {
+                                data: data[attr],
+                                filter: {
+                                    id: {
+                                        $in: rows.map(
+                                            (row) => row[`${attr}Id`]
+                                        )
+                                    },
+                                } as any
+                            }, context, params);
+
+                            rows.forEach(
+                                (row) => {
+                                    const subRow = subRows.find(
+                                        ele => ele.id === row[`${attr}Id`]
+                                    );
+                                    assign(row, {
+                                        [attr]: subRow,
+                                    });
+                                }
+                            )
+                        }
+                    );
                 }
-            }
-            for (const attr in oneToMany) {
-                const { entity: entity2, foreignKey } = oneToMany[attr];
-                const filter2 = data[attr];
-                const rows2 = await this.cascadeSelect(entity2, assign({}, filter2, {
-                    filter: addFilterSegment({
-                        [foreignKey]: row.id,
-                    } as any, filter2.filter),
-                }), context, params);
-                assign(row, {
-                    [attr]: rows2,
-                });
-            }
-            for (const attr in oneToManyOnEntity) {
-                const filter2 = data[attr];
-                const rows2 = await this.cascadeSelect(oneToManyOnEntity[attr], assign({}, filter2, {
-                    filter: addFilterSegment({
-                        entityId: row.id,
-                        entity,
-                    } as any, filter2.filter),
-                }), context, params);
-                assign(row, {
-                    [attr]: rows2,
-                });
-            }
-        }
+                return [];
+            })().concat(
+                // manyToOneOnEntity
+                (() => {
+                    const attrs = keys(manyToOneOnEntity);
+                    if (attrs.length > 0) {
+                        return attrs.map(
+                            async (attr) => {
+                                const subRows = await this.cascadeSelect(attr as keyof ED, {
+                                    data: data[attr],
+                                    filter: {
+                                        id: {
+                                            $in: rows.filter(
+                                                row => row.entity === attr
+                                            ).map(
+                                                row => row.entityId
+                                            )
+                                        },
+                                    } as any
+                                }, context, params);
+
+                                rows.filter(
+                                    row => row.entity === attr
+                                ).forEach(
+                                    (row) => {
+                                        const subRow = subRows.find(
+                                            ele => ele.id === row.entityId
+                                        );
+                                        assign(row, {
+                                            [attr]: subRow,
+                                        });
+                                    }
+                                )
+                            }
+                        );
+                    }
+                    return [];
+                })()
+            ).concat(
+                (() => {
+                    const attrs = keys(oneToMany);
+                    if (attrs.length > 0) {
+                        // 必须一行一行的查询，否则indexFrom和count无法准确
+                        return rows.map(
+                            async (row) => {
+                                for (const attr in oneToMany) {
+                                    const { entity: entity2, foreignKey } = oneToMany[attr];
+                                    const filter2 = data[attr];
+                                    const rows2 = await this.cascadeSelect(entity2, assign({}, filter2, {
+                                        filter: addFilterSegment({
+                                            [foreignKey]: row.id,
+                                        } as any, filter2.filter),
+                                    }), context, params);
+                                    assign(row, {
+                                        [attr]: rows2,
+                                    });
+                                }
+                            }
+                        );
+                    }
+                    return [];
+                })()
+            ).concat(
+                (() => {
+                    const attrs = keys(oneToManyOnEntity);
+                    if (attrs.length > 0) {
+                        // 必须一行一行的查询，否则indexFrom和count无法准确
+                        return rows.map(
+                            async (row) => {
+                                for (const attr in oneToManyOnEntity) {
+                                    const filter2 = data[attr];
+                                    const rows2 = await this.cascadeSelect(oneToManyOnEntity[attr], assign({}, filter2, {
+                                        filter: addFilterSegment({
+                                            entityId: row.id,
+                                            entity,
+                                        } as any, filter2.filter),
+                                    }), context, params);
+                                    assign(row, {
+                                        [attr]: rows2,
+                                    });
+                                }
+                            }
+                        );
+                    }
+                    return [];
+                })()
+            )
+        );
 
         return rows;
     }
@@ -379,7 +470,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                             }
                         }
                     }
-    
+
                     const result2 = await this.cascadeUpdate(entityOtm!, otm, context, params);
                     this.mergeOperationResult(result, result2);
                 };
@@ -408,7 +499,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         } as OperationResult<ED>);
         return result;
     }
-    
+
     judgeRelation(entity: keyof ED, attr: string) {
         return judgeRelation(this.storageSchema, entity, attr);
     }
