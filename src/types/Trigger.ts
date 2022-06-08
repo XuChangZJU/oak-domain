@@ -1,3 +1,4 @@
+import { SelectRowShape } from ".";
 import { GenericAction } from "../actions/action";
 import { DeduceCreateOperation, DeduceRemoveOperation, DeduceSelection, DeduceUpdateOperation, EntityDict, OperateParams } from "../types/Entity";
 import { EntityDef, EntityShape, OperationResult, SelectionResult, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
@@ -82,14 +83,14 @@ export interface SelectTriggerBase<ED extends EntityDict, T extends keyof ED> {
  */
 export interface SelectTriggerBefore<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends SelectTriggerBase<ED, T> {
     when: 'before';
-    fn: (event: { operation: DeduceSelection<ED[T]['Schema']> }, context: Cxt, params?: OperateParams) => Promise<number>;
+    fn: (event: { operation: ED[T]['Selection'] }, context: Cxt, params?: OperateParams) => Promise<number>;
 };
 
 export interface SelectTriggerAfter<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends SelectTriggerBase<ED, T> {
     when: 'after',
     fn: (event: {
         operation: ED[T]['Selection'];
-        result: ED[T]['Schema'][];
+        result: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[];
     }, context: Cxt, params?: Object) => Promise<number>;
 };
 

@@ -4960,7 +4960,7 @@ function addReverseRelationship() {
 
 function outputPackageJson(outputDir: string) {
     const pj = {
-        "name": "oak-app-domain",
+        "name": process.env.COMPLING_AS_LIB ? "general-app-domain": "oak-app-domain",
         "main": "index.ts"
     };
 

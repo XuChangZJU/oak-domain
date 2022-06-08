@@ -1,4 +1,4 @@
-import { EntityDict, OperateParams } from "../types/Entity";
+import { EntityDict, OperateParams, SelectRowShape } from "../types/Entity";
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Context } from '../types/Context';
@@ -21,6 +21,6 @@ export declare class TriggerExecutor<ED extends EntityDict, Cxt extends Context<
     preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams): Promise<void>;
     private onCommit;
     private postCommitTrigger;
-    postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams, result?: ED[T]['Schema'][]): Promise<void>;
+    postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams, result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[]): Promise<void>;
     checkpoint(context: Cxt, timestamp: number): Promise<number>;
 }

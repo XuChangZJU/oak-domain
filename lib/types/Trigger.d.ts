@@ -1,5 +1,6 @@
+import { SelectRowShape } from ".";
 import { GenericAction } from "../actions/action";
-import { DeduceCreateOperation, DeduceRemoveOperation, DeduceSelection, DeduceUpdateOperation, EntityDict, OperateParams } from "../types/Entity";
+import { DeduceCreateOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict, OperateParams } from "../types/Entity";
 import { EntityShape, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { Context } from "./Context";
 export declare type CheckerType = 'user' | 'row' | 'data';
@@ -71,14 +72,14 @@ export interface SelectTriggerBase<ED extends EntityDict, T extends keyof ED> {
 export interface SelectTriggerBefore<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends SelectTriggerBase<ED, T> {
     when: 'before';
     fn: (event: {
-        operation: DeduceSelection<ED[T]['Schema']>;
+        operation: ED[T]['Selection'];
     }, context: Cxt, params?: OperateParams) => Promise<number>;
 }
 export interface SelectTriggerAfter<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends SelectTriggerBase<ED, T> {
     when: 'after';
     fn: (event: {
         operation: ED[T]['Selection'];
-        result: ED[T]['Schema'][];
+        result: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[];
     }, context: Cxt, params?: Object) => Promise<number>;
 }
 export declare type SelectTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = SelectTriggerBefore<ED, T, Cxt> | SelectTriggerAfter<ED, T, Cxt>;

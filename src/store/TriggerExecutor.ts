@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { assign, pull, unset } from "lodash";
 import { addFilterSegment } from "../store/filter";
-import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict, OperateParams } from "../types/Entity";
+import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict, OperateParams, SelectRowShape } from "../types/Entity";
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Context } from '../types/Context';
@@ -266,7 +266,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
         operation: ED[T]['Operation'],
         context: Cxt,
         params?: OperateParams,
-        result?: ED[T]['Schema'][],
+        result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[],
     ): Promise<void> {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
