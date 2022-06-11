@@ -45,9 +45,6 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
             const relation = judgeRelation(this.storageSchema, entity, attr);
             if (relation === 1 || relation == 0) {
                 assign(projection, {
-                    [`${attr}Id`]: 1,
-                });
-                assign(projection, {
                     [attr]: data[attr],
                 });
             }
@@ -104,7 +101,9 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
             }
         }
 
-        const rows = await this.selectAbjointRow(entity, selection, context, params);
+        const rows = await this.selectAbjointRow(entity, assign({}, selection, {
+            data: projection,
+        }), context, params);
 
         await Promise.all(
             // manyToOne
