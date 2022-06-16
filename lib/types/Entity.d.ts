@@ -98,7 +98,7 @@ export declare type DeduceOperation<SH extends GeneralEntityShape> = DeduceCreat
 export declare type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'c';
     e: T;
-    d: ED[T]['OpSchema'];
+    d: ED[T]['OpSchema'] | ED[T]['OpSchema'][];
 };
 export declare type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'u';

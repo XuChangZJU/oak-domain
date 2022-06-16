@@ -2,6 +2,7 @@ import assert from "assert";
 import { assign, keys } from "lodash";
 import { Context } from '../types/Context';
 import {
+    DeduceCreateMultipleOperation,
     DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection,
     DeduceUpdateOperation, EntityDict, EntityShape, OperateParams, OperationResult, SelectionResult, SelectRowShape
 } from "../types/Entity";
@@ -16,6 +17,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         super(storageSchema);
     }
     protected abstract supportManyToOneJoin(): boolean;
+    protected abstract supportMultipleCreate(): boolean;
     protected abstract selectAbjointRow<T extends keyof ED, S extends ED[T]['Selection']>(
         entity: T,
         selection: S,
@@ -24,7 +26,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
 
     protected abstract updateAbjointRow<T extends keyof ED>(
         entity: T,
-        operation: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
+        operation: DeduceCreateMultipleOperation<ED[T]['Schema']> | DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Cxt,
         params?: OperateParams): Promise<number>;
 
@@ -261,14 +263,23 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         const result: OperationResult<ED> = {};
 
         if (action === 'create' && data instanceof Array) {
-            for (const dataEle of data) {
-                const result2 = await this.cascadeUpdate(entity, {
+            const multipleCreate = this.supportMultipleCreate();
+            if (multipleCreate) {
+                return await this.cascadeUpdate(entity, {
                     action,
-                    data: dataEle,
+                    data,
                 }, context, params);
-                this.mergeOperationResult(result, result2);
             }
-            return result;
+            else {
+                for (const dataEle of data) {
+                    const result2 = await this.cascadeUpdate(entity, {
+                        action,
+                        data: dataEle,
+                    }, context, params);
+                    this.mergeOperationResult(result, result2);
+                }
+                return result;
+            }
         }
 
         const data2 = data as (DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>)['data'];
