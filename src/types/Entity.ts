@@ -121,13 +121,13 @@ export type DeduceUpdateOperationData<SH extends GeneralEntityShape> = FormUpdat
 
 export type DeduceUpdateOperation<SH extends GeneralEntityShape> = Operation<
     'update' | string,
-    DeduceUpdateOperationData<SH>, DeduceFilter<SH>>;
+    DeduceUpdateOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 
 export type DeduceRemoveOperationData<SH extends GeneralEntityShape> = {
     [A in keyof SH]?: any;
 } & { [A: string]: any };
 
-export type DeduceRemoveOperation<SH extends GeneralEntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>>;
+export type DeduceRemoveOperation<SH extends GeneralEntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 
 export type DeduceOperation<SH extends GeneralEntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
 

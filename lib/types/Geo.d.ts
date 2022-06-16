@@ -1,6 +1,6 @@
 export declare type Point = [number, number];
 export declare type Path = Array<Point>;
-export declare type Polygon = Array<Point>;
+export declare type Polygon = Array<Path>;
 export declare type Circle = [Point, number];
 export declare type SingleGeo = {
     type: 'point';

@@ -83,7 +83,7 @@ export interface SelectTriggerBase<ED extends EntityDict, T extends keyof ED> {
  */
 export interface SelectTriggerBefore<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends SelectTriggerBase<ED, T> {
     when: 'before';
-    fn: (event: { operation: ED[T]['Selection'] }, context: Cxt, params?: OperateParams) => Promise<number>;
+    fn: (event: { operation: DeduceSelection<ED[T]['Schema']> }, context: Cxt, params?: OperateParams) => Promise<number>;
 };
 
 export interface SelectTriggerAfter<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends SelectTriggerBase<ED, T> {

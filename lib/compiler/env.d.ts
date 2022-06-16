@@ -7,3 +7,4 @@ export declare const RESERVED_ENTITIES: string[];
 export declare const STRING_LITERAL_MAX_LENGTH = 16;
 export declare const NUMERICAL_LITERL_DEFAULT_PRECISION = 8;
 export declare const NUMERICAL_LITERL_DEFAULT_SCALE = 2;
+export declare const INT_LITERL_DEFAULT_WIDTH = 4;

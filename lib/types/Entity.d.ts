@@ -87,13 +87,13 @@ export declare type DeduceCreateOperation<SH extends GeneralEntityShape> = Deduc
 export declare type DeduceUpdateOperationData<SH extends GeneralEntityShape> = FormUpdateData<SH> & {
     [k: string]: any;
 };
-export declare type DeduceUpdateOperation<SH extends GeneralEntityShape> = Operation<'update' | string, DeduceUpdateOperationData<SH>, DeduceFilter<SH>>;
+export declare type DeduceUpdateOperation<SH extends GeneralEntityShape> = Operation<'update' | string, DeduceUpdateOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 export declare type DeduceRemoveOperationData<SH extends GeneralEntityShape> = {
     [A in keyof SH]?: any;
 } & {
     [A: string]: any;
 };
-export declare type DeduceRemoveOperation<SH extends GeneralEntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>>;
+export declare type DeduceRemoveOperation<SH extends GeneralEntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 export declare type DeduceOperation<SH extends GeneralEntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
 export declare type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'c';

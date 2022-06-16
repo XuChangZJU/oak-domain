@@ -1,6 +1,6 @@
 export type Point = [number, number];
 export type Path = Array<Point>;
-export type Polygon = Array<Point>;
+export type Polygon = Array<Path>;
 export type Circle = [Point, number];
 
 export type SingleGeo = {

@@ -18,7 +18,7 @@ interface Abs<A> {
     $abs: MathType<A>;
 }
 interface Round<A> {
-    $round: MathType<A>;
+    $round: [MathType<A>, MathType<A>];
 }
 interface Floor<A> {
     $floor: MathType<A>;

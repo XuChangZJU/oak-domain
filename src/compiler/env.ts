@@ -21,3 +21,4 @@ export const RESERVED_ENTITIES = ['Schema', 'Filter', 'Query', 'SubQuery', 'Enti
 export const STRING_LITERAL_MAX_LENGTH = 16;
 export const NUMERICAL_LITERL_DEFAULT_PRECISION = 8;
 export const NUMERICAL_LITERL_DEFAULT_SCALE = 2;
+export const INT_LITERL_DEFAULT_WIDTH = 4;

@@ -14,6 +14,7 @@ import {
     STRING_LITERAL_MAX_LENGTH,
     NUMERICAL_LITERL_DEFAULT_PRECISION,
     NUMERICAL_LITERL_DEFAULT_SCALE,
+    INT_LITERL_DEFAULT_WIDTH,
 } from './env';
 import { firstLetterLowerCase, firstLetterUpperCase } from './utils';
 
@@ -3302,6 +3303,10 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("Filter"),
                         undefined
+                    ),
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Sorter"),
+                        undefined
                     )
                 ]
             )
@@ -3525,6 +3530,10 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     ),
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("Filter"),
+                        undefined
+                    ),
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Sorter"),
                         undefined
                     )
                 ]
@@ -4335,7 +4344,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                     factory.createObjectLiteralExpression(
                                         [
                                             factory.createPropertyAssignment(
-                                                factory.createIdentifier("width"),
+                                                factory.createIdentifier("length"),
                                                 factory.createNumericLiteral(
                                                     (<ts.NumericLiteral>(<ts.LiteralTypeNode>typeArguments![0]).literal).text
                                                 )
@@ -4571,12 +4580,8 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                     factory.createObjectLiteralExpression(
                                         [
                                             factory.createPropertyAssignment(
-                                                factory.createIdentifier("precision"),
-                                                factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_PRECISION)
-                                            ),
-                                            factory.createPropertyAssignment(
-                                                factory.createIdentifier("scale"),
-                                                factory.createNumericLiteral(NUMERICAL_LITERL_DEFAULT_SCALE)
+                                                factory.createIdentifier("width"),
+                                                factory.createNumericLiteral(INT_LITERL_DEFAULT_WIDTH)
                                             )
                                         ],
                                         true
