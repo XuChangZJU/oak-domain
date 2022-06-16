@@ -22,7 +22,7 @@ export declare type SimpleColumnType = "simple-array" | "simple-json" | "simple-
 /**
  * Any column type column can be.
  */
-export declare type DataType = WithPrecisionColumnType | WithLengthColumnType | WithWidthColumnType | SpatialColumnType | SimpleColumnType | BooleanConstructor | DateConstructor | NumberConstructor | StringConstructor;
+export declare type DataType = WithPrecisionColumnType | WithLengthColumnType | WithWidthColumnType | SpatialColumnType | SimpleColumnType;
 export interface DataTypeParams {
     length?: number;
     width?: number;

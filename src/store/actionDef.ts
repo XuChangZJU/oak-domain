@@ -8,7 +8,7 @@ export function getFullProjection<ED extends EntityDict, T extends keyof ED>(ent
         id: 1,
         $$createAt$$: 1,
         $$updateAt$$: 1,
-        $$removeAt$$: 1,
+        $$deleteAt$$: 1,
     };
     Object.keys(attributes).forEach(
         (k) => assign(projection, {

@@ -30,6 +30,7 @@ export interface Attribute {
     onRefDelete?: 'delete' | 'setNull' | 'ignore';
     default?: string | number | boolean;
     notNull?: boolean;
+    unique?: boolean;
 }
 
 export type Attributes<SH extends EntityShape> = Omit<{

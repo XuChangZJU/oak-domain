@@ -208,11 +208,7 @@ export type DataType = WithPrecisionColumnType
     | WithLengthColumnType
     | WithWidthColumnType
     | SpatialColumnType
-    | SimpleColumnType
-    | BooleanConstructor
-    | DateConstructor
-    | NumberConstructor
-    | StringConstructor;
+    | SimpleColumnType;
 
 
 export interface DataTypeParams {

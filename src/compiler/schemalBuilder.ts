@@ -978,7 +978,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
         // $$updateAt$$: Datetime
         factory.createPropertySignature(
             undefined,
-            factory.createIdentifier('$$removeAt$$'),
+            factory.createIdentifier('$$deleteAt$$'),
             factory.createToken(ts.SyntaxKind.QuestionToken),
             factory.createUnionTypeNode([
                 factory.createTypeReferenceNode(

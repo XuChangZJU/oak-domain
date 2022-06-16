@@ -4,7 +4,7 @@ import { OneOf, OptionalKeys } from './Polyfill';
 export declare type TriggerDataAttribute = '$$triggerData$$';
 export declare type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 declare type PrimaryKeyAttribute = 'id';
-export declare type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$removeAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
+export declare type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
 export declare const initinctiveAttributes: string[];
 export declare type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
@@ -34,7 +34,7 @@ export interface EntityShape {
     id: string;
     $$createAt$$: number | Date;
     $$updateAt$$: number | Date;
-    $$removeAt$$?: number | Date | null;
+    $$deleteAt$$?: number | Date | null;
 }
 export interface FileCarrierEntityShape extends EntityShape {
 }

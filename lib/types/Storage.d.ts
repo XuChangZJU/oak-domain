@@ -23,6 +23,7 @@ export interface Attribute {
     onRefDelete?: 'delete' | 'setNull' | 'ignore';
     default?: string | number | boolean;
     notNull?: boolean;
+    unique?: boolean;
 }
 export declare type Attributes<SH extends EntityShape> = Omit<{
     [attrName in keyof SH]: Attribute;

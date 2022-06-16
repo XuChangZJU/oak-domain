@@ -6,8 +6,8 @@ export type TriggerDataAttribute = '$$triggerData$$';
 export type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 
 type PrimaryKeyAttribute = 'id';
-export type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$removeAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
-export const initinctiveAttributes = ['id', '$$createAt$$', '$$updateAt$$', '$$removeAt$$', '$$triggerData$$', '$$triggerTimestamp$$'];
+export type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
+export const initinctiveAttributes = ['id', '$$createAt$$', '$$updateAt$$', '$$deleteAt$$', '$$triggerData$$', '$$triggerTimestamp$$'];
 
 export type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
@@ -47,7 +47,7 @@ export interface EntityShape {
     id: string;
     $$createAt$$: number | Date;
     $$updateAt$$: number | Date;
-    $$removeAt$$?: number | Date | null;
+    $$deleteAt$$?: number | Date | null;
 }
 
 export interface FileCarrierEntityShape extends EntityShape {
