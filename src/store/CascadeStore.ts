@@ -264,22 +264,14 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
 
         if (action === 'create' && data instanceof Array) {
             const multipleCreate = this.supportMultipleCreate();
-            if (multipleCreate) {
-                return await this.cascadeUpdate(entity, {
+            for (const dataEle of data) {
+                const result2 = await this.cascadeUpdate(entity, {
                     action,
-                    data,
+                    data: dataEle,
                 }, context, params);
+                this.mergeOperationResult(result, result2);
             }
-            else {
-                for (const dataEle of data) {
-                    const result2 = await this.cascadeUpdate(entity, {
-                        action,
-                        data: dataEle,
-                    }, context, params);
-                    this.mergeOperationResult(result, result2);
-                }
-                return result;
-            }
+            return result;
         }
 
         const data2 = data as (DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>)['data'];

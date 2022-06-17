@@ -6,6 +6,20 @@ export declare type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 declare type PrimaryKeyAttribute = 'id';
 export declare type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
 export declare const initinctiveAttributes: string[];
+declare type MySqlHintIndex = {
+    for?: 'join' | 'orderBy' | 'groupBy';
+    names: string[];
+};
+declare type MySqlSelectionHint = {
+    forUpdate?: boolean;
+    useIndex?: MySqlHintIndex;
+    forceIndex?: MySqlHintIndex;
+    ignoreIndex?: MySqlHintIndex;
+};
+export declare type SelectionHint = {
+    includeDeleted?: boolean;
+    mysql?: MySqlSelectionHint;
+};
 export declare type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
     indexFrom?: A extends 'create' ? undefined : number;
@@ -46,13 +60,19 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
+    Selection: Omit<DeduceSelection<this['Schema']>, 'action'> & {
+        hint?: SelectionHint;
+    };
     Operation: DeduceOperation<this['Schema']>;
     Create: DeduceCreateOperation<this['Schema']>;
     CreateSingle: DeduceCreateSingleOperation<this['Schema']>;
     CreateMulti: DeduceCreateMultipleOperation<this['Schema']>;
-    Update: DeduceUpdateOperation<this['Schema']>;
-    Remove: DeduceRemoveOperation<this['Schema']>;
+    Update: DeduceUpdateOperation<this['Schema']> & {
+        hint?: SelectionHint;
+    };
+    Remove: DeduceRemoveOperation<this['Schema']> & {
+        hint?: SelectionHint;
+    };
 }
 export interface EntityDict {
     [E: string]: EntityDef;
