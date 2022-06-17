@@ -421,7 +421,7 @@ export function execOp(op: string, params: any, obscure?: boolean): ExpressionCo
             return getDistanceBetweenPoints(coordinate1[1], coordinate1[0], coordinate2[1], coordinate2[0]);
         }
         case '$contains': {
-
+            throw new Error('$contains类型未实现');
         }
         default: {
             assert(false, `不能识别的expression运算符：${op}`);
