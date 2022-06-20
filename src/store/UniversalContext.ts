@@ -1,6 +1,6 @@
 import { EntityDict, OpRecord, RowStore, TxnOption, Context } from "../types";
 
-export class UniversalContext<ED extends EntityDict> implements Context<ED> {
+export abstract class UniversalContext<ED extends EntityDict> implements Context<ED> {
     rowStore: RowStore<ED, this>;
     uuid?: string;
     opRecords: OpRecord<ED>[];
@@ -58,4 +58,6 @@ export class UniversalContext<ED extends EntityDict> implements Context<ED> {
     getCurrentTxnId() {
         return this.uuid;
     }
+
+    abstract toString(): Promise<string>;
 }

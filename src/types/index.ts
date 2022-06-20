@@ -14,3 +14,4 @@ export * from './Storage';
 export * from './Trigger';
 export * from './Exception';
 export * from './Watcher';
+export * from './AppLoader';

@@ -8,4 +8,5 @@ export interface Context<ED extends EntityDict> {
     rollback(): Promise<void>;
     getCurrentTxnId(): string | undefined;
     on(event: 'commit' | 'rollback', callback: () => Promise<void>): void;
+    toString(): Promise<string>;
 }

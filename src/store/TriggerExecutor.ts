@@ -32,9 +32,9 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
     private volatileEntities: Array<keyof ED>;
 
     private logger: Logger;
-    private contextBuilder: (scene: string) => Cxt;
+    private contextBuilder: (cxtString: string) => Cxt;
 
-    constructor(contextBuilder: (scene: string) => Cxt, logger: Logger = console) {
+    constructor(contextBuilder: (cxtString: string) => Cxt, logger: Logger = console) {
         super();
         this.contextBuilder = contextBuilder;
         this.logger = logger;
@@ -127,7 +127,8 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
         entity: T,
         operation: ED[T]['Operation'],
         trigger: Trigger<ED, T, Cxt>,
-        context: Cxt
+        context: Cxt,
+        params?: OperateParams
     ) {
         assert(trigger.action !== 'select');
         if ((trigger as CreateTriggerCrossTxn<ED, T, Cxt>).strict === 'makeSure') {
@@ -170,6 +171,8 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                 [Executor.dataAttr]: {
                     name: trigger.name,
                     operation,
+                    cxtStr: await context.toString(),
+                    params,
                 },
                 [Executor.timestampAttr]: Date.now(),
             });
@@ -203,15 +206,15 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
             );
 
             for (const trigger of commitTriggers) {
-                await this.preCommitTrigger(entity, operation, trigger, context);
+                await this.preCommitTrigger(entity, operation, trigger, context, params);
             }
         }
     }
 
     private onCommit<T extends keyof ED>(
-        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'], params?: OperateParams) {
+        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'], cxtStr: string, params?: OperateParams) {
         return async () => {
-            const context = this.contextBuilder('triggerExecutor: onCommit');
+            const context = this.contextBuilder(cxtStr);
             await context.begin();
             const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({
                 operation: operation as DeduceCreateOperation<ED[T]['Schema']>,
@@ -258,7 +261,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
         context: Cxt,
         params?: OperateParams,
     ) {
-        context.on('commit', this.onCommit(trigger, operation, params));
+        context.on('commit', this.onCommit(trigger, operation, await context.toString(), params));
     }
 
     async postOperation<T extends keyof ED>(
@@ -314,9 +317,9 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
             } as any, context);
             for (const row of rows) {
                 const { $$triggerData$$ } = row;
-                const { name, operation } = $$triggerData$$!;
+                const { name, operation, cxtStr, params } = $$triggerData$$!;
                 const trigger = this.triggerNameMap[name];
-                await this.onCommit(trigger, operation as ED[typeof entity]['Operation'])();
+                await this.onCommit(trigger, operation as ED[typeof entity]['Operation'], cxtStr, params)();
             }
 
         }

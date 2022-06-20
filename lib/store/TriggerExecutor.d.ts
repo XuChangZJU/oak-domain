@@ -13,7 +13,7 @@ export declare class TriggerExecutor<ED extends EntityDict, Cxt extends Context<
     private volatileEntities;
     private logger;
     private contextBuilder;
-    constructor(contextBuilder: (scene: string) => Cxt, logger?: Logger);
+    constructor(contextBuilder: (cxtString: string) => Cxt, logger?: Logger);
     registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void;
     registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
     unregisterTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
