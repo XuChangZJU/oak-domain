@@ -9,4 +9,6 @@ export interface Context<ED extends EntityDict> {
     getCurrentTxnId(): string | undefined;
     on(event: 'commit' | 'rollback', callback: () => Promise<void>): void;
     toString(): Promise<string>;
+    getScene(): string | undefined;
+    setScene(scene?: string): void;
 }

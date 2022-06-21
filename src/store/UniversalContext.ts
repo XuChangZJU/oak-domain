@@ -4,6 +4,7 @@ export abstract class UniversalContext<ED extends EntityDict> implements Context
     rowStore: RowStore<ED, this>;
     uuid?: string;
     opRecords: OpRecord<ED>[];
+    private scene?: string;
     events: {
         commit: Array<() => Promise<void>>;
         rollback: Array<() => Promise<void>>;
@@ -16,6 +17,12 @@ export abstract class UniversalContext<ED extends EntityDict> implements Context
             commit: [],
             rollback: [],
         };
+    }
+    getScene(): string | undefined {
+        return this.scene;
+    }
+    setScene(scene?: string): void {
+        this.scene = scene;
     }
 
     private resetEvents() {        

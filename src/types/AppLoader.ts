@@ -1,4 +1,4 @@
-import { Context } from ".";
+import { Context, RowStore } from ".";
 import { EntityDict } from "./Entity";
 
 export abstract class AppLoader<ED extends EntityDict, Cxt extends Context<ED>> {
@@ -8,4 +8,12 @@ export abstract class AppLoader<ED extends EntityDict, Cxt extends Context<ED>> 
     }
     
     abstract goAspect(name: string, context: Cxt, params?: any): Promise<any>;
+
+    abstract initialize(dropIfExists?: boolean): Promise<void>;
+
+    abstract mount(): Promise<void>;
+
+    abstract unmount(): Promise<void>;
+
+    abstract getStore(): RowStore<ED, Cxt>;
 }

@@ -3,11 +3,14 @@ export declare abstract class UniversalContext<ED extends EntityDict> implements
     rowStore: RowStore<ED, this>;
     uuid?: string;
     opRecords: OpRecord<ED>[];
+    private scene?;
     events: {
         commit: Array<() => Promise<void>>;
         rollback: Array<() => Promise<void>>;
     };
     constructor(store: RowStore<ED, UniversalContext<ED>>);
+    getScene(): string | undefined;
+    setScene(scene?: string): void;
     private resetEvents;
     on(event: 'commit' | 'rollback', callback: () => Promise<void>): void;
     begin(options?: TxnOption): Promise<void>;
