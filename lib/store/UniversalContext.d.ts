@@ -4,6 +4,7 @@ export declare abstract class UniversalContext<ED extends EntityDict> implements
     uuid?: string;
     opRecords: OpRecord<ED>[];
     private scene?;
+    private rwLock;
     events: {
         commit: Array<() => Promise<void>>;
         rollback: Array<() => Promise<void>>;
@@ -13,6 +14,10 @@ export declare abstract class UniversalContext<ED extends EntityDict> implements
     setScene(scene?: string): void;
     private resetEvents;
     on(event: 'commit' | 'rollback', callback: () => Promise<void>): void;
+    /**
+     * 一个context中不应该有并发的事务，这里将事务串行化，使用的时候千万要注意不要自己等自己
+     * @param options
+     */
     begin(options?: TxnOption): Promise<void>;
     commit(): Promise<void>;
     rollback(): Promise<void>;

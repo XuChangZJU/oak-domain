@@ -10,6 +10,6 @@ export declare class RWLock {
     private writeWaiter;
     constructor();
     acquire(mode: Mode): Promise<void>;
-    release(): Promise<void>;
+    release(): void;
 }
 export {};

@@ -41,7 +41,7 @@ export class RWLock {
         }
     }
 
-    async release() {
+    release() {
         if(this.writeNumber) {
             assert (this.writeNumber === 1);
             this.writeNumber = 0;
