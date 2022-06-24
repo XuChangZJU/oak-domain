@@ -17,6 +17,7 @@ declare type MySqlSelectionHint = {
     ignoreIndex?: MySqlHintIndex;
 };
 export declare type SelectionHint = {
+    ignoreTrigger?: boolean;
     includeDeleted?: boolean;
     mysql?: MySqlSelectionHint;
 };

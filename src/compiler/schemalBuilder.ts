@@ -4129,10 +4129,15 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                         factory.createIdentifier("Selection"),
                         undefined
                     ),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("SelectionHint"),
-                        undefined
-                    )
+                    factory.createTypeLiteralNode([factory.createPropertySignature(
+                        undefined,
+                        factory.createIdentifier("hint"),
+                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                        factory.createTypeReferenceNode(
+                            factory.createIdentifier("SelectionHint"),
+                            undefined
+                        )
+                    )])
                 ])
             ),
             factory.createPropertySignature(
@@ -4704,7 +4709,7 @@ function outputLocale(outputDir: string, printer: ts.Printer) {
                 (ele) => {
                     assert(ts.isPropertyAssignment(ele) && (ts.isIdentifier(ele.name) || ts.isStringLiteral(ele.name)) && ts.isObjectLiteralExpression(ele.initializer));
                     const lng = ele.name.text;
-    
+
                     const result = printer.printList(
                         ts.ListFormat.SourceFileStatements,
                         factory.createNodeArray([
@@ -4718,7 +4723,7 @@ function outputLocale(outputDir: string, printer: ts.Printer) {
                         sourceFile);
                     const filename = path.join(outputDir, entity, 'locales', `${lng}.ts`);
                     writeFileSync(filename, result, { flag: 'w' });
-    
+
                     if (locales[lng]) {
                         locales[lng].push(entity);
                     }
@@ -4988,7 +4993,7 @@ function addReverseRelationship() {
 
 function outputPackageJson(outputDir: string) {
     const pj = {
-        "name": process.env.COMPLING_AS_LIB ? "general-app-domain": "oak-app-domain",
+        "name": process.env.COMPLING_AS_LIB ? "general-app-domain" : "oak-app-domain",
         "main": "index.ts"
     };
 

@@ -22,6 +22,7 @@ type MySqlSelectionHint = {
 };
 
 export type SelectionHint = {
+    ignoreTrigger?: boolean;
     includeDeleted?: boolean;
     mysql?: MySqlSelectionHint
 };
