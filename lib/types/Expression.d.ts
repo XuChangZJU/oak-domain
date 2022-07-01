@@ -2,14 +2,15 @@ import { RefAttr } from "./Demand";
 import { Geo } from "./Geo";
 export declare type RefOrExpression<A> = RefAttr<A> | Expression<A>;
 declare type MathType<A> = RefOrExpression<A> | number;
+declare type StringType<A> = RefOrExpression<A> | string;
 interface Add<A> {
-    $add: [MathType<A>, MathType<A>];
+    $add: (MathType<A> | StringType<A>)[];
 }
 interface Subtract<A> {
     $subtract: [MathType<A>, MathType<A>];
 }
 interface Multiply<A> {
-    $multiply: [MathType<A>, MathType<A>];
+    $multiply: (MathType<A>)[];
 }
 interface Divide<A> {
     $divide: [MathType<A>, MathType<A>];

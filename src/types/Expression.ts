@@ -9,14 +9,15 @@ export type RefOrExpression<A> = RefAttr<A> | Expression<A>;
 
 // Math
 type MathType<A> = RefOrExpression<A> | number;
+type StringType<A> = RefOrExpression<A> | string
 interface Add<A> {
-    $add: [MathType<A>, MathType<A>];
+    $add: (MathType<A> | StringType<A>)[];
 };
 interface Subtract<A> {
     $subtract: [MathType<A>, MathType<A>];
 };
 interface Multiply<A> {
-    $multiply: [MathType<A>, MathType<A>];
+    $multiply: (MathType<A>)[];
 };
 interface Divide<A> {
     $divide: [MathType<A>, MathType<A>];
@@ -248,13 +249,30 @@ export function execOp(op: string, params: any, obscure?: boolean): ExpressionCo
             return params[0].includes(params[1]);
         }
         case '$add': {
-            return params[0] + params[1];
+            if (typeof params[0] === 'number') {
+                let result = 0;
+                params.forEach(
+                    (ele: number) => result += ele
+                );
+                return result;
+            }
+            else {
+                let result = '';
+                params.forEach(
+                    (ele: string) => result += ele
+                );
+                return result;
+            }
         }
         case '$subtract': {
             return params[0] - params[1];
         }
         case '$multiply': {
-            return params[0] * params[1];
+            let result = 1;
+            params.forEach(
+                (ele: number) => result = result * ele
+            );
+            return result;
         }
         case '$divide': {
             return params[0] / params[1];

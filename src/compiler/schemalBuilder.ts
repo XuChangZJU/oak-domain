@@ -16,7 +16,7 @@ import {
     NUMERICAL_LITERL_DEFAULT_SCALE,
     INT_LITERL_DEFAULT_WIDTH,
 } from './env';
-import { firstLetterLowerCase, firstLetterUpperCase } from './utils';
+import { firstLetterLowerCase, firstLetterUpperCase } from '../utils/string';
 
 const Schema: Record<string, {
     schemaAttrs: Array<ts.PropertySignature>;
