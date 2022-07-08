@@ -637,9 +637,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                         node.type
                     ),
                     sourceFile!);
-                if (node.name.text.endsWith('State')) {
-                    states.push(firstLetterLowerCase(node.name.text));
-                }
             }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
@@ -706,6 +703,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                                 )
                             )
                         );
+                        states.push(firstLetterLowerCase(attr));
                     }
                     else if (declaration.type && (ts.isArrayTypeNode(declaration.type!)
                         && ts.isTypeReferenceNode(declaration.type.elementType)
