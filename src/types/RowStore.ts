@@ -33,7 +33,7 @@ export abstract class RowStore<ED extends EntityDict, Cxt extends Context<ED>> {
 
     abstract count<T extends keyof ED> (
         entity: T,
-        selection: Omit<ED[T]['Selection'], 'data' | 'sorter' | 'action'>,
+        selection: Pick<ED[T]['Selection'], 'filter'>,
         context: Cxt,
         params?: Object
     ): Promise<number>;

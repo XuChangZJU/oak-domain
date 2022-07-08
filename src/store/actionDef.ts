@@ -1,6 +1,6 @@
 import { assign } from "lodash";
 import { combineFilters, contains } from "./filter";
-import { ActionDictOfEntityDict, Checker, Context, CreateTriggerInTxn, DeduceFilter, EntityDict, OakRowInconsistencyException, StorageSchema, Trigger, UpdateChecker, UpdateTriggerInTxn } from "../types";
+import { ActionDictOfEntityDict, Checker, Context, CreateTriggerInTxn, DeduceFilter, EntityDict, OakRowInconsistencyException, StorageSchema, Trigger, UpdateChecker, UpdateTriggerInTxn, Watcher } from "../types";
 
 export function getFullProjection<ED extends EntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>) {
     const { attributes } = schema[entity];
@@ -58,6 +58,37 @@ export async function checkFilterContains<ED extends EntityDict, T extends keyof
             }
         });
     }
+}
+
+function makeIntrinsicWatchers<ED extends EntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>) {
+    const watchers: Watcher<ED, keyof ED, Cxt>[] = [];
+    for (const entity in schema) {
+        const { attributes } = schema[entity];
+
+        const now = Date.now();
+        const { expiresAt, expired } = attributes;
+        if (expiresAt && expiresAt.type === 'datetime' && expired && expired.type === 'boolean') {
+            // 如果有定义expiresAt和expired，则自动生成一个检查的watcher
+            watchers.push({
+                entity,
+                name: `对象${entity}上的过期自动watcher`,
+                filter: async () => {
+                    return {
+                        expired: false,
+                        expiresAt: {
+                            $lte: now,
+                        },
+                    };
+                },
+                action: 'update',
+                actionData: {
+                    expired: true,
+                } as ED[keyof ED]['Update']['data'],
+            })
+        }
+    }
+
+    return watchers;
 }
 
 export function analyzeActionDefDict<ED extends EntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>, actionDefDict: ActionDictOfEntityDict<ED>) {
@@ -125,5 +156,6 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends Context<
     return {
         triggers,
         checkers,
+        watchers: makeIntrinsicWatchers(schema),
     };
 }

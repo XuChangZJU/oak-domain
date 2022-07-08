@@ -11,7 +11,7 @@ export declare abstract class RowStore<ED extends EntityDict, Cxt extends Contex
     protected storageSchema: StorageSchema<ED>;
     abstract operate<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams): Promise<OperationResult<ED>>;
     abstract select<T extends keyof ED, S extends ED[T]['Selection']>(entity: T, selection: S, context: Cxt, params?: Object): Promise<SelectionResult<ED[T]['Schema'], S['data']>>;
-    abstract count<T extends keyof ED>(entity: T, selection: Omit<ED[T]['Selection'], 'data' | 'sorter' | 'action'>, context: Cxt, params?: Object): Promise<number>;
+    abstract count<T extends keyof ED>(entity: T, selection: Pick<ED[T]['Selection'], 'filter'>, context: Cxt, params?: Object): Promise<number>;
     constructor(storageSchema: StorageSchema<ED>);
     abstract begin(option?: TxnOption): Promise<string>;
     abstract commit(txnId: string): Promise<void>;
