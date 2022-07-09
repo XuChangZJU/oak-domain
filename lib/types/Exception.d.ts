@@ -1,5 +1,6 @@
 import { EntityDict, OpRecord } from "./Entity";
 export declare class OakException extends Error {
+    toString(): string;
 }
 export declare class OakUserException extends OakException {
 }
@@ -11,6 +12,7 @@ export declare class OakRowInconsistencyException<ED extends EntityDict> extends
     private data?;
     constructor(data?: OpRecord<ED>, message?: string);
     getData(): OpRecord<ED> | undefined;
+    toString(): string;
 }
 /**
  * 当输入的数据非法时抛此异常，attributes表示非法的属性
@@ -20,6 +22,7 @@ export declare class OakInputIllegalException extends OakUserException {
     constructor(attributes: string[], message?: string);
     getAttributes(): string[];
     addAttributesPrefix(prefix: string): void;
+    toString(): string;
 }
 /**
  * 用户权限不够时抛的异常
@@ -33,4 +36,10 @@ export declare class OakCongruentRowExists<ED extends EntityDict, T extends keyo
     private data;
     constructor(data: ED[T]['OpSchema'], message?: string);
     getData(): ED[T]["OpSchema"];
+    toString(): string;
 }
+export declare function makeException(data: {
+    name: string;
+    message?: string;
+    [A: string]: any;
+}): OakException | undefined;
