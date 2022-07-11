@@ -3,6 +3,10 @@ import { EntityDict, OpRecord } from "./Entity";
 export class OakException extends Error {
 }
 
+export class OakExternalException extends Error {
+    // 表示由oak生态外部造成的异常，比如网络中断
+}
+
 export class OakUserException extends OakException {
     // 继承了这个类的异常统一视为“可接受的、由用户操作造成的异常”
 };
