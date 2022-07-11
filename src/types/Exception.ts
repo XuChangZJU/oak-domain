@@ -3,7 +3,7 @@ import { EntityDict, OpRecord } from "./Entity";
 export class OakException extends Error {
     toString() {
         return JSON.stringify({
-            name: this.name,
+            name: this.constructor.name,
             message: this.message,
         });
     }
@@ -35,7 +35,7 @@ export class OakUserException extends OakException {
 
     toString(): string {
         return JSON.stringify({
-            name: this.name,
+            name: this.constructor.name,
             message: this.message,
             data: this.data,
         });
@@ -64,7 +64,7 @@ export class OakInputIllegalException extends OakUserException {
 
     toString(): string {
         return JSON.stringify({
-            name: this.name,
+            name: this.constructor.name,
             message: this.message,
             attributes: this.attributes,
         });
@@ -94,7 +94,7 @@ export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> ex
 
     toString(): string {
         return JSON.stringify({
-            name: this.name,
+            name: this.constructor.name,
             message: this.message,
             data: this.data,
         });

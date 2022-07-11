@@ -7,7 +7,7 @@ export abstract class AppLoader<ED extends EntityDict, Cxt extends Context<ED>> 
         this.path = path;
     }
     
-    abstract goAspect(name: string, context: Cxt, params?: any): Promise<any>;
+    abstract execAspect(name: string, context: Cxt, params?: any): Promise<any>;
 
     abstract initialize(dropIfExists?: boolean): Promise<void>;
 
