@@ -1,6 +1,12 @@
 import { EntityDict, OpRecord } from "./Entity";
 
 export class OakException extends Error {
+    toString() {
+        return JSON.stringify({
+            name: this.name,
+            message: this.message,
+        });
+    }
 }
 
 export class OakExternalException extends Error {
@@ -26,6 +32,14 @@ export class OakUserException extends OakException {
     getData() {
         return this.data;
     }
+
+    toString(): string {
+        return JSON.stringify({
+            name: this.name,
+            message: this.message,
+            data: this.data,
+        });
+    }
 };
 
 /**
@@ -46,6 +60,14 @@ export class OakInputIllegalException extends OakUserException {
         this.attributes = this.attributes.map(
             ele => `${prefix}.${ele}`
         );
+    }
+
+    toString(): string {
+        return JSON.stringify({
+            name: this.name,
+            message: this.message,
+            attributes: this.attributes,
+        });
     }
 };
 
@@ -68,5 +90,46 @@ export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> ex
 
     getData() {
         return this.data;
+    }
+
+    toString(): string {
+        return JSON.stringify({
+            name: this.name,
+            message: this.message,
+            data: this.data,
+        });
+    }
+}
+
+export function makeException(data: {
+    name: string;
+    message?: string;
+    [A: string]: any;
+}) {
+    const { name } = data;
+    switch (name) {
+        case OakException.name: {
+            return new OakException(data.message);
+        }
+        case OakUserException.name: {
+            return new OakUserException(data.message);
+        }
+        case OakExternalException.name: {
+            return new OakExternalException(data.message);
+        }
+        case OakRowInconsistencyException.name: {
+            return new OakRowInconsistencyException(data.data, data.message);
+        }
+        case OakInputIllegalException.name: {
+            return new OakInputIllegalException(data.attributes, data.message);
+        }
+        case OakUserUnpermittedException.name: {
+            return new OakUserUnpermittedException(data.message);
+        }
+        case OakCongruentRowExists.name: {
+            return new OakCongruentRowExists(data.data, data.message);
+        }
+        default:
+            return;
     }
 }

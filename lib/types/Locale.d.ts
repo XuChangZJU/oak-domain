@@ -13,7 +13,9 @@ declare type LocaleOfValue<V extends Record<string, string>> = {
 };
 export declare type LocaleDef<Sc extends Record<string, any>, Ac extends string, R extends string, V extends Record<string, string>> = {
     [L in Language]?: {
-        attr: LocaleOfSchema<Sc>;
+        attr: LocaleOfSchema<Sc> & {
+            [A in keyof V]: string;
+        };
         action?: LocaleOfStringEnum<Ac>;
         r?: LocaleOfStringEnum<R>;
         v?: LocaleOfValue<V>;
