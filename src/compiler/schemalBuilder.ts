@@ -282,6 +282,7 @@ function getStringTextFromUnionStringLiterals(moduleName: string, filename: stri
 const RESERVED_ACTION_NAMES = ['GenericAction', 'ParticularAction'];
 import { genericActions } from '../actions/action';
 import { unIndexedTypes } from '../types/DataType';
+import { initinctiveAttributes } from '../types/Entity';
 function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program) {
     const actionTexts = genericActions.map(
         ele => ele
@@ -418,6 +419,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     let hasActionTypeAliasDeclaration = false;
     const enumStringAttrs: string[] = [];
     const states: string[] = [];
+    const localEnumStringTypes: string[] = [];
     let localeDef: ts.ObjectLiteralExpression | undefined = undefined;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
@@ -465,6 +467,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                             }
                             else {
                                 schemaAttrs.push(attrNode);
+                                if (localEnumStringTypes.includes(type.typeName.text)) {
+                                    enumStringAttrs.push((<ts.Identifier>name).text);
+                                }
                             }
                         }
                         else {
@@ -641,6 +646,11 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
                 pushStatementIntoSchemaAst(moduleName, node, sourceFile!);
+                
+                if (ts.isUnionTypeNode(node.type) && ts.isLiteralTypeNode(node.type.types[0]) && ts.isStringLiteral(node.type.types[0].literal)) {
+                    // 本文件内定义的枚举类型
+                    localEnumStringTypes.push(node.name.text);
+                }
             }
         }
 
@@ -792,47 +802,49 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                                         ) as ts.PropertyAssignment;
 
                                         const indexAttrName = (<ts.Identifier>nameProperty.initializer!).text;
-                                        const schemaNode = schemaAttrs.find(
-                                            (ele3) => {
-                                                assert(ts.isPropertySignature(ele3));
-                                                return (<ts.Identifier>ele3.name).text === indexAttrName;
+                                        if (!initinctiveAttributes.includes(indexAttrName)) {
+                                            const schemaNode = schemaAttrs.find(
+                                                (ele3) => {
+                                                    assert(ts.isPropertySignature(ele3));
+                                                    return (<ts.Identifier>ele3.name).text === indexAttrName;
+                                                }
+                                            ) as ts.PropertySignature;
+                                            if (!schemaNode) {
+                                                throw new Error(`「${filename}」中索引「${indexName}」的属性「${indexAttrName}」定义非法`);
                                             }
-                                        ) as ts.PropertySignature;
-                                        if (!schemaNode) {
-                                            throw new Error(`「${filename}」中索引「${indexName}」的属性「${indexAttrName}」定义非法`);
-                                        }
-
-                                        const { type, name } = schemaNode;
-                                        const entity = firstLetterLowerCase(moduleName);
-                                        const { [entity]: manyToOneSet } = ManyToOne;
-                                        if (ts.isTypeReferenceNode(type!)) {
-                                            const { typeName } = type;
-                                            if (ts.isIdentifier(typeName)) {
-                                                const { text } = typeName;
-                                                const text2 = text === 'Schema' ? entity : text;
-                                                const manyToOneItem = manyToOneSet && manyToOneSet.find(
-                                                    ([refEntity, attrName]) => refEntity === text2 && attrName === (<ts.Identifier>name).text
-                                                );
-                                                if (!manyToOneItem) {
-                                                    // 如果不是外键，则不能是Text, File 
-                                                    if (isFulltextIndex) {
-                                                        assert(['Text', 'String'].includes(text2), `「${filename}」中全文索引「${indexName}」定义的属性「${indexAttrName}」类型非法，只能是Text/String`);
+    
+                                            const { type, name } = schemaNode;
+                                            const entity = firstLetterLowerCase(moduleName);
+                                            const { [entity]: manyToOneSet } = ManyToOne;
+                                            if (ts.isTypeReferenceNode(type!)) {
+                                                const { typeName } = type;
+                                                if (ts.isIdentifier(typeName)) {
+                                                    const { text } = typeName;
+                                                    const text2 = text === 'Schema' ? entity : text;
+                                                    const manyToOneItem = manyToOneSet && manyToOneSet.find(
+                                                        ([refEntity, attrName]) => refEntity === text2 && attrName === (<ts.Identifier>name).text
+                                                    );
+                                                    if (!manyToOneItem) {
+                                                        // 如果不是外键，则不能是Text, File 
+                                                        if (isFulltextIndex) {
+                                                            assert(['Text', 'String'].includes(text2), `「${filename}」中全文索引「${indexName}」定义的属性「${indexAttrName}」类型非法，只能是Text/String`);
+                                                        }
+                                                        else {
+                                                            assert(!unIndexedTypes.includes(text2), `「${filename}」中索引「${indexName}」的属性「${indexAttrName}」的类型为「${text2}」，不可索引`);
+                                                        }
                                                     }
                                                     else {
-                                                        assert(!unIndexedTypes.includes(text2), `「${filename}」中索引「${indexName}」的属性「${indexAttrName}」的类型为「${text2}」，不可索引`);
+                                                        assert(!isFulltextIndex, `「${filename}」中全文索引「${indexName}」的属性「${indexAttrName}」类型非法，只能为Text/String`);
                                                     }
                                                 }
                                                 else {
-                                                    assert(!isFulltextIndex, `「${filename}」中全文索引「${indexName}」的属性「${indexAttrName}」类型非法，只能为Text/String`);
+                                                    assert(false);          // 这是什么case，不确定
                                                 }
                                             }
                                             else {
-                                                assert(false);          // 这是什么case，不确定
+                                                assert(!isFulltextIndex, `「${filename}」中全文索引「${indexName}」的属性「${indexAttrName}」类型只能为Text/String`);
+                                                assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${entity}中索引「${indexName}」的属性${(<ts.Identifier>name).text}有定义非法`);
                                             }
-                                        }
-                                        else {
-                                            assert(!isFulltextIndex, `「${filename}」中全文索引「${indexName}」的属性「${indexAttrName}」类型只能为Text/String`);
-                                            assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${entity}中索引「${indexName}」的属性${(<ts.Identifier>name).text}有定义非法`);
                                         }
                                     }
                                 );
