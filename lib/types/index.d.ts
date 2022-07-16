@@ -15,3 +15,4 @@ export * from './Trigger';
 export * from './Exception';
 export * from './Watcher';
 export * from './AppLoader';
+export * from './Connector';
