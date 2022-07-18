@@ -4723,16 +4723,14 @@ function outputLocale(outputDir: string, printer: ts.Printer) {
                     const result = printer.printList(
                         ts.ListFormat.SourceFileStatements,
                         factory.createNodeArray([
-                            factory.createExportAssignment(
-                                undefined,
-                                undefined,
-                                undefined,
+                            factory.createReturnStatement(
                                 ele.initializer
                             )
                         ]),
                         sourceFile);
-                    const filename = path.join(outputDir, entity, 'locales', `${lng}.ts`);
-                    writeFileSync(filename, result, { flag: 'w' });
+                    const data = Function(result)();
+                    const filename = path.join(outputDir, entity, 'locales', `${lng}.json`);
+                    writeFileSync(filename, JSON.stringify(data), { flag: 'w' });
 
                     if (locales[lng]) {
                         locales[lng].push(entity);
@@ -4751,7 +4749,7 @@ function outputLocale(outputDir: string, printer: ts.Printer) {
             const lack = difference(entities, locales[lng]);
             throw new Error(`${lng}语言定义中缺少了对象${lack.join(',')}的定义，请检查相应的定义文件`);
         }
-        const statements: ts.Statement[] = locales[lng].map(
+        /* const statements: ts.Statement[] = locales[lng].map(
             (entity) => factory.createImportDeclaration(
                 undefined,
                 undefined,
@@ -4785,10 +4783,9 @@ function outputLocale(outputDir: string, printer: ts.Printer) {
         const result = printer.printList(
             ts.ListFormat.SourceFileStatements,
             factory.createNodeArray(statements),
-            ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS));
+            ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest,  false, ts.ScriptKind.TS));
         const filename = path.join(outputDir, '_locales', `${lng}.ts`);
-        writeFileSync(filename, result, { flag: 'w' });
-
+        writeFileSync(filename, result, { flag: 'w' }); */
     }
 }
 
