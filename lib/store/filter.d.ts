@@ -1,6 +1,6 @@
 import { StorageSchema } from '../types';
 import { EntityDict } from "../types/Entity";
-export declare function addFilterSegment<ED extends EntityDict, T extends keyof ED>(segment2: ED[T]['Selection']['filter'], filter2?: ED[T]['Selection']['filter']): ED[T]["Selection"]["filter"];
+export declare function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]): ED[T]["Selection"]["filter"];
 export declare function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>): ED[T]["Selection"]["filter"];
 /**
  * 判断filter是否包含conditionalFilter中的查询条件，即filter查询的结果一定满足conditionalFilter的约束

@@ -1,4 +1,3 @@
-import { assign } from "lodash";
 import { combineFilters, contains } from "./filter";
 import { ActionDictOfEntityDict, Checker, Context, CreateTriggerInTxn, DeduceFilter, EntityDict, OakRowInconsistencyException, StorageSchema, Trigger, UpdateChecker, UpdateTriggerInTxn, Watcher } from "../types";
 
@@ -11,7 +10,7 @@ export function getFullProjection<ED extends EntityDict, T extends keyof ED>(ent
         $$deleteAt$$: 1,
     };
     Object.keys(attributes).forEach(
-        (k) => assign(projection, {
+        (k) => Object.assign(projection, {
             [k]: 1,
         })
     );
@@ -47,7 +46,7 @@ export async function checkFilterContains<ED extends EntityDict, T extends keyof
     if (result.length > 0) {
         const data = {};
         result.forEach(
-            ele => assign(data, {
+            ele => Object.assign(data, {
                 [ele.id as string]: ele,
             })
         );
@@ -125,8 +124,8 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends Context<
                     when: 'before',
                     fn: async ({ operation }) => {
                         const { data = {} } = operation;
-                        assign(operation, {
-                            data: assign(data, {
+                        Object.assign(operation, {
+                            data: Object.assign(data, {
                                 [attr]: stm[action][1],
                             }),
                         });
@@ -143,7 +142,7 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends Context<
                     when: 'before',
                     fn: async ({ operation }) => {
                         const { data } = operation;
-                        assign(data, {
+                        Object.assign(data, {
                             [attr]: is,
                         });
                         return 1;

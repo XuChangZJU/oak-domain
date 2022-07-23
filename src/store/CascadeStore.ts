@@ -1,10 +1,8 @@
 import assert from "assert";
-import { assign, keys } from "lodash";
 import { Context } from '../types/Context';
 import {
     DeduceCreateMultipleOperation,
-    DeduceCreateOperation, DeduceCreateSingleOperation, DeduceFilter, DeduceRemoveOperation, DeduceSelection,
-    DeduceUpdateOperation, EntityDict, EntityShape, OperateParams, OperationResult, SelectionResult, SelectRowShape
+    DeduceCreateOperation, DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict, OperateParams, OperationResult, SelectRowShape
 } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
@@ -46,23 +44,23 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         for (const attr in data) {
             const relation = judgeRelation(this.storageSchema, entity, attr);
             if (relation === 1 || relation == 0) {
-                assign(projection, {
+                Object.assign(projection, {
                     [attr]: data[attr],
                 });
             }
             else if (relation === 2) {
                 // 基于entity的多对一
-                assign(projection, {
+                Object.assign(projection, {
                     entity: 1,
                     entityId: 1,
                 });
                 if (supportMtoJoin) {
-                    assign(projection, {
+                    Object.assign(projection, {
                         [attr]: data[attr],
                     });
                 }
                 else {
-                    assign(manyToOneOnEntity, {
+                    Object.assign(manyToOneOnEntity, {
                         [attr]: 1,
                     });
                 }
@@ -70,15 +68,15 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
             else if (typeof relation === 'string') {
                 // 基于属性的多对一
                 if (supportMtoJoin) {
-                    assign(projection, {
+                    Object.assign(projection, {
                         [attr]: data[attr],
                     });
                 }
                 else {
-                    assign(projection, {
+                    Object.assign(projection, {
                         [`${attr}Id`]: 1,
                     });
-                    assign(manyToOne, {
+                    Object.assign(manyToOne, {
                         [attr]: relation,
                     });
                 }
@@ -87,7 +85,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 const [entity2, foreignKey] = relation;
                 if (foreignKey) {
                     // 基于属性的一对多
-                    assign(oneToMany, {
+                    Object.assign(oneToMany, {
                         [attr]: {
                             entity: entity2,
                             foreignKey,
@@ -96,21 +94,21 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 }
                 else {
                     // 基于entity的多对一
-                    assign(oneToManyOnEntity, {
+                    Object.assign(oneToManyOnEntity, {
                         [attr]: entity2,
                     });
                 }
             }
         }
 
-        const rows = await this.selectAbjointRow(entity, assign({}, selection, {
+        const rows = await this.selectAbjointRow(entity, Object.assign({}, selection, {
             data: projection,
         }), context, params);
 
         await Promise.all(
             // manyToOne
             (() => {
-                const attrs = keys(manyToOne);
+                const attrs = Object.keys(manyToOne);
                 if (attrs.length > 0) {
                     return attrs.map(
                         async (attr) => {
@@ -130,7 +128,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                     const subRow = subRows.find(
                                         ele => (ele as Record<string, any>).id === (row as Record<string, any>)[`${attr}Id`]
                                     );
-                                    assign(row, {
+                                    Object.assign(row, {
                                         [attr]: subRow,
                                     });
                                 }
@@ -142,7 +140,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
             })().concat(
                 // manyToOneOnEntity
                 (() => {
-                    const attrs = keys(manyToOneOnEntity);
+                    const attrs = Object.keys(manyToOneOnEntity);
                     if (attrs.length > 0) {
                         return attrs.map(
                             async (attr) => {
@@ -166,7 +164,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                         const subRow = subRows.find(
                                             ele => (ele as Record<string, any>).id === (row as Record<string, any>).entityId
                                         );
-                                        assign(row, {
+                                        Object.assign(row, {
                                             [attr]: subRow,
                                         });
                                     }
@@ -178,7 +176,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 })()
             ).concat(
                 (() => {
-                    const attrs = keys(oneToMany);
+                    const attrs = Object.keys(oneToMany);
                     if (attrs.length > 0) {
                         // 必须一行一行的查询，否则indexFrom和count无法准确
                         return rows.map(
@@ -186,12 +184,12 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                 for (const attr in oneToMany) {
                                     const { entity: entity2, foreignKey } = oneToMany[attr];
                                     const filter2 = data[attr];
-                                    const rows2 = await this.cascadeSelect(entity2, assign({}, filter2, {
+                                    const rows2 = await this.cascadeSelect(entity2, Object.assign({}, filter2, {
                                         filter: addFilterSegment({
                                             [foreignKey]: (row as Record<string, any>).id,
                                         } as any, filter2.filter),
                                     }), context, params);
-                                    assign(row, {
+                                    Object.assign(row, {
                                         [attr]: rows2,
                                     });
                                 }
@@ -202,20 +200,20 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 })()
             ).concat(
                 (() => {
-                    const attrs = keys(oneToManyOnEntity);
+                    const attrs = Object.keys(oneToManyOnEntity);
                     if (attrs.length > 0) {
                         // 必须一行一行的查询，否则indexFrom和count无法准确
                         return rows.map(
                             async (row) => {
                                 for (const attr in oneToManyOnEntity) {
                                     const filter2 = data[attr];
-                                    const rows2 = await this.cascadeSelect(oneToManyOnEntity[attr], assign({}, filter2, {
+                                    const rows2 = await this.cascadeSelect(oneToManyOnEntity[attr], Object.assign({}, filter2, {
                                         filter: addFilterSegment({
                                             entityId: (row as Record<string, any>).id,
                                             entity,
                                         } as any, filter2.filter),
                                     }), context, params);
-                                    assign(row, {
+                                    Object.assign(row, {
                                         [attr]: rows2,
                                     });
                                 }
@@ -278,7 +276,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         for (const attr in data2) {
             const relation = judgeRelation(this.storageSchema, entity, attr);
             if (relation === 1) {
-                assign(opData, {
+                Object.assign(opData, {
                     [attr]: data2[attr],
                 });
             }
@@ -287,7 +285,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 const operationMto = data2[attr];
                 const { action: actionMto, data: dataMto, filter: filterMto } = operationMto;
                 if (actionMto === 'create') {
-                    assign(opData, {
+                    Object.assign(opData, {
                         entityId: dataMto.id,
                         entity: attr,
                     });
@@ -295,7 +293,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 else if (action === 'create') {
                     const { entityId: fkId, entity } = data2;
                     assert(typeof fkId === 'string' || entity === attr);        // A中data的entityId作为B中filter的主键
-                    assign(operationMto, {
+                    Object.assign(operationMto, {
                         filter: addFilterSegment({
                             id: fkId,
                         }), filterMto,
@@ -304,7 +302,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 else {
                     // 剩下三种情况都是B中的filter的id来自A中row的entityId
                     assert(!data2.hasOwnProperty('entityId') && !data2.hasOwnProperty('entity'));
-                    assign(operationMto, {
+                    Object.assign(operationMto, {
                         filter: addFilterSegment({
                             id: {
                                 $in: {
@@ -329,14 +327,14 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 const operationMto = data2[attr];
                 const { action: actionMto, data: dataMto, filter: filterMto } = operationMto;
                 if (actionMto === 'create') {
-                    assign(opData, {
+                    Object.assign(opData, {
                         [`${attr}Id`]: dataMto.id,
                     });
                 }
                 else if (action === 'create') {
                     const { [`${attr}Id`]: fkId } = data2;
                     assert(typeof fkId === 'string');
-                    assign(operationMto, {
+                    Object.assign(operationMto, {
                         filter: addFilterSegment(filterMto || {}, {
                             id: fkId,
                         }),
@@ -344,7 +342,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 }
                 else {
                     assert(!data2.hasOwnProperty(`${attr}Id`));
-                    assign(operationMto, {
+                    Object.assign(operationMto, {
                         filter: addFilterSegment(filterMto || {}, {
                             id: {
                                 $in: {
@@ -374,14 +372,14 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                             const { id } = data2;
                             if (dataOtm instanceof Array) {
                                 dataOtm.forEach(
-                                    ele => assign(ele, {
+                                    ele => Object.assign(ele, {
                                         entity,
                                         entityId: id,
                                     })
                                 );
                             }
                             else {
-                                assign(dataOtm, {
+                                Object.assign(dataOtm, {
                                     entity,
                                     entityId: id,
                                 });
@@ -393,14 +391,14 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                             assert(typeof id === 'string');
                             if (dataOtm instanceof Array) {
                                 dataOtm.forEach(
-                                    ele => assign(ele, {
+                                    ele => Object.assign(ele, {
                                         entity,
                                         entityId: id,
                                     })
                                 );
                             }
                             else {
-                                assign(dataOtm, {
+                                Object.assign(dataOtm, {
                                     entity,
                                     entityId: id,
                                 });
@@ -409,14 +407,14 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                         else {
                             // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
                             const { id } = filter!;
-                            assign(otm, {
+                            Object.assign(otm, {
                                 filter: addFilterSegment({
                                     entity,
                                     entityId: id,
                                 }, filterOtm),
                             });
                             if (action === 'remove' && actionOtm === 'update') {
-                                assign(dataOtm, {
+                                Object.assign(dataOtm, {
                                     entity: null,
                                     entityId: null,
                                 });
@@ -429,13 +427,13 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                             const { id } = data2;
                             if (dataOtm instanceof Array) {
                                 dataOtm.forEach(
-                                    ele => assign(ele, {
+                                    ele => Object.assign(ele, {
                                         [foreignKey]: id,
                                     })
                                 );
                             }
                             else {
-                                assign(dataOtm, {
+                                Object.assign(dataOtm, {
                                     [foreignKey]: id,
                                 });
                             }
@@ -446,13 +444,13 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                             assert(typeof id === 'string');
                             if (dataOtm instanceof Array) {
                                 dataOtm.forEach(
-                                    ele => assign(ele, {
+                                    ele => Object.assign(ele, {
                                         [foreignKey]: id,
                                     })
                                 );
                             }
                             else {
-                                assign(dataOtm, {
+                                Object.assign(dataOtm, {
                                     [foreignKey]: id,
                                 });
                             }
@@ -460,13 +458,13 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                         else {
                             // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
                             const { id } = filter!;
-                            assign(otm, {
+                            Object.assign(otm, {
                                 filter: addFilterSegment({
                                     [foreignKey]: id,
                                 }, filterOtm),
                             });
                             if (action === 'remove' && actionOtm === 'update') {
-                                assign(dataOtm, {
+                                Object.assign(dataOtm, {
                                     [foreignKey]: null,
                                 });
                             }
@@ -489,7 +487,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         }
 
         const operation2: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']> =
-            assign({}, operation as DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, {
+        Object.assign({}, operation as DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, {
                 data: opData as ED[T]['OpSchema'],
             });
 

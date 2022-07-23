@@ -2,7 +2,7 @@ import { OperationResult, OperateParams, EntityDict, SelectionResult } from './E
 import { Context } from './Context';
 import { StorageSchema } from './Storage';
 import { OakErrorDefDict } from '../OakError';
-import { get, set } from 'lodash';
+import { get, set } from '../utils/lodash';
 
 export type TxnOption = {
     isolationLevel: 'repeatable read' | 'serializable';

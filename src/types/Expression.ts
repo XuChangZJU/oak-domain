@@ -1,8 +1,13 @@
 import assert from 'assert';
 import { RefAttr } from "./Demand";
 import { Geo } from "./Geo";
-import { DateTime, Interval } from 'luxon';
+import DayJs from 'dayjs';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
+import dayOfYear from 'dayjs/plugin/dayOfYear';
 import { getDistanceBetweenPoints } from '../utils/geo';
+
+DayJs.extend(weekOfYear);
+DayJs.extend(dayOfYear);
 
 
 export type RefOrExpression<A> = RefAttr<A> | Expression<A>;
@@ -319,57 +324,46 @@ export function execOp(op: string, params: any, obscure?: boolean): ExpressionCo
             return false;
         }
         case '$year': {
-            const value = typeof params === 'number' ? DateTime.fromMillis(params) : DateTime.fromJSDate(params);
-            return value.year;
+            const value = DayJs(params);
+            return value.year();
         }
         case '$month': {
-            const value = typeof params === 'number' ? DateTime.fromMillis(params) : DateTime.fromJSDate(params);
-            return value.month;
+            const value = DayJs(params);
+            return value.month();
         }
         case '$weekday': {
-            const value = typeof params === 'number' ? DateTime.fromMillis(params) : DateTime.fromJSDate(params);
-            return value.weekday;
+            const value = DayJs(params);
+            return value.day();     // 0~6
         }
         case '$weekOfYear': {
-            const value = typeof params === 'number' ? DateTime.fromMillis(params) : DateTime.fromJSDate(params);
-            return value.weekYear;
+            const value = DayJs(params);
+            return value.week();
         }
         case '$day':
         case '$dayOfMonth': {
-            const value = typeof params === 'number' ? DateTime.fromMillis(params) : DateTime.fromJSDate(params);
-            return value.day;
+            const value = DayJs(params);
+            return value.date();
         }
         case '$dayOfWeek': {
-            const value = typeof params === 'number' ? DateTime.fromMillis(params) : DateTime.fromJSDate(params);
-            return value.weekday;
+            const value = DayJs(params);
+            return value.day();     // 0~6
         }
         case '$dayOfYear': {
-            const value = typeof params === 'number' ? DateTime.fromMillis(params) : DateTime.fromJSDate(params);
-            return value.ordinal;
+            const value = DayJs(params);
+            return value.dayOfYear();     // 0~6
         }
         case '$dateDiff': {
-            const value1 = typeof params[0] === 'number' ? DateTime.fromMillis(params[0]) : DateTime.fromJSDate(params[0]);
-            const value2 = typeof params[1] === 'number' ? DateTime.fromMillis(params[1]) : DateTime.fromJSDate(params[1]);
+            const value1 = DayJs(params[0]);
+            const value2 = DayJs(params[1]);
 
-            const i = Interval.fromDateTimes(value1, value2);
-            switch(params[2]) {
-                case 'y': {
-                    return i.length('year');
-                }
-                case 'M': {
-                    return i.length('month');
-                }
-                case 'd': {
-                    return i.length('day');
-                }
-                case 'h': {
-                    return i.length('hour');
-                }
-                case 'm': {
-                    return i.length('minute');
-                }
+            switch (params[2]) {
+                case 'y':
+                case 'M':
+                case 'd':
+                case 'h':
+                case 'm':
                 case 's': {
-                    return i.length('second');
+                    return value1.diff(value2, params[2]);
                 }
                 default: {
                     assert(false);
@@ -377,25 +371,25 @@ export function execOp(op: string, params: any, obscure?: boolean): ExpressionCo
             }
         }
         case '$dateCeil': {
-            const value = typeof params[0] === 'number' ? DateTime.fromMillis(params[0]) : DateTime.fromJSDate(params[0]);
-            switch(params[1]) {
+            const value = DayJs(params[0]);
+            switch (params[1]) {
                 case 'y': {
-                    return value.startOf('year').toMillis();
+                    return value.startOf('year').millisecond();
                 }
                 case 'M': {
-                    return value.startOf('month').toMillis();
+                    return value.startOf('month').millisecond();
                 }
                 case 'd': {
-                    return value.startOf('day').toMillis();
+                    return value.startOf('day').millisecond();
                 }
                 case 'h': {
-                    return value.startOf('hour').toMillis();
+                    return value.startOf('hour').millisecond();
                 }
                 case 'm': {
-                    return value.startOf('minute').toMillis();
+                    return value.startOf('minute').millisecond();
                 }
                 case 's': {
-                    return value.startOf('second').toMillis();
+                    return value.startOf('second').millisecond();
                 }
                 default: {
                     assert(false);
@@ -403,25 +397,25 @@ export function execOp(op: string, params: any, obscure?: boolean): ExpressionCo
             }
         }
         case '$dateFloor': {
-            const value = typeof params[0] === 'number' ? DateTime.fromMillis(params[0]) : DateTime.fromJSDate(params[0]);
-            switch(params[1]) {
+            const value = DayJs(params[0]);
+            switch (params[1]) {
                 case 'y': {
-                    return value.endOf('year').toMillis();
+                    return value.endOf('year').millisecond();
                 }
                 case 'M': {
-                    return value.endOf('month').toMillis();
+                    return value.endOf('month').millisecond();
                 }
                 case 'd': {
-                    return value.endOf('day').toMillis();
+                    return value.endOf('day').millisecond();
                 }
                 case 'h': {
-                    return value.endOf('hour').toMillis();
+                    return value.endOf('hour').millisecond();
                 }
                 case 'm': {
-                    return value.endOf('minute').toMillis();
+                    return value.endOf('minute').millisecond();
                 }
                 case 's': {
-                    return value.endOf('second').toMillis();
+                    return value.endOf('second').millisecond();
                 }
                 default: {
                     assert(false);

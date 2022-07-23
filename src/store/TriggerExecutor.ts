@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { assign, pull, unset } from "lodash";
+import { pull, unset } from "../utils/lodash";
 import { addFilterSegment } from "../store/filter";
 import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict, OperateParams, SelectRowShape } from "../types/Entity";
 import { Logger } from "../types/Logger";
@@ -32,9 +32,9 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
     private volatileEntities: Array<keyof ED>;
 
     private logger: Logger;
-    private contextBuilder: (cxtString: string) => Cxt;
+    private contextBuilder: (cxtString: string) => Promise<Cxt>;
 
-    constructor(contextBuilder: (cxtString: string) => Cxt, logger: Logger = console) {
+    constructor(contextBuilder: (cxtString: string) => Promise<Cxt>, logger: Logger = console) {
         super();
         this.contextBuilder = contextBuilder;
         this.logger = logger;
@@ -64,7 +64,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
         if (this.triggerNameMap.hasOwnProperty(trigger.name)) {
             throw new Error(`不可有同名的触发器「${trigger.name}」`);
         }
-        assign(this.triggerNameMap, {
+        Object.assign(this.triggerNameMap, {
             [trigger.name]: trigger,
         });
 
@@ -74,12 +74,12 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                 triggers.push(trigger);
             }
             else if (this.triggerMap[trigger.entity]) {
-                assign(this.triggerMap[trigger.entity], {
+                Object.assign(this.triggerMap[trigger.entity], {
                     [action]: [trigger],
                 });
             }
             else {
-                assign(this.triggerMap, {
+                Object.assign(this.triggerMap, {
                     [trigger.entity]: {
                         [action]: [trigger],
                     }
@@ -167,7 +167,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                 }
             }
 
-            assign(operation.data, {
+            Object.assign(operation.data, {
                 [Executor.dataAttr]: {
                     name: trigger.name,
                     operation,
@@ -214,7 +214,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
     private onCommit<T extends keyof ED>(
         trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'], cxtStr: string, params?: OperateParams) {
         return async () => {
-            const context = this.contextBuilder(cxtStr);
+            const context = await this.contextBuilder(cxtStr);
             await context.begin();
             const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({
                 operation: operation as DeduceCreateOperation<ED[T]['Schema']>,
@@ -237,7 +237,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                     };
                 }
                 else if (operation.filter) {
-                    assign(filter, { filter: operation.filter });
+                    Object.assign(filter, { filter: operation.filter });
                 }
 
                 await rowStore.operate(trigger.entity, {
