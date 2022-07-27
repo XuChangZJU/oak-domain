@@ -36,6 +36,9 @@ export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...f
                             ]
                         }
                     }
+                    else {
+                        filter[k] = ele[k];
+                    }
                 }
             }
         }
