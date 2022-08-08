@@ -1439,20 +1439,17 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                             );
                         }
                         else {
-                            if (text.endsWith('State')) {
-                                type2 = factory.createTypeReferenceNode(
-                                    factory.createIdentifier('Q_EnumValue'),
-                                    [
-                                        factory.createTypeReferenceNode(
-                                            factory.createIdentifier(text),
-                                            undefined
-                                        )
-                                    ]
-                                );
-                            }
-                            else {
-                                // 引用的本地定义的shape
-                            }
+                            // 这里应该都是引用某个UnionType类型的定义了，如何判断？
+                            // const words = getStringTextFromUnionStringLiterals();
+                            type2 = factory.createTypeReferenceNode(
+                                factory.createIdentifier('Q_EnumValue'),
+                                [
+                                    factory.createTypeReferenceNode(
+                                        factory.createIdentifier(text),
+                                        undefined
+                                    )
+                                ]
+                            );
                         }
                     }
                 }
