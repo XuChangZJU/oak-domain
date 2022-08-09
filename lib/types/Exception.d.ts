@@ -1,5 +1,6 @@
 import { EntityDict, OpRecord } from "./Entity";
 export declare class OakException extends Error {
+    constructor(message?: string);
     toString(): string;
 }
 export declare class OakExternalException extends Error {

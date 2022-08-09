@@ -1,6 +1,19 @@
 import { EntityDict, OpRecord } from "./Entity";
 
 export class OakException extends Error {
+    constructor(message?: string) {
+        super(message);
+        this.name = new.target.name;
+        if (typeof (Error as any).captureStackTrace === 'function') {
+            (Error as any).captureStackTrace(this, new.target);
+        }
+        if (typeof Object.setPrototypeOf === 'function') {
+            Object.setPrototypeOf(this, new.target.prototype);
+        } else {
+            (this as any).__proto__ = new.target.prototype;
+        }
+    }
+
     toString() {
         return JSON.stringify({
             name: this.constructor.name,
@@ -22,7 +35,7 @@ export class OakUserException extends OakException {
  * 数据不一致异常，系统认为现有的数据不允许相应的动作时抛此异常
  * 
  */
- export class OakRowInconsistencyException<ED extends EntityDict> extends OakUserException {
+export class OakRowInconsistencyException<ED extends EntityDict> extends OakUserException {
     private data?: OpRecord<ED>;
     constructor(data?: OpRecord<ED>, message?: string) {
         super(message);
