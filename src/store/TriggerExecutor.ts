@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { pull, unset } from "../utils/lodash";
 import { addFilterSegment } from "../store/filter";
-import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict, OperateParams, SelectRowShape } from "../types/Entity";
+import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict, OperateOption, SelectOption, SelectRowShape } from "../types/Entity";
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Context } from '../types/Context';
@@ -125,10 +125,10 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
 
     private async preCommitTrigger<T extends keyof ED>(
         entity: T,
-        operation: ED[T]['Operation'],
+        operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         trigger: Trigger<ED, T, Cxt>,
         context: Cxt,
-        params?: OperateParams
+        option?: OperateOption
     ) {
         assert(trigger.action !== 'select');
         if ((trigger as CreateTriggerCrossTxn<ED, T, Cxt>).strict === 'makeSure') {
@@ -172,7 +172,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                     name: trigger.name,
                     operation,
                     cxtStr: await context.toString(),
-                    params,
+                    params: option,
                 },
                 [Executor.timestampAttr]: Date.now(),
             });
@@ -181,9 +181,9 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
 
     async preOperation<T extends keyof ED>(
         entity: T,
-        operation: ED[T]['Operation'],
+        operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         context: Cxt,
-        params?: OperateParams
+        option?: OperateOption | SelectOption
     ): Promise<void> {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
@@ -195,7 +195,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
             );
 
             for (const trigger of preTriggers) {
-                const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as DeduceCreateOperation<ED[T]['Schema']> }, context, params);
+                const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as DeduceCreateOperation<ED[T]['Schema']> }, context, option as OperateOption);
                 if (number > 0) {
                     this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
                 }
@@ -206,19 +206,19 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
             );
 
             for (const trigger of commitTriggers) {
-                await this.preCommitTrigger(entity, operation, trigger, context, params);
+                await this.preCommitTrigger(entity, operation, trigger, context, option as OperateOption);
             }
         }
     }
 
     private onCommit<T extends keyof ED>(
-        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'], cxtStr: string, params?: OperateParams) {
+        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' }, cxtStr: string, option?: OperateOption) {
         return async () => {
             const context = await this.contextBuilder(cxtStr);
             await context.begin();
             const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({
                 operation: operation as DeduceCreateOperation<ED[T]['Schema']>,
-            }, context, params);
+            }, context, option);
             const { rowStore } = context;
             if ((trigger as CreateTriggerCrossTxn<ED, T, Cxt>).strict === 'makeSure') {
                 // 如果是必须完成的trigger，在完成成功后要把trigger相关的属性置null;
@@ -256,19 +256,19 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
     }
 
     private async postCommitTrigger<T extends keyof ED>(
-        operation: ED[T]['Operation'],
+        operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         trigger: Trigger<ED, T, Cxt>,
         context: Cxt,
-        params?: OperateParams,
+        option?: OperateOption,
     ) {
-        context.on('commit', this.onCommit(trigger, operation, await context.toString(), params));
+        context.on('commit', this.onCommit(trigger, operation, await context.toString(), option));
     }
 
     async postOperation<T extends keyof ED>(
         entity: T,
-        operation: ED[T]['Operation'],
+        operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         context: Cxt,
-        params?: OperateParams,
+        option?: OperateOption | SelectOption,
         result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[],
     ): Promise<void> {
         const { action } = operation;
@@ -284,7 +284,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                 const number = await (trigger as SelectTriggerAfter<ED, T, Cxt>).fn({
                     operation: operation as ED[T]['Selection'],
                     result: result!,
-                }, context, params);
+                }, context, option as SelectOption);
                 if (number > 0) {
                     this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
                 }
@@ -295,7 +295,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
             );
 
             for (const trigger of commitTriggers) {
-                await this.postCommitTrigger(operation, trigger, context, params);
+                await this.postCommitTrigger(operation, trigger, context, option as OperateOption);
             }
         }
     }

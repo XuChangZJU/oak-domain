@@ -116,7 +116,7 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends Context<
                         await checkFilterContains(entity, schema, conditionalFilter as any, context, filter);
                         return 0;
                     }
-                } as UpdateChecker<ED, typeof entity, Cxt>);
+                } as UpdateChecker<ED, keyof ED, Cxt>);
                 triggers.push({
                     name: `set next state of ${attr} for ${entity} on action ${action}`,
                     action: action as any,

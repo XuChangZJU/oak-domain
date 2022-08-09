@@ -1,8 +1,9 @@
-import { OperationResult, OperateParams, EntityDict, SelectionResult } from './Entity';
+import { OperationResult, OperateOption, EntityDict, SelectionResult } from './Entity';
 import { Context } from './Context';
 import { StorageSchema } from './Storage';
 import { OakErrorDefDict } from '../OakError';
 import { get, set } from '../utils/lodash';
+import { SelectOption } from '.';
 
 export type TxnOption = {
     isolationLevel: 'repeatable read' | 'serializable';
@@ -21,21 +22,21 @@ export abstract class RowStore<ED extends EntityDict, Cxt extends Context<ED>> {
         entity: T,
         operation: ED[T]['Operation'],
         context: Cxt,
-        params?: OperateParams
+        option?: OperateOption
     ): Promise<OperationResult<ED>>;
 
     abstract select<T extends keyof ED, S extends ED[T]['Selection']> (
         entity: T,
         selection: S,
         context: Cxt,
-        params?: Object
+        option?: SelectOption
     ): Promise<SelectionResult<ED[T]['Schema'], S['data']>>;
 
     abstract count<T extends keyof ED> (
         entity: T,
-        selection: Pick<ED[T]['Selection'], 'filter'>,
+        selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
         context: Cxt,
-        params?: Object
+        option?: SelectOption
     ): Promise<number>;
 
     constructor(storageSchema: StorageSchema<ED>) {

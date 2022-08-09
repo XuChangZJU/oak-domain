@@ -6,33 +6,18 @@ export declare type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 declare type PrimaryKeyAttribute = 'id';
 export declare type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
 export declare const initinctiveAttributes: string[];
-declare type MySqlHintIndex = {
-    for?: 'join' | 'orderBy' | 'groupBy';
-    names: string[];
-};
-declare type MySqlSelectionHint = {
-    forUpdate?: boolean;
-    useIndex?: MySqlHintIndex;
-    forceIndex?: MySqlHintIndex;
-    ignoreIndex?: MySqlHintIndex;
-};
-export declare type SelectionHint = {
-    ignoreTrigger?: boolean;
-    includeDeleted?: boolean;
-    mysql?: MySqlSelectionHint;
-};
 export declare type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
     indexFrom?: A extends 'create' ? undefined : number;
     count?: A extends 'create' ? undefined : number;
 };
-declare type SelectOption = {
-    forUpdate?: true;
-    usingIndex?: 'todo';
-};
-export declare type OperateParams = {
-    notCollect?: boolean;
+export declare type SelectOption = {
     obscure?: boolean;
+    forUpdate?: true;
+    includedDeleted?: true;
+};
+export declare type OperateOption = {
+    notCollect?: boolean;
 };
 export declare type FormUpdateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>>;
 export declare type FormCreateData<SH extends GeneralEntityShape> = Omit<SH, InstinctiveAttributes> & {
@@ -61,19 +46,13 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<DeduceSelection<this['Schema']>, 'action'> & {
-        hint?: SelectionHint;
-    };
+    Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
     Operation: DeduceOperation<this['Schema']>;
     Create: DeduceCreateOperation<this['Schema']>;
     CreateSingle: DeduceCreateSingleOperation<this['Schema']>;
     CreateMulti: DeduceCreateMultipleOperation<this['Schema']>;
-    Update: DeduceUpdateOperation<this['Schema']> & {
-        hint?: SelectionHint;
-    };
-    Remove: DeduceRemoveOperation<this['Schema']> & {
-        hint?: SelectionHint;
-    };
+    Update: DeduceUpdateOperation<this['Schema']>;
+    Remove: DeduceRemoveOperation<this['Schema']>;
 }
 export interface EntityDict {
     [E: string]: EntityDef;

@@ -2,7 +2,7 @@ import assert from "assert";
 import { Context } from '../types/Context';
 import {
     DeduceCreateMultipleOperation,
-    DeduceCreateOperation, DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict, OperateParams, OperationResult, SelectRowShape
+    DeduceCreateOperation, DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict, OperateOption, SelectOption, OperationResult, SelectRowShape
 } from "../types/Entity";
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
@@ -20,18 +20,19 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         entity: T,
         selection: S,
         context: Cxt,
-        params?: OperateParams): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
+        option?: SelectOption): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
 
     protected abstract updateAbjointRow<T extends keyof ED>(
         entity: T,
         operation: DeduceCreateMultipleOperation<ED[T]['Schema']> | DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Cxt,
-        params?: OperateParams): Promise<number>;
+        option?: OperateOption): Promise<number>;
 
     protected async cascadeSelect<T extends keyof ED, S extends ED[T]['Selection']>(
         entity: T,
         selection: S,
-        context: Cxt, params?: OperateParams): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]> {
+        context: Cxt,
+        option?: SelectOption): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]> {
         const { data } = selection;
 
         const projection: ED[T]['Selection']['data'] = {};
@@ -103,7 +104,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
 
         const rows = await this.selectAbjointRow(entity, Object.assign({}, selection, {
             data: projection,
-        }), context, params);
+        }), context, option);
 
         await Promise.all(
             // manyToOne
@@ -121,7 +122,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                         )
                                     },
                                 } as any
-                            }, context, params);
+                            }, context, option);
 
                             rows.forEach(
                                 (row) => {
@@ -155,7 +156,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                             )
                                         },
                                     } as any
-                                }, context, params);
+                                }, context, option);
 
                                 rows.filter(
                                     row => (row as Record<string, any>).entity === attr
@@ -188,7 +189,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                         filter: addFilterSegment({
                                             [foreignKey]: (row as Record<string, any>).id,
                                         } as any, filter2.filter),
-                                    }), context, params);
+                                    }), context, option);
                                     Object.assign(row, {
                                         [attr]: rows2,
                                     });
@@ -212,7 +213,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                                             entityId: (row as Record<string, any>).id,
                                             entity,
                                         } as any, filter2.filter),
-                                    }), context, params);
+                                    }), context, option);
                                     Object.assign(row, {
                                         [attr]: rows2,
                                     });
@@ -249,13 +250,13 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
      * @param entity 
      * @param operation 
      * @param context 
-     * @param params 
+     * @param option 
      */
     protected async cascadeUpdate<T extends keyof ED>(
         entity: T,
         operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Cxt,
-        params?: OperateParams): Promise<OperationResult<ED>> {
+        option?: OperateOption): Promise<OperationResult<ED>> {
         const { action, data, filter } = operation;
         const opData = {};
         const result: OperationResult<ED> = {};
@@ -266,7 +267,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 const result2 = await this.cascadeUpdate(entity, {
                     action,
                     data: dataEle,
-                }, context, params);
+                }, context, option);
                 this.mergeOperationResult(result, result2);
             }
             return result;
@@ -319,7 +320,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                     });
                 }
 
-                const result2 = await this.cascadeUpdate(attr, operationMto, context, params);
+                const result2 = await this.cascadeUpdate(attr, operationMto, context, option);
                 this.mergeOperationResult(result, result2);
             }
             else if (typeof relation === 'string') {
@@ -357,7 +358,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                     });
                 }
 
-                const result2 = await this.cascadeUpdate(relation, operationMto, context, params);
+                const result2 = await this.cascadeUpdate(relation, operationMto, context, option);
                 this.mergeOperationResult(result, result2);
             }
             else {
@@ -471,7 +472,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                         }
                     }
 
-                    const result2 = await this.cascadeUpdate(entityOtm!, otm, context, params);
+                    const result2 = await this.cascadeUpdate(entityOtm!, otm, context, option);
                     this.mergeOperationResult(result, result2);
                 };
 
@@ -491,7 +492,7 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
                 data: opData as ED[T]['OpSchema'],
             });
 
-        const count = await this.updateAbjointRow(entity, operation2, context, params);
+        const count = await this.updateAbjointRow(entity, operation2, context, option);
         this.mergeOperationResult(result, {
             [entity]: {
                 [operation2.action]: count,

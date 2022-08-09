@@ -1,6 +1,6 @@
-import { SelectRowShape } from ".";
+import { SelectOption, SelectRowShape } from ".";
 import { GenericAction } from "../actions/action";
-import { DeduceCreateOperation, DeduceRemoveOperation, DeduceSelection, DeduceUpdateOperation, EntityDict, OperateParams } from "../types/Entity";
+import { EntityDict, OperateOption } from "../types/Entity";
 import { EntityShape, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { Context } from "./Context";
 export declare type CheckerType = 'user' | 'row' | 'data';
@@ -9,10 +9,10 @@ export interface CreateTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     entity: T;
     name: string;
     action: 'create';
-    check?: (operation: DeduceCreateOperation<ED[T]['OpSchema']>) => boolean;
+    check?: (operation: ED[T]['Create']) => boolean;
     fn: (event: {
-        operation: DeduceCreateOperation<ED[T]['OpSchema']>;
-    }, context: Cxt, params?: OperateParams) => Promise<number>;
+        operation: ED[T]['Create'];
+    }, context: Cxt, option?: OperateOption) => Promise<number>;
 }
 export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends CreateTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
@@ -28,10 +28,10 @@ export interface UpdateTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     name: string;
     action: Exclude<ED[T]['Action'], GenericAction> | 'update' | Array<Exclude<ED[T]['Action'], GenericAction> | 'update'>;
     attributes?: keyof ED[T]['OpSchema'] | Array<keyof ED[T]['OpSchema']>;
-    check?: (operation: DeduceUpdateOperation<ED[T]['OpSchema']>) => boolean;
+    check?: (operation: ED[T]['Update']) => boolean;
     fn: (event: {
-        operation: DeduceUpdateOperation<ED[T]['OpSchema']>;
-    }, context: Cxt, params?: OperateParams) => Promise<number>;
+        operation: ED[T]['Update'];
+    }, context: Cxt, option?: OperateOption) => Promise<number>;
 }
 export interface UpdateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
@@ -46,10 +46,10 @@ export interface RemoveTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     entity: T;
     name: string;
     action: 'remove';
-    check?: (operation: DeduceRemoveOperation<ED[T]['OpSchema']>) => boolean;
+    check?: (operation: ED[T]['Remove']) => boolean;
     fn: (event: {
-        operation: DeduceRemoveOperation<ED[T]['OpSchema']>;
-    }, context: Cxt, params?: OperateParams) => Promise<number>;
+        operation: ED[T]['Remove'];
+    }, context: Cxt, option?: OperateOption) => Promise<number>;
 }
 export interface RemoveTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends RemoveTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
@@ -72,15 +72,15 @@ export interface SelectTriggerBase<ED extends EntityDict, T extends keyof ED> {
 export interface SelectTriggerBefore<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends SelectTriggerBase<ED, T> {
     when: 'before';
     fn: (event: {
-        operation: DeduceSelection<ED[T]['Schema']>;
-    }, context: Cxt, params?: OperateParams) => Promise<number>;
+        operation: ED[T]['Selection'];
+    }, context: Cxt, params?: SelectOption) => Promise<number>;
 }
 export interface SelectTriggerAfter<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends SelectTriggerBase<ED, T> {
     when: 'after';
     fn: (event: {
         operation: ED[T]['Selection'];
         result: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[];
-    }, context: Cxt, params?: Object) => Promise<number>;
+    }, context: Cxt, params?: SelectOption) => Promise<number>;
 }
 export declare type SelectTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = SelectTriggerBefore<ED, T, Cxt> | SelectTriggerAfter<ED, T, Cxt>;
 export declare type Trigger<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = CreateTrigger<ED, T, Cxt> | UpdateTrigger<ED, T, Cxt> | RemoveTrigger<ED, T, Cxt> | SelectTrigger<ED, T, Cxt>;
@@ -95,7 +95,11 @@ export declare abstract class Executor<ED extends EntityDict, Cxt extends Contex
     static dataAttr: TriggerDataAttribute;
     static timestampAttr: TriggerTimestampAttribute;
     abstract registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
-    abstract preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams): Promise<void>;
-    abstract postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'], context: Cxt, params?: OperateParams): Promise<void>;
+    abstract preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
+        action: 'select';
+    }, context: Cxt, option?: OperateOption | SelectOption): Promise<void>;
+    abstract postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
+        action: 'select';
+    }, context: Cxt, option?: OperateOption | SelectOption, result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[]): Promise<void>;
     abstract checkpoint(context: Cxt, timestamp: number): Promise<number>;
 }
