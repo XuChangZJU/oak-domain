@@ -16,13 +16,17 @@ export type Filter<A extends string, F extends Object | undefined = undefined> =
 };
 
 export type SelectOption = {
+    dontCollect?: boolean;
+    ignoreTrigger?: true;
     obscure?: boolean;      // 如果为置为true，则在filter过程中因数据不完整而不能判断为真的时候都假设为真（前端缓存专用）
     forUpdate?: true;
     includedDeleted?: true; // 是否包含删除行的信息
+    dummy?: 1;           // 无用，为了继承Option通过编译
 };
 
 export type OperateOption = {
-    notCollect?: boolean;
+    dontCollect?: boolean;
+    dummy?: 1;          // 无用，为了继承Option通过编译
 };
 
 export type FormUpdateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>>;

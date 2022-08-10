@@ -3779,11 +3779,6 @@ const initialStatements = () => [
                     false,
                     factory.createIdentifier("Operation"),
                     factory.createIdentifier("OakOperation")
-                ),
-                factory.createImportSpecifier(
-                    false,
-                    undefined,
-                    factory.createIdentifier("SelectionHint")
                 )
             ])
         ),
@@ -4131,21 +4126,10 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 undefined,
                 factory.createIdentifier("Selection"),
                 undefined,
-                factory.createIntersectionTypeNode([
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("Selection"),
-                        undefined
-                    ),
-                    factory.createTypeLiteralNode([factory.createPropertySignature(
-                        undefined,
-                        factory.createIdentifier("hint"),
-                        factory.createToken(ts.SyntaxKind.QuestionToken),
-                        factory.createTypeReferenceNode(
-                            factory.createIdentifier("SelectionHint"),
-                            undefined
-                        )
-                    )])
-                ])
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("Selection"),
+                    undefined
+                )
             ),
             factory.createPropertySignature(
                 undefined,
@@ -4169,31 +4153,19 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 undefined,
                 factory.createIdentifier("Update"),
                 undefined,
-                factory.createIntersectionTypeNode([
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("UpdateOperation"),
-                        undefined
-                    ),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("SelectionHint"),
-                        undefined
-                    )
-                ])
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("UpdateOperation"),
+                    undefined
+                )
             ),
             factory.createPropertySignature(
                 undefined,
                 factory.createIdentifier("Remove"),
                 undefined,
-                factory.createIntersectionTypeNode([
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("RemoveOperation"),
-                        undefined
-                    ),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("SelectionHint"),
-                        undefined
-                    )
-                ])
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("RemoveOperation"),
+                    undefined
+                )
             ),
             factory.createPropertySignature(
                 undefined,

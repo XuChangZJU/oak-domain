@@ -12,12 +12,16 @@ export declare type Filter<A extends string, F extends Object | undefined = unde
     count?: A extends 'create' ? undefined : number;
 };
 export declare type SelectOption = {
+    dontCollect?: boolean;
+    ignoreTrigger?: true;
     obscure?: boolean;
     forUpdate?: true;
     includedDeleted?: true;
+    dummy?: 1;
 };
 export declare type OperateOption = {
-    notCollect?: boolean;
+    dontCollect?: boolean;
+    dummy?: 1;
 };
 export declare type FormUpdateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>>;
 export declare type FormCreateData<SH extends GeneralEntityShape> = Omit<SH, InstinctiveAttributes> & {
