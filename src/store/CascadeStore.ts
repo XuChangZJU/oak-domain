@@ -16,23 +16,23 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
     }
     protected abstract supportManyToOneJoin(): boolean;
     protected abstract supportMultipleCreate(): boolean;
-    protected abstract selectAbjointRow<T extends keyof ED, S extends ED[T]['Selection']>(
+    protected abstract selectAbjointRow<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(
         entity: T,
         selection: S,
         context: Cxt,
-        option?: SelectOption): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
+        option?: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
 
-    protected abstract updateAbjointRow<T extends keyof ED>(
+    protected abstract updateAbjointRow<T extends keyof ED, OP extends OperateOption>(
         entity: T,
         operation: DeduceCreateMultipleOperation<ED[T]['Schema']> | DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Cxt,
-        option?: OperateOption): Promise<number>;
+        option?: OP): Promise<number>;
 
-    protected async cascadeSelect<T extends keyof ED, S extends ED[T]['Selection']>(
+    protected async cascadeSelect<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(
         entity: T,
         selection: S,
         context: Cxt,
-        option?: SelectOption): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]> {
+        option?: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]> {
         const { data } = selection;
 
         const projection: ED[T]['Selection']['data'] = {};
@@ -252,11 +252,11 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
      * @param context 
      * @param option 
      */
-    protected async cascadeUpdate<T extends keyof ED>(
+    protected async cascadeUpdate<T extends keyof ED, OP extends OperateOption>(
         entity: T,
         operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Cxt,
-        option?: OperateOption): Promise<OperationResult<ED>> {
+        option?: OP): Promise<OperationResult<ED>> {
         const { action, data, filter } = operation;
         const opData = {};
         const result: OperationResult<ED> = {};

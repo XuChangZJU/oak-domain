@@ -18,25 +18,25 @@ export abstract class RowStore<ED extends EntityDict, Cxt extends Context<ED>> {
     };
     protected storageSchema: StorageSchema<ED>;
     // store实现CRUD动作的统一入口定义
-    abstract operate<T extends keyof ED>(
+    abstract operate<T extends keyof ED, OP extends OperateOption>(
         entity: T,
         operation: ED[T]['Operation'],
         context: Cxt,
-        option?: OperateOption
+        option?: OP
     ): Promise<OperationResult<ED>>;
 
-    abstract select<T extends keyof ED, S extends ED[T]['Selection']> (
+    abstract select<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption> (
         entity: T,
         selection: S,
         context: Cxt,
-        option?: SelectOption
+        option?: OP
     ): Promise<SelectionResult<ED[T]['Schema'], S['data']>>;
 
-    abstract count<T extends keyof ED> (
+    abstract count<T extends keyof ED, OP extends SelectOption> (
         entity: T,
         selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
         context: Cxt,
-        option?: SelectOption
+        option?: OP
     ): Promise<number>;
 
     constructor(storageSchema: StorageSchema<ED>) {
