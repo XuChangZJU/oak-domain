@@ -49,8 +49,10 @@ export function judgeRelation<ED extends {
     }
     else if ((attributes.hasOwnProperty(`${attr}Id`))){
         const { type, ref } = attributes[`${attr}Id`];
-        assert (type === 'ref');
-        return ref!;
+        if (type === 'ref') {
+            return ref!;
+        }
+        return 1;
     }
     else if (attributes.hasOwnProperty('entity')
         && attributes.hasOwnProperty('entityId')
