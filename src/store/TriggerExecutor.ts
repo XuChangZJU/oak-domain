@@ -46,7 +46,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
 
     registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void {
         const { entity, action, checker: checkFn, type } = checker;
-        const triggerName = `${entity}${action}权限检查-${this.counter++}`;
+        const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
 
         const trigger = {
             checkerType: type,
@@ -74,7 +74,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                 triggers.push(trigger);
             }
             else if (this.triggerMap[trigger.entity]) {
-                Object.assign(this.triggerMap[trigger.entity], {
+                Object.assign(this.triggerMap[trigger.entity]!, {
                     [action]: [trigger],
                 });
             }
@@ -161,7 +161,7 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                         filter: filter2
                     } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, context);
                     if (count > 0) {
-                        throw new Error(`对象${entity}的行「${JSON.stringify(operation)}」上已经存在未完成的跨事务约束`);
+                        throw new Error(`对象${String(entity)}的行「${JSON.stringify(operation)}」上已经存在未完成的跨事务约束`);
                     }
                     break;
                 }

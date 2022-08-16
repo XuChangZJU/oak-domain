@@ -646,7 +646,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
                 pushStatementIntoSchemaAst(moduleName, node, sourceFile!);
-                
+
                 if (ts.isUnionTypeNode(node.type) && ts.isLiteralTypeNode(node.type.types[0]) && ts.isStringLiteral(node.type.types[0].literal)) {
                     // 本文件内定义的枚举类型
                     localEnumStringTypes.push(node.name.text);
@@ -812,7 +812,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                                             if (!schemaNode) {
                                                 throw new Error(`「${filename}」中索引「${indexName}」的属性「${indexAttrName}」定义非法`);
                                             }
-    
+
                                             const { type, name } = schemaNode;
                                             const entity = firstLetterLowerCase(moduleName);
                                             const { [entity]: manyToOneSet } = ManyToOne;
@@ -1293,6 +1293,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                     factory.createMappedTypeNode(
                         undefined,
                         factory.createTypeParameterDeclaration(
+                            undefined,
                             factory.createIdentifier("A"),
                             factory.createTypeReferenceNode(
                                 factory.createIdentifier("ExpressionKey"),
@@ -1503,6 +1504,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
             factory.createIdentifier('AttrFilter'),
             ReversePointerRelations[entity] ? [
                 factory.createTypeParameterDeclaration(
+                    undefined,
                     factory.createIdentifier("E"),
                     undefined,
                 )
@@ -1549,6 +1551,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
             factory.createIdentifier("Filter"),
             ReversePointerRelations[entity] ? [
                 factory.createTypeParameterDeclaration(
+                    undefined,
                     factory.createIdentifier("E"),
                     undefined,
                     factory.createTypeReferenceNode(
@@ -2507,6 +2510,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             factory.createIdentifier("SelectOperation"),
             [
                 factory.createTypeParameterDeclaration(
+                    undefined,
                     factory.createIdentifier("P"),
                     undefined,
                     factory.createTypeReferenceNode(
@@ -2540,6 +2544,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             factory.createIdentifier("Selection"),
             [
                 factory.createTypeParameterDeclaration(
+                    undefined,
                     factory.createIdentifier("P"),
                     undefined,
                     factory.createTypeReferenceNode(
@@ -3871,6 +3876,7 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
                 factory.createMappedTypeNode(
                     undefined,
                     factory.createTypeParameterDeclaration(
+                        undefined,
                         factory.createIdentifier("K"),
                         factory.createUnionTypeNode([
                             factory.createLiteralTypeNode(factory.createStringLiteral("$in")),
