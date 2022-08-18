@@ -4973,32 +4973,23 @@ function addReverseRelationship() {
     }
 }
 
+function outputIndexTs(outputDir: string) {
+    const indexTs = `export * from './EntityDict';
+    export * from './Storage';
+    export * from './ActionDefDict';
+    `;
+    const filename = path.join(outputDir, 'index.ts');
+    writeFileSync(filename, indexTs, { flag: 'w' });
+}
+
 function outputPackageJson(outputDir: string) {
     const pj = {
         "name": process.env.COMPLING_AS_LIB ? "general-app-domain" : "oak-app-domain",
         "main": "index.ts"
     };
 
-    const indexTs = `export * from './EntityDict';
-    export * from './Storage';
-    export * from './ActionDefDict';
-    `;
-    let filename = path.join(outputDir, 'index.ts');
-    writeFileSync(filename, indexTs, { flag: 'w' });
-
-
-    filename = path.join(outputDir, 'package.json');
+    const filename = path.join(outputDir, 'package.json');
     writeFileSync(filename, JSON.stringify(pj), { flag: 'w' });
-
-    // 执行npm link
-    /* try {
-        execSync('npm link', {
-            cwd: outputDir,
-        });
-    }
-    catch (err) {
-        console.error(err);
-    } */
 }
 
 export function analyzeEntities(inputDir: string) {
@@ -5034,8 +5025,9 @@ export function buildSchema(outputDir: string): void {
     outputAction(outputDir, printer);
     outputEntityDict(outputDir, printer);
     outputStorage(outputDir, printer);
+    outputIndexTs(outputDir);
 
-    //if (!process.env.COMPLING_AS_LIB) {
-    outputPackageJson(outputDir);
-    //}
+    if (!process.env.COMPLING_AS_LIB) {
+        outputPackageJson(outputDir);
+    }
 }
