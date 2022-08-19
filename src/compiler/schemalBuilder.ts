@@ -416,7 +416,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     let beforeSchema = true;
     let hasActionDef = false;
     let hasRelationDef = false;
-    let hasActionTypeAliasDeclaration = false;
+    let hasActionOrStateDef = false;
     const enumStringAttrs: string[] = [];
     const states: string[] = [];
     const localEnumStringTypes: string[] = [];
@@ -539,7 +539,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             if (node.name.text === 'Action') {
                 assert(!localeDef, `【${filename}】locale定义须在Action之后`);
                 hasActionDef = true;
-                hasActionTypeAliasDeclaration = true;
                 const modifiers = [factory.createModifier(ts.SyntaxKind.ExportKeyword)];
                 pushStatementIntoActionAst(
                     moduleName,
@@ -632,6 +631,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
             }
             else if (node.name.text.endsWith('Action') || node.name.text.endsWith('State')) {
                 assert(!localeDef, `【${filename}】locale定义须在Action/State之后`);
+                hasActionOrStateDef = true;
                 pushStatementIntoActionAst(moduleName,
                     factory.updateTypeAliasDeclaration(
                         node,
@@ -917,8 +917,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
         }
     });
 
-    if (hasActionDef && !hasActionTypeAliasDeclaration) {
-        throw new Error(`${filename}中有Action定义，但没有定义名为Action的类型`);
+    if (!hasActionDef && hasActionOrStateDef) {
+        throw new Error(`${filename}中有Action或State定义，但没有定义完整的Action类型`);
     }
     assert(schemaAttrs.length > 0);
     const schema = {
