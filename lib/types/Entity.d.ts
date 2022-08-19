@@ -64,11 +64,11 @@ export interface EntityDict {
 export interface OtmSubProjection extends Omit<DeduceSelection<any>, 'action'> {
     $entity: string;
 }
-declare type DeduceProjection<SH extends GeneralEntityShape> = Partial<{
-    '#id': NodeId;
+declare type DeduceProjection<SH extends GeneralEntityShape> = {
+    '#id'?: NodeId;
 } & {
-    [K in keyof SH]: 1 | OtmSubProjection | any;
-} & ExprOp<keyof SH>>;
+    [K in keyof SH]?: 1 | OtmSubProjection | any;
+} & Partial<ExprOp<keyof SH>>;
 export declare type AttrFilter<SH extends GeneralEntityShape> = {
     [K in keyof SH]: any;
 };
@@ -82,20 +82,20 @@ export declare type DeduceSorterItem<SH extends GeneralEntityShape> = {
 };
 export declare type DeduceSorter<SH extends GeneralEntityShape> = Array<DeduceSorterItem<SH>>;
 export declare type DeduceSelection<SH extends GeneralEntityShape> = Selection<DeduceProjection<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
-export declare type DeduceCreateOperationData<SH extends GeneralEntityShape> = FormCreateData<SH> & {
-    [k: string]: any;
+export declare type DeduceCreateOperationData<SH extends GeneralEntityShape> = {
+    id: string;
+} & {
+    [k in keyof Omit<SH, InstinctiveAttributes>]?: any;
 };
 export declare type DeduceCreateSingleOperation<SH extends GeneralEntityShape> = Operation<'create', DeduceCreateOperationData<SH>>;
 export declare type DeduceCreateMultipleOperation<SH extends GeneralEntityShape> = Operation<'create', Array<DeduceCreateOperationData<SH>>>;
 export declare type DeduceCreateOperation<SH extends GeneralEntityShape> = DeduceCreateSingleOperation<SH> | DeduceCreateMultipleOperation<SH>;
-export declare type DeduceUpdateOperationData<SH extends GeneralEntityShape> = FormUpdateData<SH> & {
-    [k: string]: any;
+export declare type DeduceUpdateOperationData<SH extends GeneralEntityShape> = {
+    [k in keyof Omit<SH, InstinctiveAttributes>]?: any;
 };
 export declare type DeduceUpdateOperation<SH extends GeneralEntityShape> = Operation<'update' | string, DeduceUpdateOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 export declare type DeduceRemoveOperationData<SH extends GeneralEntityShape> = {
-    [A in keyof SH]?: any;
-} & {
-    [A: string]: any;
+    [A in keyof Omit<SH, InstinctiveAttributes>]?: any;
 };
 export declare type DeduceRemoveOperation<SH extends GeneralEntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 export declare type DeduceOperation<SH extends GeneralEntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
