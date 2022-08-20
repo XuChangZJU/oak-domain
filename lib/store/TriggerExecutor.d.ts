@@ -1,4 +1,5 @@
 import { EntityDict, OperateOption, SelectOption, SelectRowShape } from "../types/Entity";
+import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Context } from '../types/Context';
@@ -6,7 +7,7 @@ import { Trigger, Executor } from "../types/Trigger";
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
  */
-export declare class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> extends Executor<ED, Cxt> {
+export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends Executor<ED, Cxt> {
     private counter;
     private triggerMap;
     private triggerNameMap;

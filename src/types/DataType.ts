@@ -14,7 +14,7 @@ export type PrimaryKey = string;
 export type ForeignKey<E extends string> = string;
 export { Geo, SingleGeo } from './Geo';
 
-export type DataTypes = number | string | Datetime | Geo | object | SingleGeo;
+export type DataTypes = number | string | Datetime | Geo | Object | SingleGeo;
 
 export const types = ['Int', 'Uint', 'Double', 'Float', 'String', 'Text', 'Datetime', 'Boolean', 'Image', 'File', 'Geo', 'SingleGeo'];
 export const unIndexedTypes = ['Text', 'Image', 'File', 'Object'];

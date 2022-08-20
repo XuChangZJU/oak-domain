@@ -4,13 +4,15 @@ import {
     DeduceCreateMultipleOperation,
     DeduceCreateOperation, DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict, OperateOption, SelectOption, OperationResult, SelectRowShape
 } from "../types/Entity";
+import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 import { addFilterSegment } from "./filter";
 import { judgeRelation } from "./relation";
+import { OakOperExistedException } from "../types/Exception";
 
 /**这个用来处理级联的select和update，对不同能力的 */
-export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
+export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
     constructor(storageSchema: StorageSchema<ED>) {
         super(storageSchema);
     }
@@ -257,14 +259,16 @@ export abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED
         operation: DeduceCreateOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>,
         context: Cxt,
         option?: OP): Promise<OperationResult<ED>> {
-        const { action, data, filter } = operation;
+        const { action, data, filter, id } = operation;
         const opData = {};
         const result: OperationResult<ED> = {};
 
         if (action === 'create' && data instanceof Array) {
             const multipleCreate = this.supportMultipleCreate();
+            // 如果要合并创建，要处理cascade，todo
             for (const dataEle of data) {
                 const result2 = await this.cascadeUpdate(entity, {
+                    id,
                     action,
                     data: dataEle,
                 }, context, option);

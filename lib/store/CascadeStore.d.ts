@@ -1,9 +1,10 @@
 import { Context } from '../types/Context';
 import { DeduceCreateMultipleOperation, DeduceCreateOperation, DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict, OperateOption, SelectOption, OperationResult, SelectRowShape } from "../types/Entity";
+import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 /**这个用来处理级联的select和update，对不同能力的 */
-export declare abstract class CascadeStore<ED extends EntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
+export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
     constructor(storageSchema: StorageSchema<ED>);
     protected abstract supportManyToOneJoin(): boolean;
     protected abstract supportMultipleCreate(): boolean;

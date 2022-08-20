@@ -65,4 +65,4 @@ typings/
 build
 package-lock.json
 dist
-src/base-domain
+src/base-app-domain

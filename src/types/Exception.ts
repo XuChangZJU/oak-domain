@@ -22,6 +22,14 @@ export class OakException extends Error {
     }
 }
 
+export class OakDataException extends Error {
+    // 表示由数据层发现的异常
+}
+
+export class OakOperExistedException extends OakDataException {
+    // 进行操作时发现同样id的Oper对象已经存在
+}
+
 export class OakExternalException extends Error {
     // 表示由oak生态外部造成的异常，比如网络中断
 }

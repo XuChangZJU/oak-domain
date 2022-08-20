@@ -12,6 +12,6 @@ export declare type Boolean = boolean;
 export declare type PrimaryKey = string;
 export declare type ForeignKey<E extends string> = string;
 export { Geo, SingleGeo } from './Geo';
-export declare type DataTypes = number | string | Datetime | Geo | object | SingleGeo;
+export declare type DataTypes = number | string | Datetime | Geo | Object | SingleGeo;
 export declare const types: string[];
 export declare const unIndexedTypes: string[];

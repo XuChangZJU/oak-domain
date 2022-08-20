@@ -1,14 +1,17 @@
 {
     "name": "oak-domain",
-    "version": "1.0.5",
+    "version": "1.1.0",
     "author": {
         "name": "XuChang"
     },
     "scripts": {
-        "build": "tsc"
+        "make:domain": "ts-node scripts/make.ts",
+        "build": "tsc",
+        "prebuild": "npm run make:domain"
     },
     "files": [
-        "lib/**/*"
+        "lib/**/*",
+        "src/entities/*"
     ],
     "devDependencies": {
         "@babel/cli": "^7.12.13",
@@ -17,6 +20,7 @@
         "@babel/preset-env": "^7.12.13",
         "@babel/preset-typescript": "^7.12.13",
         "@types/assert": "^1.5.6",
+        "@types/cross-spawn": "^6.0.2",
         "@types/fs-extra": "^9.0.13",
         "@types/lodash": "^4.14.182",
         "@types/luxon": "^2.0.9",

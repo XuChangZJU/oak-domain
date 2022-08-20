@@ -409,6 +409,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     const sourceFile = program.getSourceFile(fullPath);
     const moduleName = filename.split('.')[0];
 
+    if (Schema.hasOwnProperty(moduleName)) {
+        throw new Error(`出现了同名的Entity定义「${moduleName}」，请注意不要和系统保留的Entity重名。`);
+    }
     const referencedSchemas: string[] = [];
     const schemaAttrs: ts.TypeElement[] = [];
     let hasFulltextIndex: boolean = false;
@@ -527,6 +530,30 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                     });
                 }
                 beforeSchema = false;
+
+                // 对于不是Oper的对象，全部建立和Oper的反指关系
+                if (!['Oper', 'OperEntity', 'ModiEntity'].includes(moduleName)) {
+                    if (ReversePointerRelations['OperEntity']) {
+                        ReversePointerRelations['OperEntity'].push(moduleName);
+                    }
+                    else {
+                        assign(ReversePointerRelations, {
+                            ['OperEntity']: [moduleName],
+                        });
+                    }
+
+                    // 对于不是Modi的对象，全部建立和Modi的反指关系
+                    if (!['Modi'].includes(moduleName)) {
+                        if (ReversePointerRelations['ModiEntity']) {
+                            ReversePointerRelations['ModiEntity'].push(moduleName);
+                        }
+                        else {
+                            assign(ReversePointerRelations, {
+                                ['ModiEntity']: [moduleName],
+                            });
+                        }
+                    }
+                }
             }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
@@ -2043,28 +2070,34 @@ function constructQuery(statements: Array<ts.Statement>, entity: string) {
  */
 function constructSorter(statements: Array<ts.Statement>, entity: string) {
     const { schemaAttrs } = Schema[entity];
-    const members: Array<ts.TypeElement> = [
+    const members: Array<ts.TypeNode> = [
         // id: 1
-        factory.createPropertySignature(
-            undefined,
-            factory.createIdentifier("id"),
-            undefined,
-            factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+        factory.createTypeLiteralNode(
+            [factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("id"),
+                undefined,
+                factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+            )]
         ),
         // $$createAt$$: 1
-        factory.createPropertySignature(
-            undefined,
-            factory.createIdentifier('$$createAt$$'),
-            undefined,
-            factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+        factory.createTypeLiteralNode(
+            [factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("$$createAt$$"),
+                undefined,
+                factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+            )]
         ),
         // $$updateAt$$: 1
-        factory.createPropertySignature(
-            undefined,
-            factory.createIdentifier('$$updateAt$$'),
-            undefined,
-            factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
-        )
+        factory.createTypeLiteralNode(
+            [factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("$$updateAt$$"),
+                undefined,
+                factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+            )]
+        ),
     ];
 
     const { [entity]: manyToOneSet } = ManyToOne;
@@ -2100,11 +2133,13 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                             );
 
                             members.push(
-                                factory.createPropertySignature(
-                                    undefined,
-                                    `${(<ts.Identifier>name).text}Id`,
-                                    undefined,
-                                    factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                                factory.createTypeLiteralNode(
+                                    [factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(`${(<ts.Identifier>name).text}Id`),
+                                        undefined,
+                                        factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                                    )]
                                 )
                             );
                         }
@@ -2116,11 +2151,13 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 }
                 if (type2!) {
                     members.push(
-                        factory.createPropertySignature(
-                            undefined,
-                            name,
-                            undefined,
-                            type2
+                        factory.createTypeLiteralNode(
+                            [factory.createPropertySignature(
+                                undefined,
+                                name,
+                                undefined,
+                                type2
+                            )]
                         )
                     );
                 }
@@ -2128,11 +2165,13 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
         }
         else if (ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) || ts.isLiteralTypeNode(type!)) {
             members.push(
-                factory.createPropertySignature(
-                    undefined,
-                    name,
-                    undefined,
-                    factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                factory.createTypeLiteralNode(
+                    [factory.createPropertySignature(
+                        undefined,
+                        name,
+                        undefined,
+                        factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                    )]
                 )
             );
         }
@@ -2145,47 +2184,67 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
         ReversePointerRelations[entity].forEach(
             (one) => {
                 members.push(
-                    factory.createPropertySignature(
-                        undefined,
-                        firstLetterLowerCase(one),
-                        undefined,
-                        factory.createTypeReferenceNode(
-                            <ts.EntityName>createForeignRef(entity, one, 'SortAttr')
-                        )
+                    factory.createTypeLiteralNode(
+                        [factory.createPropertySignature(
+                            undefined,                            
+                            firstLetterLowerCase(one),
+                            undefined,
+                            factory.createTypeReferenceNode(
+                                <ts.EntityName>createForeignRef(entity, one, 'SortAttr')
+                            )
+                        )]
                     )
                 );
             }
         );
-        if (process.env.COMPLING_AS_LIB) {
-            members.push(
-                factory.createIndexSignature(
-                    undefined,
-                    undefined,
-                    [factory.createParameterDeclaration(
-                        undefined,
-                        undefined,
-                        undefined,
-                        factory.createIdentifier("k"),
-                        undefined,
-                        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                        undefined
-                    )],
-                    factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
-                )
-            );
-        }
     }
+
+    if (process.env.COMPLING_AS_LIB) {
+        members.push(
+            factory.createTypeLiteralNode([factory.createIndexSignature(
+                undefined,
+                undefined,
+                [factory.createParameterDeclaration(
+                  undefined,
+                  undefined,
+                  undefined,
+                  factory.createIdentifier("k"),
+                  undefined,
+                  factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                  undefined
+                )],
+                factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
+              )])
+        );
+    }
+    
+    members.push(
+        factory.createTypeReferenceNode(
+            factory.createIdentifier("OneOf"),
+            [factory.createTypeReferenceNode(
+              factory.createIdentifier("ExprOp"),
+              [factory.createTypeReferenceNode(
+                factory.createIdentifier("OpAttr"),
+                undefined
+              )]
+            )]
+          )
+    );
     /**
      * 
-        export type SortAttr = OneOf<{
+        export type SortAttr = {
             id: 1;
-            name: 1;
-            nickname: 1;
-            age: 1;
-            gender: 1;
+        } | {
             $$createAt$$: 1;
+        } | {
             $$updateAt$$: 1;
-        } & Record<FnCallKey, 1 | FnCallValue<AttrFilter>>>;
+        } | {
+            modiId: 1;
+        } | {
+            modi: Modi.SortAttr;
+        } | {
+            [k: string]: any;
+        } | OneOf<ExprOp<OpAttr>>
      */
     statements.push(
         factory.createTypeAliasDeclaration(
@@ -2193,21 +2252,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("SortAttr"),
             undefined,
-            factory.createTypeReferenceNode(
-                factory.createIdentifier("OneOf"),
-                [factory.createIntersectionTypeNode([
-                    factory.createTypeLiteralNode(
-                        members),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("ExprOp"),
-                        [
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier('OpAttr')
-                            )
-                        ]
-                    )
-                ])]
-            )
+            factory.createUnionTypeNode(members)
         )
     );
 
@@ -2520,21 +2565,27 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 )
             ],
             factory.createTypeReferenceNode(
-                factory.createIdentifier("OakOperation"),
+                factory.createIdentifier("Omit"),
                 [
-                    factory.createLiteralTypeNode(factory.createStringLiteral("select")),
                     factory.createTypeReferenceNode(
-                        factory.createIdentifier("P"),
-                        undefined
+                        factory.createIdentifier("OakOperation"),
+                        [
+                            factory.createLiteralTypeNode(factory.createStringLiteral("select")),
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("P"),
+                                undefined
+                            ),
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("Filter"),
+                                undefined
+                            ),
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("Sorter"),
+                                undefined
+                            )
+                        ]
                     ),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("Filter"),
-                        undefined
-                    ),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("Sorter"),
-                        undefined
-                    )
+                    factory.createLiteralTypeNode(factory.createStringLiteral("id"))
                 ]
             )
         ),
@@ -2615,17 +2666,17 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         }
     }
     // CreateOperationData
-    let foreignKeyAttrNode: ts.TypeNode[] = [];
+    let foreignKeyAttr: string[] = [];
     if (manyToOneSet) {
         for (const one of manyToOneSet) {
             if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[1])) {
-                foreignKeyAttrNode.push(factory.createLiteralTypeNode(factory.createStringLiteral(`${one[1]}Id`)));
+                foreignKeyAttr.push(`${one[1]}Id`);
             }
         }
-        if (ReversePointerRelations[entity]) {
-            foreignKeyAttrNode.push(
-                factory.createLiteralTypeNode(factory.createStringLiteral('entity')),
-                factory.createLiteralTypeNode(factory.createStringLiteral('entityId'))
+
+        if (ReversePointerEntities[entity]) {
+            foreignKeyAttr.push(
+                'entity', 'entityId'
             );
         }
     }
@@ -2633,7 +2684,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         factory.createTypeReferenceNode(
             factory.createIdentifier("FormCreateData"),
             [
-                foreignKeyAttrNode.length > 0
+                foreignKeyAttr.length > 0
                     ? factory.createTypeReferenceNode(
                         factory.createIdentifier("Omit"),
                         [
@@ -2641,7 +2692,9 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                                 factory.createIdentifier("OpSchema"),
                                 undefined
                             ),
-                            factory.createUnionTypeNode(foreignKeyAttrNode)
+                            factory.createUnionTypeNode(uniq(foreignKeyAttr).map(
+                                ele => factory.createLiteralTypeNode(factory.createStringLiteral(ele))
+                            ))
                         ]
                     )
                     : factory.createTypeReferenceNode(
@@ -2985,34 +3038,31 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     );
 
     // UpdateOperationData
-    foreignKeyAttrNode = [];
+    foreignKeyAttr = [];
     if (manyToOneSet) {
         for (const one of manyToOneSet) {
             if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[1])) {
-                foreignKeyAttrNode.push(factory.createLiteralTypeNode(factory.createStringLiteral(`${one[1]}Id`)));
+                foreignKeyAttr.push(`${one[1]}Id`);
             }
         }
         if (ReversePointerRelations[entity]) {
-            foreignKeyAttrNode.push(
-                factory.createLiteralTypeNode(factory.createStringLiteral('entity')),
-                factory.createLiteralTypeNode(factory.createStringLiteral('entityId'))
-            );
+            foreignKeyAttr.push('entity', 'entityId');
         }
     }
     adNodes = [
         factory.createTypeReferenceNode(
             factory.createIdentifier("FormUpdateData"),
             [
-                foreignKeyAttrNode.length > 0 ? factory.createTypeReferenceNode(
+                foreignKeyAttr.length > 0 ? factory.createTypeReferenceNode(
                     factory.createIdentifier("Omit"),
                     [
                         factory.createTypeReferenceNode(
                             factory.createIdentifier("OpSchema"),
                             undefined
-                        ),
-                        factory.createUnionTypeNode(
-                            foreignKeyAttrNode
-                        )
+                        ),                        
+                        factory.createUnionTypeNode(uniq(foreignKeyAttr).map(
+                            ele => factory.createLiteralTypeNode(factory.createStringLiteral(ele))
+                        ))
                     ]
                 ) : factory.createTypeReferenceNode(
                     factory.createIdentifier("OpSchema"),
@@ -3808,7 +3858,7 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
                         factory.createIdentifier("Selection")
                     )])
                 ),
-                factory.createStringLiteral("oak-domain/lib/types/Entity"),
+                factory.createStringLiteral(TYPE_PATH_IN_OAK_DOMAIN(1)),
                 undefined
             )
         );
@@ -4778,7 +4828,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                     factory.createIdentifier("StorageSchema")
                 )])
             ),
-            factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}Storage`),
+            factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(1)}Storage`),
             undefined
         ),
         factory.createImportDeclaration(

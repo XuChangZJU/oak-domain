@@ -23,17 +23,20 @@ export declare type OperateOption = {
     dontCollect?: boolean;
     dummy?: 1;
 };
-export declare type FormUpdateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>>;
+export declare type FormUpdateData<SH extends GeneralEntityShape> = Partial<{
+    [K in keyof Omit<SH, InstinctiveAttributes>]: SH[K] | null;
+}>;
 export declare type FormCreateData<SH extends GeneralEntityShape> = Omit<SH, InstinctiveAttributes> & {
     id: string;
 };
 export declare type Operation<A extends GenericAction | string, DATA extends Object, FILTER extends Object | undefined = undefined, SORTER extends Object | undefined = undefined> = {
+    id: string;
     action: A;
     data: DATA;
     sorter?: SORTER;
     option?: A extends 'select' ? SelectOption : undefined;
 } & Filter<A, FILTER>;
-export declare type Selection<DATA extends Object, FILTER extends Object | undefined = undefined, SORT extends Object | undefined = undefined> = Operation<'select', DATA, FILTER, SORT>;
+export declare type Selection<DATA extends Object, FILTER extends Object | undefined = undefined, SORT extends Object | undefined = undefined> = Omit<Operation<'select', DATA, FILTER, SORT>, 'id'>;
 export interface EntityShape {
     id: string;
     $$createAt$$: number | Date;

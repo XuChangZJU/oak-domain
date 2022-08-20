@@ -3,6 +3,10 @@ export declare class OakException extends Error {
     constructor(message?: string);
     toString(): string;
 }
+export declare class OakDataException extends Error {
+}
+export declare class OakOperExistedException extends OakDataException {
+}
 export declare class OakExternalException extends Error {
 }
 export declare class OakUserException extends OakException {

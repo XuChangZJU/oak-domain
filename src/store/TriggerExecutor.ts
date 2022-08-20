@@ -1,7 +1,8 @@
 import assert from 'assert';
 import { pull, unset } from "../utils/lodash";
 import { addFilterSegment } from "../store/filter";
-import { DeduceCreateOperation, DeduceCreateOperationData, EntityDict, OperateOption, SelectOption, SelectRowShape } from "../types/Entity";
+import { DeduceCreateOperation, EntityDict, OperateOption, SelectOption, SelectRowShape } from "../types/Entity";
+import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Context } from '../types/Context';
@@ -19,7 +20,7 @@ import { Trigger, Executor, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerI
     'stat': 'select',
 }; */
 
-export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> extends Executor<ED, Cxt> {
+export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends Executor<ED, Cxt> {
     private counter: number;
     private triggerMap: {
         [T in keyof ED]?: {
@@ -241,11 +242,12 @@ export class TriggerExecutor<ED extends EntityDict, Cxt extends Context<ED>> ext
                 }
 
                 await rowStore.operate(trigger.entity, {
+                    id: 'aaa',
                     action: 'update',
                     data: {
                         $$triggerTimestamp$$: null,
                         $$triggerData$$: null,
-                    } as any,
+                    },
                     ...filter /** as Filter<'update', DeduceFilter<ED[T]['Schema']>> */,
                 }, context);
             }

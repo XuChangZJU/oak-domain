@@ -29,7 +29,9 @@ export type OperateOption = {
     dummy?: 1;          // 无用，为了继承Option通过编译
 };
 
-export type FormUpdateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>>;
+export type FormUpdateData<SH extends GeneralEntityShape> = Partial<{
+    [K in keyof Omit<SH, InstinctiveAttributes>]: SH[K] | null;
+}>;
 
 export type FormCreateData<SH extends GeneralEntityShape> = Omit<SH, InstinctiveAttributes> & { id: string };
 
@@ -37,6 +39,7 @@ export type Operation<A extends GenericAction | string,
     DATA extends Object,
     FILTER extends Object | undefined = undefined,
     SORTER extends Object | undefined = undefined> = {
+        id: string;     // 为了一致性，每个operation也应当保证唯一id
         action: A;
         data: DATA;
         sorter?: SORTER;
@@ -45,7 +48,7 @@ export type Operation<A extends GenericAction | string,
 
 export type Selection<DATA extends Object,
     FILTER extends Object | undefined = undefined,
-    SORT extends Object | undefined = undefined> = Operation<'select', DATA, FILTER, SORT>;
+    SORT extends Object | undefined = undefined> = Omit<Operation<'select', DATA, FILTER, SORT>, 'id'>;
 
 export interface EntityShape {
     id: string;
