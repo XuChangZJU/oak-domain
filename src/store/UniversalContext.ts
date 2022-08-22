@@ -84,4 +84,6 @@ export abstract class UniversalContext<ED extends EntityDict> implements Context
     }
 
     abstract toString(): Promise<string>;
+
+    abstract getCurrentUserId(): Promise<string | undefined>;
 }

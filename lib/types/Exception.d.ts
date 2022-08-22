@@ -37,6 +37,12 @@ export declare class OakInputIllegalException extends OakUserException {
 export declare class OakUserUnpermittedException extends OakUserException {
 }
 /**
+ * 用户未登录抛的异常
+ */
+export declare class OakUnloggedInException extends OakUserException {
+    constructor(message?: string);
+}
+/**
  * 要插入行时，发现已经有相同的行数据
  */
 export declare class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> extends OakUserException {

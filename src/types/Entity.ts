@@ -26,6 +26,7 @@ export type SelectOption = {
 
 export type OperateOption = {
     dontCollect?: boolean;
+    parentModiId?: string;      // 如果是延时更新，所有的相关modi要关联到一个父亲上统一应用
     dummy?: 1;          // 无用，为了继承Option通过编译
 };
 
@@ -63,6 +64,8 @@ export interface FileCarrierEntityShape extends EntityShape {
 interface GeneralEntityShape extends EntityShape {
     [K: string]: any;
 }
+
+export type MakeAction<A extends string> = A | `${A}-l`;
 
 export interface EntityDef {
     // Name: E;

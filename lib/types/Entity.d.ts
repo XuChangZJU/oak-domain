@@ -21,6 +21,7 @@ export declare type SelectOption = {
 };
 export declare type OperateOption = {
     dontCollect?: boolean;
+    parentModiId?: string;
     dummy?: 1;
 };
 export declare type FormUpdateData<SH extends GeneralEntityShape> = Partial<{
@@ -48,6 +49,7 @@ export interface FileCarrierEntityShape extends EntityShape {
 interface GeneralEntityShape extends EntityShape {
     [K: string]: any;
 }
+export declare type MakeAction<A extends string> = A | `${A}-l`;
 export interface EntityDef {
     Schema: GeneralEntityShape;
     OpSchema: GeneralEntityShape;

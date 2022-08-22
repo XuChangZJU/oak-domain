@@ -23,4 +23,5 @@ export declare abstract class UniversalContext<ED extends EntityDict> implements
     rollback(): Promise<void>;
     getCurrentTxnId(): string | undefined;
     abstract toString(): Promise<string>;
+    abstract getCurrentUserId(): Promise<string | undefined>;
 }

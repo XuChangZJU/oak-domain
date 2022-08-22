@@ -329,6 +329,7 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
     actionTexts.forEach(
         (action) => {
             assert(action.length <= STRING_LITERAL_MAX_LENGTH, `${filename}中的Action「${action}」命名长度大于${STRING_LITERAL_MAX_LENGTH}`);
+            assert(/^[a-z][a-z|A-Z]+$/.test(action), `${filename}中的Action「${action}」命名不合法，必须以小字字母开头且只能包含字母`)
             if (ActionDict.hasOwnProperty(action)) {
                 throw new Error(`文件${filename}中，Action定义上的【${action}】动作存在同名`);
             }
@@ -410,7 +411,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     const moduleName = filename.split('.')[0];
 
     if (Schema.hasOwnProperty(moduleName)) {
-        throw new Error(`出现了同名的Entity定义「${moduleName}」，请注意不要和系统保留的Entity重名。`);
+        if (!path.includes('oak-general-business')) {
+            console.log(`出现了同名的Entity定义「${moduleName}」，将使用您所定义的对象结构取代掉默认对象，请确认`);
+        }
     }
     const referencedSchemas: string[] = [];
     const schemaAttrs: ts.TypeElement[] = [];
@@ -533,7 +536,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
                 // 对于不是Oper的对象，全部建立和Oper的反指关系
                 if (!['Oper', 'OperEntity', 'ModiEntity'].includes(moduleName)) {
-                    if (ReversePointerRelations['OperEntity']) {
+                    if (ReversePointerRelations['OperEntity'] && !ReversePointerRelations['OperEntity'].includes(moduleName)) {
                         ReversePointerRelations['OperEntity'].push(moduleName);
                     }
                     else {
@@ -544,7 +547,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
                     // 对于不是Modi的对象，全部建立和Modi的反指关系
                     if (!['Modi'].includes(moduleName)) {
-                        if (ReversePointerRelations['ModiEntity']) {
+                        if (ReversePointerRelations['ModiEntity'] && !ReversePointerRelations['ModiEntity'].includes(moduleName)) {
                             ReversePointerRelations['ModiEntity'].push(moduleName);
                         }
                         else {
@@ -602,7 +605,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 dealWithActions(moduleName, filename, node.type, program);
             }
             else if (node.name.text === 'Relation') {
-                assert(!localeDef, `【${filename}】locale定义须在Action之后`);
+                assert(!localeDef, `【${filename}】locale定义须在Relation之后`);
                 // 增加userXXX对象的描述
                 if (ts.isLiteralTypeNode(node.type)) {
                     assert(ts.isStringLiteral(node.type.literal));
@@ -1236,51 +1239,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
         statements.push(...SchemaAsts[entity].statements);
     }
 
-    // if (keys(foreignKeySet).length > 0) {
-    //     for (const fkItem in foreignKeySet) {
-    //         const entityLc = fkItem.slice(0, 1).toLowerCase().concat(fkItem.slice(1));
-    //         const foreignKeys = [];
-    //         /* statements.push(
-    //             factory.createTypeAliasDeclaration(
-    //                 undefined,
-    //                 undefined,
-    //                 factory.createIdentifier(`${fkItem}s`),
-    //                 undefined,
-    //                 factory.createTemplateLiteralType(
-    //                     factory.createTemplateHead(
-    //                         `${entityLc}s$`,
-    //                         `${entityLc}s$`
-    //                     ),
-    //                     [factory.createTemplateLiteralTypeSpan(
-    //                         factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-    //                         factory.createTemplateTail(
-    //                             "",
-    //                             ""
-    //                         )
-    //                     )]
-    //                 )
-    //             )
-    //         ); */
 
-    //         for (let iter = 1; iter < 11; iter++) {
-    //             foreignKeys.push(`${entityLc}s$${iter}`);
-    //         }
-
-    //         statements.push(
-    //             factory.createTypeAliasDeclaration(
-    //                 undefined,
-    //                 undefined,
-    //                 factory.createIdentifier(`${fkItem}s`),
-    //                 undefined,
-    //                 factory.createUnionTypeNode(
-    //                     foreignKeys.map(
-    //                         ele => factory.createLiteralTypeNode(factory.createStringLiteral(ele))
-    //                     )
-    //                 )
-    //             )
-    //         );
-    //     }
-    // }
     statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
@@ -1557,9 +1516,16 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
         factory.createTypeReferenceNode(
             factory.createIdentifier("ExprOp"),
             [
-                factory.createTypeReferenceNode(
-                    factory.createIdentifier('OpAttr')
-                )
+                process.env.COMPLING_AS_LIB ?
+                    factory.createUnionTypeNode([
+                        factory.createTypeReferenceNode(
+                            factory.createIdentifier('OpAttr')
+                        ),
+                        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                    ]) :
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier('OpAttr')
+                    )
             ]
         ),
     ];
@@ -1784,10 +1750,16 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
             factory.createTypeReferenceNode(
                 factory.createIdentifier("ExprOp"),
                 [
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("OpAttr"),
-                        undefined
-                    )
+                    process.env.COMPLING_AS_LIB ?
+                        factory.createUnionTypeNode([
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier('OpAttr')
+                            ),
+                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                        ]) :
+                        factory.createTypeReferenceNode(
+                            factory.createIdentifier('OpAttr')
+                        )
                 ]
             )
         ]
@@ -2186,7 +2158,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 members.push(
                     factory.createTypeLiteralNode(
                         [factory.createPropertySignature(
-                            undefined,                            
+                            undefined,
                             firstLetterLowerCase(one),
                             undefined,
                             factory.createTypeReferenceNode(
@@ -2205,30 +2177,38 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 undefined,
                 undefined,
                 [factory.createParameterDeclaration(
-                  undefined,
-                  undefined,
-                  undefined,
-                  factory.createIdentifier("k"),
-                  undefined,
-                  factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                  undefined
+                    undefined,
+                    undefined,
+                    undefined,
+                    factory.createIdentifier("k"),
+                    undefined,
+                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                    undefined
                 )],
                 factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
-              )])
+            )])
         );
     }
-    
+
     members.push(
         factory.createTypeReferenceNode(
             factory.createIdentifier("OneOf"),
             [factory.createTypeReferenceNode(
-              factory.createIdentifier("ExprOp"),
-              [factory.createTypeReferenceNode(
-                factory.createIdentifier("OpAttr"),
-                undefined
-              )]
+                factory.createIdentifier("ExprOp"),
+                [
+                    process.env.COMPLING_AS_LIB ?
+                        factory.createUnionTypeNode([
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier('OpAttr')
+                            ),
+                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                        ]) :
+                        factory.createTypeReferenceNode(
+                            factory.createIdentifier('OpAttr')
+                        )
+                ]
             )]
-          )
+        )
     );
     /**
      * 
@@ -2924,7 +2904,13 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     const otmUpdateOperationNode = factory.createTypeReferenceNode(
                         factory.createIdentifier("OakOperation"),
                         [
-                            factory.createLiteralTypeNode(factory.createStringLiteral("update")),
+                            factory.createIndexedAccessTypeNode(
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, entityName, 'UpdateOperation'),
+                                    undefined
+                                ),
+                                factory.createLiteralTypeNode(factory.createStringLiteral("action"))
+                            ),
                             factory.createTypeReferenceNode(
                                 factory.createIdentifier("Omit"),
                                 [
@@ -3059,7 +3045,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         factory.createTypeReferenceNode(
                             factory.createIdentifier("OpSchema"),
                             undefined
-                        ),                        
+                        ),
                         factory.createUnionTypeNode(uniq(foreignKeyAttr).map(
                             ele => factory.createLiteralTypeNode(factory.createStringLiteral(ele))
                         ))
@@ -3344,6 +3330,17 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     );
 
     // UpdateOperation
+    const actionTypeNodes: ts.TypeNode[] = ActionAsts[entity] ? [
+        factory.createTypeReferenceNode('ParticularAction'),
+        factory.createLiteralTypeNode(factory.createStringLiteral("update"))
+    ] : [
+        factory.createLiteralTypeNode(factory.createStringLiteral("update"))
+    ];
+    if (process.env.COMPLING_AS_LIB) {
+        actionTypeNodes.push(
+            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+        );
+    }
     statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
@@ -3353,12 +3350,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             factory.createTypeReferenceNode(
                 factory.createIdentifier("OakOperation"),
                 [
-                    ActionAsts[entity] ?
-                        factory.createUnionTypeNode([
-                            factory.createTypeReferenceNode('ParticularAction'),
-                            factory.createLiteralTypeNode(factory.createStringLiteral("update"))
-                        ]) :
-                        factory.createLiteralTypeNode(factory.createStringLiteral("update")),
+                    factory.createUnionTypeNode(actionTypeNodes),
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("UpdateOperationData")
                     ),
@@ -3834,6 +3826,11 @@ const initialStatements = () => [
                     false,
                     factory.createIdentifier("Operation"),
                     factory.createIdentifier("OakOperation")
+                ),
+                factory.createImportSpecifier(
+                    false,
+                    factory.createIdentifier("MakeAction"),
+                    factory.createIdentifier("OakMakeAction")
                 )
             ])
         ),
@@ -4150,6 +4147,13 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         constructActions(statements, entity);
         constructQuery(statements, entity);
         constructFullAttrs(statements, entity);
+
+        const actionTypeNodes: ts.TypeNode[] = ActionAsts[entity] ? [factory.createTypeReferenceNode('Action')] : [factory.createTypeReferenceNode('GenericAction')];
+        if (process.env.COMPLING_AS_LIB) {
+            actionTypeNodes.push(
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+            );
+        }
         const EntityDefAttrs = [
             factory.createPropertySignature(
                 undefined,
@@ -4174,8 +4178,10 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 factory.createIdentifier("Action"),
                 undefined,
                 factory.createTypeReferenceNode(
-                    factory.createIdentifier(ActionAsts[entity] ? 'Action' : 'GenericAction'),
-                    undefined
+                    factory.createIdentifier('OakMakeAction'),
+                    [
+                        factory.createUnionTypeNode(actionTypeNodes)
+                    ]
                 )
             ),
             factory.createPropertySignature(

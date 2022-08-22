@@ -2,6 +2,7 @@ import * as Modi from "./Modi/Schema";
 import * as ModiEntity from "./ModiEntity/Schema";
 import * as Oper from "./Oper/Schema";
 import * as OperEntity from "./OperEntity/Schema";
+import * as User from "./User/Schema";
 export declare type ModiIdSubQuery = {
     [K in "$in" | "$nin"]?: (ModiEntity.ModiIdSubQuery & {
         entity: "modiEntity";
@@ -24,5 +25,12 @@ export declare type OperIdSubQuery = {
 export declare type OperEntityIdSubQuery = {
     [K in "$in" | "$nin"]?: (OperEntity.OperEntityIdSubQuery & {
         entity: "operEntity";
+    }) | any;
+};
+export declare type UserIdSubQuery = {
+    [K in "$in" | "$nin"]?: (Oper.UserIdSubQuery & {
+        entity: "oper";
+    }) | (User.UserIdSubQuery & {
+        entity: "user";
     }) | any;
 };

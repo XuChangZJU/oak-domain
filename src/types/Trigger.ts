@@ -1,7 +1,7 @@
 import { SelectOption, SelectRowShape } from ".";
 import { GenericAction } from "../actions/action";
-import { DeduceCreateOperation, DeduceRemoveOperation, DeduceSelection, DeduceUpdateOperation, EntityDict, OperateOption } from "../types/Entity";
-import { EntityDef, EntityShape, OperationResult, SelectionResult, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
+import { EntityDict, OperateOption } from "../types/Entity";
+import { EntityShape, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { Context } from "./Context";
 
 export type CheckerType = 'user' | 'row' | 'data';

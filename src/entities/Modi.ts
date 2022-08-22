@@ -1,5 +1,5 @@
 import { ActionDef } from '../types/Action';
-import { String, Int, Datetime, Image, Boolean, Text } from '../types/DataType';
+import { String } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
 import { LocaleDef } from '../types/Locale';
 import { Index } from '../types/Storage';

@@ -100,6 +100,15 @@ export class OakUserUnpermittedException extends OakUserException {
 };
 
 /**
+ * 用户未登录抛的异常
+ */
+export class OakUnloggedInException extends OakUserException {
+    constructor(message?: string) {
+        super(message || '您尚未登录');
+    }
+};
+
+/**
  * 要插入行时，发现已经有相同的行数据
  */
 export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> extends OakUserException {
@@ -146,6 +155,9 @@ export function makeException(data: {
         }
         case OakUserUnpermittedException.name: {
             return new OakUserUnpermittedException(data.message);
+        }
+        case OakUnloggedInException.name: {
+            return new OakUnloggedInException(data.message);
         }
         case OakCongruentRowExists.name: {
             return new OakCongruentRowExists(data.data, data.message);
