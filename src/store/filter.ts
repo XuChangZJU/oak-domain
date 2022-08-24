@@ -1,5 +1,6 @@
 import { StorageSchema } from '../types';
 import { EntityDict } from "../types/Entity";
+import { intersection, union } from '../utils/lodash';
 export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
     const filter: ED[T]['Selection']['filter'] = {};
     filters.forEach(
@@ -98,4 +99,58 @@ export function repel<ED extends EntityDict, T extends keyof ED>(
     filter2: ED[T]['Selection']['filter']) {
     // todo
     return false;
+}
+
+/**
+ * 从filter中判断是否有确定的id对象，如果有则返回这些id，没有返回空数组
+ * @param filter 
+ * @returns 
+ */
+export function getRelevantIds<ED extends EntityDict, T extends keyof ED>(filter: ED[T]['Selection']['filter']): string[] {
+    let ids: string[] | undefined;
+    let idsAnd: string[] | undefined;
+    let idsOr: string[] | undefined;
+
+    if (filter?.$and) {
+        const idss = filter.$and.map(
+            ele => getRelevantIds(ele)
+        );
+        idsAnd = intersection(...idss);
+    }
+
+    if (filter?.$or) {
+        const idss = filter.$or.map(
+            ele => getRelevantIds(ele)
+        );
+        idsOr = union(...idss);
+    }
+
+    if (filter?.id) {
+        if (typeof filter.id === 'string') {
+            ids = [filter.id];
+        }
+        if (filter.id?.$eq) {
+            ids = [filter.id.$eq as string];
+        }
+        if (filter.id?.$in && filter.id.$in instanceof Array) {
+            ids = filter.id.$in;
+        }
+    }
+    
+    // 三者如果有基一，直接返回，如果大于一返回intersection
+    if (!ids && !idsAnd && !idsOr) {
+        return [];
+    }
+    let result = (ids || idsAnd  || idsOr) as string[];
+    if (ids) {
+        result = intersection(result, ids);
+    }
+    if (idsAnd) {
+        result = intersection(result, idsAnd);
+    }
+    if (idsOr) {
+        result = intersection(result, idsOr);
+    }
+
+    return result;
 }

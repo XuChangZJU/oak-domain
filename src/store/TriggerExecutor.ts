@@ -129,7 +129,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         trigger: Trigger<ED, T, Cxt>,
         context: Cxt,
-        option?: OperateOption
+        option: OperateOption
     ) {
         assert(trigger.action !== 'select');
         if ((trigger as CreateTriggerCrossTxn<ED, T, Cxt>).strict === 'makeSure') {
@@ -160,7 +160,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     const { rowStore } = context;
                     const count = await rowStore.count(entity, {
                         filter: filter2
-                    } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, context);
+                    } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, context, {});
                     if (count > 0) {
                         throw new Error(`对象${String(entity)}的行「${JSON.stringify(operation)}」上已经存在未完成的跨事务约束`);
                     }
@@ -184,7 +184,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         context: Cxt,
-        option?: OperateOption | SelectOption
+        option: OperateOption | SelectOption
     ): Promise<void> {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
@@ -213,7 +213,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     }
 
     private onCommit<T extends keyof ED>(
-        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' }, cxtStr: string, option?: OperateOption) {
+        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' }, cxtStr: string, option: OperateOption) {
         return async () => {
             const context = await this.contextBuilder(cxtStr);
             await context.begin();
@@ -249,7 +249,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                         $$triggerData$$: null,
                     },
                     ...filter /** as Filter<'update', DeduceFilter<ED[T]['Schema']>> */,
-                }, context);
+                }, context, {});
             }
 
             await context.commit();
@@ -261,7 +261,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         trigger: Trigger<ED, T, Cxt>,
         context: Cxt,
-        option?: OperateOption,
+        option: OperateOption,
     ) {
         context.on('commit', this.onCommit(trigger, operation, await context.toString(), option));
     }
@@ -270,7 +270,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         context: Cxt,
-        option?: OperateOption | SelectOption,
+        option: OperateOption | SelectOption,
         result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[],
     ): Promise<void> {
         const { action } = operation;
@@ -316,7 +316,10 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                         $gt: timestamp,
                     }
                 },
-            } as any, context);
+            } as any, context, {
+                dontCollect: true,
+                forUpdate: true,
+            });
             for (const row of rows) {
                 const { $$triggerData$$ } = row;
                 const { name, operation, cxtStr, params } = $$triggerData$$!;

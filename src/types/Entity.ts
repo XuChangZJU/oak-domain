@@ -26,6 +26,8 @@ export type SelectOption = {
 
 export type OperateOption = {
     dontCollect?: boolean;
+    dontCreateOper?: boolean;
+    allowExists?: boolean;      // 插入时允许已经存在唯一键值的行了，即insert / update逻辑
     parentModiId?: string;      // 如果是延时更新，所有的相关modi要关联到一个父亲上统一应用
     dummy?: 1;          // 无用，为了继承Option通过编译
 };
@@ -153,7 +155,7 @@ export type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
 export type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'u',
     e: T;
-    d: FormUpdateData<ED[T]['OpSchema']>;
+    d: DeduceUpdateOperationData<ED[T]['Schema']>;
     f?: DeduceFilter<ED[T]['Schema']>;
 };
 

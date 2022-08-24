@@ -13,4 +13,5 @@ import merge from 'lodash/merge';
 import cloneDeep from 'lodash/cloneDeep';
 import pick from 'lodash/pick';
 import isEqual from 'lodash/isEqual';
-export { unset, pull, uniq, get, set, intersection, omit, merge, cloneDeep, pick, isEqual, };
+import union from 'lodash/union';
+export { unset, pull, uniq, get, set, intersection, omit, merge, cloneDeep, pick, isEqual, union, };

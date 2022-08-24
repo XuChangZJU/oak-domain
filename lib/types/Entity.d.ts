@@ -21,6 +21,8 @@ export declare type SelectOption = {
 };
 export declare type OperateOption = {
     dontCollect?: boolean;
+    dontCreateOper?: boolean;
+    allowExists?: boolean;
     parentModiId?: string;
     dummy?: 1;
 };
@@ -112,7 +114,7 @@ export declare type CreateOpResult<ED extends EntityDict, T extends keyof ED> = 
 export declare type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'u';
     e: T;
-    d: FormUpdateData<ED[T]['OpSchema']>;
+    d: DeduceUpdateOperationData<ED[T]['Schema']>;
     f?: DeduceFilter<ED[T]['Schema']>;
 };
 export declare type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {

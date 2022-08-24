@@ -42,7 +42,9 @@ export async function checkFilterContains<ED extends EntityDict, T extends keyof
         filter: filter2,
         indexFrom: 0,
         count: 10,
-    }, context);
+    }, context, {
+        dontCollect: true,
+    });
     if (result.length > 0) {
         const data = {};
         result.forEach(

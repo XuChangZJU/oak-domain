@@ -34,3 +34,9 @@ export declare function contains<ED extends EntityDict, T extends keyof ED>(enti
  * @param conditionalFilter
  */
 export declare function repel<ED extends EntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter']): boolean;
+/**
+ * 从filter中判断是否有确定的id对象，如果有则返回这些id，没有返回空数组
+ * @param filter
+ * @returns
+ */
+export declare function getRelevantIds<ED extends EntityDict, T extends keyof ED>(filter: ED[T]['Selection']['filter']): string[];

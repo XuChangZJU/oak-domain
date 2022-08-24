@@ -12,7 +12,7 @@ export interface CreateTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     check?: (operation: ED[T]['Create']) => boolean;
     fn: (event: {
         operation: ED[T]['Create'];
-    }, context: Cxt, option?: OperateOption) => Promise<number>;
+    }, context: Cxt, option: OperateOption) => Promise<number>;
 }
 export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends CreateTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
@@ -31,7 +31,7 @@ export interface UpdateTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     check?: (operation: ED[T]['Update']) => boolean;
     fn: (event: {
         operation: ED[T]['Update'];
-    }, context: Cxt, option?: OperateOption) => Promise<number>;
+    }, context: Cxt, option: OperateOption) => Promise<number>;
 }
 export interface UpdateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
@@ -49,7 +49,7 @@ export interface RemoveTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     check?: (operation: ED[T]['Remove']) => boolean;
     fn: (event: {
         operation: ED[T]['Remove'];
-    }, context: Cxt, option?: OperateOption) => Promise<number>;
+    }, context: Cxt, option: OperateOption) => Promise<number>;
 }
 export interface RemoveTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> extends RemoveTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
@@ -97,9 +97,9 @@ export declare abstract class Executor<ED extends EntityDict, Cxt extends Contex
     abstract registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
     abstract preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
         action: 'select';
-    }, context: Cxt, option?: OperateOption | SelectOption): Promise<void>;
+    }, context: Cxt, option: OperateOption | SelectOption): Promise<void>;
     abstract postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
         action: 'select';
-    }, context: Cxt, option?: OperateOption | SelectOption, result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[]): Promise<void>;
+    }, context: Cxt, option: OperateOption | SelectOption, result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[]): Promise<void>;
     abstract checkpoint(context: Cxt, timestamp: number): Promise<number>;
 }

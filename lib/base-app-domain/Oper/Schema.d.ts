@@ -141,7 +141,7 @@ export declare type FullAttr = NativeAttr | `operEntitys$${number}.${OperEntity.
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;
-    Action: OakMakeAction<GenericAction | string>;
+    Action: OakMakeAction<GenericAction> | string;
     Selection: Selection;
     Operation: Operation;
     Create: CreateOperation;

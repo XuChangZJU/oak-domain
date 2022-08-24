@@ -7,8 +7,9 @@ import { Index } from '../types/Storage';
 export interface Schema extends EntityShape {
     action: String<16>;
     data: Object;
-    filter: Object;
+    filter?: Object;
     extra?: Object;
+    parent?: Schema;
 };
 
 type IState = 'active' | 'applied' | 'abandoned';
@@ -46,6 +47,7 @@ const locale: LocaleDef<Schema, Action, '', {
             filter: '条件',
             extra: '其它',
             iState: '状态',
+            parent: '关联父更新'
         },
         action: {
             abandon: '放弃',

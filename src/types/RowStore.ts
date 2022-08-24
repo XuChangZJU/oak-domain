@@ -22,21 +22,21 @@ export abstract class RowStore<ED extends EntityDict, Cxt extends Context<ED>> {
         entity: T,
         operation: ED[T]['Operation'],
         context: Cxt,
-        option?: OP
+        option: OP
     ): Promise<OperationResult<ED>>;
 
     abstract select<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption> (
         entity: T,
         selection: S,
         context: Cxt,
-        option?: OP
+        option: OP
     ): Promise<SelectionResult<ED[T]['Schema'], S['data']>>;
 
     abstract count<T extends keyof ED, OP extends SelectOption> (
         entity: T,
         selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
         context: Cxt,
-        option?: OP
+        option: OP
     ): Promise<number>;
 
     constructor(storageSchema: StorageSchema<ED>) {

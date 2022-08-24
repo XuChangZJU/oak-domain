@@ -4148,12 +4148,12 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         constructQuery(statements, entity);
         constructFullAttrs(statements, entity);
 
-        const actionTypeNodes: ts.TypeNode[] = ActionAsts[entity] ? [factory.createTypeReferenceNode('Action')] : [factory.createTypeReferenceNode('GenericAction')];
-        if (process.env.COMPLING_AS_LIB) {
-            actionTypeNodes.push(
-                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-            );
-        }
+        const actionTypeNode: ts.TypeNode = factory.createTypeReferenceNode(
+            factory.createIdentifier('OakMakeAction'),
+            [
+                ActionAsts[entity] ? factory.createTypeReferenceNode('Action') : factory.createTypeReferenceNode('GenericAction')
+            ]
+        );
         const EntityDefAttrs = [
             factory.createPropertySignature(
                 undefined,
@@ -4177,12 +4177,13 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 undefined,
                 factory.createIdentifier("Action"),
                 undefined,
-                factory.createTypeReferenceNode(
-                    factory.createIdentifier('OakMakeAction'),
-                    [
-                        factory.createUnionTypeNode(actionTypeNodes)
-                    ]
-                )
+                process.env.COMPLING_AS_LIB ?
+                    factory.createUnionTypeNode(
+                        [
+                            actionTypeNode,
+                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                        ]
+                    ) : actionTypeNode
             ),
             factory.createPropertySignature(
                 undefined,
