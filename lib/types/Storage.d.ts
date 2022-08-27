@@ -41,6 +41,7 @@ export interface StorageDesc<SH extends EntityShape> {
     uniqueConstraints?: UniqConstraint<SH>[];
     indexes?: Index<SH>[];
     config?: EntityConfig;
+    toModi?: true;
     view?: true;
 }
 export declare type StorageSchema<ED extends EntityDict> = {

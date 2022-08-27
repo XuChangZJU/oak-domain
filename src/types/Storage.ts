@@ -52,6 +52,7 @@ export interface StorageDesc<SH extends EntityShape> {
     uniqueConstraints?: UniqConstraint<SH>[];
     indexes?: Index<SH>[];
     config?: EntityConfig;
+    toModi?: true,          // 标识一下是否关联在modi上
     // view 相关
     view?: true;
 }

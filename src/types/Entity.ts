@@ -28,7 +28,8 @@ export type OperateOption = {
     dontCollect?: boolean;
     dontCreateOper?: boolean;
     allowExists?: boolean;      // 插入时允许已经存在唯一键值的行了，即insert / update逻辑
-    parentModiId?: string;      // 如果是延时更新，所有的相关modi要关联到一个父亲上统一应用
+    modiParentId?: string;      // 如果是延时更新，相关modi要关联到一个父亲上统一应用
+    modiParentEntity?: string;  // 如果是延时更新，相关modi要关联到一个父亲上统一应用
     dummy?: 1;          // 无用，为了继承Option通过编译
 };
 
@@ -67,7 +68,7 @@ interface GeneralEntityShape extends EntityShape {
     [K: string]: any;
 }
 
-export type MakeAction<A extends string> = A | `${A}-l`;
+export type MakeAction<A extends string> = A;
 
 export interface EntityDef {
     // Name: E;

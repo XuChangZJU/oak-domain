@@ -5,11 +5,13 @@ import { LocaleDef } from '../types/Locale';
 import { Index } from '../types/Storage';
 
 export interface Schema extends EntityShape {
+    targetEntity: String<32>;       // 要操作的目标对象
+    entity: String<32>;             // 关联的目标对象
+    entityId: String<64>;           // 关联的目标对象id
     action: String<16>;
     data: Object;
     filter?: Object;
     extra?: Object;
-    parent?: Schema;
 };
 
 type IState = 'active' | 'applied' | 'abandoned';
@@ -42,12 +44,14 @@ const locale: LocaleDef<Schema, Action, '', {
 }> = {
     zh_CN: {
         attr: {
+            targetEntity: '目标对象',
+            entity: '关联对象',
+            entityId: '关联对象Id',
             action: '动作',
             data: '数据',
             filter: '条件',
             extra: '其它',
             iState: '状态',
-            parent: '关联父更新'
         },
         action: {
             abandon: '放弃',

@@ -12,6 +12,7 @@ import {
     TYPE_PATH_IN_OAK_DOMAIN,
     RESERVED_ENTITIES,
     STRING_LITERAL_MAX_LENGTH,
+    ENTITY_PATH_IN_OAK_DOMAIN,
     NUMERICAL_LITERL_DEFAULT_PRECISION,
     NUMERICAL_LITERL_DEFAULT_SCALE,
     INT_LITERL_DEFAULT_WIDTH,
@@ -25,6 +26,7 @@ const Schema: Record<string, {
     states: string[];
     sourceFile: ts.SourceFile;
     locale: ts.ObjectLiteralExpression;
+    toModi: boolean;
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
 const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
@@ -355,6 +357,9 @@ function getEntityImported(declaration: ts.ImportDeclaration, filename: string) 
         else if (moduleSpecifier.text.startsWith(ENTITY_PATH_IN_OAK_GENERAL_BUSINESS())) {
             entityImported = moduleSpecifier.text.slice(ENTITY_PATH_IN_OAK_GENERAL_BUSINESS().length);
         }
+        else if (moduleSpecifier.text.startsWith(ENTITY_PATH_IN_OAK_DOMAIN())) {
+            entityImported = moduleSpecifier.text.slice(ENTITY_PATH_IN_OAK_DOMAIN().length)
+        }
     }
 
     if (entityImported) {
@@ -423,6 +428,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     let hasActionDef = false;
     let hasRelationDef = false;
     let hasActionOrStateDef = false;
+    let toModi = false;
     const enumStringAttrs: string[] = [];
     const states: string[] = [];
     const localEnumStringTypes: string[] = [];
@@ -470,12 +476,39 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                                         [reverseEntity]: [moduleName],
                                     });
                                 }
+
+                                if (reverseEntity === 'Modi') {
+                                    toModi = true;
+                                }
                             }
                             else {
                                 schemaAttrs.push(attrNode);
                                 if (localEnumStringTypes.includes(type.typeName.text)) {
                                     enumStringAttrs.push((<ts.Identifier>name).text);
                                 }
+                            }
+                        }
+                        else if (ts.isArrayTypeNode(type!) && ts.isTypeReferenceNode(type.elementType) && ts.isIdentifier(type.elementType.typeName)) {
+                            const { typeName } = type.elementType;
+
+                            if (referencedSchemas.includes(typeName.text)) {
+                                // 这也是一对多的反指定义 
+                                const reverseEntity = typeName.text;
+                                if (ReversePointerRelations[reverseEntity]) {
+                                    ReversePointerRelations[reverseEntity].push(moduleName);
+                                }
+                                else {
+                                    assign(ReversePointerRelations, {
+                                        [reverseEntity]: [moduleName],
+                                    });
+                                }
+
+                                if (reverseEntity === 'Modi') {
+                                    toModi = true;
+                                }
+                            }
+                            else {
+                                throw new Error(`对象${moduleName}中定义的属性${attrName}是不可识别的数组类别`);
                             }
                         }
                         else {
@@ -534,7 +567,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 }
                 beforeSchema = false;
 
-                // 对于不是Oper的对象，全部建立和Oper的反指关系
+                // 对于不是Oper的对象，全部建立和OperEntity的反指关系
                 if (!['Oper', 'OperEntity', 'ModiEntity'].includes(moduleName)) {
                     if (ReversePointerRelations['OperEntity'] && !ReversePointerRelations['OperEntity'].includes(moduleName)) {
                         ReversePointerRelations['OperEntity'].push(moduleName);
@@ -545,8 +578,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                         });
                     }
 
-                    // 对于不是Modi的对象，全部建立和Modi的反指关系
-                    if (!['Modi'].includes(moduleName)) {
+                    // 对于不是Modi的对象，全部建立和ModiEntity的反指关系
+                    if (!['Modi'].includes(moduleName) && !toModi) {
                         if (ReversePointerRelations['ModiEntity'] && !ReversePointerRelations['ModiEntity'].includes(moduleName)) {
                             ReversePointerRelations['ModiEntity'].push(moduleName);
                         }
@@ -954,6 +987,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     const schema = {
         schemaAttrs,
         sourceFile,
+        toModi,
     };
     if (hasFulltextIndex) {
         assign(schema, {
@@ -1473,6 +1507,22 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
     }
 
     // type AttrFilter = {};
+    if (ReversePointerRelations[entity]) {
+        // 有反向指针，将反向指针关联的对象的Filter也注入
+        ReversePointerRelations[entity].forEach(
+            ele => 
+            members.push(
+                factory.createPropertySignature(
+                    undefined,
+                    firstLetterLowerCase(ele),
+                    undefined,
+                    factory.createTypeReferenceNode(
+                        createForeignRef(entity, ele, 'Filter')
+                    )
+                )
+            )
+        );
+    }
     const eumUnionTypeNode: ts.TypeNode[] = ReversePointerRelations[entity] && ReversePointerRelations[entity].map(
         ele => factory.createLiteralTypeNode(
             factory.createStringLiteral(firstLetterLowerCase(ele))
@@ -2647,17 +2697,17 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     }
     // CreateOperationData
     let foreignKeyAttr: string[] = [];
+
+    if (ReversePointerEntities[entity]) {
+        foreignKeyAttr.push(
+            'entity', 'entityId'
+        );
+    }
     if (manyToOneSet) {
         for (const one of manyToOneSet) {
             if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[1])) {
                 foreignKeyAttr.push(`${one[1]}Id`);
             }
-        }
-
-        if (ReversePointerEntities[entity]) {
-            foreignKeyAttr.push(
-                'entity', 'entityId'
-            );
         }
     }
     let adNodes: ts.TypeNode[] = [
@@ -2747,7 +2797,16 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             }
         }
 
-        const reverseOneNodes: ts.TypeNode[] = [];
+        if (upsertOneNodes.length > 0) {
+            adNodes.push(
+                factory.createIntersectionTypeNode(
+                    upsertOneNodes
+                )
+            );
+        }
+    }
+    const reverseOneNodes: ts.TypeNode[] = [];
+    if (ReversePointerEntities[entity]) {
         if (ReversePointerRelations[entity]) {
             for (const one of ReversePointerRelations[entity]) {
                 reverseOneNodes.push(
@@ -2805,39 +2864,44 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     )
                 );
             }
-
-            if (process.env.COMPLING_AS_LIB) {
-                // 如果是base，要包容更多可能的反指
-                reverseOneNodes.push(
-                    factory.createTypeLiteralNode(
-                        [
-                            factory.createIndexSignature(
-                                undefined,
-                                undefined,
-                                [factory.createParameterDeclaration(
-                                    undefined,
-                                    undefined,
-                                    undefined,
-                                    factory.createIdentifier("K"),
-                                    undefined,
-                                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-                                    undefined
-                                )],
-                                factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
-                            )
-                        ]
-                    )
-                );
-            }
         }
 
-        if (upsertOneNodes.length > 0) {
-            adNodes.push(
-                factory.createIntersectionTypeNode(
-                    upsertOneNodes
+        if (process.env.COMPLING_AS_LIB) {
+            // 如果是base，要包容更多可能的反指
+            reverseOneNodes.push(
+                factory.createTypeLiteralNode(
+                    [
+                        factory.createPropertySignature(
+                            undefined,
+                            factory.createIdentifier('entity'),
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
+                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                        ),
+                        factory.createPropertySignature(
+                            undefined,
+                            factory.createIdentifier('entityId'),
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
+                            factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                        ),
+                        factory.createIndexSignature(
+                            undefined,
+                            undefined,
+                            [factory.createParameterDeclaration(
+                                undefined,
+                                undefined,
+                                undefined,
+                                factory.createIdentifier("K"),
+                                undefined,
+                                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                undefined
+                            )],
+                            factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
+                        )
+                    ]
                 )
             );
         }
+
         if (reverseOneNodes.length > 0) {
             adNodes.push(
                 factory.createUnionTypeNode(
@@ -2849,7 +2913,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
 
     // 一对多
     const propertySignatures: ts.TypeElement[] = [];
-    if (process.env.COMPLING_AS_LIB) {
+    /* if (process.env.COMPLING_AS_LIB) {
         propertySignatures.push(
             factory.createIndexSignature(
                 undefined,
@@ -2866,7 +2930,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
             )
         );
-    }
+    } */
     if (oneToManySet) {
         for (const entityName in foreignKeySet) {
             const entityNameLc = firstLetterLowerCase(entityName);
@@ -3025,14 +3089,14 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
 
     // UpdateOperationData
     foreignKeyAttr = [];
+    if (ReversePointerRelations[entity]) {
+        foreignKeyAttr.push('entity', 'entityId');
+    }
     if (manyToOneSet) {
         for (const one of manyToOneSet) {
             if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[1])) {
                 foreignKeyAttr.push(`${one[1]}Id`);
             }
-        }
-        if (ReversePointerRelations[entity]) {
-            foreignKeyAttr.push('entity', 'entityId');
         }
     }
     adNodes = [
@@ -4858,7 +4922,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
 
     for (const entity in Schema) {
         const indexExpressions: ts.Expression[] = [];
-        const { sourceFile, fulltextIndex, indexes } = Schema[entity];
+        const { sourceFile, fulltextIndex, indexes, toModi } = Schema[entity];
         const statements: ts.Statement[] = [
             factory.createImportDeclaration(
                 undefined,
@@ -4908,6 +4972,14 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
             indexExpressions.push(
                 ...indexes.elements
             )
+        }
+        if (toModi) {
+            propertyAssignments.push(
+                factory.createPropertyAssignment(
+                    factory.createIdentifier("toModi"),
+                    factory.createTrue()
+                )
+            );
         }
 
         if (indexExpressions.length > 0) {

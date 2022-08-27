@@ -110,7 +110,6 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "operato
     operatorId?: String<64>;
     operator?: User.UpdateOperation;
 })) & {
-    [k: string]: any;
     operEntity$oper?: OakOperation<OperEntity.UpdateOperation["action"], Omit<OperEntity.UpdateOperationData, "oper" | "operId">, OperEntity.Filter> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId"> | Omit<OperEntity.CreateOperationData, "oper" | "operId">[]> | OakOperation<OperEntity.UpdateOperation["action"], Omit<OperEntity.UpdateOperationData, "oper" | "operId">, OperEntity.Filter>>;
 };
 export declare type CreateSingleOperation = OakOperation<"create", CreateOperationData>;

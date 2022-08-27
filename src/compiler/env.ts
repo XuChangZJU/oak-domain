@@ -8,6 +8,10 @@ export const ENTITY_PATH_IN_OAK_GENERAL_BUSINESS = () => {
     return `${LIB_OAK_GENERAL_BUSINESS}/${LIB_PATH()}/entities/`;
 }
 
+export const ENTITY_PATH_IN_OAK_DOMAIN = () => {
+    return `${LIB_OAK_DOMAIN}/${LIB_PATH()}/entities/`;
+}
+
 export const TYPE_PATH_IN_OAK_DOMAIN = (level = 2) => {
     if (process.env.COMPLING_IN_DOMAIN) {
         return `${LEVEL_PREFIX[level]}/types/`;

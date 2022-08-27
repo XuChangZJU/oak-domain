@@ -4,9 +4,7 @@ import * as Oper from "./Oper/Schema";
 import * as OperEntity from "./OperEntity/Schema";
 import * as User from "./User/Schema";
 export declare type ModiIdSubQuery = {
-    [K in "$in" | "$nin"]?: (Modi.ModiIdSubQuery & {
-        entity: "modi";
-    }) | (ModiEntity.ModiIdSubQuery & {
+    [K in "$in" | "$nin"]?: (ModiEntity.ModiIdSubQuery & {
         entity: "modiEntity";
     }) | (Modi.ModiIdSubQuery & {
         entity: "modi";

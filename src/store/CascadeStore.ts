@@ -9,8 +9,8 @@ import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
 import { addFilterSegment, getRelevantIds } from "./filter";
 import { judgeRelation } from "./relation";
-import { isLaterAction } from "./action";
 import { CreateOperation as CreateOperOperation } from '../base-app-domain/Oper/Schema';
+import { CreateOperation as CreateModiOperation } from '../base-app-domain/Modi/Schema';
 import { OakCongruentRowExists } from "../types";
 import { omit, cloneDeep } from '../utils/lodash';
 
@@ -296,8 +296,17 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
         result: OperationResult<ED>,
         filter?: DeduceFilter<ED[T]['Schema']>
     ) {
-        const opData = {};
-        const laterAction = isLaterAction(action);
+        const modiAttr =  this.getSchema()[entity].toModi;
+        const option2 = Object.assign({}, option);
+        
+        const opData: Record<string, any> = {};
+        if (modiAttr && action !== 'remove') {
+            // create/update具有modi对象的对象，对其子对象的update行为全部是create modi对象（缓存动作）
+            // delete是什么情况？似乎应该先把所有的modi给abandon掉      by Xc
+            assert(!option2.modiParentId && !option2.modiParentEntity);
+            option2.modiParentId = data.id;
+            option2.modiParentEntity = entity as string;
+        }
         for (const attr in data) {
             const relation = judgeRelation(this.storageSchema, entity, attr);
             if (relation === 1) {
@@ -309,28 +318,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 // 基于entity/entityId的many-to-one
                 const operationMto = data[attr];
                 const { action: actionMto, data: dataMto, filter: filterMto } = operationMto;
-                const subLaterAction = isLaterAction(actionMto);
-                let laterLine = false;  // laterLine代表当前对象是正常动作，而子对象是延时动作
-                if (laterAction) {
-                    assert(subLaterAction, '所有延时动作的子对象的动作也必须是延时的');
-                }
-                else if (subLaterAction) {
-                    if (!laterAction) {
-                        laterLine = true;
-                    }
-                }
-                if (laterLine) {
-                    // 如果是对子对象的延时更新，此时对子对象的更新被转换成对Modi对象的插入
-                    assert(action === 'create', '延时更新必须是在对父级的申请对象create动作时进行');
-                    Object.assign(opData, {
-                        entity: 'modi',
-                        entityId: operationMto.id,
-                    });
-                    Object.assign(option, {
-                        parentModiId: operationMto.id,
-                    });
-                }
-                else if (actionMto === 'create') {
+
+                if (actionMto === 'create') {
                     Object.assign(opData, {
                         entityId: dataMto.id,
                         entity: attr,
@@ -365,15 +354,14 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     });
                 }
 
-                const result2 = await this.cascadeUpdate(attr, operationMto, context, option);
+                const result2 = await this.cascadeUpdate(attr, operationMto, context, option2);
                 this.mergeOperationResult(result, result2);
             }
             else if (typeof relation === 'string') {
                 // 基于attr的外键的many-to-one
                 const operationMto = data[attr];
                 const { action: actionMto, data: dataMto, filter: filterMto } = operationMto;
-                const subLaterAction = isLaterAction(actionMto);
-                assert(laterAction && subLaterAction || !laterAction && !subLaterAction, '延时动作的子对象的动作也必须是延时动作');
+
                 if (actionMto === 'create') {
                     Object.assign(opData, {
                         [`${attr}Id`]: dataMto.id,
@@ -405,7 +393,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     });
                 }
 
-                const result2 = await this.cascadeUpdate(relation, operationMto, context, option);
+                const result2 = await this.cascadeUpdate(relation, operationMto, context, option2);
                 this.mergeOperationResult(result, result2);
             }
             else {
@@ -414,8 +402,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 const otmOperations = data[attr];
                 const dealWithOneToMany = async (otm: DeduceUpdateOperation<ED[keyof ED]['Schema']>) => {
                     const { action: actionOtm, data: dataOtm, filter: filterOtm } = otm;
-                    const subLaterAction = isLaterAction(actionOtm);
-                    assert(laterAction && subLaterAction || !laterAction && !subLaterAction, '延时动作的子对象的动作也必须是延时动作');
                     if (!foreignKey) {
                         // 基于entity/entityId的one-to-many
                         if (action === 'create') {
@@ -521,7 +507,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         }
                     }
 
-                    const result2 = await this.cascadeUpdate(entityOtm!, otm, context, option);
+                    const result2 = await this.cascadeUpdate(entityOtm!, otm, context, option2);
                     this.mergeOperationResult(result, result2);
                 };
 
@@ -589,9 +575,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         option,
                         result,
                     );
-                    if (Object.keys(od).length > 0) {
-                        opData.push(od);
-                    }
+                    opData.push(od);
                 }
             }
             else {
@@ -603,8 +587,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     }, context, option);
                     this.mergeOperationResult(result, result2);
                 }
+                return result;
             }
-            return result;
         }
         else {
             opData = await this.destructCascadeUpdate(
@@ -646,13 +630,26 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
     ) {
         const { data, action, id: operId, filter } = operation;
         const now = Date.now();
-        const laterAction = isLaterAction(action);
 
-        switch (action || laterAction) {
+        switch (action) {
             case 'create': {
-                if (laterAction) {
+                if (option.modiParentEntity && !['modi', 'modiEntity'].includes(entity as string)) {
                     // 变成对modi的插入
-                    assert(false, '还未实现');
+                    const modiCreate: CreateModiOperation = {
+                        id: 'dummy',
+                        action: 'create',
+                        data: {
+                            id: operId,
+                            targetEntity: entity as string,
+                            action,
+                            entity: option.modiParentEntity!,
+                            entityId: option.modiParentId!,                            
+                            data,
+                            iState: 'active',
+                        },
+                    };
+                    await this.cascadeUpdate('modi', modiCreate, context, option);
+                    return 1;
                 }
                 else {
                     const addTimestamp = (data2: ED[T]['CreateSingle']['data']) => {
@@ -704,7 +701,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                     );
                                     const updateData = omit(row, ['id', '$$createAt$$']);
                                     const result3 = await this.updateAbjointRow(
-                                        entity, 
+                                        entity,
                                         {
                                             id: await generateNewId(),
                                             action: 'update',
@@ -725,7 +722,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                     }
                                     const updateData = omit(data, ['id', '$$createAt$$']);
                                     const result2 = await this.updateAbjointRow(
-                                        entity, 
+                                        entity,
                                         {
                                             id: await generateNewId(),
                                             action: 'update',
@@ -761,19 +758,19 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                 action,
                                 data,
                                 operatorId: await context.getCurrentUserId(),
-                                operEntity$oper: data instanceof Array ? await Promise.all(
-                                    data.map(
-                                        async (ele) => ({
-                                            id: 'dummy',
-                                            action: 'create',
-                                            data: {
+                                operEntity$oper: data instanceof Array ? [{
+                                    id: 'dummy',
+                                    action: 'create',
+                                    data: await Promise.all(
+                                        data.map(
+                                            async (ele) => ({
                                                 id: await generateNewId(),
                                                 entity,
-                                                entityId: (ele as ED[T]['CreateSingle']['data']).id,
-                                            },
-                                        })
-                                    )
-                                ) : [{
+                                                entityId: ele.id,
+                                            })
+                                        )
+                                    ),
+                                }] : [{
                                     id: 'dummy',
                                     action: 'create',
                                     data: {
@@ -810,9 +807,44 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     ids.push(...(rows.map(ele => ele.id! as string)));
                 }
 
-                if (laterAction) {
+                if (option.modiParentEntity && !['modi', 'modiEntity'].includes(entity as string)) {
                     // 延时更新，变成对modi的插入
-                    assert(false, '还未实现');
+                    // 变成对modi的插入
+                    const modiCreate: CreateModiOperation = {
+                        id: 'dummy',
+                        action: 'create',
+                        data: {
+                            id: operId,
+                            targetEntity: entity as string,
+                            entity: option.modiParentEntity!,
+                            entityId: option.modiParentId!,
+                            action,
+                            data,
+                            iState: 'active',
+                            filter: {
+                                id: {
+                                    $in: ids,
+                                },
+                            },
+                            modiEntity$modi: [
+                                {
+                                    id: 'dummy',
+                                    action: 'create',
+                                    data: await Promise.all(
+                                        ids.map(
+                                            async (id) => ({
+                                                id: await generateNewId(),
+                                                entity,
+                                                entityId: id,
+                                            })
+                                        )
+                                    ),
+                                }
+                            ],
+                        },
+                    };
+                    await this.cascadeUpdate('modi', modiCreate, context, option);
+                    return 1;
                 }
                 else {
                     if (action === 'remove') {
@@ -829,6 +861,10 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         }
                     }
                     else {
+                        if (Object.keys(data).length === 0) {
+                            // 优化一下，如果不更新任何属性，则不实际执行
+                            return 0;
+                        }
                         Object.assign(data, {
                             $$updateAt$$: now,
                         });
