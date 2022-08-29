@@ -747,7 +747,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                             d: data as ED[T]['OpSchema'] | ED[T]['OpSchema'][],
                         });
                     }
-                    if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity'].includes(entity as string)) {
+                    if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
                         // 按照框架要求生成Oper和OperEntity这两个内置的对象
                         assert(operId);
                         const createOper: CreateOperOperation = {
@@ -883,7 +883,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     }
 
                     const result = await this.updateAbjointRow(entity, operation, context, option);
-                    if (!option?.dontCreateOper && !['oper', 'operEntity', 'modiEntity'].includes(entity as string) && ids.length > 0) {
+                    if (!option?.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
                         // 按照框架要求生成Oper和OperEntity这两个内置的对象
                         assert(operId);
                         const createOper: CreateOperOperation = {
