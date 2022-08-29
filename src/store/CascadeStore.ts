@@ -633,7 +633,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
 
         switch (action) {
             case 'create': {
-                if (option.modiParentEntity && !['modi', 'modiEntity'].includes(entity as string)) {
+                if (option.modiParentEntity && !['modi', 'modiEntity', 'oper', 'operEntity'].includes(entity as string)) {
                     // 变成对modi的插入
                     const modiCreate: CreateModiOperation = {
                         id: 'dummy',

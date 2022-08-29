@@ -1,5 +1,11 @@
 import { ActionDef } from '../types/Action';
-export declare type GenericAction = 'create' | 'update' | 'remove' | 'select' | 'count' | 'stat' | 'download';
+export declare type ReadOnlyAction = 'select' | 'count' | 'stat' | 'download';
+export declare type AppendOnlyAction = ReadOnlyAction | 'create';
+export declare type ExcludeUpdateAction = AppendOnlyAction | 'remove';
+export declare type GenericAction = 'update' | ExcludeUpdateAction;
+export declare const readOnlyActions: string[];
+export declare const appendOnlyActions: string[];
+export declare const excludeUpdateActions: string[];
 export declare const genericActions: string[];
 export declare type AbleAction = 'enable' | 'disable';
 export declare type AbleState = 'enabled' | 'disabled';

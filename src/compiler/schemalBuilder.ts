@@ -27,6 +27,7 @@ const Schema: Record<string, {
     sourceFile: ts.SourceFile;
     locale: ts.ObjectLiteralExpression;
     toModi: boolean;
+    actionType: string;
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
 const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
@@ -285,7 +286,7 @@ const RESERVED_ACTION_NAMES = ['GenericAction', 'ParticularAction'];
 import { genericActions } from '../actions/action';
 import { unIndexedTypes } from '../types/DataType';
 import { initinctiveAttributes } from '../types/Entity';
-function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program) {
+function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program, sourceFile: ts.SourceFile) {
     const actionTexts = genericActions.map(
         ele => ele
     );
@@ -343,8 +344,26 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
         }
     );
 
-    // 为每个action在schema中建立相应的state域(除了genericState)
-    // 放到actionDef的定义处去做。by Xc
+    pushStatementIntoActionAst(moduleName,
+        factory.createVariableStatement(
+            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+            factory.createVariableDeclarationList(
+                [factory.createVariableDeclaration(
+                    factory.createIdentifier("actions"),
+                    undefined,
+                    undefined,
+                    factory.createArrayLiteralExpression(
+                        actionTexts.map(
+                            ele => factory.createStringLiteral(ele)
+                        ),
+                        false
+                    )
+                )],
+                ts.NodeFlags.Const
+            )
+        ),
+        sourceFile
+    );
 }
 
 function getEntityImported(declaration: ts.ImportDeclaration, filename: string) {
@@ -429,6 +448,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     let hasRelationDef = false;
     let hasActionOrStateDef = false;
     let toModi = false;
+    let actionType = 'crud';
     const enumStringAttrs: string[] = [];
     const states: string[] = [];
     const localEnumStringTypes: string[] = [];
@@ -635,7 +655,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                     ),
                     sourceFile!
                 );
-                dealWithActions(moduleName, filename, node.type, program);
+                dealWithActions(moduleName, filename, node.type, program, sourceFile!);
             }
             else if (node.name.text === 'Relation') {
                 assert(!localeDef, `【${filename}】locale定义须在Relation之后`);
@@ -685,6 +705,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                     [relationEntityName]: {
                         schemaAttrs: relationSchemaAttrs,
                         sourceFile,
+                        actionType: 'crud',
                     },
                 });
                 addRelationship(relationEntityName, 'User', 'user', true);
@@ -916,12 +937,11 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
                         indexes = declaration.initializer;
                     }
-                    else if (ts.isIdentifier(declaration.name) && declaration.name.text === 'locale') {
+                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'LocaleDef') {
                         // locale定义
                         const { type, initializer } = declaration;
 
                         assert(ts.isObjectLiteralExpression(initializer!));
-                        assert(ts.isTypeReferenceNode(type!) && ts.isIdentifier(type.typeName!) && type.typeName.text === 'LocaleDef', 'locale定义的类型必须是LocaleDef');
                         const { properties } = initializer;
                         assert(properties.length > 0, `${filename}至少需要有一种locale定义`);
 
@@ -972,6 +992,10 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
                         localeDef = initializer;
                     }
+                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ActionType') {
+                        assert(ts.isStringLiteral(declaration.initializer!));
+                        actionType = declaration.initializer.text;
+                    }
                     else {
                         throw new Error(`不能理解的定义内容${declaration.name.getText()}`);
                     }
@@ -983,11 +1007,15 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     if (!hasActionDef && hasActionOrStateDef) {
         throw new Error(`${filename}中有Action或State定义，但没有定义完整的Action类型`);
     }
+    if (hasActionDef && actionType !== 'crud') {
+        throw new Error(`${filename}中有Action定义，但却定义了actionType不是crud`);
+    }
     assert(schemaAttrs.length > 0);
     const schema = {
         schemaAttrs,
         sourceFile,
         toModi,
+        actionType,
     };
     if (hasFulltextIndex) {
         assign(schema, {
@@ -1510,17 +1538,17 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
     if (ReversePointerRelations[entity]) {
         // 有反向指针，将反向指针关联的对象的Filter也注入
         ReversePointerRelations[entity].forEach(
-            ele => 
-            members.push(
-                factory.createPropertySignature(
-                    undefined,
-                    firstLetterLowerCase(ele),
-                    undefined,
-                    factory.createTypeReferenceNode(
-                        createForeignRef(entity, ele, 'Filter')
+            ele =>
+                members.push(
+                    factory.createPropertySignature(
+                        undefined,
+                        firstLetterLowerCase(ele),
+                        undefined,
+                        factory.createTypeReferenceNode(
+                            createForeignRef(entity, ele, 'Filter')
+                        )
                     )
                 )
-            )
         );
     }
     const eumUnionTypeNode: ts.TypeNode[] = ReversePointerRelations[entity] && ReversePointerRelations[entity].map(
@@ -4922,7 +4950,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
 
     for (const entity in Schema) {
         const indexExpressions: ts.Expression[] = [];
-        const { sourceFile, fulltextIndex, indexes, toModi } = Schema[entity];
+        const { sourceFile, fulltextIndex, indexes, toModi, actionType } = Schema[entity];
         const statements: ts.Statement[] = [
             factory.createImportDeclaration(
                 undefined,
@@ -4955,8 +4983,110 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 undefined
             )
         ];
+        switch (actionType) {
+            case 'readOnly': {
+                statements.push(
+                    factory.createImportDeclaration(
+                        undefined,
+                        undefined,
+                        factory.createImportClause(
+                            false,
+                            undefined,
+                            factory.createNamedImports([factory.createImportSpecifier(
+                                false,
+                                factory.createIdentifier("readOnlyActions"),
+                                factory.createIdentifier("actions")
+                            )])
+                        ),
+                        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
+                        undefined
+                    )
+                );
+                break;
+            }
+            case 'appendOnly': {
+                statements.push(
+                    factory.createImportDeclaration(
+                        undefined,
+                        undefined,
+                        factory.createImportClause(
+                            false,
+                            undefined,
+                            factory.createNamedImports([factory.createImportSpecifier(
+                                false,
+                                factory.createIdentifier("appendOnlyActions"),
+                                factory.createIdentifier("actions")
+                            )])
+                        ),
+                        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
+                        undefined
+                    )
+                );
+                break;
+            }
+            case 'excludeUpdate': {
+                statements.push(
+                    factory.createImportDeclaration(
+                        undefined,
+                        undefined,
+                        factory.createImportClause(
+                            false,
+                            undefined,
+                            factory.createNamedImports([factory.createImportSpecifier(
+                                false,
+                                factory.createIdentifier("excludeUpdateActions"),
+                                factory.createIdentifier("actions")
+                            )])
+                        ),
+                        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
+                        undefined
+                    )
+                );
+                break;
+            }
+            default: {
+                if (ActionAsts[entity]) {
+                    statements.push(
+                        factory.createImportDeclaration(
+                            undefined,
+                            undefined,
+                            factory.createImportClause(
+                                false,
+                                undefined,
+                                factory.createNamedImports([factory.createImportSpecifier(
+                                    false,
+                                    undefined,
+                                    factory.createIdentifier("actions")
+                                )])
+                            ),
+                            factory.createStringLiteral("./Action"),
+                            undefined
+                        )
+                    );
+                }
+                else {
+                    statements.push(
+                        factory.createImportDeclaration(
+                            undefined,
+                            undefined,
+                            factory.createImportClause(
+                                false,
+                                undefined,
+                                factory.createNamedImports([factory.createImportSpecifier(
+                                    false,
+                                    factory.createIdentifier("genericActions"),
+                                    factory.createIdentifier("actions")
+                                )])
+                            ),
+                            factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
+                            undefined
+                        )
+                    );
+                }
+            }
+        }
 
-        const propertyAssignments: ts.PropertyAssignment[] = [];
+        const propertyAssignments: (ts.PropertyAssignment | ts.ShorthandPropertyAssignment)[] = [];
         const attributes = constructAttributes(entity);
         propertyAssignments.push(
             factory.createPropertyAssignment(
@@ -4981,6 +5111,17 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 )
             );
         }
+
+        propertyAssignments.push(
+            factory.createPropertyAssignment(
+                factory.createIdentifier("actionType"),
+                factory.createStringLiteral(actionType)
+            ),
+            factory.createShorthandPropertyAssignment(
+                factory.createIdentifier("actions"),
+                undefined
+            )
+        );
 
         if (indexExpressions.length > 0) {
             propertyAssignments.push(

@@ -13,13 +13,14 @@ export declare type Filter<A extends string, F extends Object | undefined = unde
 };
 export declare type SelectOption = {
     dontCollect?: boolean;
-    ignoreTrigger?: true;
+    blockTrigger?: true;
     obscure?: boolean;
     forUpdate?: true;
     includedDeleted?: true;
     dummy?: 1;
 };
 export declare type OperateOption = {
+    blockTrigger?: true;
     dontCollect?: boolean;
     dontCreateOper?: boolean;
     allowExists?: boolean;
@@ -38,7 +39,6 @@ export declare type Operation<A extends GenericAction | string, DATA extends Obj
     action: A;
     data: DATA;
     sorter?: SORTER;
-    option?: A extends 'select' ? SelectOption : undefined;
 } & Filter<A, FILTER>;
 export declare type Selection<DATA extends Object, FILTER extends Object | undefined = undefined, SORT extends Object | undefined = undefined> = Omit<Operation<'select', DATA, FILTER, SORT>, 'id'>;
 export interface EntityShape {
@@ -143,4 +143,5 @@ export declare type SelectRowShape<E extends GeneralEntityShape, P extends Deduc
 export declare type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
     result: Array<SelectRowShape<E, P>>;
 };
+export declare type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'crud';
 export {};

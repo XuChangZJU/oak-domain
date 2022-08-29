@@ -17,7 +17,7 @@ export type Filter<A extends string, F extends Object | undefined = undefined> =
 
 export type SelectOption = {
     dontCollect?: boolean;
-    ignoreTrigger?: true;
+    blockTrigger?: true;
     obscure?: boolean;      // 如果为置为true，则在filter过程中因数据不完整而不能判断为真的时候都假设为真（前端缓存专用）
     forUpdate?: true;
     includedDeleted?: true; // 是否包含删除行的信息
@@ -25,6 +25,7 @@ export type SelectOption = {
 };
 
 export type OperateOption = {
+    blockTrigger?: true;
     dontCollect?: boolean;
     dontCreateOper?: boolean;
     allowExists?: boolean;      // 插入时允许已经存在唯一键值的行了，即insert / update逻辑
@@ -47,7 +48,6 @@ export type Operation<A extends GenericAction | string,
         action: A;
         data: DATA;
         sorter?: SORTER;
-        option?: A extends 'select' ? SelectOption : undefined;
     } & Filter<A, FILTER>;
 
 export type Selection<DATA extends Object,
@@ -204,3 +204,5 @@ export type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProject
 export type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
     result: Array<SelectRowShape<E, P>>;
 }
+
+export type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'crud';       // 只读型、只插入型、没有更新型、所有型

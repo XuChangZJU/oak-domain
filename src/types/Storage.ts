@@ -1,3 +1,4 @@
+import { ActionType } from '.';
 import { EntityDict, EntityShape, InstinctiveAttributes } from './Entity';
 import { DataType, DataTypeParams } from './schema/DataTypes';
 
@@ -52,7 +53,9 @@ export interface StorageDesc<SH extends EntityShape> {
     uniqueConstraints?: UniqConstraint<SH>[];
     indexes?: Index<SH>[];
     config?: EntityConfig;
-    toModi?: true,          // 标识一下是否关联在modi上
+    toModi?: true;          // 标识一下是否关联在modi上
+    actions: string[];
+    actionType: ActionType;
     // view 相关
     view?: true;
 }

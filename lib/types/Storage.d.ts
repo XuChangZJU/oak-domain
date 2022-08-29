@@ -1,3 +1,4 @@
+import { ActionType } from '.';
 import { EntityDict, EntityShape, InstinctiveAttributes } from './Entity';
 import { DataType, DataTypeParams } from './schema/DataTypes';
 export declare type Ref = 'ref';
@@ -42,6 +43,8 @@ export interface StorageDesc<SH extends EntityShape> {
     indexes?: Index<SH>[];
     config?: EntityConfig;
     toModi?: true;
+    actions: string[];
+    actionType: ActionType;
     view?: true;
 }
 export declare type StorageSchema<ED extends EntityDict> = {

@@ -28,7 +28,9 @@ const triggers: Trigger<EntityDict, 'modi', UniversalContext<EntityDict>>[] = [
                     action,
                     data,
                     filter: filter as any,
-                }, context, option);
+                }, context, Object.assign({}, option, {
+                    blockTrigger: true,
+                }));
             }
 
             return modies.length;

@@ -1,6 +1,13 @@
 import { ActionDef } from '../types/Action';
-export type GenericAction = 'create' | 'update' | 'remove' | 'select' | 'count' | 'stat' | 'download';
-export const genericActions = ['create', 'update', 'remove', 'count', 'stat', 'download', 'select'];
+export type ReadOnlyAction =  'select' | 'count' | 'stat' | 'download';
+export type AppendOnlyAction = ReadOnlyAction | 'create';
+export type ExcludeUpdateAction = AppendOnlyAction | 'remove';
+export type GenericAction = 'update' | ExcludeUpdateAction;
+
+export const readOnlyActions = ['count', 'stat', 'download', 'select'];
+export const appendOnlyActions = readOnlyActions.concat('create');
+export const excludeUpdateActions = appendOnlyActions.concat('remove');
+export const genericActions = excludeUpdateActions.concat('update');
 
 export type AbleAction = 'enable' | 'disable';
 export type AbleState = 'enabled' | 'disabled';

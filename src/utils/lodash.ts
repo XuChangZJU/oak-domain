@@ -14,6 +14,7 @@ import cloneDeep from 'lodash/cloneDeep';
 import pick from 'lodash/pick';
 import isEqual from 'lodash/isEqual';
 import union from 'lodash/union';
+import difference from 'lodash/difference';
 
 export {
     unset,
@@ -28,4 +29,5 @@ export {
     pick,
     isEqual,
     union,
+    difference,
 };

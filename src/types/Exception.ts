@@ -108,6 +108,15 @@ export class OakUnloggedInException extends OakUserException {
     }
 };
 
+
+/**
+ * 用户未登录抛的异常
+ */
+ export class OakRowLockedException extends OakUserException {
+    constructor(message?: string) {
+        super(message || '该行数据正在被更新中，请稍后再试');
+    }
+};
 /**
  * 要插入行时，发现已经有相同的行数据
  */
@@ -161,6 +170,9 @@ export function makeException(data: {
         }
         case OakCongruentRowExists.name: {
             return new OakCongruentRowExists(data.data, data.message);
+        }
+        case OakRowLockedException.name: {
+            return new OakRowLockedException(data.message);
         }
         default:
             return;
