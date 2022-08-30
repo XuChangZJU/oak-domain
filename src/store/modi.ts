@@ -113,20 +113,3 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
     return checkers;
 }
 
-export function getModiSubSelection() {
-    return {
-        data: {
-            id: 1,
-            targetEntity: 1,
-            entity: 1,
-            entityId: 1,
-            action: 1,
-            data: 1,
-            filter: 1,
-            iState: 1,
-        },
-        filter: {
-            iState: 'active',
-        },
-    };
-}

@@ -9,18 +9,3 @@ export declare function createOperationsFromModies(modies: Modi[]): Array<{
 export declare function applyModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>>(filter: ED['modi']['Selection']['filter'], context: Cxt): Promise<import("../types").OperationResult<ED>>;
 export declare function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>>(filter: ED['modi']['Selection']['filter'], context: Cxt): Promise<import("../types").OperationResult<ED>>;
 export declare function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>): Checker<ED, keyof ED, Cxt>[];
-export declare function getModiSubSelection(): {
-    data: {
-        id: number;
-        targetEntity: number;
-        entity: number;
-        entityId: number;
-        action: number;
-        data: number;
-        filter: number;
-        iState: number;
-    };
-    filter: {
-        iState: string;
-    };
-};
