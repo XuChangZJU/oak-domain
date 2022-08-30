@@ -129,4 +129,13 @@ export declare function isMathExpression<A>(expression: any): expression is Math
 export declare function isExpression<A>(expression: any): expression is Expression<A>;
 export declare function opMultipleParams(op: string): boolean;
 export declare function execOp(op: string, params: any, obscure?: boolean): ExpressionConstant;
+/**
+ * 检查一个表达式，并分析其涉及到的属性
+ * @param expression
+ * @returns {
+ *      '#current': [当前结点涉及的属性]
+ *      'node-1': [node-1结点上涉及的属性]
+ * }
+ */
+export declare function getAttrRefInExpression(expression: Expression<any>): Record<string, string[]>;
 export {};

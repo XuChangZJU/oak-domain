@@ -440,3 +440,40 @@ export function execOp(op: string, params: any, obscure?: boolean): ExpressionCo
         }
     }
 }
+
+/**
+ * 检查一个表达式，并分析其涉及到的属性
+ * @param expression 
+ * @returns {
+ *      '#current': [当前结点涉及的属性]
+ *      'node-1': [node-1结点上涉及的属性]
+ * }
+ */
+export function getAttrRefInExpression(expression: Expression<any>) {
+    const result: Record<string, string[]> = {
+        ['#current']: [],
+    };
+    const check = (node: RefOrExpression<any>) => {
+        if ((node as any)['#attr']) {
+            result['#current'].push((node as any)['#attr']);
+        }
+        else if ((node as any)['#refAttr']) {
+            if (result[(node as any)['#refId']]) {
+                result[(node as any)['#refId']].push((node as any)['#refAttr']);
+            }
+            else {
+                Object.assign(result, {
+                    [(node as any)['#refId']]: [(node as any)['#refAttr']],
+                });
+            }
+        }
+        else {
+            for (const attr in expression) {
+                check((expression as any)[attr]);
+            }
+        }
+    };
+
+    check(expression);
+    return result;
+}

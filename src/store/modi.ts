@@ -1,14 +1,14 @@
-import { EntityDict } from '../base-app-domain';
+import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { UniversalContext } from '../store/UniversalContext';
 import { OpSchema as Modi, Filter } from '../base-app-domain/Modi/Schema';
-import { Checker, Operation, StorageSchema, UpdateChecker, EntityDict as BaseEntityDict, OakRowLockedException, Context } from '../types';
+import { Checker, Operation, StorageSchema, UpdateChecker, EntityDict, OakRowLockedException, Context } from '../types';
 import { appendOnlyActions } from '../actions/action';
 import { difference } from '../utils/lodash';
 
 export function createOperationsFromModies(modies: Modi[]): Array<{
-    operation: Operation <string, Object, Object>,
+    operation: Operation<string, Object, Object>,
     entity: string,
-}>{
+}> {
     return modies.map(
         (modi) => {
             return {
@@ -24,7 +24,7 @@ export function createOperationsFromModies(modies: Modi[]): Array<{
     );
 }
 
-export async function applyModis<ED extends EntityDict, Cxt extends UniversalContext<ED>>(filter: Filter, context: Cxt) {
+export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>>(filter: ED['modi']['Selection']['filter'], context: Cxt) {
     return context.rowStore.operate('modi', {
         id: await generateNewId(),
         action: 'apply',
@@ -44,7 +44,7 @@ export async function applyModis<ED extends EntityDict, Cxt extends UniversalCon
     });
 }
 
-export async function abandonModis<ED extends EntityDict, Cxt extends UniversalContext<ED>>(filter: Filter, context: Cxt) {
+export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>>(filter: ED['modi']['Selection']['filter'], context: Cxt) {
     return context.rowStore.operate('modi', {
         id: await generateNewId(),
         action: 'abadon',
@@ -65,7 +65,7 @@ export async function abandonModis<ED extends EntityDict, Cxt extends UniversalC
 }
 
 export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>) {
-    const checkers:Checker<ED, keyof ED, Cxt>[] = [];
+    const checkers: Checker<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
         const { actionType, actions } = schema[entity];
@@ -78,7 +78,7 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
             action: restActions as any,
             type: 'row',
             checker: async ({ operation }, context) => {
-                const { filter } = operation; 
+                const { filter } = operation;
                 const filter2 = {
                     modi: {
                         iState: 'active',
@@ -111,4 +111,22 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
     }
 
     return checkers;
+}
+
+export function getModiSubSelection() {
+    return {
+        data: {
+            id: 1,
+            targetEntity: 1,
+            entity: 1,
+            entityId: 1,
+            action: 1,
+            data: 1,
+            filter: 1,
+            iState: 1,
+        },
+        filter: {
+            iState: 'active',
+        },
+    };
 }
