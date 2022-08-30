@@ -1010,7 +1010,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     if (hasActionDef && actionType !== 'crud') {
         throw new Error(`${filename}中有Action定义，但却定义了actionType不是crud`);
     }
-    assert(schemaAttrs.length > 0);
+    assert(schemaAttrs.length > 0, `对象${moduleName}没有任何属性定义`);
     const schema = {
         schemaAttrs,
         sourceFile,
