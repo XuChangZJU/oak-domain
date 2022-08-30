@@ -15,4 +15,5 @@ import pick from 'lodash/pick';
 import isEqual from 'lodash/isEqual';
 import union from 'lodash/union';
 import difference from 'lodash/difference';
-export { unset, pull, uniq, get, set, intersection, omit, merge, cloneDeep, pick, isEqual, union, difference, };
+import groupBy from 'lodash/groupBy';
+export { unset, pull, uniq, get, set, intersection, omit, merge, cloneDeep, pick, isEqual, union, difference, groupBy, };

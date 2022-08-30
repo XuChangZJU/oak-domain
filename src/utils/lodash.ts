@@ -15,6 +15,7 @@ import pick from 'lodash/pick';
 import isEqual from 'lodash/isEqual';
 import union from 'lodash/union';
 import difference from 'lodash/difference';
+import groupBy from 'lodash/groupBy';
 
 export {
     unset,
@@ -30,4 +31,5 @@ export {
     isEqual,
     union,
     difference,
+    groupBy,
 };
