@@ -1120,24 +1120,24 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                 action,
                                 data,
                                 operatorId: await context.getCurrentUserId(),
-                                operEntity$oper: data instanceof Array ? [{
+                                operEntity$oper: data instanceof Array ? {
                                     id: 'dummy',
                                     action: 'create',
                                     data: await Promise.all(
                                         data.map(
                                             async (ele) => ({
                                                 id: await generateNewId(),
-                                                entity,
+                                                entity: entity as string,
                                                 entityId: ele.id,
                                             })
                                         )
                                     ),
-                                }] : [{
+                                } : [{
                                     id: 'dummy',
                                     action: 'create',
                                     data: {
                                         id: await generateNewId(),
-                                        entity,
+                                        entity: entity as string,
                                         entityId: (data as ED[T]['CreateSingle']['data']).id,
                                     },
                                 }]
@@ -1188,21 +1188,19 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                     $in: ids,
                                 },
                             },
-                            modiEntity$modi: [
-                                {
-                                    id: 'dummy',
-                                    action: 'create',
-                                    data: await Promise.all(
-                                        ids.map(
-                                            async (id) => ({
-                                                id: await generateNewId(),
-                                                entity,
-                                                entityId: id,
-                                            })
-                                        )
-                                    ),
-                                }
-                            ],
+                            modiEntity$modi: {
+                                id: 'dummy',
+                                action: 'create',
+                                data: await Promise.all(
+                                    ids.map(
+                                        async (id) => ({
+                                            id: await generateNewId(),
+                                            entity: entity as string,
+                                            entityId: id,
+                                        })
+                                    )
+                                ),
+                            },
                         },
                     };
                     await this.cascadeUpdate('modi', modiCreate, context, option);
@@ -1255,19 +1253,19 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                 id: operId,
                                 action,
                                 data,
-                                operEntity$oper: await Promise.all(
-                                    ids.map(
-                                        async (ele) => ({
-                                            id: 'dummy',
-                                            action: 'create',
-                                            data: {
+                                operEntity$oper: {
+                                    id: 'dummy',
+                                    action: 'create',
+                                    data: await Promise.all(
+                                        ids.map(
+                                            async (ele) => ({
                                                 id: await generateNewId(),
-                                                entity,
+                                                entity: entity as string,
                                                 entityId: ele,
-                                            }
-                                        })
+                                            })
+                                        )
                                     )
-                                ),
+                                },
                             },
                         }
                         await this.cascadeUpdate('oper', createOper, context, {

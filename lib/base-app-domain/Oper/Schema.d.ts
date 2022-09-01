@@ -3,7 +3,7 @@ import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey }
 import { OneOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, Operation as OakOperation, MakeAction as OakMakeAction } from "../../types/Entity";
-import { GenericAction } from "../../actions/action";
+import { AppendOnlyAction } from "../../actions/action";
 import * as User from "../User/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 export declare type OpSchema = {
@@ -104,32 +104,38 @@ export declare type SelectOperation<P = Projection> = Omit<OakOperation<"select"
 export declare type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
 export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "operatorId">> & (({
-    operatorId?: never | null;
+    operatorId?: never;
     operator?: User.CreateSingleOperation;
 } | {
-    operatorId?: String<64>;
+    operatorId: String<64>;
     operator?: User.UpdateOperation;
+} | {
+    operatorId?: String<64>;
 })) & {
-    operEntity$oper?: OakOperation<OperEntity.UpdateOperation["action"], Omit<OperEntity.UpdateOperationData, "oper" | "operId">, OperEntity.Filter> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId"> | Omit<OperEntity.CreateOperationData, "oper" | "operId">[]> | OakOperation<OperEntity.UpdateOperation["action"], Omit<OperEntity.UpdateOperationData, "oper" | "operId">, OperEntity.Filter>>;
+    operEntity$oper?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">>>;
 };
 export declare type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export declare type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export declare type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
 export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "operatorId">> & (({
-    operator?: User.CreateSingleOperation | User.UpdateOperation | User.RemoveOperation;
-    operatorId?: undefined;
+    operator: User.CreateSingleOperation;
+    operatorId?: never;
 } | {
-    operator?: undefined;
+    operator: User.UpdateOperation;
+    operatorId?: never;
+} | {
+    operator: User.RemoveOperation;
+    operatorId?: never;
+} | {
+    operator?: never;
     operatorId?: String<64> | null;
 })) & {
     [k: string]: any;
-    operEntitys$oper?: OperEntity.UpdateOperation | OperEntity.RemoveOperation | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId"> | Omit<OperEntity.CreateOperationData, "oper" | "operId">[]> | OperEntity.UpdateOperation | OperEntity.RemoveOperation>;
+    operEntitys$oper?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">>>;
 };
 export declare type UpdateOperation = OakOperation<"update" | string, UpdateOperationData, Filter, Sorter>;
 export declare type RemoveOperationData = {} & (({
-    operator?: User.UpdateOperation;
-} | {
-    operator?: User.RemoveOperation;
+    operator?: User.UpdateOperation | User.RemoveOperation;
 }));
 export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter, Sorter>;
 export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation | SelectOperation;
@@ -140,7 +146,7 @@ export declare type FullAttr = NativeAttr | `operEntitys$${number}.${OperEntity.
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;
-    Action: OakMakeAction<GenericAction> | string;
+    Action: OakMakeAction<AppendOnlyAction> | string;
     Selection: Selection;
     Operation: Operation;
     Create: CreateOperation;

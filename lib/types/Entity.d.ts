@@ -143,5 +143,5 @@ export declare type SelectRowShape<E extends GeneralEntityShape, P extends Deduc
 export declare type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
     result: Array<SelectRowShape<E, P>>;
 };
-export declare type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'crud';
+export declare type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'excludeRemove' | 'crud';
 export {};

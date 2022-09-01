@@ -43,6 +43,7 @@ export interface StorageDesc<SH extends EntityShape> {
     indexes?: Index<SH>[];
     config?: EntityConfig;
     toModi?: true;
+    inModi?: true;
     actions: string[];
     actionType: ActionType;
     view?: true;

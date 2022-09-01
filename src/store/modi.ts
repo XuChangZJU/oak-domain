@@ -68,8 +68,8 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
     const checkers: Checker<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
-        const { actionType, actions } = schema[entity];
-        if (['modi', 'modiEntity', 'oper', 'operEntity'].includes(entity) || ['readOnly', 'appendOnly'].includes(actionType)) {
+        const { actionType, actions, inModi } = schema[entity];
+        if (!inModi || ['readOnly', 'appendOnly'].includes(actionType)) {
             continue;
         }
         const restActions = difference(actions, appendOnlyActions);

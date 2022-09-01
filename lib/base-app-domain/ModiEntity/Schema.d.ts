@@ -3,7 +3,7 @@ import { Q_DateValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, ExprOp, Ex
 import { OneOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, Operation as OakOperation, MakeAction as OakMakeAction } from "../../types/Entity";
-import { GenericAction } from "../../actions/action";
+import { AppendOnlyAction } from "../../actions/action";
 import * as Modi from "../Modi/Schema";
 import * as User from "../User/Schema";
 export declare type OpSchema = {
@@ -101,11 +101,13 @@ export declare type SelectOperation<P = Projection> = Omit<OakOperation<"select"
 export declare type Selection<P = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
 export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "entityId" | "modiId">> & (({
-    modiId?: never | null;
+    modiId?: never;
     modi: Modi.CreateSingleOperation;
 } | {
     modiId: String<64>;
     modi?: Modi.UpdateOperation;
+} | {
+    modiId: String<64>;
 })) & ({
     entity?: never;
     entityId?: never;
@@ -113,7 +115,10 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity"
 } | {
     entity: "user";
     entityId: String<64>;
-    user?: User.UpdateOperation;
+    user: User.UpdateOperation;
+} | {
+    entity: "user";
+    entityId: String<64>;
 } | {
     entity?: string;
     entityId?: string;
@@ -123,15 +128,21 @@ export declare type CreateSingleOperation = OakOperation<"create", CreateOperati
 export declare type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export declare type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
 export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity" | "entityId" | "modiId">> & (({
-    modi?: Modi.CreateSingleOperation | Modi.UpdateOperation | Modi.RemoveOperation;
-    modiId?: undefined;
+    modi: Modi.CreateSingleOperation;
+    modiId?: never;
 } | {
-    modi?: undefined;
+    modi: Modi.UpdateOperation;
+    modiId?: never;
+} | {
+    modi: Modi.RemoveOperation;
+    modiId?: never;
+} | {
+    modi?: never;
     modiId?: String<64> | null;
 })) & ({
     user?: User.CreateSingleOperation | User.UpdateOperation | User.RemoveOperation;
-    entityId?: undefined;
-    entity?: undefined;
+    entityId?: never;
+    entity?: never;
 } | {
     entity?: ("user" | string) | null;
     entityId?: String<64> | null;
@@ -140,13 +151,9 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity"
 };
 export declare type UpdateOperation = OakOperation<"update" | string, UpdateOperationData, Filter, Sorter>;
 export declare type RemoveOperationData = {} & (({
-    modi?: Modi.UpdateOperation;
-} | {
-    modi?: Modi.RemoveOperation;
+    modi?: Modi.UpdateOperation | Modi.RemoveOperation;
 })) & ({
-    user?: User.UpdateOperation;
-} | {
-    user?: User.RemoveOperation;
+    user?: User.UpdateOperation | User.RemoveOperation;
 } | {
     [k: string]: any;
 });
@@ -160,7 +167,7 @@ export declare type FullAttr = NativeAttr;
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;
-    Action: OakMakeAction<GenericAction> | string;
+    Action: OakMakeAction<AppendOnlyAction> | string;
     Selection: Selection;
     Operation: Operation;
     Create: CreateOperation;

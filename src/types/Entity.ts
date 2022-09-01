@@ -205,4 +205,4 @@ export type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjec
     result: Array<SelectRowShape<E, P>>;
 }
 
-export type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'crud';       // 只读型、只插入型、没有更新型、所有型
+export type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'excludeRemove' | 'crud';       // 只读型、只插入型、没有更新型、没有删除型、所有型

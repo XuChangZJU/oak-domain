@@ -53,7 +53,8 @@ export interface StorageDesc<SH extends EntityShape> {
     uniqueConstraints?: UniqConstraint<SH>[];
     indexes?: Index<SH>[];
     config?: EntityConfig;
-    toModi?: true;          // 标识一下是否关联在modi上
+    toModi?: true;          // 标识是否有一对多的modi关联关系（业务层的申请）
+    inModi?: true;          // 标识是否可能被modi所指向（编译器根据toModi对象进行的推断，主要用于对这些对象的update/remove时检查有无modi的存在）
     actions: string[];
     actionType: ActionType;
     // view 相关
