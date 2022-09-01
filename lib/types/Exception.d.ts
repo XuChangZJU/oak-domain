@@ -3,7 +3,7 @@ export declare class OakException extends Error {
     constructor(message?: string);
     toString(): string;
 }
-export declare class OakDataException extends Error {
+export declare class OakDataException extends OakException {
 }
 export declare class OakOperExistedException extends OakDataException {
 }
@@ -73,4 +73,4 @@ export declare function makeException(data: {
     name: string;
     message?: string;
     [A: string]: any;
-}): OakException | OakRowUnexistedException | OakExternalException | undefined;
+}): OakException | OakExternalException | undefined;

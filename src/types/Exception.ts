@@ -22,7 +22,7 @@ export class OakException extends Error {
     }
 }
 
-export class OakDataException extends Error {
+export class OakDataException extends OakException {
     // 表示由数据层发现的异常
 }
 
