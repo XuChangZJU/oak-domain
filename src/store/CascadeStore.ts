@@ -2,17 +2,18 @@ import assert from "assert";
 import { Context } from '../types/Context';
 import {
     DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict,
-    OperateOption, SelectOption, OperationResult, SelectRowShape, DeduceFilter
+    OperateOption, SelectOption, OperationResult, SelectRowShape, DeduceFilter, DeduceSelection
 } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
-import { addFilterSegment, getRelevantIds } from "./filter";
+import { addFilterSegment, combineFilters, getRelevantIds } from "./filter";
 import { judgeRelation } from "./relation";
 import { CreateOperation as CreateOperOperation } from '../base-app-domain/Oper/Schema';
 import { CreateOperation as CreateModiOperation } from '../base-app-domain/Modi/Schema';
-import { OakCongruentRowExists } from "../types";
-import { omit, cloneDeep } from '../utils/lodash';
+import { OakCongruentRowExists, OakRowUnexistedException } from "../types";
+import { omit, cloneDeep, uniq } from '../utils/lodash';
+import { result } from "lodash";
 
 /**这个用来处理级联的select和update，对不同能力的 */
 export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
@@ -82,12 +83,373 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
         });
     }
 
+    private reduceDescendants<T extends keyof ED, S extends ED[T]['Selection']>(entity: T, rows: SelectRowShape<ED[T]['Schema'], S['data']>[]) {
+        return rows.map(
+            (row) => {
+                const row2 = {} as typeof row;
+                for (const attr in row) {
+                    const rel = this.judgeRelation(entity, attr);
+                    if (typeof rel === 'number' && [0, 1].includes(rel)) {
+                        Object.assign(row2, {
+                            [attr]: row[attr],
+                        });
+                    }
+                }
+                return row2;
+            }
+        );
+    }
+
+    private destructCascadeSelect<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(
+        entity: T, projection2: S['data'], context: Cxt, option: OP) {
+        const projection: ED[T]['Selection']['data'] = {};
+        const cascadeSelectionFns: Array<(result: SelectRowShape<ED[T]['Schema'], S['data']>[]) => Promise<void>> = [];
+
+        const supportMtoJoin = this.supportManyToOneJoin();
+        const { toModi } = this.getSchema()[entity];
+
+        for (const attr in projection2) {
+            const relation = judgeRelation(this.storageSchema, entity, attr);
+            if (relation === 1 || relation == 0) {
+                Object.assign(projection, {
+                    [attr]: projection2[attr],
+                });
+            }
+            else if (relation === 2) {
+                // 基于entity/entityId的多对一
+                Object.assign(projection, {
+                    entity: 1,
+                    entityId: 1,
+                });
+                if (supportMtoJoin) {
+                    cascadeSelectionFns.push(
+                        async (result) => {
+                            if (!toModi) {
+                                result.forEach(
+                                    (ele) => {
+                                        if (ele.entity === attr) {
+                                            assert(ele.entityId);
+                                            if (!ele[attr]) {
+                                                throw new OakRowUnexistedException([{
+                                                    entity: attr,
+                                                    selection: {
+                                                        data: projection2[attr],
+                                                        filter: {
+                                                            id: ele.entityId,
+                                                        }
+                                                    }
+                                                }]);
+                                            }
+                                        }
+                                    }
+                                );
+                            }
+                            if (!option.dontCollect) {
+                                this.addToResultSelections(attr, this.reduceDescendants(attr, result.map(ele => ele[attr] as any)), context);
+                            }
+                        }
+                    );
+                    const {
+                        projection: subProjection,
+                        cascadeSelectionFns: subCascadeSelectionFns,
+                    } = this.destructCascadeSelect(attr, projection2[attr], context, option);
+                    Object.assign(projection, {
+                        [attr]: subProjection,
+                    });
+                    subCascadeSelectionFns.forEach(
+                        ele => cascadeSelectionFns.push(
+                            async (result) => {
+                                await ele(result.map(ele2 => ele2[attr] as any));
+                            }
+                        )
+                    );
+                }
+                else {
+                    cascadeSelectionFns.push(
+                        async (result) => {
+                            const entityIds = uniq(result.filter(
+                                ele => ele.entity === attr
+                            ).map(
+                                ele => ele.entityId
+                            ) as string[]);
+
+                            const subRows = await this.cascadeSelect(attr, {
+                                data: projection2[attr],
+                                filter: {
+                                    id: {
+                                        $in: entityIds
+                                    },
+                                } as any,
+                            }, context, option);
+                            assert(subRows.length <= entityIds.length);
+                            if (subRows.length < entityIds.length && !toModi) {
+                                throw new OakRowUnexistedException([{
+                                    entity: attr,
+                                    selection: {
+                                        data: projection2[attr],
+                                        filter: {
+                                            id: {
+                                                $in: entityIds
+                                            },
+                                        },
+                                    },
+                                }]);
+                            }
+
+                            result.forEach(
+                                (ele) => {
+                                    if (ele.entity === attr) {
+                                        const subRow = subRows.find(
+                                            ele2 => ele2.id === ele.entityId
+                                        );
+                                        if (subRow) {
+                                            Object.assign(ele, {
+                                                [attr]: subRow,
+                                            });
+                                        }
+                                    }
+                                }
+                            );
+                        }
+                    );
+                }
+            }
+            else if (typeof relation === 'string') {
+                Object.assign(projection, {
+                    [`${attr}Id`]: 1,
+                });
+                if (supportMtoJoin) {
+                    if (!toModi) {
+                        // 如果不是modi，要保证外键没有空指针
+                        cascadeSelectionFns.push(
+                            async (result) => {
+                                if (!toModi) {
+                                    result.forEach(
+                                        (ele) => {
+                                            if (ele[`${attr}Id`] && !ele[attr]) {
+                                                throw new OakRowUnexistedException([{
+                                                    entity: relation,
+                                                    selection: {
+                                                        data: projection2[attr],
+                                                        filter: {
+                                                            id: ele[`${attr}Id`],
+                                                        }
+                                                    }
+                                                }]);
+                                            }
+                                        }
+                                    );
+                                }
+                                if (!option.dontCollect) {
+                                    this.addToResultSelections(relation, this.reduceDescendants(relation, result.map(ele => ele[attr] as any)), context);
+                                }
+                            }
+                        );
+                    }
+                    const {
+                        projection: subProjection,
+                        cascadeSelectionFns: subCascadeSelectionFns,
+                    } = this.destructCascadeSelect(relation, projection2[attr], context, option);
+                    Object.assign(projection, {
+                        [attr]: subProjection,
+                    });
+                    subCascadeSelectionFns.forEach(
+                        ele => cascadeSelectionFns.push(
+                            async (result) => {
+                                await ele(result.map(ele2 => ele2[attr] as any));
+                            }
+                        )
+                    );
+                }
+                else {
+                    cascadeSelectionFns.push(
+                        async (result) => {
+                            const ids = uniq(result.filter(
+                                ele => !!(ele[`${attr}Id`])
+                            ).map(
+                                ele => ele[`${attr}Id`]
+                            ) as string[]);
+
+                            const subRows = await this.cascadeSelect(relation, {
+                                data: projection2[attr],
+                                filter: {
+                                    id: {
+                                        $in: ids
+                                    },
+                                } as any,
+                            }, context, option);
+                            assert(subRows.length <= ids.length);
+                            if (subRows.length < ids.length && !toModi) {
+                                throw new OakRowUnexistedException([{
+                                    entity: relation,
+                                    selection: {
+                                        data: projection2[attr],
+                                        filter: {
+                                            id: {
+                                                $in: ids
+                                            },
+                                        },
+                                    }
+                                }]);
+                            }
+
+                            result.forEach(
+                                (ele) => {
+                                    if (ele[`${attr}Id`]) {
+                                        const subRow = subRows.find(
+                                            ele2 => ele2.id === ele[`${attr}Id`]
+                                        );
+                                        if (subRow) {
+                                            Object.assign(ele, {
+                                                [attr]: subRow,
+                                            });
+                                        }
+                                    }
+                                }
+                            );
+                        }
+                    );
+                }
+            }
+            else {
+                assert(relation instanceof Array);
+                const { data: subProjection, filter: subFilter, indexFrom, count, sorter: subSorter } = projection2[attr];
+                const [entity2, foreignKey] = relation;
+                if (foreignKey) {
+                    // 基于属性的一对多
+                    cascadeSelectionFns.push(
+                        async (result) => {
+                            const ids = result.map(
+                                ele => ele.id
+                            ) as string[];
+
+                            const subRows = await this.cascadeSelect(entity2, {
+                                data: subProjection,
+                                filter: combineFilters([{
+                                    [foreignKey]: {
+                                        $in: ids,
+                                    }
+                                }, subFilter]),
+                                indexFrom,
+                                count
+                            }, context, option);
+
+                            result.forEach(
+                                (ele) => {
+                                    const subRowss = subRows.filter(
+                                        ele2 => ele2[foreignKey] === ele.id
+                                    );
+                                    assert(subRowss);
+                                    Object.assign(ele, {
+                                        [attr]: subRowss,
+                                    });
+                                }
+                            );
+                        }
+                    );
+                }
+                else {
+                    // 基于entity的多对一
+                    cascadeSelectionFns.push(
+                        async (result) => {
+                            const ids = result.map(
+                                ele => ele.id
+                            ) as string[];
+
+                            const subRows = await this.cascadeSelect(entity2, {
+                                data: subProjection,
+                                filter: combineFilters([{
+                                    entity,
+                                    entityId: {
+                                        $in: ids,
+                                    }
+                                }, subFilter]),
+                                indexFrom,
+                                count
+                            }, context, option);
+
+                            result.forEach(
+                                (ele) => {
+                                    const subRowss = subRows.filter(
+                                        ele2 => ele2.entityId === ele.id
+                                    );
+                                    assert(subRowss);
+                                    Object.assign(ele, {
+                                        [attr]: subRowss,
+                                    });
+                                }
+                            );
+                        }
+                    );
+                }
+            }
+        }
+
+        return {
+            projection,
+            cascadeSelectionFns,
+        }
+    }
+
     protected async cascadeSelect<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(
         entity: T,
         selection: S,
         context: Cxt,
         option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]> {
-        const { data } = selection;
+        const { data, filter, indexFrom, count, sorter } = selection;
+        const { projection, cascadeSelectionFns } = await this.destructCascadeSelect(entity, data, context, option);
+
+        const rows = await this.selectAbjointRow(entity, {
+            data: projection,
+            filter,
+            indexFrom,
+            count,
+            sorter
+        }, context, option);
+
+
+        if (!option.dontCollect) {
+            this.addToResultSelections(entity, this.supportMultipleCreate() ? this.reduceDescendants(entity, rows) : rows, context);
+        }
+
+        if (cascadeSelectionFns.length > 0) {
+            const ruException: Array<{
+                entity: keyof ED,
+                selection: DeduceSelection<ED[keyof ED]['Schema']>
+            }> = [];
+            await Promise.all(
+                cascadeSelectionFns.map(
+                    async ele => {
+                        try {
+                            await ele(rows);
+                        }
+                        catch (e) {
+                            if (e instanceof OakRowUnexistedException) {
+                                const rows = e.getRows();
+                                ruException.push(...rows);
+                            }
+                            else {
+                                throw e;
+                            }
+                        }
+                    }
+                )
+            );
+
+            if (ruException.length > 0) {
+                throw new OakRowUnexistedException(ruException);
+            }
+        }
+
+        return rows;
+    }
+
+    protected async cascadeSelect2<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(
+        entity: T,
+        selection: S,
+        context: Cxt,
+        option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]> {
+        const { data, filter } = selection;
 
         const projection: ED[T]['Selection']['data'] = {};
         const oneToMany: any = {};
@@ -160,7 +522,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
             data: projection,
         }), context, option);
 
-        if (!option?.dontCollect) {
+        if (!option.dontCollect) {
             this.addToResultSelections(entity, rows, context);
         }
 
@@ -296,9 +658,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
         result: OperationResult<ED>,
         filter?: DeduceFilter<ED[T]['Schema']>
     ) {
-        const modiAttr =  this.getSchema()[entity].toModi;
+        const modiAttr = this.getSchema()[entity].toModi;
         const option2 = Object.assign({}, option);
-        
+
         const opData: Record<string, any> = {};
         if (modiAttr && action !== 'remove') {
             // create/update具有modi对象的对象，对其子对象的update行为全部是create modi对象（缓存动作）
@@ -643,7 +1005,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                             targetEntity: entity as string,
                             action,
                             entity: option.modiParentEntity!,
-                            entityId: option.modiParentId!,                            
+                            entityId: option.modiParentId!,
                             data,
                             iState: 'active',
                         },
@@ -790,7 +1152,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 }
             }
             default: {
-                // 这里要优化一下，显式的对id的update/remove不要去查了，节省数据库层的性能
+                // 这里要优化一下，显式的对id的update/remove不要去查了，节省数据库层的性能（如果这些row是建立在一个create的modi上也查不到）
                 const ids = getRelevantIds(filter);
                 if (ids.length === 0) {
                     const selection: ED[T]['Selection'] = {

@@ -7,6 +7,18 @@ export declare class OakDataException extends Error {
 }
 export declare class OakOperExistedException extends OakDataException {
 }
+export declare class OakRowUnexistedException extends OakDataException {
+    private rows;
+    constructor(rows: Array<{
+        entity: any;
+        selection: any;
+    }>);
+    toString(): string;
+    getRows(): {
+        entity: any;
+        selection: any;
+    }[];
+}
 export declare class OakExternalException extends Error {
 }
 export declare class OakUserException extends OakException {
@@ -61,4 +73,4 @@ export declare function makeException(data: {
     name: string;
     message?: string;
     [A: string]: any;
-}): OakException | OakExternalException | undefined;
+}): OakException | OakRowUnexistedException | OakExternalException | undefined;

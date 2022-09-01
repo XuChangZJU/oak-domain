@@ -30,6 +30,26 @@ export class OakOperExistedException extends OakDataException {
     // 进行操作时发现同样id的Oper对象已经存在
 }
 
+export class OakRowUnexistedException extends OakDataException {
+    private rows: Array<{
+        entity: any;
+        selection: any;
+    }>
+    // 指定主键查询时却发现行不存在，一般发生在缓存中
+    constructor(rows: Array<{entity: any, selection: any}>) {
+        super(`查询${rows.map(ele => ele.entity).join(',')}对象时发现了空指针，请检查数据一致性`);
+        this.rows = rows;
+    }
+
+    toString() {
+        return JSON.stringify({rows: this.rows });
+    }
+
+    getRows() {
+        return this.rows;
+    }
+}
+
 export class OakExternalException extends Error {
     // 表示由oak生态外部造成的异常，比如网络中断
 }
@@ -173,6 +193,9 @@ export function makeException(data: {
         }
         case OakRowLockedException.name: {
             return new OakRowLockedException(data.message);
+        }
+        case OakRowUnexistedException.name: {
+            return new OakRowUnexistedException(data.rows);
         }
         default:
             return;

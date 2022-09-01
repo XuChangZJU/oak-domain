@@ -17,7 +17,10 @@ export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDic
      * @param context
      */
     private addToResultSelections;
+    private reduceDescendants;
+    private destructCascadeSelect;
     protected cascadeSelect<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(entity: T, selection: S, context: Cxt, option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
+    protected cascadeSelect2<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(entity: T, selection: S, context: Cxt, option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
     private destructCascadeUpdate;
     /**
      * 级联更新
