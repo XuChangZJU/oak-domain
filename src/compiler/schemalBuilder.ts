@@ -28,6 +28,7 @@ const Schema: Record<string, {
     locale: ts.ObjectLiteralExpression;
     toModi: boolean;
     actionType: string;
+    static: boolean;
     inModi: boolean;
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
@@ -480,6 +481,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     let hasActionOrStateDef = false;
     let toModi = false;
     let actionType = 'crud';
+    let _static = false;
     const enumStringAttrs: string[] = [];
     const states: string[] = [];
     const localEnumStringTypes: string[] = [];
@@ -1023,13 +1025,25 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
                         localeDef = initializer;
                     }
-                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ActionType') {
-                        assert(!hasActionDef, `${moduleName}中的actionType定义在Action之后`);
-                        assert(ts.isStringLiteral(declaration.initializer!));
-                        actionType = declaration.initializer.text;
+                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'Configuration') {
+                        assert(!hasActionDef, `${moduleName}中的Configuration定义在Action之后`);
+                        assert(ts.isObjectLiteralExpression(declaration.initializer!));
+                        const { properties } = declaration.initializer;
+                        const atProperty = properties.find(
+                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'actionType'
+                        );
+                        const staticProperty = properties.find(
+                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'static'
+                        );
+                        if (atProperty) {
+                            actionType = (<ts.StringLiteral>(<ts.PropertyAssignment>atProperty).initializer).text;
+                        }
+                        if (staticProperty) {
+                            _static = true;     // static如果有值只能为true
+                        }
                     }
                     else {
-                        throw new Error(`不能理解的定义内容${declaration.name.getText()}`);
+                        throw new Error(`${moduleName}：不能理解的定义内容${declaration.name.getText()}`);
                     }
                 }
             );
@@ -1048,6 +1062,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
         sourceFile,
         toModi,
         actionType,
+        static: _static,
     };
     if (hasFulltextIndex) {
         assign(schema, {
@@ -2859,27 +2874,32 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         )
                     ]
                 );
-                switch (Schema[oneEntity].actionType) {
-                    case 'crud':
-                    case 'excludeRemove': {
-                        upsertOneNodes.push(
-                            factory.createUnionTypeNode([cascadeCreateNode, cascadeUpdateNode, noCascadeNode])
-                        );
-                        break;
-                    }
-                    case 'excludeUpdate':
-                    case 'appendOnly': {
-                        upsertOneNodes.push(
-                            factory.createUnionTypeNode([cascadeCreateNode, noCascadeNode])
-                        );
-                        break;
-                    }
-                    case 'readOnly': {
-                        upsertOneNodes.push(noCascadeNode);
-                        break;
-                    }
-                    default: {
-                        assert(false);
+                if (Schema[oneEntity].static) {
+                    upsertOneNodes.push(noCascadeNode);
+                }
+                else {
+                    switch (Schema[oneEntity].actionType) {
+                        case 'crud':
+                        case 'excludeRemove': {
+                            upsertOneNodes.push(
+                                factory.createUnionTypeNode([cascadeCreateNode, cascadeUpdateNode, noCascadeNode])
+                            );
+                            break;
+                        }
+                        case 'excludeUpdate':
+                        case 'appendOnly': {
+                            upsertOneNodes.push(
+                                factory.createUnionTypeNode([cascadeCreateNode, noCascadeNode])
+                            );
+                            break;
+                        }
+                        case 'readOnly': {
+                            upsertOneNodes.push(noCascadeNode);
+                            break;
+                        }
+                        default: {
+                            assert(false);
+                        }
                     }
                 }
             }
@@ -2969,23 +2989,28 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         )
                     ]
                 );
-                switch (Schema[one].actionType) {
-                    case 'crud':
-                    case 'excludeRemove': {
-                        reverseOneNodes.push(cascadeCreateNode, cascadeUpdateNode, noCascadeNode);
-                        break;
-                    }
-                    case 'appendOnly':
-                    case 'excludeUpdate': {
-                        reverseOneNodes.push(cascadeCreateNode, noCascadeNode);
-                        break;
-                    }
-                    case 'readOnly': {
-                        reverseOneNodes.push(noCascadeNode);
-                        break;
-                    }
-                    default: {
-                        assert(false);
+                if (Schema[one].static) {
+                    reverseOneNodes.push(noCascadeNode);
+                }
+                else {
+                    switch (Schema[one].actionType) {
+                        case 'crud':
+                        case 'excludeRemove': {
+                            reverseOneNodes.push(cascadeCreateNode, cascadeUpdateNode, noCascadeNode);
+                            break;
+                        }
+                        case 'appendOnly':
+                        case 'excludeUpdate': {
+                            reverseOneNodes.push(cascadeCreateNode, noCascadeNode);
+                            break;
+                        }
+                        case 'readOnly': {
+                            reverseOneNodes.push(noCascadeNode);
+                            break;
+                        }
+                        default: {
+                            assert(false);
+                        }
                     }
                 }
             }
@@ -3110,51 +3135,53 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         ]
                     );
 
-                    switch (Schema[entityName].actionType) {
-                        case 'crud': {
-                            propertySignatures.push(
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier(identifier),
-                                    factory.createToken(ts.SyntaxKind.QuestionToken),
-                                    factory.createUnionTypeNode([
-                                        otmUpdateOperationNode,
-                                        otmCreateMultipleOperationNode,
-                                        factory.createTypeReferenceNode(
-                                            factory.createIdentifier("Array"),
-                                            [factory.createUnionTypeNode([
-                                                otmCreateSingleOperationNode,
-                                                otmUpdateOperationNode
-                                            ])]
-                                        )
-                                    ])
-                                )
-                            );
-                            break;
-                        }
-                        case 'appendOnly':
-                        case 'excludeUpdate': {
-                            propertySignatures.push(
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier(identifier),
-                                    factory.createToken(ts.SyntaxKind.QuestionToken),
-                                    factory.createUnionTypeNode([
-                                        otmCreateMultipleOperationNode,
-                                        factory.createTypeReferenceNode(
-                                            factory.createIdentifier("Array"),
-                                            [otmCreateSingleOperationNode]
-                                        )
-                                    ])
-                                )
-                            );
-                            break;
-                        }
-                        case 'readOnly': {
-                            break;
-                        }
-                        default: {
-                            assert(false);
+                    if (!Schema[entityName].static) {
+                        switch (Schema[entityName].actionType) {
+                            case 'crud': {
+                                propertySignatures.push(
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(identifier),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createUnionTypeNode([
+                                            otmUpdateOperationNode,
+                                            otmCreateMultipleOperationNode,
+                                            factory.createTypeReferenceNode(
+                                                factory.createIdentifier("Array"),
+                                                [factory.createUnionTypeNode([
+                                                    otmCreateSingleOperationNode,
+                                                    otmUpdateOperationNode
+                                                ])]
+                                            )
+                                        ])
+                                    )
+                                );
+                                break;
+                            }
+                            case 'appendOnly':
+                            case 'excludeUpdate': {
+                                propertySignatures.push(
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(identifier),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createUnionTypeNode([
+                                            otmCreateMultipleOperationNode,
+                                            factory.createTypeReferenceNode(
+                                                factory.createIdentifier("Array"),
+                                                [otmCreateSingleOperationNode]
+                                            )
+                                        ])
+                                    )
+                                );
+                                break;
+                            }
+                            case 'readOnly': {
+                                break;
+                            }
+                            default: {
+                                assert(false);
+                            }
                         }
                     }
                 }
@@ -3351,39 +3378,46 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         ),
                     ]
                 );
-                switch (Schema[one[0]].actionType) {
-                    case 'crud': {
-                        upsertOneNodes.push(
-                            factory.createUnionTypeNode([cascadeCreateNode, cascadeUpdateNode, cascadeRemoveNode, noCascadeNode])
-                        );
-                        break;
-                    }
-                    case 'excludeUpdate': {
-                        upsertOneNodes.push(
-                            factory.createUnionTypeNode([cascadeCreateNode, cascadeRemoveNode, noCascadeNode])
-                        );
-                        break;
-                    }
-                    case 'appendOnly': {
-                        upsertOneNodes.push(
-                            factory.createUnionTypeNode([cascadeCreateNode, noCascadeNode])
-                        );
-                        break;
-                    }
-                    case 'readOnly': {
-                        upsertOneNodes.push(
-                            noCascadeNode
-                        );
-                        break;
-                    }
-                    case 'excludeRemove': {
-                        upsertOneNodes.push(
-                            factory.createUnionTypeNode([cascadeCreateNode, cascadeUpdateNode, noCascadeNode])
-                        );
-                        break;
-                    }
-                    default: {
-                        assert(false);
+                if (Schema[one[0]].static) {
+                    upsertOneNodes.push(
+                        noCascadeNode
+                    );
+                }
+                else {
+                    switch (Schema[one[0]].actionType) {
+                        case 'crud': {
+                            upsertOneNodes.push(
+                                factory.createUnionTypeNode([cascadeCreateNode, cascadeUpdateNode, cascadeRemoveNode, noCascadeNode])
+                            );
+                            break;
+                        }
+                        case 'excludeUpdate': {
+                            upsertOneNodes.push(
+                                factory.createUnionTypeNode([cascadeCreateNode, cascadeRemoveNode, noCascadeNode])
+                            );
+                            break;
+                        }
+                        case 'appendOnly': {
+                            upsertOneNodes.push(
+                                factory.createUnionTypeNode([cascadeCreateNode, noCascadeNode])
+                            );
+                            break;
+                        }
+                        case 'readOnly': {
+                            upsertOneNodes.push(
+                                noCascadeNode
+                            );
+                            break;
+                        }
+                        case 'excludeRemove': {
+                            upsertOneNodes.push(
+                                factory.createUnionTypeNode([cascadeCreateNode, cascadeUpdateNode, noCascadeNode])
+                            );
+                            break;
+                        }
+                        default: {
+                            assert(false);
+                        }
                     }
                 }
             }
@@ -3402,56 +3436,58 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             for (const one of ReversePointerRelations[entity]) {
                 refEntityLitrals.push(factory.createLiteralTypeNode(factory.createStringLiteral(`${firstLetterLowerCase(one)}`)));
                 const actionNodes: ts.TypeNode[] = [];
-                switch (Schema[one].actionType) {
-                    case 'crud': {
-                        actionNodes.push(
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, one, 'CreateSingleOperation')
-                            ),
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, one, 'UpdateOperation')
-                            ),
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, one, 'RemoveOperation')
-                            )
-                        );
-                        break;
-                    }
-                    case 'excludeUpdate': {
-                        actionNodes.push(
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, one, 'CreateSingleOperation')
-                            ),
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, one, 'RemoveOperation')
-                            )
-                        );
-                        break;
-                    }
-                    case 'excludeRemove': {
-                        actionNodes.push(
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, one, 'CreateSingleOperation')
-                            ),
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, one, 'UpdateOperation')
-                            )
-                        );
-                        break;
-                    }
-                    case 'appendOnly': {
-                        actionNodes.push(
-                            factory.createTypeReferenceNode(
-                                createForeignRef(entity, one, 'CreateSingleOperation')
-                            )
-                        );
-                        break;
-                    }
-                    case 'readOnly': {
-                        break;
-                    }
-                    default: {
-                        assert(false);
+                if (!Schema[one].static) {
+                    switch (Schema[one].actionType) {
+                        case 'crud': {
+                            actionNodes.push(
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'CreateSingleOperation')
+                                ),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'UpdateOperation')
+                                ),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'RemoveOperation')
+                                )
+                            );
+                            break;
+                        }
+                        case 'excludeUpdate': {
+                            actionNodes.push(
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'CreateSingleOperation')
+                                ),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'RemoveOperation')
+                                )
+                            );
+                            break;
+                        }
+                        case 'excludeRemove': {
+                            actionNodes.push(
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'CreateSingleOperation')
+                                ),
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'UpdateOperation')
+                                )
+                            );
+                            break;
+                        }
+                        case 'appendOnly': {
+                            actionNodes.push(
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, one, 'CreateSingleOperation')
+                                )
+                            );
+                            break;
+                        }
+                        case 'readOnly': {
+                            break;
+                        }
+                        default: {
+                            assert(false);
+                        }
                     }
                 }
                 if (actionNodes.length > 0) {
@@ -3597,99 +3633,100 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         createForeignRef(entity, entityName, 'RemoveOperation'),
                         undefined
                     );
-                    switch (Schema[entityName].actionType) {
-                        case 'crud': {
-                            propertySignatures2.push(
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier(identifier),
-                                    factory.createToken(ts.SyntaxKind.QuestionToken),
-                                    factory.createUnionTypeNode([
-                                        otmUpdateOperationNode,
-                                        otmRemoveOperationNode,
-                                        otmCreateMultipleOperationNode,
-                                        factory.createTypeReferenceNode(
-                                            factory.createIdentifier("Array"),
-                                            [factory.createUnionTypeNode([
-                                                otmCreateSingleOperationNode,
-                                                otmUpdateOperationNode,
-                                                otmRemoveOperationNode
-                                            ])]
-                                        )
-                                    ])
-                                )
-                            );
-                            break;
-                        }
-                        case 'excludeUpdate': {
-                            propertySignatures2.push(
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier(identifier),
-                                    factory.createToken(ts.SyntaxKind.QuestionToken),
-                                    factory.createUnionTypeNode([
-                                        otmRemoveOperationNode,
-                                        otmCreateMultipleOperationNode,
-                                        factory.createTypeReferenceNode(
-                                            factory.createIdentifier("Array"),
-                                            [factory.createUnionTypeNode([
-                                                otmCreateSingleOperationNode,
-                                                otmRemoveOperationNode
-                                            ])]
-                                        )
-                                    ])
-                                )
-                            );
-                            break;
-                        }
-                        case 'excludeRemove': {
-                            propertySignatures2.push(
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier(identifier),
-                                    factory.createToken(ts.SyntaxKind.QuestionToken),
-                                    factory.createUnionTypeNode([
-                                        otmUpdateOperationNode,
-                                        otmCreateMultipleOperationNode,
-                                        factory.createTypeReferenceNode(
-                                            factory.createIdentifier("Array"),
-                                            [factory.createUnionTypeNode([
-                                                otmCreateSingleOperationNode,
-                                                otmUpdateOperationNode
-                                            ])]
-                                        )
-                                    ])
-                                )
-                            );
-                            break;
-                        }
-                        case 'appendOnly': {
-                            propertySignatures2.push(
-                                factory.createPropertySignature(
-                                    undefined,
-                                    factory.createIdentifier(identifier),
-                                    factory.createToken(ts.SyntaxKind.QuestionToken),
-                                    factory.createUnionTypeNode([
-                                        otmCreateMultipleOperationNode,
-                                        factory.createTypeReferenceNode(
-                                            factory.createIdentifier("Array"),
-                                            [factory.createUnionTypeNode([
-                                                otmCreateSingleOperationNode
-                                            ])]
-                                        )
-                                    ])
-                                )
-                            );
-                            break;
-                        }
-                        case 'readOnly': {
-                            break;
-                        }
-                        default: {
-                            assert(false);
+                    if (!Schema[entityName].static) {
+                        switch (Schema[entityName].actionType) {
+                            case 'crud': {
+                                propertySignatures2.push(
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(identifier),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createUnionTypeNode([
+                                            otmUpdateOperationNode,
+                                            otmRemoveOperationNode,
+                                            otmCreateMultipleOperationNode,
+                                            factory.createTypeReferenceNode(
+                                                factory.createIdentifier("Array"),
+                                                [factory.createUnionTypeNode([
+                                                    otmCreateSingleOperationNode,
+                                                    otmUpdateOperationNode,
+                                                    otmRemoveOperationNode
+                                                ])]
+                                            )
+                                        ])
+                                    )
+                                );
+                                break;
+                            }
+                            case 'excludeUpdate': {
+                                propertySignatures2.push(
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(identifier),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createUnionTypeNode([
+                                            otmRemoveOperationNode,
+                                            otmCreateMultipleOperationNode,
+                                            factory.createTypeReferenceNode(
+                                                factory.createIdentifier("Array"),
+                                                [factory.createUnionTypeNode([
+                                                    otmCreateSingleOperationNode,
+                                                    otmRemoveOperationNode
+                                                ])]
+                                            )
+                                        ])
+                                    )
+                                );
+                                break;
+                            }
+                            case 'excludeRemove': {
+                                propertySignatures2.push(
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(identifier),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createUnionTypeNode([
+                                            otmUpdateOperationNode,
+                                            otmCreateMultipleOperationNode,
+                                            factory.createTypeReferenceNode(
+                                                factory.createIdentifier("Array"),
+                                                [factory.createUnionTypeNode([
+                                                    otmCreateSingleOperationNode,
+                                                    otmUpdateOperationNode
+                                                ])]
+                                            )
+                                        ])
+                                    )
+                                );
+                                break;
+                            }
+                            case 'appendOnly': {
+                                propertySignatures2.push(
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier(identifier),
+                                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                                        factory.createUnionTypeNode([
+                                            otmCreateMultipleOperationNode,
+                                            factory.createTypeReferenceNode(
+                                                factory.createIdentifier("Array"),
+                                                [factory.createUnionTypeNode([
+                                                    otmCreateSingleOperationNode
+                                                ])]
+                                            )
+                                        ])
+                                    )
+                                );
+                                break;
+                            }
+                            case 'readOnly': {
+                                break;
+                            }
+                            default: {
+                                assert(false);
+                            }
                         }
                     }
-
                 }
             );
         }
@@ -3762,81 +3799,83 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
         const upsertOneNodes: ts.TypeNode[] = [];
         for (const one of manyToOneSet) {
             if (!ReversePointerRelations[entity] || !ReversePointerRelations[entity].includes(one[0])) {
-                switch (Schema[one[0]].actionType) {
-                    case 'crud': {
-                        upsertOneNodes.push(
-                            factory.createUnionTypeNode(
-                                [
-                                    factory.createTypeLiteralNode(
-                                        [
-                                            factory.createPropertySignature(
-                                                undefined,
-                                                factory.createIdentifier(one[1]),
-                                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                                factory.createUnionTypeNode([
-                                                    factory.createTypeReferenceNode(
-                                                        createForeignRef(entity, one[0], 'UpdateOperation')
-                                                    ),
+                if (!Schema[one[0]].static) {
+                    switch (Schema[one[0]].actionType) {
+                        case 'crud': {
+                            upsertOneNodes.push(
+                                factory.createUnionTypeNode(
+                                    [
+                                        factory.createTypeLiteralNode(
+                                            [
+                                                factory.createPropertySignature(
+                                                    undefined,
+                                                    factory.createIdentifier(one[1]),
+                                                    factory.createToken(ts.SyntaxKind.QuestionToken),
+                                                    factory.createUnionTypeNode([
+                                                        factory.createTypeReferenceNode(
+                                                            createForeignRef(entity, one[0], 'UpdateOperation')
+                                                        ),
+                                                        factory.createTypeReferenceNode(
+                                                            createForeignRef(entity, one[0], 'RemoveOperation')
+                                                        )
+                                                    ])
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                            );
+                            break;
+                        }
+                        case 'excludeUpdate': {
+                            upsertOneNodes.push(
+                                factory.createUnionTypeNode(
+                                    [
+                                        factory.createTypeLiteralNode(
+                                            [
+                                                factory.createPropertySignature(
+                                                    undefined,
+                                                    factory.createIdentifier(one[1]),
+                                                    factory.createToken(ts.SyntaxKind.QuestionToken),
                                                     factory.createTypeReferenceNode(
                                                         createForeignRef(entity, one[0], 'RemoveOperation')
                                                     )
-                                                ])
-                                            )
-                                        ]
-                                    )
-                                ]
-                            )
-                        );
-                        break;
-                    }
-                    case 'excludeUpdate': {
-                        upsertOneNodes.push(
-                            factory.createUnionTypeNode(
-                                [
-                                    factory.createTypeLiteralNode(
-                                        [
-                                            factory.createPropertySignature(
-                                                undefined,
-                                                factory.createIdentifier(one[1]),
-                                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                                factory.createTypeReferenceNode(
-                                                    createForeignRef(entity, one[0], 'RemoveOperation')
                                                 )
-                                            )
-                                        ]
-                                    )
-                                ]
-                            )
-                        );
-                        break;
-                    }
-                    case 'excludeRemove': {
-                        upsertOneNodes.push(
-                            factory.createUnionTypeNode(
-                                [
-                                    factory.createTypeLiteralNode(
-                                        [
-                                            factory.createPropertySignature(
-                                                undefined,
-                                                factory.createIdentifier(one[1]),
-                                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                                factory.createTypeReferenceNode(
-                                                    createForeignRef(entity, one[0], 'UpdateOperation')
+                                            ]
+                                        )
+                                    ]
+                                )
+                            );
+                            break;
+                        }
+                        case 'excludeRemove': {
+                            upsertOneNodes.push(
+                                factory.createUnionTypeNode(
+                                    [
+                                        factory.createTypeLiteralNode(
+                                            [
+                                                factory.createPropertySignature(
+                                                    undefined,
+                                                    factory.createIdentifier(one[1]),
+                                                    factory.createToken(ts.SyntaxKind.QuestionToken),
+                                                    factory.createTypeReferenceNode(
+                                                        createForeignRef(entity, one[0], 'UpdateOperation')
+                                                    )
                                                 )
-                                            )
-                                        ]
-                                    )
-                                ]
-                            )
-                        );
-                        break;
-                    }
-                    case 'appendOnly':
-                    case 'readOnly': {
-                        break;
-                    }
-                    default: {
-                        assert(false);
+                                            ]
+                                        )
+                                    ]
+                                )
+                            );
+                            break;
+                        }
+                        case 'appendOnly':
+                        case 'readOnly': {
+                            break;
+                        }
+                        default: {
+                            assert(false);
+                        }
                     }
                 }
             }
@@ -3847,69 +3886,71 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             const refEntityLitrals: (ts.TypeNode)[] = [];
             for (const one of ReversePointerRelations[entity]) {
                 refEntityLitrals.push(factory.createLiteralTypeNode(factory.createStringLiteral(`${firstLetterLowerCase(one)}`)));
-                switch (Schema[one].actionType) {
-                    case 'crud': {
-                        reverseOneNodes.push(
-                            factory.createTypeLiteralNode(
-                                [
-                                    factory.createPropertySignature(
-                                        undefined,
-                                        factory.createIdentifier(firstLetterLowerCase(one)),
-                                        factory.createToken(ts.SyntaxKind.QuestionToken),
-                                        factory.createUnionTypeNode([
-                                            factory.createTypeReferenceNode(
-                                                createForeignRef(entity, one, 'UpdateOperation')
-                                            ),
+                if (!Schema[one].static) {
+                    switch (Schema[one].actionType) {
+                        case 'crud': {
+                            reverseOneNodes.push(
+                                factory.createTypeLiteralNode(
+                                    [
+                                        factory.createPropertySignature(
+                                            undefined,
+                                            factory.createIdentifier(firstLetterLowerCase(one)),
+                                            factory.createToken(ts.SyntaxKind.QuestionToken),
+                                            factory.createUnionTypeNode([
+                                                factory.createTypeReferenceNode(
+                                                    createForeignRef(entity, one, 'UpdateOperation')
+                                                ),
+                                                factory.createTypeReferenceNode(
+                                                    createForeignRef(entity, one, 'RemoveOperation')
+                                                )
+                                            ])
+                                        )
+                                    ]
+                                ),
+                            );
+                            break;
+                        }
+                        case 'excludeUpdate': {
+                            reverseOneNodes.push(
+                                factory.createTypeLiteralNode(
+                                    [
+                                        factory.createPropertySignature(
+                                            undefined,
+                                            factory.createIdentifier(firstLetterLowerCase(one)),
+                                            factory.createToken(ts.SyntaxKind.QuestionToken),
                                             factory.createTypeReferenceNode(
                                                 createForeignRef(entity, one, 'RemoveOperation')
                                             )
-                                        ])
-                                    )
-                                ]
-                            ),
-                        );
-                        break;
-                    }
-                    case 'excludeUpdate': {
-                        reverseOneNodes.push(
-                            factory.createTypeLiteralNode(
-                                [
-                                    factory.createPropertySignature(
-                                        undefined,
-                                        factory.createIdentifier(firstLetterLowerCase(one)),
-                                        factory.createToken(ts.SyntaxKind.QuestionToken),
-                                        factory.createTypeReferenceNode(
-                                            createForeignRef(entity, one, 'RemoveOperation')
                                         )
-                                    )
-                                ]
-                            ),
-                        );
-                        break;
-                    }
-                    case 'excludeRemove': {
-                        reverseOneNodes.push(
-                            factory.createTypeLiteralNode(
-                                [
-                                    factory.createPropertySignature(
-                                        undefined,
-                                        factory.createIdentifier(firstLetterLowerCase(one)),
-                                        factory.createToken(ts.SyntaxKind.QuestionToken),
-                                        factory.createTypeReferenceNode(
-                                            createForeignRef(entity, one, 'UpdateOperation')
+                                    ]
+                                ),
+                            );
+                            break;
+                        }
+                        case 'excludeRemove': {
+                            reverseOneNodes.push(
+                                factory.createTypeLiteralNode(
+                                    [
+                                        factory.createPropertySignature(
+                                            undefined,
+                                            factory.createIdentifier(firstLetterLowerCase(one)),
+                                            factory.createToken(ts.SyntaxKind.QuestionToken),
+                                            factory.createTypeReferenceNode(
+                                                createForeignRef(entity, one, 'UpdateOperation')
+                                            )
                                         )
-                                    )
-                                ]
-                            ),
-                        );
-                        break;
-                    }
-                    case 'appendOnly':
-                    case 'readOnly': {
-                        break;
-                    }
-                    default: {
-                        assert(false);
+                                    ]
+                                ),
+                            );
+                            break;
+                        }
+                        case 'appendOnly':
+                        case 'readOnly': {
+                            break;
+                        }
+                        default: {
+                            assert(false);
+                        }
                     }
                 }
 
@@ -5351,7 +5392,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
 
     for (const entity in Schema) {
         const indexExpressions: ts.Expression[] = [];
-        const { sourceFile, inModi, indexes, toModi, actionType } = Schema[entity];
+        const { sourceFile, inModi, indexes, toModi, actionType, static: _static } = Schema[entity];
         const statements: ts.Statement[] = [
             factory.createImportDeclaration(
                 undefined,
@@ -5517,6 +5558,15 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
             propertyAssignments.push(
                 factory.createPropertyAssignment(
                     factory.createIdentifier("inModi"),
+                    factory.createTrue()
+                )
+            );
+        }
+
+        if (_static || actionType === 'readOnly') {
+            propertyAssignments.push(
+                factory.createPropertyAssignment(
+                    factory.createIdentifier("static"),
                     factory.createTrue()
                 )
             );
@@ -5701,9 +5751,10 @@ function analyzeInModi() {
             return;
         }
         const schema = Schema[entity];
-        if (schema.toModi || schema.inModi || schema.actionType === 'readOnly') {
+        if (schema.toModi || schema.inModi || schema.actionType === 'readOnly' || schema.static) {
             return;
         }
+        console.log('setInModi', entity);
         schema.inModi = true;
         const related = getRelateEntities(entity);
         related.forEach(

@@ -1,5 +1,5 @@
 import { String, Int, Datetime, Image, Boolean, Text } from '../types/DataType';
-import { EntityShape, ActionType } from '../types/Entity';
+import { EntityShape, Configuration } from '../types/Entity';
 import { LocaleDef } from '../types/Locale';
 import { Schema as User } from './User';
 
@@ -11,7 +11,9 @@ export interface Schema extends EntityShape {
     operator?: User;
 };
 
-const actionType: ActionType = 'appendOnly';
+const configuration: Configuration = {
+    actionType: 'appendOnly',
+}
 
 const locale: LocaleDef<Schema, '', '', {}> = {
     zh_CN: {

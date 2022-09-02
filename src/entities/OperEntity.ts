@@ -1,5 +1,5 @@
 import { String } from '../types/DataType';
-import { EntityShape, ActionType } from '../types/Entity';
+import { EntityShape, Configuration } from '../types/Entity';
 import { LocaleDef } from '../types/Locale';
 import { Schema as Oper } from './Oper';
 
@@ -9,7 +9,9 @@ export interface Schema extends EntityShape {
     entityId: String<64>;
 };
 
-const actionType: ActionType = 'appendOnly';
+const config: Configuration = {
+    actionType: 'appendOnly',
+};
 
 const locale: LocaleDef<Schema, '', '', {}> = {
     zh_CN: {

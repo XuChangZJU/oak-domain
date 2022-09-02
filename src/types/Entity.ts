@@ -206,3 +206,8 @@ export type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjec
 }
 
 export type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'excludeRemove' | 'crud';       // 只读型、只插入型、没有更新型、没有删除型、所有型
+
+export type Configuration = {
+    actionType?: ActionType;
+    static?: boolean;    // 标识是维表（变动较小，相对独立）
+};

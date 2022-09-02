@@ -144,4 +144,8 @@ export declare type SelectionResult<E extends GeneralEntityShape, P extends Dedu
     result: Array<SelectRowShape<E, P>>;
 };
 export declare type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'excludeRemove' | 'crud';
+export declare type Configuration = {
+    actionType?: ActionType;
+    static?: boolean;
+};
 export {};
