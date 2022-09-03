@@ -1,7 +1,7 @@
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { UniversalContext } from '../store/UniversalContext';
 import { OpSchema as Modi, Filter } from '../base-app-domain/Modi/Schema';
-import { Checker, Operation, StorageSchema, UpdateChecker, EntityDict, OakRowLockedException, Context } from '../types';
+import { Checker, Operation, StorageSchema, UpdateChecker, EntityDict, OakRowLockedException, Context, OperateOption } from '../types';
 import { appendOnlyActions } from '../actions/action';
 import { difference } from '../utils/lodash';
 
@@ -24,7 +24,7 @@ export function createOperationsFromModies(modies: Modi[]): Array<{
     );
 }
 
-export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>>(filter: ED['modi']['Selection']['filter'], context: Cxt) {
+export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
     return context.rowStore.operate('modi', {
         id: await generateNewId(),
         action: 'apply',
@@ -38,13 +38,12 @@ export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt ext
                 $direction: 'asc',
             }
         ]
-    }, context, {
-        dontCollect: true,
-        blockTrigger: true,
-    });
+    }, context, Object.assign({}, option, {
+        blockTrigger: false,
+    }));
 }
 
-export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>>(filter: ED['modi']['Selection']['filter'], context: Cxt) {
+export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
     return context.rowStore.operate('modi', {
         id: await generateNewId(),
         action: 'abadon',
@@ -58,10 +57,9 @@ export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt e
                 $direction: 'asc',
             }
         ]
-    }, context, {
-        dontCollect: true,
-        blockTrigger: true,
-    });
+    }, context,  Object.assign({}, option, {
+        blockTrigger: false,
+    }));
 }
 
 export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>) {

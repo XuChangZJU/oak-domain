@@ -144,10 +144,26 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends Context<
                     when: 'before',
                     fn: async ({ operation }) => {
                         const { data } = operation;
-                        Object.assign(data, {
-                            [attr]: is,
-                        });
-                        return 1;
+                        if (data instanceof Array) {
+                            data.forEach(
+                                ele => {
+                                    if (!ele[attr]) {
+                                        Object.assign(ele, {
+                                            [attr]: is,
+                                        });
+                                    }
+                                }
+                            );
+                            return data.length;
+                        }
+                        else {
+                            if (!data[attr]) {
+                                Object.assign(data, {
+                                    [attr]: is,
+                                });
+                            }
+                            return 1;
+                        }
                     }
                 } as CreateTriggerInTxn<ED, any, Cxt>);
             }
