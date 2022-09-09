@@ -10,7 +10,7 @@ import { StorageSchema } from '../types/Storage';
 import { addFilterSegment, combineFilters, getRelevantIds } from "./filter";
 import { judgeRelation } from "./relation";
 import { CreateOperation as CreateOperOperation } from '../base-app-domain/Oper/Schema';
-import { CreateOperation as CreateModiOperation } from '../base-app-domain/Modi/Schema';
+import { CreateOperation as CreateModiOperation, UpdateOperation as UpdateModiOperation } from '../base-app-domain/Modi/Schema';
 import { OakCongruentRowExists, OakRowUnexistedException } from "../types";
 import { omit, cloneDeep, uniq } from '../utils/lodash';
 import { result } from "lodash";
@@ -664,9 +664,15 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
         const opData: Record<string, any> = {};
         if (modiAttr && action !== 'remove') {
             // create/update具有modi对象的对象，对其子对象的update行为全部是create modi对象（缓存动作）
-            // delete是什么情况？似乎应该先把所有的modi给abandon掉      by Xc
+            // delete此对象，所有的modi子对象应该通过触发器作废，这个通过系统的trigger来搞
             assert(!option2.modiParentId && !option2.modiParentEntity);
-            option2.modiParentId = data.id;
+            if (action === 'create') {
+                option2.modiParentId = data.id;
+            }
+            else {
+                assert(filter?.id && typeof filter.id === 'string');
+                option2.modiParentId = filter.id;
+            }
             option2.modiParentEntity = entity as string;
         }
         for (const attr in data) {
@@ -690,16 +696,18 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 else if (action === 'create') {
                     const { entityId: fkId, entity } = data;
                     assert(typeof fkId === 'string' || entity === attr);        // A中data的entityId作为B中filter的主键
-                    Object.assign(operationMto, {
+                    assert(filterMto.id && filterMto.id === fkId);
+                    /* Object.assign(operationMto, {
                         filter: addFilterSegment({
                             id: fkId,
                         }), filterMto,
-                    });
+                    }); */
                 }
                 else {
                     // 剩下三种情况都是B中的filter的id来自A中row的entityId
-                    assert(!data.hasOwnProperty('entityId') && !data.hasOwnProperty('entity'));
-                    Object.assign(operationMto, {
+                    assert(!data.hasOwnProperty('entityId') && !data.hasOwnProperty('entity'));      // 这里不能再addFilterSegment，否则会造成后面判断不出来对应的id是多少。在实际情况中跑到这里应该不可能没有id
+                    assert(filterMto.id && typeof filterMto.id === 'string');
+                    /* Object.assign(operationMto, {
                         filter: addFilterSegment({
                             id: {
                                 $in: {
@@ -713,7 +721,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                 }
                             },
                         }, filterMto),
-                    });
+                    }); */
                 }
 
                 const result2 = await this.cascadeUpdate(attr, operationMto, context, option2);
@@ -732,15 +740,17 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 else if (action === 'create') {
                     const { [`${attr}Id`]: fkId } = data;
                     assert(typeof fkId === 'string');
-                    Object.assign(operationMto, {
+                    assert(filterMto?.id && filterMto.id === fkId);       // 这里不能再addFilterSegment，否则会造成后面判断不出来对应的id是多少。在实际情况中跑到这里应该不可能没有id
+                    /* Object.assign(operationMto, {
                         filter: addFilterSegment(filterMto || {}, {
                             id: fkId,
                         }),
-                    });
+                    }); */
                 }
                 else {
                     assert(!data.hasOwnProperty(`${attr}Id`));
-                    Object.assign(operationMto, {
+                    assert(filterMto?.id && typeof filterMto.id === 'string');       // 这里不能再addFilterSegment，否则会造成后面判断不出来对应的id是多少。在实际情况中跑到这里应该不可能没有id
+                    /* Object.assign(operationMto, {
                         filter: addFilterSegment(filterMto || {}, {
                             id: {
                                 $in: {
@@ -752,7 +762,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                 }
                             },
                         }),
-                    });
+                    }); */
                 }
 
                 const result2 = await this.cascadeUpdate(relation, operationMto, context, option2);
@@ -1006,6 +1016,11 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                             action,
                             entity: option.modiParentEntity!,
                             entityId: option.modiParentId!,
+                            filter: {
+                                id: {
+                                    $in: [(data as any).id as string],      //这里记录这个filter是为了后面update的时候直接在其上面update，参见本函数后半段关于modiUpsert相关的优化
+                                },
+                            },
                             data,
                             iState: 'active',
                         },
@@ -1172,38 +1187,85 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 if (option.modiParentEntity && !['modi', 'modiEntity'].includes(entity as string)) {
                     // 延时更新，变成对modi的插入
                     // 变成对modi的插入
-                    const modiCreate: CreateModiOperation = {
-                        id: 'dummy',
-                        action: 'create',
-                        data: {
-                            id: operId,
-                            targetEntity: entity as string,
-                            entity: option.modiParentEntity!,
-                            entityId: option.modiParentId!,
-                            action,
-                            data,
-                            iState: 'active',
+                    // 优化，这里如果是对同一个targetEntity反复update，则变成对最后一条create/update的modi进行update，以避免发布文章这样的需求时产生过多的modi
+                    let modiUpsert: CreateModiOperation | UpdateModiOperation | undefined;
+                    if (action !== 'remove') {
+                        const upsertModis = await this.selectAbjointRow('modi', {
+                            data: {
+                                id: 1,
+                                data: 1,
+                            },
                             filter: {
-                                id: {
-                                    $in: ids,
+                                targetEntity: entity as string,
+                                action: {
+                                    $in: ['create', 'update'],
+                                },
+                                iState: 'active',
+                                filter: {
+                                    id: {
+                                        $in: ids,
+                                    },
+                                }
+                            },
+                            sorter: [
+                                {
+                                    $attr: {
+                                        $$createAt$$: 1,
+                                    },
+                                    $direction: 'desc',
+                                }
+                            ],
+                            indexFrom: 0,
+                            count: 1,
+                        }, context, option);
+                        if (upsertModis.length > 0) {
+                            const { data: originData, id: originId } = upsertModis[0];
+                            modiUpsert = {
+                                id: 'dummy',
+                                action: 'update',
+                                data: {
+                                    data: Object.assign({}, originData, data),
+                                },
+                                filter: {
+                                    id: originId as string,
+                                }
+                            };
+                        }
+                    }
+                    if (!modiUpsert) {
+                        modiUpsert = {
+                            id: 'dummy',
+                            action: 'create',
+                            data: {
+                                id: operId,
+                                targetEntity: entity as string,
+                                entity: option.modiParentEntity!,
+                                entityId: option.modiParentId!,
+                                action,
+                                data,
+                                iState: 'active',
+                                filter: {
+                                    id: {
+                                        $in: ids,
+                                    },
+                                },
+                                modiEntity$modi: {
+                                    id: 'dummy',
+                                    action: 'create',
+                                    data: await Promise.all(
+                                        ids.map(
+                                            async (id) => ({
+                                                id: await generateNewId(),
+                                                entity: entity as string,
+                                                entityId: id,
+                                            })
+                                        )
+                                    ),
                                 },
                             },
-                            modiEntity$modi: {
-                                id: 'dummy',
-                                action: 'create',
-                                data: await Promise.all(
-                                    ids.map(
-                                        async (id) => ({
-                                            id: await generateNewId(),
-                                            entity: entity as string,
-                                            entityId: id,
-                                        })
-                                    )
-                                ),
-                            },
-                        },
-                    };
-                    await this.cascadeUpdate('modi', modiCreate, context, option);
+                        };
+                    }
+                    await this.cascadeUpdate('modi', modiUpsert!, context, option);
                     return 1;
                 }
                 else {

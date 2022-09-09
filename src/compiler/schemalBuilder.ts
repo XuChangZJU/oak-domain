@@ -1499,9 +1499,14 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                         break;
                     }
                     case 'SingleGeo':
-                    case 'Geo':
+                    case 'Geo': {
+                        // geo类型暂时只支持通过expr查询
+                        break;
+                    }
                     case 'Object': {
-                        // object类型暂不支持查询
+                        type2 = factory.createTypeReferenceNode(
+                            factory.createIdentifier('Object'),
+                        );
                         break;
                     }
                     default: {

@@ -38,6 +38,9 @@ declare type AttrFilter = {
     $$createAt$$: Q_DateValue;
     $$updateAt$$: Q_DateValue;
     action: Q_StringValue;
+    data: Object;
+    filter: Object;
+    extra: Object;
     operatorId: Q_StringValue | SubQuery.UserIdSubQuery;
     operator: User.Filter;
 };

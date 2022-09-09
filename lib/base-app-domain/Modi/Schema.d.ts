@@ -47,6 +47,9 @@ declare type AttrFilter = {
     entity: Q_StringValue;
     entityId: Q_StringValue;
     action: Q_StringValue;
+    data: Object;
+    filter: Object;
+    extra: Object;
     iState: Q_EnumValue<IState>;
 };
 export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
