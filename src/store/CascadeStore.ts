@@ -1269,6 +1269,38 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     return 1;
                 }
                 else {
+                    const createOper = async () => {
+                        if (!option?.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
+                            // 按照框架要求生成Oper和OperEntity这两个内置的对象
+                            assert(operId);
+                            const createOper: CreateOperOperation = {
+                                id: 'dummy',
+                                action: 'create',
+                                data: {
+                                    id: operId,
+                                    action,
+                                    data,
+                                    operEntity$oper: {
+                                        id: 'dummy',
+                                        action: 'create',
+                                        data: await Promise.all(
+                                            ids.map(
+                                                async (ele) => ({
+                                                    id: await generateNewId(),
+                                                    entity: entity as string,
+                                                    entityId: ele,
+                                                })
+                                            )
+                                        )
+                                    },
+                                },
+                            }
+                            await this.cascadeUpdate('oper', createOper, context, {
+                                dontCollect: true,
+                                dontCreateOper: true,
+                            });
+                        }
+                    };
                     if (action === 'remove') {
                         if (!option.dontCollect) {
                             context.opRecords.push({
@@ -1283,58 +1315,37 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         }
                     }
                     else {
-                        if (Object.keys(data).length === 0) {
+                        const updateAttrCount = Object.keys(data).length;
+                        if (updateAttrCount > 0) {
                             // 优化一下，如果不更新任何属性，则不实际执行
+                            Object.assign(data, {
+                                $$updateAt$$: now,
+                            });
+                            if (!option.dontCollect) {
+                                context.opRecords.push({
+                                    a: 'u',
+                                    e: entity,
+                                    d: data as ED[T]['Update']['data'],
+                                    f: {
+                                        id: {
+                                            $in: ids,
+                                        }
+                                    } as DeduceFilter<ED[T]['Schema']>,
+                                });
+                            }
+                        }
+                        else if (action !== 'update') {
+                            // 如果不是update动作而是用户自定义的动作，这里还是要记录oper
+                            await createOper();
                             return 0;
                         }
-                        Object.assign(data, {
-                            $$updateAt$$: now,
-                        });
-                        if (!option.dontCollect) {
-                            context.opRecords.push({
-                                a: 'u',
-                                e: entity,
-                                d: data as ED[T]['Update']['data'],
-                                f: {
-                                    id: {
-                                        $in: ids,
-                                    }
-                                } as DeduceFilter<ED[T]['Schema']>,
-                            });
+                        else {
+                            return 0;
                         }
                     }
 
                     const result = await this.updateAbjointRow(entity, operation, context, option);
-                    if (!option?.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
-                        // 按照框架要求生成Oper和OperEntity这两个内置的对象
-                        assert(operId);
-                        const createOper: CreateOperOperation = {
-                            id: 'dummy',
-                            action: 'create',
-                            data: {
-                                id: operId,
-                                action,
-                                data,
-                                operEntity$oper: {
-                                    id: 'dummy',
-                                    action: 'create',
-                                    data: await Promise.all(
-                                        ids.map(
-                                            async (ele) => ({
-                                                id: await generateNewId(),
-                                                entity: entity as string,
-                                                entityId: ele,
-                                            })
-                                        )
-                                    )
-                                },
-                            },
-                        }
-                        await this.cascadeUpdate('oper', createOper, context, {
-                            dontCollect: true,
-                            dontCreateOper: true,
-                        });
-                    }
+                    await createOper();
 
                     return result;
                 }
