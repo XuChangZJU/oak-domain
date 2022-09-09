@@ -2667,7 +2667,10 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 factory.createTypeParameterDeclaration(
                     undefined,
                     factory.createIdentifier("P"),
-                    undefined,
+                    factory.createTypeReferenceNode(
+                      factory.createIdentifier("Object"),
+                      undefined
+                    ),
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("Projection"),
                         undefined
@@ -2707,7 +2710,10 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 factory.createTypeParameterDeclaration(
                     undefined,
                     factory.createIdentifier("P"),
-                    undefined,
+                    factory.createTypeReferenceNode(
+                      factory.createIdentifier("Object"),
+                      undefined
+                    ),
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("Projection"),
                         undefined
