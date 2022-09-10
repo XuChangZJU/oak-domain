@@ -1,7 +1,7 @@
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { UniversalContext } from '../store/UniversalContext';
 import { OpSchema as Modi, Filter } from '../base-app-domain/Modi/Schema';
-import { Checker, Operation, StorageSchema, UpdateChecker, EntityDict, OakRowLockedException, Context, OperateOption } from '../types';
+import { Checker, Operation, StorageSchema, UpdateChecker, EntityDict, OakRowLockedException, Context, OperateOption, Trigger, RemoveTrigger } from '../types';
 import { appendOnlyActions } from '../actions/action';
 import { difference } from '../utils/lodash';
 
@@ -109,5 +109,36 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
     }
 
     return checkers;
+}
+
+export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>) {
+    const triggers: Trigger<ED, keyof ED, Cxt>[] = [];
+
+    for (const entity in schema) {
+        const { inModi } = schema[entity];
+        if (inModi) {
+            // 当关联modi的对象被删除时，对应的modi也删除
+            triggers.push({
+                name: `当删除${entity}对象时，删除相关联还活跃的modi`,
+                action: 'remove',
+                entity,
+                when: 'after',
+                fn: async ({ operation }, context, option) => {
+                    const { data } = operation;
+                    const { id } = data;
+                    await context.rowStore.operate('modi', {
+                        id: await generateNewId(),
+                        action: 'remove',
+                        data: {},
+                        filter: {
+                            entity,
+                            entityId: id,
+                        }
+                    }, context, option);
+                    return 1;
+                },
+            } as RemoveTrigger<ED, keyof ED, Cxt>);
+        }
+    }
 }
 
