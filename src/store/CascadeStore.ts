@@ -695,33 +695,45 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 }
                 else if (action === 'create') {
                     const { entityId: fkId, entity } = data;
-                    assert(typeof fkId === 'string' || entity === attr);        // A中data的entityId作为B中filter的主键
-                    assert(filterMto.id && filterMto.id === fkId);
-                    /* Object.assign(operationMto, {
-                        filter: addFilterSegment({
-                            id: fkId,
-                        }), filterMto,
-                    }); */
+                    assert(typeof fkId === 'string' || entity === attr);
+                    if (filterMto.id) {
+                        // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
+                        assert(filterMto.id === fkId);
+                    }
+                    else {
+                        // A中data的entityId作为B中filter的主键
+                        Object.assign(operationMto, {
+                            filter: addFilterSegment({
+                                id: fkId,
+                            }), filterMto,
+                        });
+                    }
                 }
                 else {
                     // 剩下三种情况都是B中的filter的id来自A中row的entityId
-                    assert(!data.hasOwnProperty('entityId') && !data.hasOwnProperty('entity'));      // 这里不能再addFilterSegment，否则会造成后面判断不出来对应的id是多少。在实际情况中跑到这里应该不可能没有id
-                    assert(filterMto.id && typeof filterMto.id === 'string');
-                    /* Object.assign(operationMto, {
-                        filter: addFilterSegment({
-                            id: {
-                                $in: {
-                                    entity,
-                                    data: {
-                                        entityId: 1,
-                                    },
-                                    filter: addFilterSegment({
-                                        entity: attr,
-                                    } as any, filter),
-                                }
-                            },
-                        }, filterMto),
-                    }); */
+                    assert(!data.hasOwnProperty('entityId') && !data.hasOwnProperty('entity'));
+                    if (filterMto.id) {
+                        // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
+                        assert(typeof filterMto.id === 'string');
+                    }
+                    else {
+                        // A中data的entityId作为B中filter的主键
+                        Object.assign(operationMto, {
+                            filter: addFilterSegment({
+                                id: {
+                                    $in: {
+                                        entity,
+                                        data: {
+                                            entityId: 1,
+                                        },
+                                        filter: addFilterSegment({
+                                            entity: attr,
+                                        } as any, filter),
+                                    }
+                                },
+                            }, filterMto),
+                        });
+                    }
                 }
 
                 const result2 = await this.cascadeUpdate(attr, operationMto, context, option2);
@@ -740,29 +752,41 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 else if (action === 'create') {
                     const { [`${attr}Id`]: fkId } = data;
                     assert(typeof fkId === 'string');
-                    assert(filterMto?.id && filterMto.id === fkId);       // 这里不能再addFilterSegment，否则会造成后面判断不出来对应的id是多少。在实际情况中跑到这里应该不可能没有id
-                    /* Object.assign(operationMto, {
-                        filter: addFilterSegment(filterMto || {}, {
-                            id: fkId,
-                        }),
-                    }); */
+                    if (filterMto?.id) {
+                        // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
+                        assert(filterMto.id === fkId)
+                    }
+                    else {
+                        // A中data的entityId作为B中filter的主键
+                        Object.assign(operationMto, {
+                            filter: addFilterSegment(filterMto || {}, {
+                                id: fkId,
+                            }),
+                        });
+                    }
                 }
                 else {
                     assert(!data.hasOwnProperty(`${attr}Id`));
-                    assert(filterMto?.id && typeof filterMto.id === 'string');       // 这里不能再addFilterSegment，否则会造成后面判断不出来对应的id是多少。在实际情况中跑到这里应该不可能没有id
-                    /* Object.assign(operationMto, {
-                        filter: addFilterSegment(filterMto || {}, {
-                            id: {
-                                $in: {
-                                    entity,
-                                    data: {
-                                        [`${attr}Id`]: 1,
-                                    },
-                                    filter,
-                                }
-                            },
-                        }),
-                    }); */
+                    if (filterMto?.id) {
+                        // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
+                        assert(typeof filterMto.id === 'string');
+                    }
+                    else {
+                        // A中data的entityId作为B中filter的主键
+                        Object.assign(operationMto, {
+                            filter: addFilterSegment(filterMto || {}, {
+                                id: {
+                                    $in: {
+                                        entity,
+                                        data: {
+                                            [`${attr}Id`]: 1,
+                                        },
+                                        filter,
+                                    }
+                                },
+                            }),
+                        });
+                    }
                 }
 
                 const result2 = await this.cascadeUpdate(relation, operationMto, context, option2);
