@@ -696,7 +696,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 else if (action === 'create') {
                     const { entityId: fkId, entity } = data;
                     assert(typeof fkId === 'string' || entity === attr);
-                    if (filterMto.id) {
+                    if (filterMto?.id) {
                         // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
                         assert(filterMto.id === fkId);
                     }
@@ -712,7 +712,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 else {
                     // 剩下三种情况都是B中的filter的id来自A中row的entityId
                     assert(!data.hasOwnProperty('entityId') && !data.hasOwnProperty('entity'));
-                    if (filterMto.id) {
+                    if (filterMto?.id) {
                         // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
                         assert(typeof filterMto.id === 'string');
                     }
