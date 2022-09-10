@@ -140,5 +140,7 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
             } as RemoveTrigger<ED, keyof ED, Cxt>);
         }
     }
+
+    return triggers;
 }
 
