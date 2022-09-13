@@ -3,7 +3,7 @@ import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey }
 import { OneOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, Operation as OakOperation, MakeAction as OakMakeAction } from "../../types/Entity";
-import { GenericAction } from "../../actions/action";
+import { GenericAction, RelationAction } from "../../actions/action";
 import * as Oper from "../Oper/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 import * as ModiEntity from "../ModiEntity/Schema";
@@ -118,7 +118,7 @@ export declare type UpdateOperationData = FormUpdateData<OpSchema> & {
     operEntitys$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
     modiEntitys$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
 };
-export declare type UpdateOperation = OakOperation<"update" | string, UpdateOperationData, Filter, Sorter>;
+export declare type UpdateOperation = OakOperation<"update" | RelationAction | string, UpdateOperationData, Filter, Sorter>;
 export declare type RemoveOperationData = {};
 export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter, Sorter>;
 export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation | SelectOperation;
@@ -128,7 +128,7 @@ export declare type FullAttr = NativeAttr | `opers$${number}.${Oper.NativeAttr}`
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;
-    Action: OakMakeAction<GenericAction> | string;
+    Action: OakMakeAction<GenericAction | RelationAction> | string;
     Selection: Selection;
     Operation: Operation;
     Create: CreateOperation;

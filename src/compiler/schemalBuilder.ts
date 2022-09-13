@@ -30,6 +30,7 @@ const Schema: Record<string, {
     actionType: string;
     static: boolean;
     inModi: boolean;
+    hasRelationDef: boolean;
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
 const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
@@ -83,6 +84,11 @@ const ActionImportStatements = () => [
                     false,
                     undefined,
                     factory.createIdentifier("ExcludeRemoveAction")
+                ),
+                factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("RelationAction")
                 ),
             ])
         ),
@@ -306,8 +312,8 @@ function getStringTextFromUnionStringLiterals(moduleName: string, filename: stri
     }
 }
 
-const RESERVED_ACTION_NAMES = ['GenericAction', 'ParticularAction', 'ExcludeRemoveAction', 'ExcludeUpdateAction', 'ReadOnlyAction', 'AppendOnlyAction'];
-import { genericActions } from '../actions/action';
+const RESERVED_ACTION_NAMES = ['GenericAction', 'ParticularAction', 'ExcludeRemoveAction', 'ExcludeUpdateAction', 'ReadOnlyAction', 'AppendOnlyAction', 'RelationAction'];
+import { genericActions, relationActions } from '../actions/action';
 import { unIndexedTypes } from '../types/DataType';
 import { initinctiveAttributes } from '../types/Entity';
 
@@ -318,10 +324,13 @@ const OriginActionDict = {
     'appendOnly': 'AppendOnlyAction',
     'readOnly': 'ReadOnlyAction',
 };
-function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program, sourceFile: ts.SourceFile) {
+function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program, sourceFile: ts.SourceFile, hasRelationDef?: boolean) {
     const actionTexts = genericActions.map(
         ele => ele
     );
+    if (hasRelationDef) {
+        actionTexts.push(...relationActions);
+    }
     if (ts.isUnionTypeNode(node)) {
         const actionNames = node.types.map(
             ele => {
@@ -668,6 +677,24 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                     ),
                     sourceFile!
                 );
+                const actionDefNodes = [
+                    factory.createTypeReferenceNode(
+                        OriginActionDict[actionType as keyof typeof OriginActionDict],
+                        undefined
+                    ),
+                    factory.createTypeReferenceNode(
+                        'ParticularAction',
+                        undefined
+                    )
+                ];
+                if (hasRelationDef || moduleName === 'User') {
+                    actionDefNodes.push(
+                        factory.createTypeReferenceNode(
+                            'RelationAction',
+                            undefined
+                        )
+                    );
+                }
                 pushStatementIntoActionAst(
                     moduleName,
                     factory.createTypeAliasDeclaration(
@@ -675,22 +702,14 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                         [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                         factory.createIdentifier("Action"),
                         undefined,
-                        factory.createUnionTypeNode([
-                            factory.createTypeReferenceNode(
-                                OriginActionDict[actionType as keyof typeof OriginActionDict],
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                'ParticularAction',
-                                undefined
-                            )
-                        ])
+                        factory.createUnionTypeNode(actionDefNodes)
                     ),
                     sourceFile!
                 );
-                dealWithActions(moduleName, filename, node.type, program, sourceFile!);
+                dealWithActions(moduleName, filename, node.type, program, sourceFile!, hasRelationDef || moduleName === 'User');
             }
             else if (node.name.text === 'Relation') {
+                assert(!hasActionDef, `【${filename}】action定义须在Relation之后`);
                 assert(!localeDef, `【${filename}】locale定义须在Relation之后`);
                 // 增加userXXX对象的描述
                 if (ts.isLiteralTypeNode(node.type)) {
@@ -1063,6 +1082,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
         toModi,
         actionType,
         static: _static,
+        hasRelationDef,
     };
     if (hasFulltextIndex) {
         assign(schema, {
@@ -2668,8 +2688,8 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     undefined,
                     factory.createIdentifier("P"),
                     factory.createTypeReferenceNode(
-                      factory.createIdentifier("Object"),
-                      undefined
+                        factory.createIdentifier("Object"),
+                        undefined
                     ),
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("Projection"),
@@ -2711,8 +2731,8 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                     undefined,
                     factory.createIdentifier("P"),
                     factory.createTypeReferenceNode(
-                      factory.createIdentifier("Object"),
-                      undefined
+                        factory.createIdentifier("Object"),
+                        undefined
                     ),
                     factory.createTypeReferenceNode(
                         factory.createIdentifier("Projection"),
@@ -3760,17 +3780,24 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     );
 
     // UpdateOperation
-    const actionTypeNodes: ts.TypeNode[] = ActionAsts[entity] ? [
-        factory.createTypeReferenceNode('ParticularAction'),
-        factory.createLiteralTypeNode(factory.createStringLiteral("update"))
-    ] : [
-        factory.createLiteralTypeNode(factory.createStringLiteral("update"))
-    ];
+    const actionTypeNodes: ts.TypeNode[] = [factory.createLiteralTypeNode(factory.createStringLiteral("update"))];
+
+    if (ActionAsts[entity]) {
+        actionTypeNodes.push(
+            factory.createTypeReferenceNode('ParticularAction')
+        );
+    }
+    if (Schema[entity].hasRelationDef || entity === 'User') {
+        actionTypeNodes.push(
+            factory.createTypeReferenceNode('RelationAction')
+        );
+    }
     if (process.env.COMPLING_AS_LIB) {
         actionTypeNodes.push(
             factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
         );
     }
+
     statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
@@ -4638,6 +4665,23 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     ),
                     factory.createStringLiteral('./Action'),
                     undefined
+                ),
+                factory.createImportDeclaration(
+                    undefined,
+                    undefined,
+                    factory.createImportClause(
+                        false,
+                        undefined,
+                        factory.createNamedImports([
+                            factory.createImportSpecifier(
+                                false,
+                                undefined,
+                                factory.createIdentifier("RelationAction")
+                            ),
+                        ])
+                    ),
+                    factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
+                    undefined
                 )
             );
         }
@@ -4675,6 +4719,11 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                                 undefined,
                                 factory.createIdentifier("ExcludeRemoveAction")
                             ),
+                            factory.createImportSpecifier(
+                                false,
+                                undefined,
+                                factory.createIdentifier("RelationAction")
+                            ),
                         ])
                     ),
                     factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
@@ -4691,13 +4740,25 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         constructQuery(statements, entity);
         constructFullAttrs(statements, entity);
 
-        const actionTypeNode: ts.TypeNode = factory.createTypeReferenceNode(
-            factory.createIdentifier('OakMakeAction'),
-            [
-                ActionAsts[entity] ? factory.createTypeReferenceNode('Action') : factory.createTypeReferenceNode(
+        const makeActionArguments: ts.TypeNode[] = [];
+        if (ActionAsts[entity]) {
+            makeActionArguments.push(factory.createTypeReferenceNode('Action'));
+        }
+        else {
+            makeActionArguments.push(
+                factory.createTypeReferenceNode(
                     OriginActionDict[Schema[entity].actionType as keyof typeof OriginActionDict],
                 )
-            ]
+            );
+        }
+        if (Schema[entity].hasRelationDef || entity === 'User') {
+            makeActionArguments.push(
+                factory.createTypeReferenceNode('RelationAction')
+            );
+        }
+        const actionTypeNode: ts.TypeNode = factory.createTypeReferenceNode(
+            factory.createIdentifier('OakMakeAction'),
+            makeActionArguments.length === 1 ? makeActionArguments : [factory.createUnionTypeNode(makeActionArguments)]
         );
         const EntityDefAttrs = [
             factory.createPropertySignature(
@@ -5436,63 +5497,35 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 undefined
             )
         ];
+
+        const needImportActions: ts.ImportSpecifier[] = [];
         switch (actionType) {
             case 'readOnly': {
-                statements.push(
-                    factory.createImportDeclaration(
-                        undefined,
-                        undefined,
-                        factory.createImportClause(
-                            false,
-                            undefined,
-                            factory.createNamedImports([factory.createImportSpecifier(
-                                false,
-                                factory.createIdentifier("readOnlyActions"),
-                                factory.createIdentifier("actions")
-                            )])
-                        ),
-                        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
-                        undefined
+                needImportActions.push(
+                    factory.createImportSpecifier(
+                        false,
+                        factory.createIdentifier("readOnlyActions"),
+                        factory.createIdentifier("actions")
                     )
                 );
                 break;
             }
             case 'appendOnly': {
-                statements.push(
-                    factory.createImportDeclaration(
-                        undefined,
-                        undefined,
-                        factory.createImportClause(
-                            false,
-                            undefined,
-                            factory.createNamedImports([factory.createImportSpecifier(
-                                false,
-                                factory.createIdentifier("appendOnlyActions"),
-                                factory.createIdentifier("actions")
-                            )])
-                        ),
-                        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
-                        undefined
+                needImportActions.push(
+                    factory.createImportSpecifier(
+                        false,
+                        factory.createIdentifier("appendOnlyActions"),
+                        factory.createIdentifier("actions")
                     )
                 );
                 break;
             }
             case 'excludeUpdate': {
-                statements.push(
-                    factory.createImportDeclaration(
-                        undefined,
-                        undefined,
-                        factory.createImportClause(
-                            false,
-                            undefined,
-                            factory.createNamedImports([factory.createImportSpecifier(
-                                false,
-                                factory.createIdentifier("excludeUpdateActions"),
-                                factory.createIdentifier("actions")
-                            )])
-                        ),
-                        factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
-                        undefined
+                needImportActions.push(
+                    factory.createImportSpecifier(
+                        false,
+                        factory.createIdentifier("excludeUpdateActions"),
+                        factory.createIdentifier("actions")
                     )
                 );
                 break;
@@ -5518,27 +5551,41 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                     );
                 }
                 else {
-                    statements.push(
-                        factory.createImportDeclaration(
-                            undefined,
-                            undefined,
-                            factory.createImportClause(
-                                false,
-                                undefined,
-                                factory.createNamedImports([factory.createImportSpecifier(
-                                    false,
-                                    factory.createIdentifier("genericActions"),
-                                    factory.createIdentifier("actions")
-                                )])
-                            ),
-                            factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
-                            undefined
+                    needImportActions.push(
+                        factory.createImportSpecifier(
+                            false,
+                            factory.createIdentifier("genericActions"),
+                            factory.createIdentifier("actions")
                         )
                     );
                 }
             }
         }
 
+        if (Schema[entity].hasRelationDef || entity === 'User') {
+            needImportActions.push(
+                factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("relationActions"),
+                )
+            );
+        }
+        if (needImportActions.length > 0) {
+            statements.push(
+                factory.createImportDeclaration(
+                    undefined,
+                    undefined,
+                    factory.createImportClause(
+                        false,
+                        undefined,
+                        factory.createNamedImports(needImportActions)
+                    ),
+                    factory.createStringLiteral(ACTION_CONSTANT_IN_OAK_DOMAIN()),
+                    undefined
+                )
+            );
+        }
         const propertyAssignments: (ts.PropertyAssignment | ts.ShorthandPropertyAssignment)[] = [];
         const attributes = constructAttributes(entity);
         propertyAssignments.push(
@@ -5587,12 +5634,32 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
             factory.createPropertyAssignment(
                 factory.createIdentifier("actionType"),
                 factory.createStringLiteral(actionType)
-            ),
-            factory.createShorthandPropertyAssignment(
-                factory.createIdentifier("actions"),
-                undefined
             )
         );
+
+        if (Schema[entity].hasRelationDef || entity === 'User') {
+            propertyAssignments.push(
+                factory.createPropertyAssignment(
+                    factory.createIdentifier("actions"),
+                    factory.createCallExpression(
+                        factory.createPropertyAccessExpression(
+                            factory.createIdentifier("actions"),
+                            factory.createIdentifier("concat")
+                        ),
+                        undefined,
+                        [factory.createIdentifier("relationActions")]
+                    )
+                )
+            );
+        }
+        else {
+            propertyAssignments.push(
+                factory.createShorthandPropertyAssignment(
+                    factory.createIdentifier("actions"),
+                    undefined
+                )
+            );
+        }
 
         if (indexExpressions.length > 0) {
             propertyAssignments.push(

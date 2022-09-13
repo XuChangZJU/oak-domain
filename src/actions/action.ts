@@ -4,12 +4,15 @@ export type AppendOnlyAction = ReadOnlyAction | 'create';
 export type ExcludeUpdateAction = AppendOnlyAction | 'remove';
 export type ExcludeRemoveAction = AppendOnlyAction | 'update';
 export type GenericAction = 'update' | ExcludeUpdateAction;
+export type RelationAction = 'grant' | 'revoke';
 
 export const readOnlyActions = ['count', 'stat', 'download', 'select'];
 export const appendOnlyActions = readOnlyActions.concat('create');
 export const excludeUpdateActions = appendOnlyActions.concat('remove');
 export const exludeRemoveActions = appendOnlyActions.concat('update');
 export const genericActions = excludeUpdateActions.concat('update');
+export const relationActions = ['grant', 'revoke'];
+
 
 export type AbleAction = 'enable' | 'disable';
 export type AbleState = 'enabled' | 'disabled';
