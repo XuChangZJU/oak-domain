@@ -14,9 +14,9 @@ export class SimpleConnector<ED extends EntityDict, Cxt extends UniversalContext
     static ROUTER = '/aspect';
     private serverUrl: string;
     private makeException: (exceptionData: any) => OakException;
-    private contextBuilder: (str: string | undefined) => (store: RowStore<ED, Cxt>) => Cxt;
+    private contextBuilder: (str: string | undefined) => (store: RowStore<ED, Cxt>) => Promise<Cxt>;
 
-    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: RowStore<ED, Cxt>) => Cxt) {
+    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: RowStore<ED, Cxt>) => Promise<Cxt>) {
         super();
         this.serverUrl = `${serverUrl}${SimpleConnector.ROUTER}`;
         this.makeException = makeException;
@@ -61,11 +61,11 @@ export class SimpleConnector<ED extends EntityDict, Cxt extends UniversalContext
         return SimpleConnector.ROUTER;
     }
 
-    parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>): { name: string; params: any; context: Cxt; } {        
+    async parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>) {        
         const { 'oak-cxt': oakCxtStr, 'oak-aspect': aspectName } = headers;
         assert(typeof oakCxtStr === 'string' || oakCxtStr === undefined);
         assert(typeof aspectName === 'string');
-        const context = this.contextBuilder(oakCxtStr as string | undefined)(store);
+        const context = await this.contextBuilder(oakCxtStr as string | undefined)(store);
         return {
             name: aspectName,
             params: body,

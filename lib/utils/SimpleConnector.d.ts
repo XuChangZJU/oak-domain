@@ -7,17 +7,17 @@ export declare class SimpleConnector<ED extends EntityDict, Cxt extends Universa
     private serverUrl;
     private makeException;
     private contextBuilder;
-    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: RowStore<ED, Cxt>) => Cxt);
+    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: RowStore<ED, Cxt>) => Promise<Cxt>);
     callAspect(name: string, params: any, context: Cxt): Promise<{
         result: any;
         opRecords: OpRecord<ED>[];
     }>;
     getRouter(): string;
-    parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>): {
+    parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>): Promise<{
         name: string;
         params: any;
         context: Cxt;
-    };
+    }>;
     serializeResult(result: any, context: Cxt, headers: IncomingHttpHeaders, body: any): {
         body: any;
         headers?: Record<string, any> | undefined;

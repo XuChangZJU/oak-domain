@@ -12,11 +12,7 @@ export abstract class Connector<ED extends EntityDict, Cxt extends Context<ED>> 
 
     abstract getRouter(): string;
 
-    abstract parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>): {
-        name: string;
-        params: any;
-        context: Cxt;
-    };
+    abstract parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>): Promise<{ name: string; params: any; context: Cxt; }>;
 
     abstract serializeResult(result: any, context: Cxt, headers: IncomingHttpHeaders, body: any): {
         body: any;
