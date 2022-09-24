@@ -580,6 +580,12 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                                 const { types } = type;
                                 if (ts.isLiteralTypeNode(types[0]) && ts.isStringLiteral(types[0].literal)) {
                                     enumStringAttrs.push((<ts.Identifier>name).text);
+                                    types.forEach(
+                                        (ele) => {
+                                            assert(ts.isLiteralTypeNode(ele) &&ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的枚举属性定义「${attrName}」`);
+                                            assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」中定义的属性枚举「${attrName}」的字符串长度应小于${STRING_LITERAL_MAX_LENGTH}`);
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -787,6 +793,13 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                 if (ts.isUnionTypeNode(node.type) && ts.isLiteralTypeNode(node.type.types[0]) && ts.isStringLiteral(node.type.types[0].literal)) {
                     // 本文件内定义的枚举类型
                     localEnumStringTypes.push(node.name.text);
+
+                    node.type.types.forEach(
+                        (ele) => {
+                            assert(ts.isLiteralTypeNode(ele) &&ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的常量定义「${node.name.text}」`);
+                            assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」中定义的常量枚举「${node.name.text}」的字符串长度应小于${STRING_LITERAL_MAX_LENGTH}`);
+                        }
+                    )
                 }
             }
         }
