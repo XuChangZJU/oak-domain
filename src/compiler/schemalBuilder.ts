@@ -31,6 +31,7 @@ const Schema: Record<string, {
     static: boolean;
     inModi: boolean;
     hasRelationDef: boolean;
+    enumStringAttrs: string[],
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
 const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
@@ -1083,6 +1084,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
         actionType,
         static: _static,
         hasRelationDef,
+        enumStringAttrs: enumStringAttrs.concat(states),
     };
     if (hasFulltextIndex) {
         assign(schema, {
@@ -4994,7 +4996,7 @@ function outputAction(outputDir: string, printer: ts.Printer) {
 }
 
 function constructAttributes(entity: string): ts.PropertyAssignment[] {
-    const { schemaAttrs } = Schema[entity];
+    const { schemaAttrs, enumStringAttrs } = Schema[entity];
     const { [entity]: manyToOneSet } = ManyToOne;
     const result: ts.PropertyAssignment[] = [];
 
@@ -5188,7 +5190,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                 );
                             }
                             else {
-                                if (text.endsWith('State')) {
+                                if (enumStringAttrs.includes((<ts.Identifier>name).text)) {
                                     attrAssignments.push(
                                         factory.createPropertyAssignment(
                                             factory.createIdentifier("type"),
@@ -5207,7 +5209,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                     );
                                 }
                                 else {
-                                    // 引用的shape                                    
+                                    // todo 引用的非string定义，目前没有处理int类型的引用，等遇到了再处理
                                     attrAssignments.push(
                                         factory.createPropertyAssignment(
                                             factory.createIdentifier("type"),
@@ -5832,7 +5834,6 @@ function analyzeInModi() {
         if (schema.toModi || schema.inModi || schema.actionType === 'readOnly' || schema.static) {
             return;
         }
-        console.log('setInModi', entity);
         schema.inModi = true;
         const related = getRelateEntities(entity);
         related.forEach(

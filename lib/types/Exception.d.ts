@@ -65,8 +65,10 @@ export declare class OakRowLockedException extends OakUserException {
  */
 export declare class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> extends OakUserException {
     private data;
-    constructor(data: ED[T]['OpSchema'], message?: string);
+    private entity;
+    constructor(entity: T, data: ED[T]['OpSchema'], message?: string);
     getData(): ED[T]["OpSchema"];
+    getEntity(): T;
     toString(): string;
 }
 export declare function makeException(data: {

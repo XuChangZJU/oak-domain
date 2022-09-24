@@ -1,3 +1,5 @@
+/// <reference types="node" />
+import { IncomingHttpHeaders } from 'http';
 import { EntityDict, OpRecord, RowStore, TxnOption, Context } from "../types";
 export declare abstract class UniversalContext<ED extends EntityDict> implements Context<ED> {
     rowStore: RowStore<ED, this>;
@@ -5,11 +7,14 @@ export declare abstract class UniversalContext<ED extends EntityDict> implements
     opRecords: OpRecord<ED>[];
     private scene?;
     private rwLock;
+    private headers?;
     events: {
         commit: Array<() => Promise<void>>;
         rollback: Array<() => Promise<void>>;
     };
-    constructor(store: RowStore<ED, UniversalContext<ED>>);
+    constructor(store: RowStore<ED, UniversalContext<ED>>, headers?: IncomingHttpHeaders);
+    setHeaders(headers: IncomingHttpHeaders): void;
+    getHeader(key: string): string | string[] | undefined;
     getScene(): string | undefined;
     setScene(scene?: string): void;
     private resetEvents;

@@ -142,13 +142,19 @@ export class OakUnloggedInException extends OakUserException {
  */
 export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> extends OakUserException {
     private data: ED[T]['OpSchema'];
-    constructor(data: ED[T]['OpSchema'], message?: string) {
+    private entity: T;
+    constructor(entity: T, data: ED[T]['OpSchema'], message?: string) {
         super(message);
         this.data = data;
+        this.entity = entity;
     }
 
     getData() {
         return this.data;
+    }
+
+    getEntity() {
+        return this.entity;
     }
 
     toString(): string {
@@ -156,6 +162,7 @@ export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> ex
             name: this.constructor.name,
             message: this.message,
             data: this.data,
+            entity: this.entity,
         });
     }
 }
@@ -189,7 +196,7 @@ export function makeException(data: {
             return new OakUnloggedInException(data.message);
         }
         case OakCongruentRowExists.name: {
-            return new OakCongruentRowExists(data.data, data.message);
+            return new OakCongruentRowExists(data.entity, data.data, data.message);
         }
         case OakRowLockedException.name: {
             return new OakRowLockedException(data.message);

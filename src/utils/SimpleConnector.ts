@@ -61,11 +61,12 @@ export class SimpleConnector<ED extends EntityDict, Cxt extends UniversalContext
         return SimpleConnector.ROUTER;
     }
 
-    async parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>) {        
+    async parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>): Promise<{ name: string; params: any; context: Cxt; }> {        
         const { 'oak-cxt': oakCxtStr, 'oak-aspect': aspectName } = headers;
         assert(typeof oakCxtStr === 'string' || oakCxtStr === undefined);
         assert(typeof aspectName === 'string');
         const context = await this.contextBuilder(oakCxtStr as string | undefined)(store);
+        context.setHeaders(headers);
         return {
             name: aspectName,
             params: body,

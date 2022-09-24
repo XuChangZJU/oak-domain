@@ -1,4 +1,5 @@
 import assert from 'assert';
+import { IncomingHttpHeaders } from 'http';
 import { EntityDict, OpRecord, RowStore, TxnOption, Context } from "../types";
 import { RWLock } from '../utils/concurrent';
 
@@ -8,12 +9,13 @@ export abstract class UniversalContext<ED extends EntityDict> implements Context
     opRecords: OpRecord<ED>[];
     private scene?: string;
     private rwLock: RWLock;
+    private headers?: IncomingHttpHeaders;
     events: {
         commit: Array<() => Promise<void>>;
         rollback: Array<() => Promise<void>>;
     }
 
-    constructor(store: RowStore<ED, UniversalContext<ED>>) {
+    constructor(store: RowStore<ED, UniversalContext<ED>>, headers?: IncomingHttpHeaders) {
         this.rowStore = store;
         this.opRecords = [];
         this.rwLock = new RWLock();
@@ -21,6 +23,19 @@ export abstract class UniversalContext<ED extends EntityDict> implements Context
             commit: [],
             rollback: [],
         };
+        if (headers) {
+            this.headers = headers;
+        }
+    }
+
+    setHeaders(headers: IncomingHttpHeaders) {
+        this.headers = headers;
+    }
+    
+    getHeader(key: string): string | string[] | undefined {
+        if (this.headers) {
+            return this.headers[key];
+        }
     }
     getScene(): string | undefined {
         return this.scene;

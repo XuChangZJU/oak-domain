@@ -14,5 +14,6 @@ export interface Context<ED extends EntityDict>{
     getScene(): string | undefined;
     setScene(scene?: string): void;
     getCurrentUserId(): Promise<string | undefined>;
+    getHeader(key: string): string | string[] | undefined;
 };
 

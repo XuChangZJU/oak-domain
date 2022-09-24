@@ -959,31 +959,17 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
         const result: OperationResult<ED> = {};
 
         if (['create', 'create-l'].includes(action) && data instanceof Array) {
-            const multipleCreate = this.supportMultipleCreate();
-            if (multipleCreate) {
-                opData = [];
-                for (const d of data) {
-                    const od = await this.destructCascadeUpdate(
-                        entity,
-                        action,
-                        d,
-                        context,
-                        option,
-                        result,
-                    );
-                    opData.push(od);
-                }
-            }
-            else {
-                for (const dataEle of data) {
-                    const result2 = await this.cascadeUpdate(entity, {
-                        id,
-                        action,
-                        data: dataEle,
-                    }, context, option);
-                    this.mergeOperationResult(result, result2);
-                }
-                return result;
+            opData = [];
+            for (const d of data) {
+                const od = await this.destructCascadeUpdate(
+                    entity,
+                    action,
+                    d,
+                    context,
+                    option,
+                    result,
+                );
+                opData.push(od);
             }
         }
         else {
@@ -1068,79 +1054,103 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         addTimestamp(<ED[T]['CreateSingle']['data']>data);
                     }
                     let result: number;
-                    try {
-                        result = await this.updateAbjointRow(
-                            entity,
-                            operation,
-                            context,
-                            option
-                        );
-                    }
-                    catch (e: any) {
-                        if (e instanceof OakCongruentRowExists) {
-                            if (option.allowExists) {
-                                // 如果允许存在，对已存在行进行updata，剩下的行继续insert
-                                const congruentRow = e.getData() as ED[T]['OpSchema'];
-                                if (data instanceof Array) {
-                                    const rest = data.filter(
-                                        ele => ele.id !== congruentRow.id
-                                    );
-                                    if (rest.length === data.length) {
-                                        throw e;
-                                    }
-                                    const result2 = await this.updateAbjointRow(
-                                        entity,
-                                        Object.assign({}, operation, {
-                                            data: rest,
-                                        }),
-                                        context,
-                                        option
-                                    );
+                    const createInner = async (operation2: ED[T]['Create']) => {
+                        try {
+                            result = await this.updateAbjointRow(
+                                entity,
+                                operation2,
+                                context,
+                                option
+                            );
+                        }
+                        catch (e: any) {
+                            /* 这段代码是处理插入时有重复的行，现在看有问题，等实际需求出现再写
+                            if (e instanceof OakCongruentRowExists) {
+                                if (option.allowExists) {
+                                    // 如果允许存在，对已存在行进行update，剩下的行继续insert
+                                    const congruentRow = e.getData() as ED[T]['OpSchema'];
+                                    if (data instanceof Array) {
+                                        const rest = data.filter(
+                                            ele => ele.id !== congruentRow.id
+                                        );
+                                        if (rest.length === data.length) {
+                                            throw e;
+                                        }
+                                        const result2 = await this.updateAbjointRow(
+                                            entity,
+                                            Object.assign({}, operation, {
+                                                data: rest,
+                                            }),
+                                            context,
+                                            option
+                                        );
 
-                                    const row = data.find(
-                                        ele => ele.id === congruentRow.id
-                                    );
-                                    const updateData = omit(row, ['id', '$$createAt$$']);
-                                    const result3 = await this.updateAbjointRow(
-                                        entity,
-                                        {
-                                            id: await generateNewId(),
-                                            action: 'update',
-                                            data: updateData,
-                                            filter: {
-                                                id: congruentRow.id,
-                                            } as any,
-                                        },
-                                        context,
-                                        option
-                                    );
+                                        const row = data.find(
+                                            ele => ele.id === congruentRow.id
+                                        );
+                                        const updateData = omit(row, ['id', '$$createAt$$']);
+                                        const result3 = await this.updateAbjointRow(
+                                            entity,
+                                            {
+                                                id: await generateNewId(),
+                                                action: 'update',
+                                                data: updateData,
+                                                filter: {
+                                                    id: congruentRow.id,
+                                                } as any,
+                                            },
+                                            context,
+                                            option
+                                        );
 
-                                    return result2 + result3;
-                                }
-                                else {
-                                    if (data.id !== congruentRow.id) {
-                                        throw e;
+                                        return result2 + result3;
                                     }
-                                    const updateData = omit(data, ['id', '$$createAt$$']);
-                                    const result2 = await this.updateAbjointRow(
-                                        entity,
-                                        {
-                                            id: await generateNewId(),
-                                            action: 'update',
-                                            data: updateData,
-                                            filter: {
-                                                id: congruentRow.id,
-                                            } as any,
-                                        },
-                                        context,
-                                        option
-                                    );
-                                    return result2;
+                                    else {
+                                        if (data.id !== congruentRow.id) {
+                                            throw e;
+                                        }
+                                        const updateData = omit(data, ['id', '$$createAt$$']);
+                                        const result2 = await this.updateAbjointRow(
+                                            entity,
+                                            {
+                                                id: await generateNewId(),
+                                                action: 'update',
+                                                data: updateData,
+                                                filter: {
+                                                    id: congruentRow.id,
+                                                } as any,
+                                            },
+                                            context,
+                                            option
+                                        );
+                                        return result2;
+                                    }
                                 }
-                            }
+                            } */
                             throw e;
                         }
+                    };
+
+                    if (data instanceof Array) {
+                        const multipleCreate = this.supportMultipleCreate();
+                        if (multipleCreate) {
+                            await createInner(operation as ED[T]['Create']);
+                        }
+                        else {
+                            for (const d of data) {
+                                const createSingleOper: ED[T]['CreateSingle'] = {
+                                    id: 'any',
+                                    action: 'create',
+                                    data: d,
+                                };
+                                await createInner(createSingleOper);
+                            }
+                        }
                     }
+                    else {
+                        await createInner(operation as ED[T]['Create']);
+                    }
+
                     if (!option.dontCollect) {
                         context.opRecords.push({
                             a: 'c',
