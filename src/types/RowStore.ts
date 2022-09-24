@@ -68,4 +68,11 @@ export abstract class RowStore<ED extends EntityDict, Cxt extends Context<ED>> {
         }
     }
 
+    mergeMultipleResults(toBeMerged: OperationResult<ED>[]) {
+        const result: OperationResult<ED> = {};
+        toBeMerged.forEach(
+            ele => this.mergeOperationResult(result, ele)
+        );
+        return result;
+    }
 }

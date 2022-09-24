@@ -19,4 +19,5 @@ export declare abstract class RowStore<ED extends EntityDict, Cxt extends Contex
     abstract rollback(txnId: string): Promise<void>;
     getSchema(): StorageSchema<ED>;
     mergeOperationResult(result: OperationResult<ED>, toBeMerged: OperationResult<ED>): void;
+    mergeMultipleResults(toBeMerged: OperationResult<ED>[]): OperationResult<ED>;
 }
