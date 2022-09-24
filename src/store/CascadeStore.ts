@@ -330,6 +330,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                         $in: ids,
                                     }
                                 }, subFilter]),
+                                sorter: subSorter,
                                 indexFrom,
                                 count
                             }, context, option);
@@ -364,6 +365,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                         $in: ids,
                                     }
                                 }, subFilter]),
+                                sorter: subSorter,
                                 indexFrom,
                                 count
                             }, context, option);
