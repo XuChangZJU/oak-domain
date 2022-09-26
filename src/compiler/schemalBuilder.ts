@@ -1,4 +1,4 @@
-import path from 'path';
+import PathLib from 'path';
 import assert from 'assert';
 import { execSync } from 'child_process';
 import { writeFileSync, readdirSync, mkdirSync, fstat } from 'fs';
@@ -16,6 +16,7 @@ import {
     NUMERICAL_LITERL_DEFAULT_PRECISION,
     NUMERICAL_LITERL_DEFAULT_SCALE,
     INT_LITERL_DEFAULT_WIDTH,
+    LIB_OAK_DOMAIN,
 } from './env';
 import { firstLetterLowerCase, firstLetterUpperCase } from '../utils/string';
 
@@ -32,6 +33,7 @@ const Schema: Record<string, {
     inModi: boolean;
     hasRelationDef: boolean;
     enumStringAttrs: string[],
+    additionalImports: ts.ImportDeclaration[],
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
 const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
@@ -252,7 +254,7 @@ function addActionSource(moduleName: string, name: ts.Identifier, node: ts.Impor
     const ast = ActionAsts[moduleName];
     const { moduleSpecifier } = node;
 
-    // 目前应该只会引用oak-domain/src/actions/action里的公共action
+    // todo 目前应该只会引用oak-domain/src/actions/action里的公共action，未来如果有交叉引用这里代码要修正（如果domain中也有引用action_constants这里应该也会错）
     assert(ts.isStringLiteral(moduleSpecifier) && moduleSpecifier.text === ACTION_CONSTANT_IN_OAK_DOMAIN());
     assign(ast.importedFrom, {
         [name.text]: node,
@@ -408,30 +410,29 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
     );
 }
 
-function getEntityImported(declaration: ts.ImportDeclaration, filename: string) {
+/**
+ * entity的引用一定要以 import { Schema as XXX } from '..../XXX'这种形式
+ * @param declaration 
+ * @param filename 
+ * @returns 
+ */
+function getEntityImported(declaration: ts.ImportDeclaration) {
     const { moduleSpecifier, importClause } = declaration;
     let entityImported: string | undefined;
-    if (ts.isStringLiteral(moduleSpecifier)) {
-        if (moduleSpecifier.text.startsWith('./')) {
-            entityImported = moduleSpecifier.text.slice(2);
-        }
-        else if (moduleSpecifier.text.startsWith(ENTITY_PATH_IN_OAK_GENERAL_BUSINESS())) {
-            entityImported = moduleSpecifier.text.slice(ENTITY_PATH_IN_OAK_GENERAL_BUSINESS().length);
-        }
-        else if (moduleSpecifier.text.startsWith(ENTITY_PATH_IN_OAK_DOMAIN())) {
-            entityImported = moduleSpecifier.text.slice(ENTITY_PATH_IN_OAK_DOMAIN().length)
-        }
-    }
 
-    if (entityImported) {
+    if (ts.isStringLiteral(moduleSpecifier)) {
+        const { name: importedFileName } = PathLib.parse(moduleSpecifier.text);
         const { namedBindings } = importClause!;
-        assert(ts.isNamedImports(namedBindings!));
-        const { elements } = namedBindings!;
-        assert(elements.find(
-            ele => ts.isImportSpecifier(ele) && ele.name.text === entityImported && ele.propertyName!.text === 'Schema'
-        ), `「${filename}」导入的对象名称和对象所在的文件名称「${entityImported}」不符`);
-        return entityImported;
+        if (ts.isNamedImports(namedBindings!)) {
+            const { elements } = namedBindings!;
+            if (elements.find(
+                ele => ts.isImportSpecifier(ele) && ele.name.text === importedFileName && ele.propertyName!.text === 'Schema'
+            )) {
+                entityImported = importedFileName;
+            }
+        }
     }
+    return entityImported;
 }
 
 function checkLocaleEnumAttrs(node: ts.TypeLiteralNode, attrs: string[], filename: string) {
@@ -471,7 +472,7 @@ function checkLocaleExpressionPropertyExists(root: ts.ObjectLiteralExpression, a
     )
 }
 
-function analyzeEntity(filename: string, path: string, program: ts.Program) {
+function analyzeEntity(filename: string, path: string, program: ts.Program, relativePath?: string) {
     const fullPath = `${path}/${filename}`;
     const sourceFile = program.getSourceFile(fullPath);
     const moduleName = filename.split('.')[0];
@@ -495,12 +496,34 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
     const enumStringAttrs: string[] = [];
     const states: string[] = [];
     const localEnumStringTypes: string[] = [];
+    const additionalImports: ts.ImportDeclaration[] = [];
     let localeDef: ts.ObjectLiteralExpression | undefined = undefined;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
-            const entityImported = getEntityImported(node, filename);
+            const entityImported = getEntityImported(node);
             if (entityImported) {
                 referencedSchemas.push(entityImported);
+            }
+            else if (!process.env.COMPLING_IN_DOMAIN && !relativePath?.startsWith(LIB_OAK_DOMAIN)) {
+                /**import了domain以外的其它定义类型，需要被复制到生成的Schema文件中
+                 * 这里必须注意，1、假设了domain当中定义的几个entity不会引用其它文件上的定义（除了type里的那些通用类型，默认都会被输出到文件中）
+                 * 2、假设了其它项目文件不会引用domain当中除了type通用类型之外的其它内容，否则不会被输出到文件中
+                 * 这里主要是对import的处理比较粗略，日后有需要的时候再精修
+                */
+                const { moduleSpecifier, importClause } = node;
+                if (ts.isStringLiteral(moduleSpecifier) && !moduleSpecifier.text.startsWith(LIB_OAK_DOMAIN)) {
+                    const moduleSpecifier2Text = relativePath ? PathLib.join(relativePath, '..', moduleSpecifier.text) : PathLib.join('..', moduleSpecifier.text);
+                    additionalImports.push(
+                        factory.updateImportDeclaration(
+                            node,
+                            undefined,
+                            undefined,
+                            importClause,
+                            factory.createStringLiteral(moduleSpecifier2Text),
+                            undefined
+                        )
+                    );
+                }
             }
         }
 
@@ -582,7 +605,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
                                     enumStringAttrs.push((<ts.Identifier>name).text);
                                     types.forEach(
                                         (ele) => {
-                                            assert(ts.isLiteralTypeNode(ele) &&ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的枚举属性定义「${attrName}」`);
+                                            assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的枚举属性定义「${attrName}」`);
                                             assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」中定义的属性枚举「${attrName}」的字符串长度应小于${STRING_LITERAL_MAX_LENGTH}`);
                                         }
                                     )
@@ -796,7 +819,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
 
                     node.type.types.forEach(
                         (ele) => {
-                            assert(ts.isLiteralTypeNode(ele) &&ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的常量定义「${node.name.text}」`);
+                            assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的常量定义「${node.name.text}」`);
                             assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」中定义的常量枚举「${node.name.text}」的字符串长度应小于${STRING_LITERAL_MAX_LENGTH}`);
                         }
                     )
@@ -1098,6 +1121,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program) {
         static: _static,
         hasRelationDef,
         enumStringAttrs: enumStringAttrs.concat(states),
+        additionalImports,
     };
     if (hasFulltextIndex) {
         assign(schema, {
@@ -4514,7 +4538,7 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
         resultFile
     );
 
-    const fileName = path.join(outputDir, '_SubQuery.ts');
+    const fileName = PathLib.join(outputDir, '_SubQuery.ts');
     writeFileSync(fileName, result, { flag: 'w' });
 }
 
@@ -4622,7 +4646,7 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
         resultFile
     );
 
-    const fileName = path.join(outputDir, 'EntityDict.ts');
+    const fileName = PathLib.join(outputDir, 'EntityDict.ts');
     writeFileSync(fileName, result, { flag: 'w' });
 }
 
@@ -4745,6 +4769,10 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     undefined
                 )
             );
+        }
+        const { additionalImports } = Schema[entity];
+        if (additionalImports?.length > 0) {
+            statements.push(...additionalImports);
         }
 
         constructSchema(statements, entity);
@@ -4894,7 +4922,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         )
 
         const result = printer.printList(ts.ListFormat.SourceFileStatements, factory.createNodeArray(statements), Schema[entity].sourceFile);
-        const fileName = path.join(outputDir, entity, 'Schema.ts');
+        const fileName = PathLib.join(outputDir, entity, 'Schema.ts');
         writeFileSync(fileName, result, { flag: 'w' });
     }
 }
@@ -4951,7 +4979,7 @@ function outputAction(outputDir: string, printer: ts.Printer) {
             ts.ListFormat.SourceFileStatements,
             factory.createNodeArray(importStatements.concat(statements)),
             sourceFile);
-        const filename = path.join(outputDir, entity, 'Action.ts');
+        const filename = PathLib.join(outputDir, entity, 'Action.ts');
         writeFileSync(filename, result, { flag: 'w' });
 
         actionDictStatements.push(
@@ -5004,7 +5032,7 @@ function outputAction(outputDir: string, printer: ts.Printer) {
         resultFile
     );
 
-    const fileName = path.join(outputDir, 'ActionDefDict.ts');
+    const fileName = PathLib.join(outputDir, 'ActionDefDict.ts');
     writeFileSync(fileName, result, { flag: 'w' });
 }
 
@@ -5382,7 +5410,7 @@ function outputLocale(outputDir: string, printer: ts.Printer) {
                         ]),
                         sourceFile);
                     const data = Function(result)();
-                    const filename = path.join(outputDir, entity, 'locales', `${lng}.json`);
+                    const filename = PathLib.join(outputDir, entity, 'locales', `${lng}.json`);
                     writeFileSync(filename, JSON.stringify(data), { flag: 'w' });
 
                     if (locales[lng]) {
@@ -5714,7 +5742,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
             ts.ListFormat.SourceFileStatements,
             factory.createNodeArray(statements),
             sourceFile);
-        const filename = path.join(outputDir, entity, 'Storage.ts');
+        const filename = PathLib.join(outputDir, entity, 'Storage.ts');
         writeFileSync(filename, result, { flag: 'w' });
 
         importStatements.push(
@@ -5771,7 +5799,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
         ts.ListFormat.SourceFileStatements,
         factory.createNodeArray(importStatements),
         ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS));
-    const filename = path.join(outputDir, 'Storage.ts');
+    const filename = PathLib.join(outputDir, 'Storage.ts');
     writeFileSync(filename, result, { flag: 'w' });
 }
 
@@ -5779,10 +5807,10 @@ function resetOutputDir(outputDir: string) {
     emptydirSync(outputDir);
 
     for (const moduleName in Schema) {
-        mkdirSync(path.join(outputDir, moduleName));
-        mkdirSync(path.join(outputDir, moduleName, 'locales'));
+        mkdirSync(PathLib.join(outputDir, moduleName));
+        mkdirSync(PathLib.join(outputDir, moduleName, 'locales'));
     }
-    mkdirSync(path.join(outputDir, '_locales'))
+    mkdirSync(PathLib.join(outputDir, '_locales'))
 }
 
 function addReverseRelationship() {
@@ -5801,7 +5829,7 @@ function outputIndexTs(outputDir: string) {
     export * from './Storage';
     export * from './ActionDefDict';
     `;
-    const filename = path.join(outputDir, 'index.ts');
+    const filename = PathLib.join(outputDir, 'index.ts');
     writeFileSync(filename, indexTs, { flag: 'w' });
 }
 
@@ -5811,7 +5839,7 @@ function outputPackageJson(outputDir: string) {
         "main": "index.ts"
     };
 
-    const filename = path.join(outputDir, 'package.json');
+    const filename = PathLib.join(outputDir, 'package.json');
     writeFileSync(filename, JSON.stringify(pj), { flag: 'w' });
 }
 
@@ -5863,7 +5891,7 @@ function analyzeInModi() {
     }
 }
 
-export function analyzeEntities(inputDir: string) {
+export function analyzeEntities(inputDir: string, relativePath?: string) {
     const files = readdirSync(inputDir);
     const fullFilenames = files.map(
         ele => {
@@ -5881,7 +5909,7 @@ export function analyzeEntities(inputDir: string) {
 
     files.forEach(
         (filename) => {
-            analyzeEntity(filename, inputDir, program);
+            analyzeEntity(filename, inputDir, program, relativePath);
         }
     );
     analyzeInModi();
