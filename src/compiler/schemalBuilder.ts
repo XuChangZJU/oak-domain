@@ -423,10 +423,10 @@ function getEntityImported(declaration: ts.ImportDeclaration) {
     if (ts.isStringLiteral(moduleSpecifier)) {
         const { name: importedFileName } = PathLib.parse(moduleSpecifier.text);
         const { namedBindings } = importClause!;
-        if (ts.isNamedImports(namedBindings!)) {
-            const { elements } = namedBindings!;
+        if (namedBindings && ts.isNamedImports(namedBindings)) {
+            const { elements } = namedBindings;
             if (elements.find(
-                ele => ts.isImportSpecifier(ele) && ele.name.text === importedFileName && ele.propertyName!.text === 'Schema'
+                ele => ts.isImportSpecifier(ele) && ele.name.text === importedFileName && ele.propertyName?.text === 'Schema'
             )) {
                 entityImported = importedFileName;
             }
