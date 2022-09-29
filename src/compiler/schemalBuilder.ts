@@ -513,7 +513,15 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 const { moduleSpecifier, importClause } = node;
                 if (ts.isStringLiteral(moduleSpecifier) && !moduleSpecifier.text.startsWith(LIB_OAK_DOMAIN)) {
                     // 编译后的路径默认要深一层
-                    const moduleSpecifier2Text = relativePath ? PathLib.join(relativePath, moduleSpecifier.text) : PathLib.join('..', moduleSpecifier.text);
+                    const moduleSpecifier2Text = relativePath
+                        ? PathLib.join(
+                              relativePath,
+                              moduleSpecifier.text
+                          ).replace(/\\/g, '/')
+                        : PathLib.join('..', moduleSpecifier.text).replace(
+                              /\\/g,
+                              '/'
+                          );
                     additionalImports.push(
                         factory.updateImportDeclaration(
                             node,
