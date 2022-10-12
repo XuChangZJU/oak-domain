@@ -3,6 +3,7 @@
  * 像assign, keys尽量使用Object的函数
  */
 import unset from 'lodash/unset';
+import uniqBy from 'lodash/uniqBy';
 import pull from 'lodash/pull';
 import uniq from 'lodash/uniq';
 import get from 'lodash/get';
@@ -21,6 +22,7 @@ export {
     unset,
     pull,
     uniq,
+    uniqBy,
     get,
     set,
     intersection,

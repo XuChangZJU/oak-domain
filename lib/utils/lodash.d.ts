@@ -3,6 +3,7 @@
  * 像assign, keys尽量使用Object的函数
  */
 import unset from 'lodash/unset';
+import uniqBy from 'lodash/uniqBy';
 import pull from 'lodash/pull';
 import uniq from 'lodash/uniq';
 import get from 'lodash/get';
@@ -16,4 +17,4 @@ import isEqual from 'lodash/isEqual';
 import union from 'lodash/union';
 import difference from 'lodash/difference';
 import groupBy from 'lodash/groupBy';
-export { unset, pull, uniq, get, set, intersection, omit, merge, cloneDeep, pick, isEqual, union, difference, groupBy, };
+export { unset, pull, uniq, uniqBy, get, set, intersection, omit, merge, cloneDeep, pick, isEqual, union, difference, groupBy, };
