@@ -224,9 +224,13 @@ export function makeTreeAncestorFilter<ED extends EntityDict, T extends keyof ED
     parentKey: string,
     filter: ED[T]['Selection']['filter'],
     level: number = 1,
-    includeAll?: true) {
+    includeAll?: boolean,
+    includeSelf?: boolean): ED[T]['Selection']['filter'] {
     assert(level >= 0);
-    let idInFilters: ED[T]['Selection']['filter'][] = [filter];
+    let idInFilters: ED[T]['Selection']['filter'][] = [];
+    if (includeSelf) {
+        idInFilters.push(filter);
+    }
     let currentLevelInFilter: ED[T]['Selection']['filter'] = filter;
     while (level > 0) {
         currentLevelInFilter = {
@@ -248,7 +252,7 @@ export function makeTreeAncestorFilter<ED extends EntityDict, T extends keyof ED
     if (includeAll) {
         return {
             $or: idInFilters,
-        };
+        } as ED[T]['Selection']['filter'];
     }
     return currentLevelInFilter;
 }
@@ -266,23 +270,19 @@ export function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof 
     parentKey: string,
     filter: ED[T]['Selection']['filter'],
     level: number = 1,
-    includeAll?: true) {
+    includeAll?: boolean,
+    includeSelf?: boolean): ED[T]['Selection']['filter'] {
     assert(level >= 0);
     assert(parentKey.endsWith('Id'));
     const parentKeyRef = parentKey.slice(0, parentKey.length - 2);
-    let idInFilters: ED[T]['Selection']['filter'][] = [filter];
+    let idInFilters: ED[T]['Selection']['filter'][] = [];
+    if (includeSelf) {
+        idInFilters.push(filter);
+    }
     let currentLevelInFilter: ED[T]['Selection']['filter'] = filter;
     while (level > 0) {
         currentLevelInFilter = {
-            [parentKey]: {
-                $in: {
-                    entity,
-                    data: {
-                        id: 1,
-                    },
-                    filter: currentLevelInFilter,
-                }
-            },
+            [parentKeyRef]: currentLevelInFilter,
         };
         if (includeAll) {
             idInFilters.push(currentLevelInFilter);
@@ -292,7 +292,7 @@ export function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof 
     if (includeAll) {
         return {
             $or: idInFilters,
-        };
+        } as ED[T]['Selection']['filter'];
     }
     return currentLevelInFilter;
 }

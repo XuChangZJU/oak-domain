@@ -57,9 +57,7 @@ export declare function same<ED extends EntityDict, T extends keyof ED>(entity: 
  * @param filter 查询当前行的条件
  * @param level
  */
-export declare function makeTreeAncestorFilter<ED extends EntityDict, T extends keyof ED>(entity: T, parentKey: string, filter: ED[T]['Selection']['filter'], level?: number, includeAll?: true): ED[T]["Selection"]["filter"] | {
-    $or: ED[T]["Selection"]["filter"][];
-};
+export declare function makeTreeAncestorFilter<ED extends EntityDict, T extends keyof ED>(entity: T, parentKey: string, filter: ED[T]['Selection']['filter'], level?: number, includeAll?: boolean, includeSelf?: boolean): ED[T]['Selection']['filter'];
 /**
  * 寻找在树形结构中满足条件的数据行的下层数据
  * 例如在area表中，如果“杭州市”满足这一条件，则希望查到更低层的“西湖区”，即可构造出满足条件的filter
@@ -68,6 +66,4 @@ export declare function makeTreeAncestorFilter<ED extends EntityDict, T extends 
  * @param filter 查询当前行的条件
  * @param level
  */
-export declare function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof ED>(entity: T, parentKey: string, filter: ED[T]['Selection']['filter'], level?: number, includeAll?: true): ED[T]["Selection"]["filter"] | {
-    $or: ED[T]["Selection"]["filter"][];
-};
+export declare function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof ED>(entity: T, parentKey: string, filter: ED[T]['Selection']['filter'], level?: number, includeAll?: boolean, includeSelf?: boolean): ED[T]['Selection']['filter'];
