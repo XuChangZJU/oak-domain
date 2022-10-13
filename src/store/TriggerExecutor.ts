@@ -6,7 +6,7 @@ import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Context } from '../types/Context';
-import { Trigger, Executor, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter } from "../types/Trigger";
+import { Trigger, Executor, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, CheckerType } from "../types/Trigger";
 
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
@@ -58,6 +58,14 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
             when: 'before',
         } as CreateTriggerInTxn<ED, T, Cxt>;
         this.registerTrigger(trigger);
+    }
+
+    getCheckers<T extends keyof ED>(entity: T, action: ED[T]['Action'], checkerTypes?: CheckerType[]) {
+        const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
+            trigger => (typeof trigger.action === 'string' && trigger.action === action || (trigger.action).includes(action as any))
+                && (!checkerTypes || trigger.checkerType && checkerTypes.includes(trigger.checkerType))
+        );
+        return triggers;
     }
 
     registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void {

@@ -1,7 +1,8 @@
 import { StorageSchema } from '../types';
 import { EntityDict } from "../types/Entity";
 export declare function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]): ED[T]["Selection"]["filter"];
-export declare function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>): ED[T]["Selection"]["filter"];
+export declare function unionFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]): ED[T]["Selection"]["filter"];
+export declare function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>, union?: true): ED[T]["Selection"]["filter"];
 /**
  * 判断filter是否包含conditionalFilter中的查询条件，即filter查询的结果一定满足conditionalFilter的约束
  * filter = {
@@ -40,3 +41,33 @@ export declare function repel<ED extends EntityDict, T extends keyof ED>(entity:
  * @returns
  */
 export declare function getRelevantIds<ED extends EntityDict, T extends keyof ED>(filter: ED[T]['Selection']['filter']): string[];
+/**
+ * 判断两个过滤条件是否完全一致
+ * @param entity
+ * @param schema
+ * @param filter1
+ * @param filter2
+ */
+export declare function same<ED extends EntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter']): boolean;
+/**
+ * 寻找在树形结构中满足条件的数据行的上层数据
+ * 例如在area表中，如果“杭州市”满足这一条件，则希望查到更高层的“浙江省”和“中国”，即可构造出满足条件的filter
+ * @param entity
+ * @param parentKey parentId属性名
+ * @param filter 查询当前行的条件
+ * @param level
+ */
+export declare function makeTreeAncestorFilter<ED extends EntityDict, T extends keyof ED>(entity: T, parentKey: string, filter: ED[T]['Selection']['filter'], level?: number, includeAll?: true): ED[T]["Selection"]["filter"] | {
+    $or: ED[T]["Selection"]["filter"][];
+};
+/**
+ * 寻找在树形结构中满足条件的数据行的下层数据
+ * 例如在area表中，如果“杭州市”满足这一条件，则希望查到更低层的“西湖区”，即可构造出满足条件的filter
+ * @param entity
+ * @param parentKey parentId属性名
+ * @param filter 查询当前行的条件
+ * @param level
+ */
+export declare function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof ED>(entity: T, parentKey: string, filter: ED[T]['Selection']['filter'], level?: number, includeAll?: true): ED[T]["Selection"]["filter"] | {
+    $or: ED[T]["Selection"]["filter"][];
+};

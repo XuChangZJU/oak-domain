@@ -1,3 +1,4 @@
+import assert from 'assert';
 import { StorageSchema } from '../types';
 import { EntityDict } from "../types/Entity";
 import { intersection, union } from '../utils/lodash';
@@ -15,7 +16,7 @@ export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...f
                             filter.$and = ele[k];
                         }
                     }
-                    else if(k === '$or') {
+                    else if (k === '$or') {
                         if (filter.$or) {
                             filter.$or.push(...(ele[k] as any));
                         }
@@ -48,7 +49,33 @@ export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...f
     return filter;
 }
 
-export function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>) {
+export function unionFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
+    let allOnlyOneOr = true;
+    for (const f of filters) {
+        if (Object.keys(f!).length > 1 || !f!.$or) {
+            allOnlyOneOr = false;
+            break;
+        }
+    }
+    if (allOnlyOneOr) {
+        // 优化特殊情况，全部都是$or，直接合并
+        const ors = filters.map(
+            ele => ele!.$or
+        );
+        return {
+            $or: ors.reduce((prev, next) => prev!.concat(next!), [])
+        } as ED[T]['Selection']['filter'];
+    }
+
+    return {
+        $or: filters,
+    } as ED[T]['Selection']['filter'];
+}
+
+export function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>, union?: true) {
+    if (union) {
+        return unionFilterSegment(...filters);
+    }
     return addFilterSegment(...filters);
 }
 
@@ -146,12 +173,12 @@ export function getRelevantIds<ED extends EntityDict, T extends keyof ED>(filter
             ids = filter.id.$in;
         }
     }
-    
+
     // 三者如果有基一，直接返回，如果大于一返回intersection
     if (!ids && !idsAnd && !idsOr) {
         return [];
     }
-    let result = (ids || idsAnd  || idsOr) as string[];
+    let result = (ids || idsAnd || idsOr) as string[];
     if (ids) {
         result = intersection(result, ids);
     }
@@ -164,3 +191,109 @@ export function getRelevantIds<ED extends EntityDict, T extends keyof ED>(filter
 
     return result;
 }
+
+/**
+ * 判断两个过滤条件是否完全一致
+ * @param entity 
+ * @param schema 
+ * @param filter1 
+ * @param filter2 
+ */
+export function same<ED extends EntityDict, T extends keyof ED>(
+    entity: T,
+    schema: StorageSchema<ED>,
+    filter1: ED[T]['Selection']['filter'],
+    filter2: ED[T]['Selection']['filter']) {
+    // 当前只需要判断是不是id相等就行了，在runningTree的operation合并的时间使用
+    if (!filter1 || !filter1.id || Object.keys(filter1).length > 1 || !filter2 || !filter2.id || Object.keys(filter2).length > 1) {
+        return false;
+    }
+    return filter1.id === filter2.id;
+}
+
+/**
+ * 寻找在树形结构中满足条件的数据行的上层数据
+ * 例如在area表中，如果“杭州市”满足这一条件，则希望查到更高层的“浙江省”和“中国”，即可构造出满足条件的filter
+ * @param entity 
+ * @param parentKey parentId属性名
+ * @param filter 查询当前行的条件
+ * @param level 
+ */
+export function makeTreeAncestorFilter<ED extends EntityDict, T extends keyof ED>(
+    entity: T,
+    parentKey: string,
+    filter: ED[T]['Selection']['filter'],
+    level: number = 1,
+    includeAll?: true) {
+    assert(level >= 0);
+    let idInFilters: ED[T]['Selection']['filter'][] = [filter];
+    let currentLevelInFilter: ED[T]['Selection']['filter'] = filter;
+    while (level > 0) {
+        currentLevelInFilter = {
+            id: {
+                $in: {
+                    entity,
+                    data: {
+                        [parentKey]: 1,
+                    },
+                    filter: currentLevelInFilter,
+                }
+            },
+        };
+        if (includeAll) {
+            idInFilters.push(currentLevelInFilter);
+        }
+        level--;
+    };
+    if (includeAll) {
+        return {
+            $or: idInFilters,
+        };
+    }
+    return currentLevelInFilter;
+}
+
+/**
+ * 寻找在树形结构中满足条件的数据行的下层数据
+ * 例如在area表中，如果“杭州市”满足这一条件，则希望查到更低层的“西湖区”，即可构造出满足条件的filter
+ * @param entity 
+ * @param parentKey parentId属性名
+ * @param filter 查询当前行的条件
+ * @param level 
+ */
+export function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof ED>(
+    entity: T,
+    parentKey: string,
+    filter: ED[T]['Selection']['filter'],
+    level: number = 1,
+    includeAll?: true) {
+    assert(level >= 0);
+    assert(parentKey.endsWith('Id'));
+    const parentKeyRef = parentKey.slice(0, parentKey.length - 2);
+    let idInFilters: ED[T]['Selection']['filter'][] = [filter];
+    let currentLevelInFilter: ED[T]['Selection']['filter'] = filter;
+    while (level > 0) {
+        currentLevelInFilter = {
+            [parentKey]: {
+                $in: {
+                    entity,
+                    data: {
+                        id: 1,
+                    },
+                    filter: currentLevelInFilter,
+                }
+            },
+        };
+        if (includeAll) {
+            idInFilters.push(currentLevelInFilter);
+        }
+        level--;
+    };
+    if (includeAll) {
+        return {
+            $or: idInFilters,
+        };
+    }
+    return currentLevelInFilter;
+}
+
