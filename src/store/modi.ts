@@ -46,7 +46,7 @@ export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt ext
 export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
     return context.rowStore.operate('modi', {
         id: await generateNewId(),
-        action: 'abadon',
+        action: 'abandon',
         data: {},
         filter,
         sorter: [
