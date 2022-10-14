@@ -84,7 +84,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
     }
 
     private reduceDescendants<T extends keyof ED, S extends ED[T]['Selection']>(entity: T, rows: SelectRowShape<ED[T]['Schema'], S['data']>[]) {
-        return rows.map(
+        return rows.filter(ele => !!ele).map(
             (row) => {
                 const row2 = {} as typeof row;
                 for (const attr in row) {
