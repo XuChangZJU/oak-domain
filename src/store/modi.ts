@@ -25,11 +25,32 @@ export function createOperationsFromModies(modies: Modi[]): Array<{
 }
 
 export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
+    const { result: modis } = await context.rowStore.select('modi', {
+        data: {
+            id: 1,
+        },
+        filter,
+        sorter: [
+            {
+                $attr: {
+                    $$createAt$$: 1,
+                },
+                $direction: 'asc',
+            }
+        ]
+    }, context, Object.assign({}, option, {
+        blockTrigger: false,
+    }));
+
     return context.rowStore.operate('modi', {
         id: await generateNewId(),
         action: 'apply',
         data: {},
-        filter,
+        filter: {
+            id: {
+                $in: modis.map(ele => ele.id),
+            }
+        },
         sorter: [
             {
                 $attr: {
