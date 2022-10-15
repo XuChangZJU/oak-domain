@@ -23,19 +23,11 @@ const triggers: Trigger<EntityDict, 'modi', UniversalContext<EntityDict>>[] = [
 
             for (const modi of modies) {
                 const { targetEntity, id, action, data, filter} = modi;
-                const targets = await context.rowStore.select(targetEntity as keyof EntityDict, {
-                    data: {
-                        id: 1,
-                    },
-                    filter: filter as any,
-                }, context, Object.assign({}, option, {
-                    blockTrigger: true,                    
-                }));
                 await context.rowStore.operate(targetEntity as keyof EntityDict, {
                     id,
                     action,
                     data,
-                    filter: targets.result.map(ele => ele.id),
+                    filter: filter as any,
                 }, context, Object.assign({}, option, {
                     blockTrigger: true,
                 }));

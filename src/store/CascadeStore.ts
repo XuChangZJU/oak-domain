@@ -158,8 +158,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     });
                     subCascadeSelectionFns.forEach(
                         ele => cascadeSelectionFns.push(
-                            async (result) => {
-                                await ele(result.map(ele2 => ele2[attr] as any));
+                            async (result) => {                                
+                                await ele(result.map(ele2 => ele2[attr] as any).filter(ele2 => !!ele2));
                             }
                         )
                     );
@@ -256,7 +256,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     subCascadeSelectionFns.forEach(
                         ele => cascadeSelectionFns.push(
                             async (result) => {
-                                await ele(result.map(ele2 => ele2[attr] as any));
+                                await ele(result.map(ele2 => ele2[attr] as any).filter(ele2 => !!ele2));
                             }
                         )
                     );

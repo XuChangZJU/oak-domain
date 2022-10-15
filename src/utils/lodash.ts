@@ -2,7 +2,7 @@
  * 避免lodash打包体积过大
  * 像assign, keys尽量使用Object的函数
  */
-import unset from 'lodash/unset';
+/* import unset from 'lodash/unset';
 import uniqBy from 'lodash/uniqBy';
 import pull from 'lodash/pull';
 import uniq from 'lodash/uniq';
@@ -16,8 +16,7 @@ import pick from 'lodash/pick';
 import isEqual from 'lodash/isEqual';
 import union from 'lodash/union';
 import difference from 'lodash/difference';
-import groupBy from 'lodash/groupBy';
-
+import groupBy from 'lodash/groupBy'; */
 export {
     unset,
     pull,
@@ -34,4 +33,4 @@ export {
     union,
     difference,
     groupBy,
-};
+} from 'lodash';
