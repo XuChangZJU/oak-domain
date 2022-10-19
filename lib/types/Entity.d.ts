@@ -1,10 +1,11 @@
 import { GenericAction } from '../actions/action';
 import { ExpressionKey, ExprOp, MakeFilter, NodeId } from './Demand';
 import { OneOf, OptionalKeys } from './Polyfill';
+import { PrimaryKey, Sequence } from './DataType';
 export declare type TriggerDataAttribute = '$$triggerData$$';
 export declare type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 declare type PrimaryKeyAttribute = 'id';
-export declare type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
+export declare type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute | '$$seq$$';
 export declare const initinctiveAttributes: string[];
 export declare type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
@@ -42,7 +43,8 @@ export declare type Operation<A extends GenericAction | string, DATA extends Obj
 } & Filter<A, FILTER>;
 export declare type Selection<DATA extends Object, FILTER extends Object | undefined = undefined, SORT extends Object | undefined = undefined> = Omit<Operation<'select', DATA, FILTER, SORT>, 'id'>;
 export interface EntityShape {
-    id: string;
+    id: PrimaryKey;
+    $$seq$$: Sequence;
     $$createAt$$: number | Date;
     $$updateAt$$: number | Date;
     $$deleteAt$$?: number | Date | null;

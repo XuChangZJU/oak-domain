@@ -12,6 +12,7 @@ export type Datetime = number | Date;
 export type Boolean = boolean;
 export type PrimaryKey = string;
 export type ForeignKey<E extends string> = string;
+export type Sequence = string;      // 自增长序列，为了让人阅读方便，为了支持分布式这里用string，底层实现可自定义
 export { Geo, SingleGeo } from './Geo';
 
 export type DataTypes = number | string | Datetime | Geo | Object | SingleGeo;

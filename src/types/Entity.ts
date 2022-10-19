@@ -1,13 +1,14 @@
 import { GenericAction } from '../actions/action';
 import { ExpressionKey, ExprOp, FulltextFilter, MakeFilter, NodeId, Q_BooleanValue, Q_NumberValue, Q_StringValue } from './Demand';
 import { OneOf, OptionalKeys } from './Polyfill';
+import { PrimaryKey, Sequence } from './DataType';
 
 export type TriggerDataAttribute = '$$triggerData$$';
 export type TriggerTimestampAttribute = '$$triggerTimestamp$$';
 
 type PrimaryKeyAttribute = 'id';
-export type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute;
-export const initinctiveAttributes = ['id', '$$createAt$$', '$$updateAt$$', '$$deleteAt$$', '$$triggerData$$', '$$triggerTimestamp$$'];
+export type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute | '$$seq$$';
+export const initinctiveAttributes = ['id', '$$createAt$$', '$$updateAt$$', '$$deleteAt$$', '$$triggerData$$', '$$triggerTimestamp$$', '$$seq$$'];
 
 export type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
@@ -55,7 +56,8 @@ export type Selection<DATA extends Object,
     SORT extends Object | undefined = undefined> = Omit<Operation<'select', DATA, FILTER, SORT>, 'id'>;
 
 export interface EntityShape {
-    id: string;
+    id: PrimaryKey;
+    $$seq$$: Sequence;
     $$createAt$$: number | Date;
     $$updateAt$$: number | Date;
     $$deleteAt$$?: number | Date | null;

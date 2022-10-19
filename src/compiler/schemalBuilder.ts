@@ -1165,45 +1165,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
 function constructSchema(statements: Array<ts.Statement>, entity: string) {
     const { schemaAttrs } = Schema[entity];
     const members: Array<ts.TypeElement> = [
-        // id: String<64>
-        factory.createPropertySignature(
-            undefined,
-            factory.createIdentifier('id'),
-            undefined,
-            factory.createTypeReferenceNode(
-                factory.createIdentifier('PrimaryKey'),
-            )
-        ),
-        // $$createAt$$: Datetime
-        factory.createPropertySignature(
-            undefined,
-            factory.createIdentifier('$$createAt$$'),
-            undefined,
-            factory.createTypeReferenceNode(
-                factory.createIdentifier('Datetime'),
-            )
-        ),
-        // $$updateAt$$: Datetime
-        factory.createPropertySignature(
-            undefined,
-            factory.createIdentifier('$$updateAt$$'),
-            undefined,
-            factory.createTypeReferenceNode(
-                factory.createIdentifier('Datetime'),
-            )
-        ),
-        // $$updateAt$$: Datetime
-        factory.createPropertySignature(
-            undefined,
-            factory.createIdentifier('$$deleteAt$$'),
-            factory.createToken(ts.SyntaxKind.QuestionToken),
-            factory.createUnionTypeNode([
-                factory.createTypeReferenceNode(
-                    factory.createIdentifier('Datetime'),
-                ),
-                factory.createLiteralTypeNode(factory.createNull())
-            ])
-        )
     ];
     const members2: Array<ts.TypeElement> = [];
 
@@ -1425,7 +1386,10 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
             ],
             factory.createIdentifier('OpSchema'),
             undefined,
-            factory.createTypeLiteralNode(members)
+            factory.createIntersectionTypeNode([
+                factory.createTypeReferenceNode('EntityShape'),
+                factory.createTypeLiteralNode(members)
+            ])
         ),
         factory.createTypeAliasDeclaration(
             undefined,
@@ -1452,6 +1416,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
             undefined,
             factory.createIntersectionTypeNode(
                 [
+                    factory.createTypeReferenceNode('EntityShape'),
                     factory.createTypeLiteralNode(members.concat(members2)),
                     factory.createMappedTypeNode(
                         undefined,
@@ -1508,6 +1473,15 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
             undefined,
             factory.createTypeReferenceNode(
                 factory.createIdentifier('Q_DateValue'),
+            )
+        ),
+        // $$seq$$: Q_StringValue
+        factory.createPropertySignature(
+            undefined,
+            factory.createIdentifier('$$seq$$'),
+            undefined,
+            factory.createTypeReferenceNode(
+                factory.createIdentifier('Q_StringValue'),
             )
         ),
         // $$updateAt$$: Q_DateValue
@@ -1774,6 +1748,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
         ['id', true],
         ['$$createAt$$', false],
         ['$$updateAt$$', false],
+        ['$$seq$$', false],
     ];
     const foreignKeyProperties: {
         [k: string]: [string]
@@ -2255,6 +2230,15 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
             [factory.createPropertySignature(
                 undefined,
                 factory.createIdentifier("$$createAt$$"),
+                undefined,
+                factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+            )]
+        ),
+        // $$seq$$: 1
+        factory.createTypeLiteralNode(
+            [factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("$$seq$$"),
                 undefined,
                 factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
             )]
@@ -4427,7 +4411,12 @@ const initialStatements = () => [
                     false,
                     factory.createIdentifier("MakeAction"),
                     factory.createIdentifier("OakMakeAction")
-                )
+                ),
+                factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("EntityShape")
+                ),
             ])
         ),
         factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}Entity`),

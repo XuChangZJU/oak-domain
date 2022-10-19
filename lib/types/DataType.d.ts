@@ -11,6 +11,7 @@ export declare type Datetime = number | Date;
 export declare type Boolean = boolean;
 export declare type PrimaryKey = string;
 export declare type ForeignKey<E extends string> = string;
+export declare type Sequence = string;
 export { Geo, SingleGeo } from './Geo';
 export declare type DataTypes = number | string | Datetime | Geo | Object | SingleGeo;
 export declare const types: string[];

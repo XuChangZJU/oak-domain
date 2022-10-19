@@ -197,7 +197,8 @@ export type SimpleColumnType =
 
     | "object"      // 增加的json类型别名
     | "array"      // 增加的json类型别名
-    | "function";       // 增加的function类型
+    | "function"       // 增加的function类型
+    | "sequence";       // 自增长类型别名
 
 
 
