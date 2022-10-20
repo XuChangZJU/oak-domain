@@ -36,12 +36,12 @@ export declare type FormCreateData<SH extends GeneralEntityShape> = Omit<SH, Ins
     id: string;
 };
 export declare type Operation<A extends GenericAction | string, DATA extends Object, FILTER extends Object | undefined = undefined, SORTER extends Object | undefined = undefined> = {
-    id: string;
+    id?: string;
     action: A;
     data: DATA;
     sorter?: SORTER;
 } & Filter<A, FILTER>;
-export declare type Selection<DATA extends Object, FILTER extends Object | undefined = undefined, SORT extends Object | undefined = undefined> = Omit<Operation<'select', DATA, FILTER, SORT>, 'id'>;
+export declare type Selection<DATA extends Object, FILTER extends Object | undefined = undefined, SORT extends Object | undefined = undefined> = Operation<'select', DATA, FILTER, SORT>;
 export interface EntityShape {
     id: PrimaryKey;
     $$seq$$: Sequence;

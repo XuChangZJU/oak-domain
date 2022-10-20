@@ -45,7 +45,7 @@ export type Operation<A extends GenericAction | string,
     DATA extends Object,
     FILTER extends Object | undefined = undefined,
     SORTER extends Object | undefined = undefined> = {
-        id: string;     // 为了一致性，每个operation也应当保证唯一id
+        id?: string;     // 为了一致性，每个operation也应当保证唯一id
         action: A;
         data: DATA;
         sorter?: SORTER;
@@ -53,7 +53,7 @@ export type Operation<A extends GenericAction | string,
 
 export type Selection<DATA extends Object,
     FILTER extends Object | undefined = undefined,
-    SORT extends Object | undefined = undefined> = Omit<Operation<'select', DATA, FILTER, SORT>, 'id'>;
+    SORT extends Object | undefined = undefined> = Operation<'select', DATA, FILTER, SORT>;
 
 export interface EntityShape {
     id: PrimaryKey;

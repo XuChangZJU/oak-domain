@@ -56,6 +56,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                 [id!]: cloneDeep(row),
                             });
                         }
+                        else {
+                            Object.assign(entityBranch[id], row);
+                        }
                     }
                 );
                 return;
@@ -1023,7 +1026,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         id: 'dummy',
                         action: 'create',
                         data: {
-                            id: operId,
+                            id: operId!,
                             targetEntity: entity as string,
                             action,
                             entity: option.modiParentEntity!,
