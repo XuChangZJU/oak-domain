@@ -106,7 +106,7 @@ export const isVehicleNumber: ValidatorFunction = (str) => {
 }
 
 
-export function checkAttributesNotNull<T extends Record<string, any>>(data: T, attributes: Array<keyof T>, allowEmpty?: true) {
+export function checkAttributesNotNull<T extends Record<string, any>>(entity: string, data: T, attributes: Array<keyof T>, allowEmpty?: true) {
     const attrs = attributes.filter(
         (attr) => {
             if (data[attr] === null || data[attr] === '') {
@@ -119,16 +119,16 @@ export function checkAttributesNotNull<T extends Record<string, any>>(data: T, a
     ) as string[];
 
     if (attrs.length > 0) {
-        throw new OakInputIllegalException(attrs, '属性不能为空');
+        throw new OakInputIllegalException(entity, attrs, '属性不能为空');
     }
 };
 
-export function checkAttributesScope<T extends Record<string, any>>(data: T, attributes: Array<keyof T>) {
+export function checkAttributesScope<T extends Record<string, any>>(entity: string, data: T, attributes: Array<keyof T>) {
     const attrs = attributes.filter(
         attr => !data.hasOwnProperty(attr)
     ) as string[];    
 
     if (attrs.length > 0) {
-        throw new OakInputIllegalException(attrs, '多余的属性');
+        throw new OakInputIllegalException(entity, attrs, '多余的属性');
     }
 }

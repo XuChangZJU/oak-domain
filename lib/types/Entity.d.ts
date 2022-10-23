@@ -24,6 +24,7 @@ export declare type OperateOption = {
     blockTrigger?: true;
     dontCollect?: boolean;
     dontCreateOper?: boolean;
+    dontCreateModi?: boolean;
     allowExists?: boolean;
     modiParentId?: string;
     modiParentEntity?: string;

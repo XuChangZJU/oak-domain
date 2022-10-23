@@ -667,7 +667,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
         const option2 = Object.assign({}, option);
 
         const opData: Record<string, any> = {};
-        if (modiAttr && action !== 'remove') {
+        if (modiAttr && action !== 'remove' && !option.dontCreateModi) {
             // create/update具有modi对象的对象，对其子对象的update行为全部是create modi对象（缓存动作）
             // delete此对象，所有的modi子对象应该通过触发器作废，这个通过系统的trigger来搞
             assert(!option2.modiParentId && !option2.modiParentEntity);

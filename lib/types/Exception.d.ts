@@ -38,7 +38,9 @@ export declare class OakRowInconsistencyException<ED extends EntityDict> extends
  */
 export declare class OakInputIllegalException extends OakUserException {
     private attributes;
-    constructor(attributes: string[], message?: string);
+    private entity;
+    constructor(entity: string, attributes: string[], message?: string);
+    getEntity(): string;
     getAttributes(): string[];
     addAttributesPrefix(prefix: string): void;
     toString(): string;
@@ -70,6 +72,9 @@ export declare class OakCongruentRowExists<ED extends EntityDict, T extends keyo
     getData(): ED[T]["OpSchema"];
     getEntity(): T;
     toString(): string;
+}
+export declare class OakDeadlock extends OakUserException {
+    constructor(message?: string | undefined);
 }
 export declare function makeException(data: {
     name: string;

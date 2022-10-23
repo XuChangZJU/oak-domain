@@ -29,6 +29,7 @@ export type OperateOption = {
     blockTrigger?: true;
     dontCollect?: boolean;
     dontCreateOper?: boolean;
+    dontCreateModi?: boolean;
     allowExists?: boolean;      // 插入时允许已经存在唯一键值的行了，即insert / update逻辑
     modiParentId?: string;      // 如果是延时更新，相关modi要关联到一个父亲上统一应用
     modiParentEntity?: string;  // 如果是延时更新，相关modi要关联到一个父亲上统一应用

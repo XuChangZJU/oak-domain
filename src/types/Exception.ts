@@ -88,9 +88,15 @@ export class OakRowInconsistencyException<ED extends EntityDict> extends OakUser
  */
 export class OakInputIllegalException extends OakUserException {
     private attributes: string[];
-    constructor(attributes: string[], message?: string) {
+    private entity: string;
+    constructor(entity: string, attributes: string[], message?: string) {
         super(message);
+        this.entity = entity;
         this.attributes = attributes;
+    }
+
+    getEntity() {
+        return this.entity;
     }
 
     getAttributes() {
@@ -105,6 +111,7 @@ export class OakInputIllegalException extends OakUserException {
 
     toString(): string {
         return JSON.stringify({
+            entity: this.entity,
             name: this.constructor.name,
             message: this.message,
             attributes: this.attributes,
@@ -167,6 +174,12 @@ export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> ex
     }
 }
 
+export class OakDeadlock extends OakUserException {
+    constructor(message?: string | undefined) {
+        super(message || '发现死锁');
+    }
+};
+
 export function makeException(data: {
     name: string;
     message?: string;
@@ -187,7 +200,7 @@ export function makeException(data: {
             return new OakRowInconsistencyException(data.data, data.message);
         }
         case OakInputIllegalException.name: {
-            return new OakInputIllegalException(data.attributes, data.message);
+            return new OakInputIllegalException(data.entity, data.attributes, data.message);
         }
         case OakUserUnpermittedException.name: {
             return new OakUserUnpermittedException(data.message);
@@ -203,6 +216,9 @@ export function makeException(data: {
         }
         case OakRowUnexistedException.name: {
             return new OakRowUnexistedException(data.rows);
+        }
+        case OakDeadlock.name: {
+            return new OakDeadlock(data.message);
         }
         default:
             return;
