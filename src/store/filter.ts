@@ -144,7 +144,7 @@ export function getRelevantIds<ED extends EntityDict, T extends keyof ED>(filter
 
     // 因为要准确判定id，如果有其它的过滤条件，可能会使实际处理的行数少于id指向的行数，只能返回空数组
     const attrs = Object.keys(filter);
-    if (union(attrs, ['id', '$and', '$or']).length > 3) {
+    if (intersection(attrs, ['id', '$and', '$or']).length > 3) {
         return [];
     }
 

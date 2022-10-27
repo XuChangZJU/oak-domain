@@ -1166,41 +1166,44 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
                         // 按照框架要求生成Oper和OperEntity这两个内置的对象
                         assert(operId);
-                        const createOper: CreateOperOperation = {
-                            id: 'dummy',
-                            action: 'create',
-                            data: {
-                                id: operId,
-                                action,
-                                data,
-                                operatorId: await context.getCurrentUserId(),
-                                operEntity$oper: data instanceof Array ? {
-                                    id: 'dummy',
-                                    action: 'create',
-                                    data: await Promise.all(
-                                        data.map(
-                                            async (ele) => ({
-                                                id: await generateNewId(),
-                                                entity: entity as string,
-                                                entityId: ele.id,
-                                            })
-                                        )
-                                    ),
-                                } : [{
-                                    id: 'dummy',
-                                    action: 'create',
-                                    data: {
-                                        id: await generateNewId(),
-                                        entity: entity as string,
-                                        entityId: (data as ED[T]['CreateSingle']['data']).id,
-                                    },
-                                }]
-                            },
-                        };
-                        await this.cascadeUpdate('oper', createOper, context, {
-                            dontCollect: true,
-                            dontCreateOper: true,
-                        });
+                        const operatorId = await context.getCurrentUserId(true);
+                        if (operatorId) {
+                            const createOper: CreateOperOperation = {
+                                id: 'dummy',
+                                action: 'create',
+                                data: {
+                                    id: operId,
+                                    action,
+                                    data,
+                                    operatorId,
+                                    operEntity$oper: data instanceof Array ? {
+                                        id: 'dummy',
+                                        action: 'create',
+                                        data: await Promise.all(
+                                            data.map(
+                                                async (ele) => ({
+                                                    id: await generateNewId(),
+                                                    entity: entity as string,
+                                                    entityId: ele.id,
+                                                })
+                                            )
+                                        ),
+                                    } : [{
+                                        id: 'dummy',
+                                        action: 'create',
+                                        data: {
+                                            id: await generateNewId(),
+                                            entity: entity as string,
+                                            entityId: (data as ED[T]['CreateSingle']['data']).id,
+                                        },
+                                    }]
+                                },
+                            };
+                            await this.cascadeUpdate('oper', createOper, context, {
+                                dontCollect: true,
+                                dontCreateOper: true,
+                            });
+                        }
                     }
                     return result!;
                 }
