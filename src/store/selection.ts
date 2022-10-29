@@ -192,6 +192,7 @@ export function reinforceSelection<ED extends EntityDict>(schema: StorageSchema<
                         entity: 1,
                         entityId: 1,
                         action: 1,
+                        iState: 1,
                         data: 1,
                         filter: 1,
                     },
