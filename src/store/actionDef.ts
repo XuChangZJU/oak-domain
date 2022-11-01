@@ -37,8 +37,9 @@ export async function checkFilterContains<ED extends EntityDict, T extends keyof
     const filter2 = combineFilters([filter, {
         $not: contained,
     }]);
+    const projection = process.env.OAK_PLATFORM === 'server' ? getFullProjection(entity, schema) : { id: 1 };
     const { result } = await rowStore.select(entity, {
-        data: getFullProjection(entity, schema) as any,
+        data: projection,
         filter: filter2,
         indexFrom: 0,
         count: 10,
