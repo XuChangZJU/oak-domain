@@ -12,8 +12,7 @@ import { judgeRelation } from "./relation";
 import { CreateOperation as CreateOperOperation } from '../base-app-domain/Oper/Schema';
 import { CreateOperation as CreateModiOperation, UpdateOperation as UpdateModiOperation } from '../base-app-domain/Modi/Schema';
 import { OakCongruentRowExists, OakRowUnexistedException } from "../types";
-import { omit, cloneDeep, uniq } from '../utils/lodash';
-import { result } from "lodash";
+import { unset, omit, cloneDeep, uniq } from '../utils/lodash';
 
 /**这个用来处理级联的select和update，对不同能力的 */
 export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
@@ -161,7 +160,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     });
                     subCascadeSelectionFns.forEach(
                         ele => cascadeSelectionFns.push(
-                            async (result) => {                                
+                            async (result) => {
                                 await ele(result.map(ele2 => ele2[attr] as any).filter(ele2 => !!ele2));
                             }
                         )
@@ -1003,6 +1002,28 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
         return result;
     }
 
+    // 对插入的数据，没有初始值的属性置null
+    private preProcessDataCreated<T extends keyof ED>(entity: T, data: ED[T]['CreateSingle']['data']) {
+        const { attributes } = this.getSchema()[entity];
+        for (const key in attributes) {
+            if (data[key] === undefined) {
+                Object.assign(data, {
+                    [key]: null,
+                });
+            }
+        }
+    }
+
+    // 对更新的数据，去掉所有的undefined属性
+    private preProcessDataUpdated<T extends keyof ED>(data: ED[T]['Update']['data']) {
+        const undefinedKeys = Object.keys(data).filter(
+            ele => data[ele] === undefined
+        );
+        undefinedKeys.forEach(
+            ele => unset(data, ele)
+        );
+    }
+
     /**
      * 和具体的update过程无关的例程放在这里，包括对later动作的处理、对oper的记录以及对record的收集等
      * @param entity 
@@ -1020,6 +1041,14 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
 
         switch (action) {
             case 'create': {
+                if (data instanceof Array) {
+                    data.forEach(
+                        ele => this.preProcessDataCreated(entity, ele)
+                    );
+                }
+                else {                    
+                    this.preProcessDataCreated(entity, data as ED[T]['CreateSingle']['data']);
+                }
                 if (option.modiParentEntity && !['modi', 'modiEntity', 'oper', 'operEntity'].includes(entity as string)) {
                     // 变成对modi的插入
                     const modiCreate: CreateModiOperation = {
@@ -1224,6 +1253,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         dontCollect: true,
                     });
                     ids.push(...(rows.map(ele => ele.id! as string)));
+                }
+                if (data) {
+                    this.preProcessDataUpdated(data);
                 }
 
                 if (option.modiParentEntity && !['modi', 'modiEntity'].includes(entity as string)) {

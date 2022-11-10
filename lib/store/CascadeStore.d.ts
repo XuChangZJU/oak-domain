@@ -51,6 +51,8 @@ export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDic
      * @param option
      */
     protected cascadeUpdate<T extends keyof ED, OP extends OperateOption>(entity: T, operation: ED[T]['Create'] | ED[T]['Update'] | ED[T]['Remove'], context: Cxt, option: OP): Promise<OperationResult<ED>>;
+    private preProcessDataCreated;
+    private preProcessDataUpdated;
     /**
      * 和具体的update过程无关的例程放在这里，包括对later动作的处理、对oper的记录以及对record的收集等
      * @param entity

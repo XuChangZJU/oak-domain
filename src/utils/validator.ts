@@ -109,7 +109,7 @@ export const isVehicleNumber: ValidatorFunction = (str) => {
 export function checkAttributesNotNull<T extends Record<string, any>>(entity: string, data: T, attributes: Array<keyof T>, allowEmpty?: true) {
     const attrs = attributes.filter(
         (attr) => {
-            if (data[attr] === null || data[attr] === '') {
+            if (data[attr] === null || data[attr] === ''|| data[attr] === undefined) {
                 return true;
             }
             if (!allowEmpty && !data.hasOwnProperty(attr)) {
