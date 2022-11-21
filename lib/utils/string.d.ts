@@ -6,7 +6,7 @@ export declare function firstLetterUpperCase(s: string): string;
  * @param keys
  * @returns {function(...[*]): string}
  */
-export declare const template: (strings: Array<string>, ...keys: Array<any>) => (...values: Array<any>) => string;
+export declare const template: (strings: TemplateStringsArray, ...keys: Array<any>) => (...values: Array<any>) => string;
 /**
  * 随机生成字符串
  * @param randomLength

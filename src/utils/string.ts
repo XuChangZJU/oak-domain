@@ -12,7 +12,7 @@ export function firstLetterUpperCase(s: string) {
  * @param keys
  * @returns {function(...[*]): string}
  */
-export const template = (strings: Array<string>, ...keys: Array<any>): (...values: Array<any>) => string => {
+export const template = (strings: TemplateStringsArray, ...keys: Array<any>): (...values: Array<any>) => string => {
     return (function (...values) {
         const dict = values[values.length - 1] || {};
         const result = [strings[0]];
