@@ -1,12 +1,12 @@
 import { EntityDict } from "./Entity";
-import { Context } from './Context';
 import { OpRecord } from "./Entity";
+import { AsyncContext } from "../store/AsyncRowStore";
 
-export interface Aspect<ED extends EntityDict, Cxt extends Context<ED>>{
+export interface Aspect<ED extends EntityDict, Cxt extends AsyncContext<ED>>{
     (params: any, context: Cxt): Promise<any>;
 };
 
-export interface AspectWrapper<ED extends EntityDict, Cxt extends Context<ED>, AD extends Record<string, Aspect<ED, Cxt>>>{
+export interface AspectWrapper<ED extends EntityDict, Cxt extends AsyncContext<ED>, AD extends Record<string, Aspect<ED, Cxt>>>{
     exec: <T extends keyof AD>(name: T, params: Parameters<AD[T]>[0]) => Promise<{
         result: Awaited<ReturnType<AD[T]>>;
         opRecords: OpRecord<ED>[];

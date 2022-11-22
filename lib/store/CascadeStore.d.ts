@@ -1,27 +1,22 @@
-import { Context } from '../types/Context';
-import { EntityDict, OperateOption, SelectOption, OperationResult, SelectRowShape } from "../types/Entity";
+import { EntityDict, OperateOption, SelectOption, OperationResult, DeduceFilter } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
+import { SyncContext } from "./SyncRowStore";
+import { AsyncContext } from "./AsyncRowStore";
 /**这个用来处理级联的select和update，对不同能力的 */
-export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
+export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> extends RowStore<ED> {
     constructor(storageSchema: StorageSchema<ED>);
     protected abstract supportManyToOneJoin(): boolean;
     protected abstract supportMultipleCreate(): boolean;
-    protected abstract selectAbjointRow<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(entity: T, selection: S, context: Cxt, option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
-    protected abstract updateAbjointRow<T extends keyof ED, OP extends OperateOption>(entity: T, operation: ED[T]['Create'] | ED[T]['Update'] | ED[T]['Remove'], context: Cxt, option: OP): Promise<number>;
-    /**
-     * 将一次查询的结果集加入result
-     * @param entity
-     * @param rows
-     * @param context
-     */
-    private addToResultSelections;
-    private reduceDescendants;
-    private destructCascadeSelect;
-    protected cascadeSelect<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(entity: T, selection: S, context: Cxt, option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
-    protected cascadeSelect2<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(entity: T, selection: S, context: Cxt, option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
-    private destructCascadeUpdate;
+    protected abstract selectAbjointRow<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Partial<ED[T]['Schema']>[];
+    protected abstract updateAbjointRow<T extends keyof ED, OP extends OperateOption, Cxt extends SyncContext<ED>>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): number;
+    protected abstract selectAbjointRowAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Promise<Partial<ED[T]['Schema']>[]>;
+    protected abstract updateAbjointRowAsync<T extends keyof ED, OP extends OperateOption, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Create'] | ED[T]['Update'] | ED[T]['Remove'], context: Cxt, option: OP): Promise<number>;
+    protected destructCascadeSelect<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED> | AsyncContext<ED>, R>(entity: T, projection2: ED[T]['Selection']['data'], context: Cxt, cascadeSelect: <T2 extends keyof ED>(entity2: T2, selection: ED[T2]['Selection'], context: Cxt, op: OP) => R, option: OP): {
+        projection: ED[T]["Selection"]["data"];
+        cascadeSelectionFns: ((result: Partial<ED[T]['Schema']>[]) => Promise<void> | void)[];
+    };
     /**
      * 级联更新
      * A --> B
@@ -46,13 +41,22 @@ export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDic
      * 两者必须通过entity/entityId关联
      * 此时需要把对B的更新记录成一条新插入的Modi对象，并将A上的entity/entityId指向该对象（新生成的Modi对象的id与此operation的id保持一致）
      * @param entity
-     * @param operation
+     * @param action
+     * @param data
      * @param context
      * @param option
+     * @param result
+     * @param filter
+     * @returns
      */
-    protected cascadeUpdate<T extends keyof ED, OP extends OperateOption>(entity: T, operation: ED[T]['Create'] | ED[T]['Update'] | ED[T]['Remove'], context: Cxt, option: OP): Promise<OperationResult<ED>>;
-    private preProcessDataCreated;
-    private preProcessDataUpdated;
+    protected destructCascadeUpdate<T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>, OP extends OperateOption, R>(entity: T, action: ED[T]['Action'], data: ED[T]['CreateSingle']['data'] | ED[T]['Update']['data'] | ED[T]['Remove']['data'], context: Cxt, option: OP, cascadeUpdate: <T2 extends keyof ED>(entity: T2, operation: ED[T2]['Operation'], context: Cxt, option: OP) => R, filter?: DeduceFilter<ED[T]['Schema']>): {
+        data: Record<string, any>;
+        beforeFns: (() => R)[];
+        afterFns: (() => R)[];
+    };
+    protected preProcessDataCreated<T extends keyof ED>(entity: T, data: ED[T]['Create']['data']): void;
+    protected preProcessDataUpdated<T extends keyof ED>(data: ED[T]['Update']['data']): void;
+    judgeRelation(entity: keyof ED, attr: string): string | 2 | 1 | string[] | 0;
     /**
      * 和具体的update过程无关的例程放在这里，包括对later动作的处理、对oper的记录以及对record的收集等
      * @param entity
@@ -60,6 +64,26 @@ export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDic
      * @param context
      * @param option
      */
+    private doUpdateSingleRowAsync;
     private doUpdateSingleRow;
-    judgeRelation(entity: keyof ED, attr: string): string | string[] | 1 | 0 | 2;
+    protected cascadeUpdate<T extends keyof ED, Cxt extends SyncContext<ED>, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): OperationResult<ED>;
+    /**
+     *
+     * @param entity
+     * @param operation
+     * @param context
+     * @param option
+     */
+    protected cascadeUpdateAsync<T extends keyof ED, Cxt extends AsyncContext<ED>, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): Promise<OperationResult<ED>>;
+    protected cascadeSelect<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Partial<ED[T]['Schema']>[];
+    /**
+     * 将一次查询的结果集加入result
+     * todo 如果是supportMtoOJoin，这里还要解构（未充分测试）
+     * @param entity
+     * @param rows
+     * @param context
+     */
+    private addToResultSelections;
+    private addSingleRowToResultSelections;
+    protected cascadeSelectAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Promise<Partial<ED[T]['Schema']>[]>;
 }

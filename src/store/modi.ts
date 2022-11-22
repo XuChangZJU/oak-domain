@@ -1,9 +1,11 @@
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
-import { UniversalContext } from '../store/UniversalContext';
 import { OpSchema as Modi, Filter } from '../base-app-domain/Modi/Schema';
-import { Checker, Operation, StorageSchema, UpdateChecker, EntityDict, OakRowLockedException, Context, OperateOption, Trigger, RemoveTrigger } from '../types';
+import { Checker, Operation, StorageSchema, RowChecker, EntityDict, OakRowLockedException, Context, OperateOption, Trigger, RemoveTrigger } from '../types';
 import { appendOnlyActions } from '../actions/action';
 import { difference } from '../utils/lodash';
+import { AsyncContext } from './AsyncRowStore';
+import { generateNewIdAsync } from "../utils/uuid";
+import { SyncContext } from './SyncRowStore';
 
 export function createOperationsFromModies(modies: Modi[]): Array<{
     operation: Operation<string, Object, Object>,
@@ -24,9 +26,9 @@ export function createOperationsFromModies(modies: Modi[]): Array<{
     );
 }
 
-export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
-    return context.rowStore.operate('modi', {
-        id: await generateNewId(),
+export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
+    return context.operate('modi', {
+        id: await generateNewIdAsync(),
         action: 'apply',
         data: {},
         filter,
@@ -38,14 +40,14 @@ export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt ext
                 $direction: 'asc',
             }
         ] */
-    }, context, Object.assign({}, option, {
+    }, Object.assign({}, option, {
         blockTrigger: false,
     }));
 }
 
-export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt extends UniversalContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
-    return context.rowStore.operate('modi', {
-        id: await generateNewId(),
+export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
+    return context.operate('modi', {
+        id: await generateNewIdAsync(),
         action: 'abandon',
         data: {},
         filter,
@@ -57,13 +59,13 @@ export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt e
                 $direction: 'asc',
             }
         ]
-    }, context,  Object.assign({}, option, {
+    }, Object.assign({}, option, {
         blockTrigger: false,
     }));
 }
 
-export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>) {
-    const checkers: Checker<ED, keyof ED, Cxt>[] = [];
+export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
+    const checkers: RowChecker<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
         const { actionType, actions, inModi } = schema[entity];
@@ -75,43 +77,30 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
             entity,
             action: restActions as any,
             type: 'row',
-            checker: async ({ operation }, context) => {
-                const { filter } = operation;
-                const filter2 = {
-                    modi: {
-                        iState: 'active',
+            filter: {
+                id: {
+                    $nin: {
+                        entity: 'modiEntity',
+                        data: {
+                            entityId: 1,
+                        },
+                        filter: {
+                            entity,
+                            modi: {
+                                iState: 'active',
+                            }
+                        },
                     },
-                };
-                if (filter) {
-                    Object.assign(filter2, {
-                        [entity]: filter
-                    });
-                }
-                else {
-                    Object.assign(filter2, {
-                        entity,
-                    });
-                }
-                const count = await context.rowStore.count(
-                    'modiEntity',
-                    {
-                        filter: filter2 as any,
-                    },
-                    context,
-                    {}
-                );
-                if (count > 0) {
-                    throw new OakRowLockedException();
-                }
-                return 0;
-            },
-        } as UpdateChecker<ED, keyof ED, Cxt>)
+                },
+            } as ED[keyof ED]['Selection']['filter'],
+            errMsg: `更新的对象${entity}上有尚未结束的modi`,
+        })
     }
 
     return checkers;
 }
 
-export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>) {
+export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>>(schema: StorageSchema<ED>) {
     const triggers: Trigger<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
@@ -126,15 +115,15 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
                 fn: async ({ operation }, context, option) => {
                     const { data } = operation;
                     const { id } = data;
-                    await context.rowStore.operate('modi', {
-                        id: await generateNewId(),
+                    await context.operate('modi', {
+                        id: await generateNewIdAsync(),
                         action: 'remove',
                         data: {},
                         filter: {
                             entity,
                             entityId: id,
                         }
-                    }, context, option);
+                    }, option);
                     return 1;
                 },
             } as RemoveTrigger<ED, keyof ED, Cxt>);

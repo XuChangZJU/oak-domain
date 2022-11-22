@@ -1,24 +1,25 @@
 /// <reference types="node" />
 import { IncomingHttpHeaders } from "http";
-import { UniversalContext } from "../store/UniversalContext";
-import { Connector, EntityDict, OakException, OpRecord, RowStore } from "../types";
-export declare class SimpleConnector<ED extends EntityDict, Cxt extends UniversalContext<ED>> extends Connector<ED, Cxt> {
+import { AsyncContext, AsyncRowStore } from '../store/AsyncRowStore';
+import { SyncContext } from '../store/SyncRowStore';
+import { Connector, EntityDict, OakException, OpRecord } from "../types";
+export declare class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
     static ROUTER: string;
     private serverUrl;
     private makeException;
     private contextBuilder;
-    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: RowStore<ED, Cxt>) => Promise<Cxt>);
-    callAspect(name: string, params: any, context: Cxt): Promise<{
+    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>);
+    callAspect(name: string, params: any, context: FrontCxt): Promise<{
         result: any;
         opRecords: OpRecord<ED>[];
     }>;
     getRouter(): string;
-    parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>): Promise<{
+    parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{
         name: string;
         params: any;
-        context: Cxt;
+        context: BackCxt;
     }>;
-    serializeResult(result: any, context: Cxt, headers: IncomingHttpHeaders, body: any): {
+    serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): {
         body: any;
         headers?: Record<string, any> | undefined;
     };

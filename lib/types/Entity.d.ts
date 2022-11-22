@@ -1,11 +1,22 @@
 import { GenericAction } from '../actions/action';
-import { ExpressionKey, ExprOp, MakeFilter, NodeId } from './Demand';
-import { OneOf, OptionalKeys } from './Polyfill';
+import { ExprOp, MakeFilter, NodeId } from './Demand';
+import { OneOf } from './Polyfill';
 import { PrimaryKey, Sequence } from './DataType';
-export declare type TriggerDataAttribute = '$$triggerData$$';
-export declare type TriggerTimestampAttribute = '$$triggerTimestamp$$';
-declare type PrimaryKeyAttribute = 'id';
-export declare type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute | '$$seq$$';
+declare type TriggerDataAttributeType = '$$triggerData$$';
+declare type TriggerTimestampAttributeType = '$$triggerTimestamp$$';
+declare type PrimaryKeyAttributeType = 'id';
+declare type CreateAtAttributeType = '$$createAt$$';
+declare type UpdateAtAttributeType = '$$updateAt$$';
+declare type DeleteAtAttributeType = '$$deleteAt$$';
+declare type SeqAttributeType = '$$seq$$';
+export declare const TriggerDataAttribute = "$$triggerData$$";
+export declare const TriggerTimestampAttribute = "$$triggerTimestamp$$";
+export declare const PrimaryKeyAttribute = "id";
+export declare const CreateAtAttribute = "$$createAt$$";
+export declare const UpdateAtAttribute = "$$updateAt$$";
+export declare const DeleteAtAttribute = "$$deleteAt$$";
+export declare const SeqAttribute = "$$seq$$";
+export declare type InstinctiveAttributes = PrimaryKeyAttributeType | CreateAtAttributeType | UpdateAtAttributeType | DeleteAtAttributeType | TriggerDataAttributeType | TriggerTimestampAttributeType | SeqAttributeType;
 export declare const initinctiveAttributes: string[];
 export declare type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
@@ -109,7 +120,7 @@ export declare type DeduceRemoveOperationData<SH extends GeneralEntityShape> = {
     [A in keyof Omit<SH, InstinctiveAttributes>]?: any;
 };
 export declare type DeduceRemoveOperation<SH extends GeneralEntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
-export declare type DeduceOperation<SH extends GeneralEntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
+export declare type DeduceOperation<SH extends GeneralEntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH>;
 export declare type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'c';
     e: T;
@@ -139,12 +150,6 @@ export declare type OperationResult<ED extends EntityDict> = {
     [K in keyof ED]?: {
         [A in ED[K]['Action']]?: number;
     };
-};
-export declare type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
-    [K in keyof P]: K extends ExpressionKey ? any : (K extends keyof E ? (P[K] extends 1 | undefined ? E[K] : (P[K] extends OtmSubProjection ? SelectRowShape<Required<E>[K][0], P[K]['data']>[] | Array<never> : (K extends OptionalKeys<E> ? SelectRowShape<NonNullable<Required<E>[K]>, P[K]> | null : SelectRowShape<NonNullable<Required<E>[K]>, P[K]>))) : never);
-};
-export declare type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
-    result: Array<SelectRowShape<E, P>>;
 };
 export declare type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'excludeRemove' | 'crud';
 export declare type Configuration = {

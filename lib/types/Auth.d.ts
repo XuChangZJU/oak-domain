@@ -1,28 +1,31 @@
+import { AsyncContext } from "../store/AsyncRowStore";
+import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict } from "../types/Entity";
-import { Context } from "./Context";
-import { CreateTriggerBase, RemoveTriggerBase, UpdateTriggerBase, CheckerType, SelectTriggerBefore } from "./Trigger";
-export declare type CreateChecker<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = {
-    type: CheckerType;
-    action: 'create';
+export declare type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
+    priority?: number;
+    type: 'data';
     entity: T;
-    checker: CreateTriggerBase<ED, T, Cxt>['fn'];
+    action: Omit<ED[T]['Action'], 'remove'>;
+    checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => void;
 };
-export declare type UpdateChecker<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = {
-    type: CheckerType;
-    action: UpdateTriggerBase<ED, T, Cxt>['action'];
+export declare type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
+    priority?: number;
+    type: 'row';
     entity: T;
-    checker: UpdateTriggerBase<ED, T, Cxt>['fn'];
+    action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
+    filter: ED[T]['Selection']['filter'] | ((context: Cxt) => ED[T]['Selection']['filter']);
+    errMsg?: string;
+    inconsistentRows?: {
+        entity: keyof ED;
+        selection: (filter?: ED[T]['Selection']['filter']) => ED[keyof ED]['Selection'];
+    };
 };
-export declare type RemoveChecker<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = {
-    type: CheckerType;
-    action: 'remove';
+export declare type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
+    priority?: number;
+    type: 'relation';
     entity: T;
-    checker: RemoveTriggerBase<ED, T, Cxt>['fn'];
+    action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
+    relationFilter: (context: Cxt) => ED[T]['Selection']['filter'];
+    errMsg: string;
 };
-export declare type SelectChecker<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = {
-    type: CheckerType;
-    action: 'select';
-    entity: T;
-    checker: SelectTriggerBefore<ED, T, Cxt>['fn'];
-};
-export declare type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>> = CreateChecker<ED, T, Cxt> | UpdateChecker<ED, T, Cxt> | RemoveChecker<ED, T, Cxt> | SelectChecker<ED, T, Cxt>;
+export declare type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt>;

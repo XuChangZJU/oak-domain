@@ -1,111 +1,62 @@
 import assert from "assert";
-import { Context } from '../types/Context';
 import {
-    DeduceCreateSingleOperation, DeduceRemoveOperation, DeduceUpdateOperation, EntityDict,
-    OperateOption, SelectOption, OperationResult, SelectRowShape, DeduceFilter, DeduceSelection
+    EntityDict,
+    OperateOption, SelectOption, OperationResult, DeduceFilter, CreateAtAttribute, UpdateAtAttribute
 } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
-import { addFilterSegment, combineFilters, getRelevantIds } from "./filter";
+import { addFilterSegment, combineFilters } from "./filter";
 import { judgeRelation } from "./relation";
+import { OakRowUnexistedException } from "../types";
+import { unset, uniq, cloneDeep, pick } from '../utils/lodash';
+import { SyncContext } from "./SyncRowStore";
+import { AsyncContext } from "./AsyncRowStore";
+import { getRelevantIds } from "./filter";
 import { CreateOperation as CreateOperOperation } from '../base-app-domain/Oper/Schema';
 import { CreateOperation as CreateModiOperation, UpdateOperation as UpdateModiOperation } from '../base-app-domain/Modi/Schema';
-import { OakCongruentRowExists, OakRowUnexistedException } from "../types";
-import { unset, omit, cloneDeep, uniq } from '../utils/lodash';
+import { generateNewIdAsync } from "../utils/uuid";
 
 /**这个用来处理级联的select和update，对不同能力的 */
-export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends RowStore<ED, Cxt> {
+export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> extends RowStore<ED> {
     constructor(storageSchema: StorageSchema<ED>) {
         super(storageSchema);
     }
     protected abstract supportManyToOneJoin(): boolean;
     protected abstract supportMultipleCreate(): boolean;
-    protected abstract selectAbjointRow<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(
-        entity: T,
-        selection: S,
-        context: Cxt,
-        option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]>;
 
-    protected abstract updateAbjointRow<T extends keyof ED, OP extends OperateOption>(
+    protected abstract selectAbjointRow<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
+        entity: T,
+        selection: ED[T]['Selection'],
+        context: Cxt,
+        option: OP): Partial<ED[T]['Schema']>[];
+
+    protected abstract updateAbjointRow<T extends keyof ED, OP extends OperateOption, Cxt extends SyncContext<ED>>(
+        entity: T,
+        operation: ED[T]['Operation'],
+        context: Cxt,
+        option: OP): number;
+
+    protected abstract selectAbjointRowAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        selection: ED[T]['Selection'],
+        context: Cxt,
+        option: OP): Promise<Partial<ED[T]['Schema']>[]>;
+
+    protected abstract updateAbjointRowAsync<T extends keyof ED, OP extends OperateOption, Cxt extends AsyncContext<ED>>(
         entity: T,
         operation: ED[T]['Create'] | ED[T]['Update'] | ED[T]['Remove'],
         context: Cxt,
         option: OP): Promise<number>;
 
-
-    /**
-     * 将一次查询的结果集加入result
-     * @param entity 
-     * @param rows 
-     * @param context 
-     */
-    private addToResultSelections<T extends keyof ED, S extends ED[T]['Selection']['data']>(entity: T, rows: Array<SelectRowShape<ED[T]['Schema'], S>>, context: Cxt) {
-        const { opRecords } = context;
-
-        let lastOperation = opRecords[opRecords.length - 1];
-        if (lastOperation && lastOperation.a === 's') {
-            const entityBranch = lastOperation.d[entity];
-            if (entityBranch) {
-                rows.forEach(
-                    (row) => {
-                        const { id } = row as { id: string };
-                        if (!entityBranch![id!]) {
-                            Object.assign(entityBranch!, {
-                                [id!]: cloneDeep(row),
-                            });
-                        }
-                        else {
-                            Object.assign(entityBranch[id], row);
-                        }
-                    }
-                );
-                return;
-            }
-        }
-        else {
-            lastOperation = {
-                a: 's',
-                d: {},
-            };
-            opRecords.push(lastOperation);
-        }
-
-        const entityBranch = {};
-        rows.forEach(
-            (row) => {
-                const { id } = row as { id: string };
-                Object.assign(entityBranch!, {
-                    [id!]: cloneDeep(row),
-                });
-            }
-        );
-        Object.assign(lastOperation.d, {
-            [entity]: entityBranch,
-        });
-    }
-
-    private reduceDescendants<T extends keyof ED, S extends ED[T]['Selection']>(entity: T, rows: SelectRowShape<ED[T]['Schema'], S['data']>[]) {
-        return rows.filter(ele => !!ele).map(
-            (row) => {
-                const row2 = {} as typeof row;
-                for (const attr in row) {
-                    const rel = this.judgeRelation(entity, attr);
-                    if (typeof rel === 'number' && [0, 1].includes(rel)) {
-                        Object.assign(row2, {
-                            [attr]: row[attr],
-                        });
-                    }
-                }
-                return row2;
-            }
-        );
-    }
-
-    private destructCascadeSelect<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(
-        entity: T, projection2: S['data'], context: Cxt, option: OP) {
+    protected destructCascadeSelect<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED> | AsyncContext<ED>, R>(
+        entity: T,
+        projection2: ED[T]['Selection']['data'],
+        context: Cxt,
+        cascadeSelect: <T2 extends keyof ED>(entity2: T2, selection: ED[T2]['Selection'], context: Cxt, op: OP) => R,
+        option: OP) {
         const projection: ED[T]['Selection']['data'] = {};
-        const cascadeSelectionFns: Array<(result: SelectRowShape<ED[T]['Schema'], S['data']>[]) => Promise<void>> = [];
+        const cascadeSelectionFns: Array<(result: Partial<ED[T]['Schema']>[]) => Promise<void> | void> = [];
 
         const supportMtoJoin = this.supportManyToOneJoin();
         const { toModi } = this.getSchema()[entity];
@@ -146,22 +97,19 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                     }
                                 );
                             }
-                            if (!option.dontCollect) {
-                                this.addToResultSelections(attr, this.reduceDescendants(attr, result.map(ele => ele[attr] as any)), context);
-                            }
                         }
                     );
                     const {
                         projection: subProjection,
                         cascadeSelectionFns: subCascadeSelectionFns,
-                    } = this.destructCascadeSelect(attr, projection2[attr], context, option);
+                    } = this.destructCascadeSelect(attr, projection2[attr], context, cascadeSelect, option);
                     Object.assign(projection, {
                         [attr]: subProjection,
                     });
                     subCascadeSelectionFns.forEach(
                         ele => cascadeSelectionFns.push(
-                            async (result) => {
-                                await ele(result.map(ele2 => ele2[attr] as any).filter(ele2 => !!ele2));
+                            (result) => {
+                                return ele(result.map(ele2 => ele2[attr] as any).filter(ele2 => !!ele2));
                             }
                         )
                     );
@@ -169,13 +117,49 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 else {
                     cascadeSelectionFns.push(
                         async (result) => {
+                            const dealWithSubRows = (subRows: Partial<ED[T]['Schema']>[]) => {
+                                assert(subRows.length <= entityIds.length);
+                                if (subRows.length < entityIds.length && !toModi) {
+                                    throw new OakRowUnexistedException([{
+                                        entity: attr,
+                                        selection: {
+                                            data: projection2[attr],
+                                            filter: {
+                                                id: {
+                                                    $in: entityIds
+                                                },
+                                            },
+                                        },
+                                    }]);
+                                }
+
+                                result.forEach(
+                                    (ele) => {
+                                        if (ele.entity === attr) {
+                                            const subRow = subRows.find(
+                                                ele2 => ele2.id === ele.entityId
+                                            );
+                                            if (subRow) {
+                                                Object.assign(ele, {
+                                                    [attr]: subRow,
+                                                });
+                                            }
+                                            else {
+                                                Object.assign(ele, {
+                                                    [attr]: null,
+                                                });
+                                            }
+                                        }
+                                    }
+                                );
+                            };
                             const entityIds = uniq(result.filter(
                                 ele => ele.entity === attr
                             ).map(
                                 ele => ele.entityId
                             ) as string[]);
 
-                            const subRows = await this.cascadeSelect(attr, {
+                            const subRows = cascadeSelect.call(this, attr as any, {
                                 data: projection2[attr],
                                 filter: {
                                     id: {
@@ -183,35 +167,14 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                     },
                                 } as any,
                             }, context, option);
-                            assert(subRows.length <= entityIds.length);
-                            if (subRows.length < entityIds.length && !toModi) {
-                                throw new OakRowUnexistedException([{
-                                    entity: attr,
-                                    selection: {
-                                        data: projection2[attr],
-                                        filter: {
-                                            id: {
-                                                $in: entityIds
-                                            },
-                                        },
-                                    },
-                                }]);
+                            if (subRows instanceof Promise) {
+                                return subRows.then(
+                                    (subRowss) => dealWithSubRows(subRowss)
+                                )
                             }
-
-                            result.forEach(
-                                (ele) => {
-                                    if (ele.entity === attr) {
-                                        const subRow = subRows.find(
-                                            ele2 => ele2.id === ele.entityId
-                                        );
-                                        if (subRow) {
-                                            Object.assign(ele, {
-                                                [attr]: subRow,
-                                            });
-                                        }
-                                    }
-                                }
-                            );
+                            else {
+                                dealWithSubRows(subRows as any);
+                            }
                         }
                     );
                 }
@@ -242,23 +205,20 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                         }
                                     );
                                 }
-                                if (!option.dontCollect) {
-                                    this.addToResultSelections(relation, this.reduceDescendants(relation, result.map(ele => ele[attr] as any)), context);
-                                }
                             }
                         );
                     }
                     const {
                         projection: subProjection,
                         cascadeSelectionFns: subCascadeSelectionFns,
-                    } = this.destructCascadeSelect(relation, projection2[attr], context, option);
+                    } = this.destructCascadeSelect(relation, projection2[attr], context, cascadeSelect, option);
                     Object.assign(projection, {
                         [attr]: subProjection,
                     });
                     subCascadeSelectionFns.forEach(
                         ele => cascadeSelectionFns.push(
-                            async (result) => {
-                                await ele(result.map(ele2 => ele2[attr] as any).filter(ele2 => !!ele2));
+                            (result) => {
+                                return ele(result.map(ele2 => ele2[attr] as any).filter(ele2 => !!ele2));
                             }
                         )
                     );
@@ -266,13 +226,54 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 else {
                     cascadeSelectionFns.push(
                         async (result) => {
+                            const dealWithSubRows = (subRows: Partial<ED[keyof ED]['Schema']>[]) => {
+                                assert(subRows.length <= ids.length);
+                                if (subRows.length < ids.length && !toModi) {
+                                    throw new OakRowUnexistedException([{
+                                        entity: relation,
+                                        selection: {
+                                            data: projection2[attr],
+                                            filter: {
+                                                id: {
+                                                    $in: ids
+                                                },
+                                            },
+                                        }
+                                    }]);
+                                }
+
+                                result.forEach(
+                                    (ele) => {
+                                        if (ele[`${attr}Id`]) {
+                                            const subRow = subRows.find(
+                                                ele2 => ele2.id === ele[`${attr}Id`]
+                                            );
+                                            if (subRow) {
+                                                Object.assign(ele, {
+                                                    [attr]: subRow,
+                                                });
+                                            }
+                                            else {
+                                                Object.assign(ele, {
+                                                    [attr]: null,
+                                                });
+                                            }
+                                        }
+                                        else {
+                                            Object.assign(ele, {
+                                                [attr]: null,
+                                            });
+                                        }
+                                    }
+                                );
+                            };
                             const ids = uniq(result.filter(
                                 ele => !!(ele[`${attr}Id`])
                             ).map(
                                 ele => ele[`${attr}Id`]
                             ) as string[]);
 
-                            const subRows = await this.cascadeSelect(relation, {
+                            const subRows = cascadeSelect.call(this, relation, {
                                 data: projection2[attr],
                                 filter: {
                                     id: {
@@ -280,35 +281,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                     },
                                 } as any,
                             }, context, option);
-                            assert(subRows.length <= ids.length);
-                            if (subRows.length < ids.length && !toModi) {
-                                throw new OakRowUnexistedException([{
-                                    entity: relation,
-                                    selection: {
-                                        data: projection2[attr],
-                                        filter: {
-                                            id: {
-                                                $in: ids
-                                            },
-                                        },
-                                    }
-                                }]);
+                            if (subRows instanceof Promise) {
+                                return subRows.then(
+                                    (subRowss) => dealWithSubRows(subRowss)
+                                );
                             }
-
-                            result.forEach(
-                                (ele) => {
-                                    if (ele[`${attr}Id`]) {
-                                        const subRow = subRows.find(
-                                            ele2 => ele2.id === ele[`${attr}Id`]
-                                        );
-                                        if (subRow) {
-                                            Object.assign(ele, {
-                                                [attr]: subRow,
-                                            });
-                                        }
-                                    }
-                                }
-                            );
+                            dealWithSubRows(subRows as any);
                         }
                     );
                 }
@@ -320,12 +298,26 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                 if (foreignKey) {
                     // 基于属性的一对多
                     cascadeSelectionFns.push(
-                        async (result) => {
+                        (result) => {
                             const ids = result.map(
                                 ele => ele.id
                             ) as string[];
 
-                            const subRows = await this.cascadeSelect(entity2, {
+                            const dealWithSubRows = (subRows: Partial<ED[keyof ED]['Schema']>[]) => {
+                                result.forEach(
+                                    (ele) => {
+                                        const subRowss = subRows.filter(
+                                            ele2 => ele2[foreignKey] === ele.id
+                                        );
+                                        assert(subRowss);
+                                        Object.assign(ele, {
+                                            [attr]: subRowss,
+                                        });
+                                    }
+                                );
+                            };
+
+                            const subRows = cascadeSelect.call(this, entity2, {
                                 data: subProjection,
                                 filter: combineFilters([{
                                     [foreignKey]: {
@@ -336,18 +328,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                 indexFrom,
                                 count
                             }, context, option);
-
-                            result.forEach(
-                                (ele) => {
-                                    const subRowss = subRows.filter(
-                                        ele2 => ele2[foreignKey] === ele.id
-                                    );
-                                    assert(subRowss);
-                                    Object.assign(ele, {
-                                        [attr]: subRowss,
-                                    });
-                                }
-                            );
+                            if (subRows instanceof Promise) {
+                                return subRows.then(
+                                    (subRowss) => dealWithSubRows(subRowss)
+                                );
+                            }
+                            dealWithSubRows(subRows as any);
                         }
                     );
                 }
@@ -358,8 +344,21 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                             const ids = result.map(
                                 ele => ele.id
                             ) as string[];
+                            const dealWithSubRows = (subRows: Partial<ED[T]['Schema']>[]) => {
+                                result.forEach(
+                                    (ele) => {
+                                        const subRowss = subRows.filter(
+                                            ele2 => ele2.entityId === ele.id
+                                        );
+                                        assert(subRowss);
+                                        Object.assign(ele, {
+                                            [attr]: subRowss,
+                                        });
+                                    }
+                                );
+                            };
 
-                            const subRows = await this.cascadeSelect(entity2, {
+                            const subRows = cascadeSelect.call(this, entity2, {
                                 data: subProjection,
                                 filter: combineFilters([{
                                     entity,
@@ -371,18 +370,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                 indexFrom,
                                 count
                             }, context, option);
-
-                            result.forEach(
-                                (ele) => {
-                                    const subRowss = subRows.filter(
-                                        ele2 => ele2.entityId === ele.id
-                                    );
-                                    assert(subRowss);
-                                    Object.assign(ele, {
-                                        [attr]: subRowss,
-                                    });
-                                }
-                            );
+                            if (subRows instanceof Promise) {
+                                return subRows.then(
+                                    (subRowss) => dealWithSubRows(subRowss)
+                                );
+                            }
+                            dealWithSubRows(subRows as any);
                         }
                     );
                 }
@@ -395,280 +388,59 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
         }
     }
 
-    protected async cascadeSelect<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(
-        entity: T,
-        selection: S,
-        context: Cxt,
-        option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]> {
-        const { data, filter, indexFrom, count, sorter } = selection;
-        const { projection, cascadeSelectionFns } = await this.destructCascadeSelect(entity, data, context, option);
+    /**
+     * 级联更新
+     * A --> B
+        多对一：A CREATE／B CREATE，B data的主键赋到A的data上
+            A CREATE／B UPDATE，B filter的主键来自A的data
+            A UPDATE／B CREATE，B data的主键赋到A的data上
+            A UPDATE／B UPDATE，B filter的主键来自A的row
+            A UPDATE／B REMOVE，B filter的主键来自A的row
+            A REMOVE／B UPDATE，B filter的主键来自A的row
+            A REMOVE／B REMOVE，B filter的主键来自A的row
 
-        const rows = await this.selectAbjointRow(entity, {
-            data: projection,
-            filter,
-            indexFrom,
-            count,
-            sorter
-        }, context, option);
-
-
-        if (!option.dontCollect) {
-            this.addToResultSelections(entity, this.supportMultipleCreate() ? this.reduceDescendants(entity, rows) : rows, context);
-        }
-
-        if (cascadeSelectionFns.length > 0) {
-            const ruException: Array<{
-                entity: keyof ED,
-                selection: DeduceSelection<ED[keyof ED]['Schema']>
-            }> = [];
-            await Promise.all(
-                cascadeSelectionFns.map(
-                    async ele => {
-                        try {
-                            await ele(rows);
-                        }
-                        catch (e) {
-                            if (e instanceof OakRowUnexistedException) {
-                                const rows = e.getRows();
-                                ruException.push(...rows);
-                            }
-                            else {
-                                throw e;
-                            }
-                        }
-                    }
-                )
-            );
-
-            if (ruException.length > 0) {
-                throw new OakRowUnexistedException(ruException);
-            }
-        }
-
-        return rows;
-    }
-
-    protected async cascadeSelect2<T extends keyof ED, S extends ED[T]['Selection'], OP extends SelectOption>(
-        entity: T,
-        selection: S,
-        context: Cxt,
-        option: OP): Promise<SelectRowShape<ED[T]['Schema'], S['data']>[]> {
-        const { data, filter } = selection;
-
-        const projection: ED[T]['Selection']['data'] = {};
-        const oneToMany: any = {};
-        const oneToManyOnEntity: any = {};
-        const manyToOne: any = {};
-        const manyToOneOnEntity: any = {};
-
-        const supportMtoJoin = this.supportManyToOneJoin();
-        for (const attr in data) {
-            const relation = judgeRelation(this.storageSchema, entity, attr);
-            if (relation === 1 || relation == 0) {
-                Object.assign(projection, {
-                    [attr]: data[attr],
-                });
-            }
-            else if (relation === 2) {
-                // 基于entity的多对一
-                Object.assign(projection, {
-                    entity: 1,
-                    entityId: 1,
-                });
-                if (supportMtoJoin) {
-                    Object.assign(projection, {
-                        [attr]: data[attr],
-                    });
-                }
-                else {
-                    Object.assign(manyToOneOnEntity, {
-                        [attr]: 1,
-                    });
-                }
-            }
-            else if (typeof relation === 'string') {
-                // 基于属性的多对一
-                if (supportMtoJoin) {
-                    Object.assign(projection, {
-                        [attr]: data[attr],
-                    });
-                }
-                else {
-                    Object.assign(projection, {
-                        [`${attr}Id`]: 1,
-                    });
-                    Object.assign(manyToOne, {
-                        [attr]: relation,
-                    });
-                }
-            }
-            else {
-                const [entity2, foreignKey] = relation;
-                if (foreignKey) {
-                    // 基于属性的一对多
-                    Object.assign(oneToMany, {
-                        [attr]: {
-                            entity: entity2,
-                            foreignKey,
-                        },
-                    });
-                }
-                else {
-                    // 基于entity的多对一
-                    Object.assign(oneToManyOnEntity, {
-                        [attr]: entity2,
-                    });
-                }
-            }
-        }
-
-        const rows = await this.selectAbjointRow<T, S, OP>(entity, Object.assign({}, selection, {
-            data: projection,
-        }), context, option);
-
-        if (!option.dontCollect) {
-            this.addToResultSelections(entity, rows, context);
-        }
-
-        await Promise.all(
-            // manyToOne
-            (() => {
-                const attrs = Object.keys(manyToOne);
-                if (attrs.length > 0) {
-                    return attrs.map(
-                        async (attr) => {
-                            const subRows = await this.cascadeSelect(manyToOne[attr] as keyof ED, {
-                                data: data[attr],
-                                filter: {
-                                    id: {
-                                        $in: rows.map(
-                                            (row) => (row as Record<string, any>)[`${attr}Id`]
-                                        )
-                                    },
-                                } as any
-                            }, context, option);
-
-                            rows.forEach(
-                                (row) => {
-                                    const subRow = subRows.find(
-                                        ele => (ele as Record<string, any>).id === (row as Record<string, any>)[`${attr}Id`]
-                                    );
-                                    Object.assign(row, {
-                                        [attr]: subRow,
-                                    });
-                                }
-                            )
-                        }
-                    );
-                }
-                return [];
-            })().concat(
-                // manyToOneOnEntity
-                (() => {
-                    const attrs = Object.keys(manyToOneOnEntity);
-                    if (attrs.length > 0) {
-                        return attrs.map(
-                            async (attr) => {
-                                const subRows = await this.cascadeSelect(attr as keyof ED, {
-                                    data: data[attr],
-                                    filter: {
-                                        id: {
-                                            $in: rows.filter(
-                                                row => (row as Record<string, any>).entity === attr
-                                            ).map(
-                                                row => (row as Record<string, any>).entityId
-                                            )
-                                        },
-                                    } as any
-                                }, context, option);
-
-                                rows.filter(
-                                    row => (row as Record<string, any>).entity === attr
-                                ).forEach(
-                                    (row) => {
-                                        const subRow = subRows.find(
-                                            ele => (ele as Record<string, any>).id === (row as Record<string, any>).entityId
-                                        );
-                                        Object.assign(row, {
-                                            [attr]: subRow,
-                                        });
-                                    }
-                                )
-                            }
-                        );
-                    }
-                    return [];
-                })()
-            ).concat(
-                (() => {
-                    const attrs = Object.keys(oneToMany);
-                    if (attrs.length > 0) {
-                        // 必须一行一行的查询，否则indexFrom和count无法准确
-                        return rows.map(
-                            async (row) => {
-                                for (const attr in oneToMany) {
-                                    const { entity: entity2, foreignKey } = oneToMany[attr];
-                                    const filter2 = data[attr];
-                                    const rows2 = await this.cascadeSelect(entity2, Object.assign({}, filter2, {
-                                        filter: addFilterSegment({
-                                            [foreignKey]: (row as Record<string, any>).id,
-                                        } as any, filter2.filter),
-                                    }), context, option);
-                                    Object.assign(row, {
-                                        [attr]: rows2,
-                                    });
-                                }
-                            }
-                        );
-                    }
-                    return [];
-                })()
-            ).concat(
-                (() => {
-                    const attrs = Object.keys(oneToManyOnEntity);
-                    if (attrs.length > 0) {
-                        // 必须一行一行的查询，否则indexFrom和count无法准确
-                        return rows.map(
-                            async (row) => {
-                                for (const attr in oneToManyOnEntity) {
-                                    const filter2 = data[attr];
-                                    const rows2 = await this.cascadeSelect(oneToManyOnEntity[attr], Object.assign({}, filter2, {
-                                        filter: addFilterSegment({
-                                            entityId: (row as Record<string, any>).id,
-                                            entity,
-                                        } as any, filter2.filter),
-                                    }), context, option);
-                                    Object.assign(row, {
-                                        [attr]: rows2,
-                                    });
-                                }
-                            }
-                        );
-                    }
-                    return [];
-                })()
-            )
-        );
-
-        return rows;
-    }
-
-    private async destructCascadeUpdate<T extends keyof ED, OP extends OperateOption>(
+        一对多：A CREATE／B CREATE，A data上的主键赋到B的data上
+            A CREATE／B UPDATE，A data上的主键赋到B的data上
+            A UPDATE／B CREATE，A filter上的主键赋到B的data上（一定是带主键的filter）
+            A UPDATE／B UPDATE，A filter上的主键赋到B的filter上（一定是带主键的filter）
+            A UPDATE／B REMOVE，A filter上的主键赋到B的filter上（一定是带主键的filter）
+            A REMOVE／B UPDATE，A filter上的主键赋到B的filter上（且B关于A的外键清空）
+            A REMOVE／B REMOVE，A filter上的主键赋到B的filter上
+     *
+     * 延时更新，
+     *  A（业务级别的申请对象） ---> B（业务级别需要更新的对象）
+     * 两者必须通过entity/entityId关联
+     * 此时需要把对B的更新记录成一条新插入的Modi对象，并将A上的entity/entityId指向该对象（新生成的Modi对象的id与此operation的id保持一致）
+     * @param entity 
+     * @param action 
+     * @param data 
+     * @param context 
+     * @param option 
+     * @param result 
+     * @param filter 
+     * @returns 
+     */
+    protected destructCascadeUpdate<T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>, OP extends OperateOption, R>(
         entity: T,
         action: ED[T]['Action'],
         data: ED[T]['CreateSingle']['data'] | ED[T]['Update']['data'] | ED[T]['Remove']['data'],
         context: Cxt,
         option: OP,
-        result: OperationResult<ED>,
+        cascadeUpdate: <T2 extends keyof ED>(entity: T2,
+            operation: ED[T2]['Operation'],
+            context: Cxt,
+            option: OP) => R,
         filter?: DeduceFilter<ED[T]['Schema']>
     ) {
         const modiAttr = this.getSchema()[entity].toModi;
         const option2 = Object.assign({}, option);
 
         const opData: Record<string, any> = {};
+        const beforeFns: Array<() => R> = [];
+        const afterFns: Array<() => R> = [];
         if (modiAttr && action !== 'remove' && !option.dontCreateModi) {
             // create/update具有modi对象的对象，对其子对象的update行为全部是create modi对象（缓存动作）
-            // delete此对象，所有的modi子对象应该通过触发器作废，这个通过系统的trigger来搞
+            // delete此对象，所有的modi子对象应该通过触发器作废，这个目前先通过系统的trigger来实现
             assert(!option2.modiParentId && !option2.modiParentEntity);
             if (action === 'create') {
                 option2.modiParentId = data.id;
@@ -740,8 +512,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     }
                 }
 
-                const result2 = await this.cascadeUpdate(attr, operationMto, context, option2);
-                this.mergeOperationResult(result, result2);
+                beforeFns.push(
+                    () => cascadeUpdate.call(this, attr, operationMto, context, option2)
+                );
             }
             else if (typeof relation === 'string') {
                 // 基于attr的外键的many-to-one
@@ -793,14 +566,15 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     }
                 }
 
-                const result2 = await this.cascadeUpdate(relation, operationMto, context, option2);
-                this.mergeOperationResult(result, result2);
+                beforeFns.push(
+                    () => cascadeUpdate.call(this, relation, operationMto, context, option2)
+                );
             }
             else {
                 assert(relation instanceof Array);
                 const [entityOtm, foreignKey] = relation;
                 const otmOperations = data[attr];
-                const dealWithOneToMany = async (otm: DeduceUpdateOperation<ED[keyof ED]['Schema']>) => {
+                const dealWithOneToMany = (otm: ED[keyof ED]['Update']) => {
                     const { action: actionOtm, data: dataOtm, filter: filterOtm } = otm;
                     if (!foreignKey) {
                         // 基于entity/entityId的one-to-many
@@ -907,121 +681,67 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         }
                     }
 
-                    const result2 = await this.cascadeUpdate(entityOtm!, otm, context, option2);
-                    this.mergeOperationResult(result, result2);
+                    afterFns.push(() => cascadeUpdate.call(this, entityOtm!, otm, context, option2));
                 };
 
                 if (otmOperations instanceof Array) {
                     for (const oper of otmOperations) {
-                        await dealWithOneToMany(oper);
+                        dealWithOneToMany(oper);
                     }
                 }
                 else {
-                    await dealWithOneToMany(otmOperations);
+                    dealWithOneToMany(otmOperations);
                 }
             }
         }
 
-        return opData;
-    }
-
-    /**
-     * 级联更新
-     * A --> B
-        多对一：A CREATE／B CREATE，B data的主键赋到A的data上
-            A CREATE／B UPDATE，B filter的主键来自A的data
-            A UPDATE／B CREATE，B data的主键赋到A的data上
-            A UPDATE／B UPDATE，B filter的主键来自A的row
-            A UPDATE／B REMOVE，B filter的主键来自A的row
-            A REMOVE／B UPDATE，B filter的主键来自A的row
-            A REMOVE／B REMOVE，B filter的主键来自A的row
-
-        一对多：A CREATE／B CREATE，A data上的主键赋到B的data上
-            A CREATE／B UPDATE，A data上的主键赋到B的data上
-            A UPDATE／B CREATE，A filter上的主键赋到B的data上（一定是带主键的filter）
-            A UPDATE／B UPDATE，A filter上的主键赋到B的filter上（一定是带主键的filter）
-            A UPDATE／B REMOVE，A filter上的主键赋到B的filter上（一定是带主键的filter）
-            A REMOVE／B UPDATE，A filter上的主键赋到B的filter上（且B关于A的外键清空）
-            A REMOVE／B REMOVE，A filter上的主键赋到B的filter上
-     *
-     * 延时更新，
-     *  A（业务级别的申请对象） ---> B（业务级别需要更新的对象）
-     * 两者必须通过entity/entityId关联
-     * 此时需要把对B的更新记录成一条新插入的Modi对象，并将A上的entity/entityId指向该对象（新生成的Modi对象的id与此operation的id保持一致）
-     * @param entity 
-     * @param operation 
-     * @param context 
-     * @param option 
-     */
-    protected async cascadeUpdate<T extends keyof ED, OP extends OperateOption>(
-        entity: T,
-        operation: ED[T]['Create'] | ED[T]['Update'] | ED[T]['Remove'],
-        context: Cxt,
-        option: OP): Promise<OperationResult<ED>> {
-        const { action, data, filter, id } = operation;
-        let opData: any;
-        const result: OperationResult<ED> = {};
-
-        if (['create', 'create-l'].includes(action) && data instanceof Array) {
-            opData = [];
-            for (const d of data) {
-                const od = await this.destructCascadeUpdate(
-                    entity,
-                    action,
-                    d,
-                    context,
-                    option,
-                    result,
-                );
-                opData.push(od);
-            }
-        }
-        else {
-            opData = await this.destructCascadeUpdate(
-                entity,
-                action,
-                data,
-                context,
-                option,
-                result,
-                filter
-            );
-        }
-
-        const operation2: DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']> =
-            Object.assign({}, operation as DeduceCreateSingleOperation<ED[T]['Schema']> | DeduceUpdateOperation<ED[T]['Schema']> | DeduceRemoveOperation<ED[T]['Schema']>, {
-                data: opData as ED[T]['OpSchema'],
-            });
-
-        const count = await this.doUpdateSingleRow(entity, operation2, context, option);
-        this.mergeOperationResult(result, {
-            [entity]: {
-                [operation2.action]: count,
-            }
-        } as OperationResult<ED>);
-        return result;
+        return {
+            data: opData,
+            beforeFns,
+            afterFns,
+        };
     }
 
     // 对插入的数据，没有初始值的属性置null
-    private preProcessDataCreated<T extends keyof ED>(entity: T, data: ED[T]['CreateSingle']['data']) {
+    protected preProcessDataCreated<T extends keyof ED>(entity: T, data: ED[T]['Create']['data']) {
+        const now = Date.now();
         const { attributes } = this.getSchema()[entity];
-        for (const key in attributes) {
-            if (data[key] === undefined) {
-                Object.assign(data, {
-                    [key]: null,
-                });
+        const processSingle = (data2: ED[T]['CreateSingle']['data']) => {
+            for (const key in attributes) {
+                if (data2[key] === undefined) {
+                    Object.assign(data2, {
+                        [key]: null,
+                    });
+                }
             }
+            Object.assign(data2, {
+                [CreateAtAttribute]: now,
+                [UpdateAtAttribute]: now,
+            });
+        }
+        if (data instanceof Array) {
+            data.forEach(
+                ele => processSingle(ele)
+            );
+        }
+        else {
+            processSingle(data as ED[T]['CreateSingle']['data']);
         }
     }
 
     // 对更新的数据，去掉所有的undefined属性
-    private preProcessDataUpdated<T extends keyof ED>(data: ED[T]['Update']['data']) {
+    protected preProcessDataUpdated<T extends keyof ED>(data: ED[T]['Update']['data']) {
         const undefinedKeys = Object.keys(data).filter(
             ele => data[ele] === undefined
         );
         undefinedKeys.forEach(
             ele => unset(data, ele)
         );
+    }
+
+
+    judgeRelation(entity: keyof ED, attr: string) {
+        return judgeRelation(this.storageSchema, entity, attr);
     }
 
     /**
@@ -1031,8 +751,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
      * @param context 
      * @param option 
      */
-    private async doUpdateSingleRow<T extends keyof ED, OP extends OperateOption>(entity: T,
-        operation: ED[T]['Create'] | ED[T]['Update'] | ED[T]['Remove'],
+    private async doUpdateSingleRowAsync<T extends keyof ED, OP extends OperateOption, Cxt extends AsyncContext<ED>>(entity: T,
+        operation: ED[T]['Operation'],
         context: Cxt,
         option: OP
     ) {
@@ -1041,14 +761,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
 
         switch (action) {
             case 'create': {
-                if (data instanceof Array) {
-                    data.forEach(
-                        ele => this.preProcessDataCreated(entity, ele)
-                    );
-                }
-                else {                    
-                    this.preProcessDataCreated(entity, data as ED[T]['CreateSingle']['data']);
-                }
+                this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
                 if (option.modiParentEntity && !['modi', 'modiEntity', 'oper', 'operEntity'].includes(entity as string)) {
                     // 变成对modi的插入
                     const modiCreate: CreateModiOperation = {
@@ -1069,28 +782,14 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                             iState: 'active',
                         },
                     };
-                    await this.cascadeUpdate('modi', modiCreate, context, option);
+                    await this.cascadeUpdateAsync('modi', modiCreate, context, option);
                     return 1;
                 }
                 else {
-                    const addTimestamp = (data2: ED[T]['CreateSingle']['data']) => {
-                        Object.assign(data2, {
-                            $$createAt$$: now,
-                            $$updateAt$$: now,
-                        });
-                    };
-                    if (data instanceof Array) {
-                        data.forEach(
-                            ele => addTimestamp(ele)
-                        );
-                    }
-                    else {
-                        addTimestamp(<ED[T]['CreateSingle']['data']>data);
-                    }
-                    let result: number;
+                    let result = 0;
                     const createInner = async (operation2: ED[T]['Create']) => {
                         try {
-                            result = await this.updateAbjointRow(
+                            result += await this.updateAbjointRowAsync(
                                 entity,
                                 operation2,
                                 context,
@@ -1211,7 +910,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                         data: await Promise.all(
                                             data.map(
                                                 async (ele) => ({
-                                                    id: await generateNewId(),
+                                                    id: await generateNewIdAsync(),
                                                     entity: entity as string,
                                                     entityId: ele.id,
                                                 })
@@ -1221,14 +920,14 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                         id: 'dummy',
                                         action: 'create',
                                         data: {
-                                            id: await generateNewId(),
+                                            id: await generateNewIdAsync(),
                                             entity: entity as string,
                                             entityId: (data as ED[T]['CreateSingle']['data']).id,
                                         },
                                     }]
                                 },
                             };
-                            await this.cascadeUpdate('oper', createOper, context, {
+                            await this.cascadeUpdateAsync('oper', createOper, context, {
                                 dontCollect: true,
                                 dontCreateOper: true,
                             });
@@ -1249,7 +948,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         indexFrom: operation.indexFrom,
                         count: operation.count,
                     };
-                    const rows = await this.selectAbjointRow(entity, selection, context, {
+                    const rows = await this.selectAbjointRowAsync(entity, selection, context, {
                         dontCollect: true,
                     });
                     ids.push(...(rows.map(ele => ele.id! as string)));
@@ -1264,7 +963,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                     // 优化，这里如果是对同一个targetEntity反复update，则变成对最后一条create/update的modi进行update，以避免发布文章这样的需求时产生过多的modi
                     let modiUpsert: CreateModiOperation | UpdateModiOperation | undefined;
                     if (action !== 'remove') {
-                        const upsertModis = await this.selectAbjointRow('modi', {
+                        const upsertModis = await this.selectAbjointRowAsync('modi', {
                             data: {
                                 id: 1,
                                 data: 1,
@@ -1329,7 +1028,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                     data: await Promise.all(
                                         ids.map(
                                             async (id) => ({
-                                                id: await generateNewId(),
+                                                id: await generateNewIdAsync(),
                                                 entity: entity as string,
                                                 entityId: id,
                                             })
@@ -1339,7 +1038,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                             },
                         };
                     }
-                    await this.cascadeUpdate('modi', modiUpsert!, context, option);
+                    await this.cascadeUpdateAsync('modi', modiUpsert!, context, option);
                     return 1;
                 }
                 else {
@@ -1360,7 +1059,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                         data: await Promise.all(
                                             ids.map(
                                                 async (ele) => ({
-                                                    id: await generateNewId(),
+                                                    id: await generateNewIdAsync(),
                                                     entity: entity as string,
                                                     entityId: ele,
                                                 })
@@ -1369,7 +1068,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                                     },
                                 },
                             }
-                            await this.cascadeUpdate('oper', createOper, context, {
+                            await this.cascadeUpdateAsync('oper', createOper, context, {
                                 dontCollect: true,
                                 dontCreateOper: true,
                             });
@@ -1418,7 +1117,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
                         }
                     }
 
-                    const result = await this.updateAbjointRow(entity, operation, context, option);
+                    const result = await this.updateAbjointRowAsync(entity, operation, context, option);
                     await createOper();
 
                     return result;
@@ -1427,7 +1126,384 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict, Cxt e
         }
     }
 
-    judgeRelation(entity: keyof ED, attr: string) {
-        return judgeRelation(this.storageSchema, entity, attr);
+    private doUpdateSingleRow<T extends keyof ED, OP extends OperateOption, Cxt extends SyncContext<ED>>(entity: T,
+        operation: ED[T]['Operation'],
+        context: Cxt,
+        option: OP
+    ) {
+        const { data, action, id: operId, filter } = operation;
+        const now = Date.now();
+
+        switch (action) {
+            case 'create': {
+                this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
+                let result = 0;
+                const createInner = (operation2: ED[T]['Create']) => {
+                    try {
+                        result += this.updateAbjointRow(
+                            entity,
+                            operation2,
+                            context,
+                            option
+                        );
+                    }
+                    catch (e: any) {
+                        throw e;
+                    }
+                };
+
+                if (data instanceof Array) {
+                    const multipleCreate = this.supportMultipleCreate();
+                    if (multipleCreate) {
+                        createInner(operation as ED[T]['Create']);
+                    }
+                    else {
+                        for (const d of data) {
+                            const createSingleOper: ED[T]['CreateSingle'] = {
+                                id: 'any',
+                                action: 'create',
+                                data: d,
+                            };
+                            createInner(createSingleOper);
+                        }
+                    }
+                }
+                else {
+                    createInner(operation as ED[T]['Create']);
+                }
+                return result;
+            }
+            default: {
+                if (action === 'remove') {
+                }
+                else {
+                    const updateAttrCount = Object.keys(data).length;
+                    if (updateAttrCount > 0) {
+                        // 优化一下，如果不更新任何属性，则不实际执行
+                        Object.assign(data, {
+                            $$updateAt$$: now,
+                        });
+                        this.preProcessDataUpdated(data);
+                    }
+                    else {
+                        return 0;
+                    }
+                }
+
+                return this.updateAbjointRow(entity, operation, context, option);
+            }
+        }
+    }
+
+    protected cascadeUpdate<T extends keyof ED, Cxt extends SyncContext<ED>, OP extends OperateOption>(
+        entity: T,
+        operation: ED[T]['Operation'],
+        context: Cxt,
+        option: OP): OperationResult<ED> {
+        const { action, data, filter, id } = operation;
+        let opData: any;
+        const wholeBeforeFns: Array<() => any> = [];
+        const wholeAfterFns: Array<() => any> = [];
+        const result: OperationResult<ED> = {};
+
+        if (['create', 'create-l'].includes(action) && data instanceof Array) {
+            opData = [];
+            for (const d of data) {
+                const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
+                    entity,
+                    action,
+                    d,
+                    context,
+                    option,
+                    this.cascadeUpdate,
+                );
+                opData.push(od);
+                wholeBeforeFns.push(...beforeFns);
+                wholeAfterFns.push(...afterFns);
+            }
+        }
+        else {
+            const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
+                entity,
+                action,
+                data,
+                context,
+                option,
+                this.cascadeUpdate,
+                filter
+            );
+            opData = od;
+            wholeBeforeFns.push(...beforeFns);
+            wholeAfterFns.push(...afterFns);
+        }
+
+        const operation2: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'] =
+            Object.assign({}, operation as ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'], {
+                data: opData as ED[T]['OpSchema'],
+            });
+
+        for (const before of wholeBeforeFns) {
+            before();
+        }
+        const count = this.doUpdateSingleRow(entity, operation2, context, option);
+        for (const after of wholeAfterFns) {
+            after();
+        }
+        return result;
+    }
+
+    /**
+     * 
+     * @param entity 
+     * @param operation 
+     * @param context 
+     * @param option 
+     */
+    protected async cascadeUpdateAsync<T extends keyof ED, Cxt extends AsyncContext<ED>, OP extends OperateOption>(
+        entity: T,
+        operation: ED[T]['Operation'],
+        context: Cxt,
+        option: OP): Promise<OperationResult<ED>> {
+        const { action, data, filter, id } = operation;
+        let opData: any;
+        const wholeBeforeFns: Array<() => Promise<any>> = [];
+        const wholeAfterFns: Array<() => Promise<any>> = [];
+        const result: OperationResult<ED> = {};
+
+        if (['create', 'create-l'].includes(action) && data instanceof Array) {
+            opData = [];
+            for (const d of data) {
+                const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
+                    entity,
+                    action,
+                    d,
+                    context,
+                    option,
+                    this.cascadeUpdateAsync,
+                );
+                opData.push(od);
+                wholeBeforeFns.push(...beforeFns);
+                wholeAfterFns.push(...afterFns);
+            }
+        }
+        else {
+            const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
+                entity,
+                action,
+                data,
+                context,
+                option,
+                this.cascadeUpdateAsync,
+                filter
+            );
+            opData = od;
+            wholeBeforeFns.push(...beforeFns);
+            wholeAfterFns.push(...afterFns);
+        }
+
+        const operation2: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'] =
+            Object.assign({}, operation as ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'], {
+                data: opData as ED[T]['OpSchema'],
+            });
+
+        for (const before of wholeBeforeFns) {
+            await before();
+        }
+        const count = await this.doUpdateSingleRowAsync(entity, operation2, context, option);
+        this.mergeOperationResult(result, {
+            [entity]: {
+                [operation2.action]: count,
+            }
+        } as OperationResult<ED>);
+        for (const after of wholeAfterFns) {
+            await after();
+        }
+        return result;
+    }
+
+    protected cascadeSelect<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
+        entity: T,
+        selection: ED[T]['Selection'],
+        context: Cxt,
+        option: OP): Partial<ED[T]['Schema']>[] {
+        const { data, filter, indexFrom, count, sorter } = selection;
+        const { projection, cascadeSelectionFns } = this.destructCascadeSelect(entity, data, context, this.cascadeSelect, option);
+
+        const rows = this.selectAbjointRow(entity, {
+            data: projection,
+            filter,
+            indexFrom,
+            count,
+            sorter
+        }, context, option);
+
+
+        if (cascadeSelectionFns.length > 0) {
+            const ruException: Array<{
+                entity: keyof ED,
+                selection: ED[keyof ED]['Selection']
+            }> = [];
+            cascadeSelectionFns.forEach(
+                ele => {
+                    try {
+                        ele(rows);
+                    }
+                    catch (e) {
+                        if (e instanceof OakRowUnexistedException) {
+                            const rows = e.getRows();
+                            ruException.push(...rows);
+                        }
+                        else {
+                            throw e;
+                        }
+                    }
+                }
+            )
+
+            if (ruException.length > 0) {
+                throw new OakRowUnexistedException(ruException);
+            }
+        }
+
+        return rows;
+    }
+
+    /**
+     * 将一次查询的结果集加入result
+     * todo 如果是supportMtoOJoin，这里还要解构（未充分测试）
+     * @param entity 
+     * @param rows 
+     * @param context 
+     */
+     private addToResultSelections<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, rows: Partial<ED[T]['Schema']>[], context: Cxt) {
+        if (this.supportManyToOneJoin()) {
+            const attrsToPick: string[] = [];
+            for (const attr in rows[0]) {
+                const data: Partial<ED[T]['Schema']> = {}
+                const rel = this.judgeRelation(entity, attr);
+                if (rel === 2) {
+                    this.addToResultSelections(attr, rows.map(ele => ele[attr]!), context);
+                }
+                else if (typeof rel === 'string') {
+                    this.addToResultSelections(rel, rows.map(ele => ele[attr]!), context);
+                }
+                else if (rel instanceof Array) {
+                    this.addToResultSelections(rel[0], rows.map(ele => ele[attr]!).reduce((prev, current) => prev.concat(current), [] as any[]), context);
+                }
+                else {
+                    attrsToPick.push(attr);
+                }
+            }
+            const originRows = rows.map(
+                ele => pick(ele, attrsToPick)
+            ) as Partial<ED[T]['Schema']>[];
+            this.addSingleRowToResultSelections(entity, originRows, context);
+        }
+        else {
+            this.addSingleRowToResultSelections(entity, rows, context);
+        }
+    }
+
+    private addSingleRowToResultSelections<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, rows: Partial<ED[T]['OpSchema']>[], context: Cxt) {
+        const { opRecords } = context;
+
+        let lastOperation = opRecords[opRecords.length - 1];
+        if (lastOperation && lastOperation.a === 's') {
+            const entityBranch = lastOperation.d[entity];
+            if (entityBranch) {
+                rows.forEach(
+                    (row) => {
+                        if (row) {
+                            assert(row.id);
+                            const { id } = row;
+                            if (!entityBranch![id!]) {
+                                Object.assign(entityBranch!, {
+                                    [id!]: cloneDeep(row),
+                                });
+                            }
+                            else {
+                                Object.assign(entityBranch[id], row);
+                            }
+                        }
+                    }
+                );
+                return;
+            }
+        }
+        else {
+            lastOperation = {
+                a: 's',
+                d: {},
+            };
+            opRecords.push(lastOperation);
+        }
+
+        const entityBranch = {};
+        rows.forEach(
+            (row) => {
+                if (row) {
+                    const { id } = row as { id: string };
+                    Object.assign(entityBranch!, {
+                        [id!]: cloneDeep(row),
+                    });
+                }
+            }
+        );
+        Object.assign(lastOperation.d, {
+            [entity]: entityBranch,
+        });
+    }
+    
+    protected async cascadeSelectAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        selection: ED[T]['Selection'],
+        context: Cxt,
+        option: OP): Promise<Partial<ED[T]['Schema']>[]> {
+        const { data, filter, indexFrom, count, sorter } = selection;
+        const { projection, cascadeSelectionFns } = this.destructCascadeSelect(entity, data, context, this.cascadeSelectAsync, option);
+
+        const rows = await this.selectAbjointRowAsync(entity, {
+            data: projection,
+            filter,
+            indexFrom,
+            count,
+            sorter
+        }, context, option);
+
+
+        if (!option.dontCollect) {
+            this.addToResultSelections(entity, rows, context);
+        }
+
+        if (cascadeSelectionFns.length > 0) {
+            const ruException: Array<{
+                entity: keyof ED,
+                selection: ED[keyof ED]['Selection']
+            }> = [];
+            await Promise.all(
+                cascadeSelectionFns.map(
+                    async ele => {
+                        try {
+                            await ele(rows);
+                        }
+                        catch (e) {
+                            if (e instanceof OakRowUnexistedException) {
+                                const rows = e.getRows();
+                                ruException.push(...rows);
+                            }
+                            else {
+                                throw e;
+                            }
+                        }
+                    }
+                )
+            );
+
+            if (ruException.length > 0) {
+                throw new OakRowUnexistedException(ruException);
+            }
+        }
+
+        return rows;
     }
 }

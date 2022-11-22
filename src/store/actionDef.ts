@@ -1,5 +1,6 @@
-import { combineFilters, contains } from "./filter";
-import { ActionDictOfEntityDict, Checker, Context, CreateTriggerInTxn, DeduceFilter, EntityDict, OakRowInconsistencyException, StorageSchema, Trigger, UpdateChecker, UpdateTriggerInTxn, Watcher } from "../types";
+import { ActionDictOfEntityDict, BBWatcher, Checker, EntityDict, StorageSchema, Trigger, RowChecker } from "../types";
+import { SyncContext } from "./SyncRowStore";
+import { AsyncContext } from "./AsyncRowStore";
 
 export function getFullProjection<ED extends EntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>) {
     const { attributes } = schema[entity];
@@ -18,52 +19,8 @@ export function getFullProjection<ED extends EntityDict, T extends keyof ED>(ent
     return projection;
 }
 
-export async function checkFilterContains<ED extends EntityDict, T extends keyof ED, Cxt extends Context<ED>>(
-    entity: T,
-    schema: StorageSchema<ED>,
-    contained: DeduceFilter<ED[T]['Schema']>,
-    context: Cxt,
-    filter?: DeduceFilter<ED[T]['Schema']>) {
-
-    if (!filter) {
-        throw new OakRowInconsistencyException();
-    }
-    // 优先判断两个条件是否相容
-    if (contains(entity, schema, filter, contained)) {
-        return;
-    }
-    // 再判断加上了conditionalFilter后取得的行数是否缩减
-    const { rowStore } = context;
-    const filter2 = combineFilters([filter, {
-        $not: contained,
-    }]);
-    const projection = process.env.OAK_PLATFORM === 'server' ? getFullProjection(entity, schema) : { id: 1 };
-    const { result } = await rowStore.select(entity, {
-        data: projection,
-        filter: filter2,
-        indexFrom: 0,
-        count: 10,
-    }, context, {
-        dontCollect: true,
-    });
-    if (result.length > 0) {
-        const data = {};
-        result.forEach(
-            ele => Object.assign(data, {
-                [ele.id as string]: ele,
-            })
-        );
-        throw new OakRowInconsistencyException({
-            a: 's',
-            d: {
-                [entity]: data,
-            }
-        });
-    }
-}
-
-function makeIntrinsicWatchers<ED extends EntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>) {
-    const watchers: Watcher<ED, keyof ED, Cxt>[] = [];
+function makeIntrinsicWatchers<ED extends EntityDict>(schema: StorageSchema<ED>) {
+    const watchers: BBWatcher<ED, keyof ED>[] = [];
     for (const entity in schema) {
         const { attributes } = schema[entity];
 
@@ -93,7 +50,7 @@ function makeIntrinsicWatchers<ED extends EntityDict, Cxt extends Context<ED>>(s
     return watchers;
 }
 
-export function analyzeActionDefDict<ED extends EntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>, actionDefDict: ActionDictOfEntityDict<ED>) {
+export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(schema: StorageSchema<ED>, actionDefDict: ActionDictOfEntityDict<ED>) {
     const checkers: Array<Checker<ED, keyof ED, Cxt>> = [];
     const triggers: Array<Trigger<ED, keyof ED, Cxt>> = [];
     for (const entity in actionDefDict) {
@@ -102,49 +59,40 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends Context<
             const { stm, is } = def!;
             for (const action in stm) {
                 const actionStm = stm[action]!;
+                const conditionalFilter = typeof actionStm[0] === 'string' ? {
+                    [attr]: actionStm[0],
+                } : {
+                    [attr]: {
+                        $in: actionStm[0],
+                    },
+                };
                 checkers.push({
                     action: action as any,
                     type: 'row',
                     entity,
-                    checker: async ({ operation }, context) => {
-                        const { filter } = operation;
-                        const conditionalFilter = typeof actionStm[0] === 'string' ? {
-                            [attr]: actionStm[0],
-                        } : {
-                            [attr]: {
-                                $in: actionStm[0],
-                            },
-                        };
-
-                        await checkFilterContains(entity, schema, conditionalFilter as any, context, filter);
-                        return 0;
-                    }
-                } as UpdateChecker<ED, keyof ED, Cxt>);
-                triggers.push({
-                    name: `set next state of ${attr} for ${entity} on action ${action}`,
+                    filter: conditionalFilter,
+                    errMsg: '',
+                } as RowChecker<ED, keyof ED, Cxt>);
+                checkers.push({
                     action: action as any,
+                    type: 'data',
                     entity,
-                    when: 'before',
-                    fn: async ({ operation }) => {
-                        const { data = {} } = operation;
-                        Object.assign(operation, {
-                            data: Object.assign(data, {
-                                [attr]: stm[action][1],
-                            }),
+                    priority: 10,       // 优先级要高
+                    checker: (data) => {
+                        Object.assign(data, {
+                            [attr]: stm[action][1],
                         });
-                        return 1;
                     }
-                } as UpdateTriggerInTxn<ED, any, Cxt>)
+                });
             }
 
             if (is) {
-                triggers.push({
-                    name: `set initial state of ${attr} for ${entity} on create`,
-                    action: 'create',
+                checkers.push({
+                    action: 'create' as any,
+                    type: 'data',
                     entity,
-                    when: 'before',
-                    fn: async ({ operation }) => {
-                        const { data } = operation;
+                    priority: 10,       // 优先级要高
+                    checker: (data) => {                       
                         if (data instanceof Array) {
                             data.forEach(
                                 ele => {
@@ -155,18 +103,16 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends Context<
                                     }
                                 }
                             );
-                            return data.length;
                         }
                         else {
-                            if (!data[attr]) {
+                            if (!(data as ED[keyof ED]['CreateSingle']['data'])[attr]) {
                                 Object.assign(data, {
                                     [attr]: is,
                                 });
                             }
-                            return 1;
                         }
                     }
-                } as CreateTriggerInTxn<ED, any, Cxt>);
+                });
             }
         }
     }

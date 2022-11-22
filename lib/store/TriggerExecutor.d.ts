@@ -1,13 +1,14 @@
-import { EntityDict, OperateOption, SelectOption, SelectRowShape } from "../types/Entity";
+import { EntityDict, OperateOption, SelectOption } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
-import { Context } from '../types/Context';
-import { Trigger, Executor, CheckerType } from "../types/Trigger";
+import { Trigger, CheckerType } from "../types/Trigger";
+import { AsyncContext } from './AsyncRowStore';
+import { SyncContext } from './SyncRowStore';
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
  */
-export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends Executor<ED, Cxt> {
+export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>> {
     private counter;
     private triggerMap;
     private triggerNameMap;
@@ -22,11 +23,11 @@ export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt
     private preCommitTrigger;
     preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
         action: 'select';
-    }, context: Cxt, option: OperateOption | SelectOption): Promise<void>;
+    }, context: Cxt, option: OperateOption | SelectOption): Promise<void> | void;
     private onCommit;
     private postCommitTrigger;
     postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
         action: 'select';
-    }, context: Cxt, option: OperateOption | SelectOption, result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[]): Promise<void>;
+    }, context: Cxt, option: OperateOption | SelectOption, result?: Partial<ED[T]['Schema']>[]): Promise<void> | void;
     checkpoint(context: Cxt, timestamp: number): Promise<number>;
 }

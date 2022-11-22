@@ -1,7 +1,10 @@
 import assert from 'assert';
-import { StorageSchema } from '../types';
-import { EntityDict } from "../types/Entity";
+import { OakRowInconsistencyException, StorageSchema } from '../types';
+import { DeduceFilter, EntityDict } from "../types/Entity";
 import { intersection, union } from '../utils/lodash';
+import { getFullProjection } from './actionDef';
+import { AsyncContext } from './AsyncRowStore';
+import { SyncContext } from './SyncRowStore';
 export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
     const filter: ED[T]['Selection']['filter'] = {};
     filters.forEach(
@@ -297,3 +300,32 @@ export function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof 
     return currentLevelInFilter;
 }
 
+export function checkFilterContains<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
+    entity: T,
+    context: Cxt,
+    contained: ED[T]['Selection']['filter'],
+    filter?: ED[T]['Selection']['filter']): boolean | Promise<boolean> {
+    if (!filter) {
+        throw new OakRowInconsistencyException();
+    }
+    const schema = context.getSchema();
+    // 优先判断两个条件是否相容
+    if (contains(entity, schema, filter, contained)) {
+        return true;
+    }
+    // 再判断加上了conditionalFilter后取得的行数是否缩减
+    const filter2 = combineFilters([filter, {
+        $not: contained,
+    }]);
+    const count = context.count(entity, {
+        filter: filter2,
+    }, {
+        dontCollect: true,
+    });
+    if (count instanceof Promise) {
+        return count.then(
+            (count2) => count2 === 0
+        );
+    }
+    return count === 0;
+}

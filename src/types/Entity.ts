@@ -3,12 +3,24 @@ import { ExpressionKey, ExprOp, FulltextFilter, MakeFilter, NodeId, Q_BooleanVal
 import { OneOf, OptionalKeys } from './Polyfill';
 import { PrimaryKey, Sequence } from './DataType';
 
-export type TriggerDataAttribute = '$$triggerData$$';
-export type TriggerTimestampAttribute = '$$triggerTimestamp$$';
+type TriggerDataAttributeType = '$$triggerData$$';
+type TriggerTimestampAttributeType = '$$triggerTimestamp$$';
+type PrimaryKeyAttributeType = 'id';
+type CreateAtAttributeType = '$$createAt$$';
+type UpdateAtAttributeType = '$$updateAt$$';
+type DeleteAtAttributeType = '$$deleteAt$$';
+type SeqAttributeType = '$$seq$$';
 
-type PrimaryKeyAttribute = 'id';
-export type InstinctiveAttributes = PrimaryKeyAttribute | '$$createAt$$' | '$$updateAt$$' | '$$deleteAt$$' | TriggerDataAttribute | TriggerTimestampAttribute | '$$seq$$';
-export const initinctiveAttributes = ['id', '$$createAt$$', '$$updateAt$$', '$$deleteAt$$', '$$triggerData$$', '$$triggerTimestamp$$', '$$seq$$'];
+export const TriggerDataAttribute = '$$triggerData$$';
+export const TriggerTimestampAttribute = '$$triggerTimestamp$$';
+export const PrimaryKeyAttribute = 'id';
+export const CreateAtAttribute = '$$createAt$$';
+export const UpdateAtAttribute = '$$updateAt$$';
+export const DeleteAtAttribute = '$$deleteAt$$';
+export const SeqAttribute = '$$seq$$';
+
+export type InstinctiveAttributes = PrimaryKeyAttributeType | CreateAtAttributeType | UpdateAtAttributeType| DeleteAtAttributeType | TriggerDataAttributeType | TriggerTimestampAttributeType | SeqAttributeType;
+export const initinctiveAttributes = [PrimaryKeyAttribute, TriggerDataAttribute, TriggerTimestampAttribute, CreateAtAttribute, UpdateAtAttribute, DeleteAtAttribute, SeqAttribute];
 
 export type Filter<A extends string, F extends Object | undefined = undefined> = {
     filter?: A extends 'create' ? undefined : F;
@@ -148,7 +160,7 @@ export type DeduceRemoveOperationData<SH extends GeneralEntityShape> = {
 
 export type DeduceRemoveOperation<SH extends GeneralEntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
 
-export type DeduceOperation<SH extends GeneralEntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH> | DeduceSelection<SH>;
+export type DeduceOperation<SH extends GeneralEntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH>;
 
 export type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'c';
@@ -193,7 +205,7 @@ export type OperationResult<ED extends EntityDict> = {
     }>>;
 } */
 
-export type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
+/* export type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
     [K in keyof P]: K extends ExpressionKey ? any : 
         (K extends keyof E ? 
             (P[K] extends 1 | undefined ? E[K] : 
@@ -206,7 +218,7 @@ export type SelectRowShape<E extends GeneralEntityShape, P extends DeduceProject
 
 export type SelectionResult<E extends GeneralEntityShape, P extends DeduceProjection<GeneralEntityShape>> = {
     result: Array<SelectRowShape<E, P>>;
-}
+} */
 
 export type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | 'excludeRemove' | 'crud';       // 只读型、只插入型、没有更新型、没有删除型、所有型
 

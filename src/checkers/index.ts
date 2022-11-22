@@ -1,7 +1,9 @@
 import { EntityDict } from '../base-app-domain';
+import { AsyncContext } from '../store/AsyncRowStore';
 import { createModiRelatedCheckers } from '../store/modi';
-import { StorageSchema, EntityDict as BaseEntityDict, Context } from '../types';
+import { SyncContext } from '../store/SyncRowStore';
+import { StorageSchema, EntityDict as BaseEntityDict } from '../types';
 
-export function createDynamicCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>>(schema: StorageSchema<ED>){
+export function createDynamicCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>){
     return createModiRelatedCheckers<ED, Cxt>(schema);
 }

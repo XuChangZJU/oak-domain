@@ -1,7 +1,7 @@
-import { Context, RowStore } from ".";
+import { AsyncContext, AsyncRowStore } from "../store/AsyncRowStore";
 import { EntityDict } from "./Entity";
 
-export abstract class AppLoader<ED extends EntityDict, Cxt extends Context<ED>> {
+export abstract class AppLoader<ED extends EntityDict, Cxt extends AsyncContext<ED>> {
     protected path: string;
     constructor(path: string) {
         this.path = path;
@@ -15,5 +15,5 @@ export abstract class AppLoader<ED extends EntityDict, Cxt extends Context<ED>> 
 
     abstract unmount(): Promise<void>;
 
-    abstract getStore(): RowStore<ED, Cxt>;
+    abstract getStore(): AsyncRowStore<ED, Cxt>;
 }

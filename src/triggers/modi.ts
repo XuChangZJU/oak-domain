@@ -1,8 +1,8 @@
 import { EntityDict } from "../base-app-domain";
-import { Trigger } from "../types";
-import { UniversalContext } from "../store/UniversalContext";
+import { AsyncContext } from "../store/AsyncRowStore";
+import { Trigger, UpdateTrigger } from "../types";
 
-const triggers: Trigger<EntityDict, 'modi', UniversalContext<EntityDict>>[] = [
+const triggers: Trigger<EntityDict, 'modi', AsyncContext<EntityDict>>[] = [
     {
         name: '当modi被应用时，将相应的operate完成',
         entity: 'modi',
@@ -10,7 +10,7 @@ const triggers: Trigger<EntityDict, 'modi', UniversalContext<EntityDict>>[] = [
         when: 'after',
         fn: async ({ operation }, context, option) => {
             const { filter } = operation;
-            const { result: modies } = await context.rowStore.select('modi', {
+            const modies = await context.select('modi', {
                 data: {
                     id: 1,
                     action: 1,
@@ -19,16 +19,16 @@ const triggers: Trigger<EntityDict, 'modi', UniversalContext<EntityDict>>[] = [
                     targetEntity: 1,
                 },
                 filter,
-            }, context, option);
+            }, option);
 
             for (const modi of modies) {
                 const { targetEntity, id, action, data, filter} = modi;
-                await context.rowStore.operate(targetEntity as keyof EntityDict, {
+                await context.operate(targetEntity as keyof EntityDict, {
                     id,
-                    action,
-                    data,
-                    filter: filter as any,
-                }, context, Object.assign({}, option, {
+                    action: action as EntityDict[keyof EntityDict]['Action'],
+                    data: data as EntityDict[keyof EntityDict]['Update']['data'],
+                    filter: filter as EntityDict[keyof EntityDict]['Update']['filter'],
+                }, Object.assign({}, option, {
                     blockTrigger: true,
                 }));
             }

@@ -1,7 +1,8 @@
 import assert from 'assert';
 import { IncomingHttpHeaders } from "http";
-import { UniversalContext } from "../store/UniversalContext";
-import { Connector, EntityDict, OakException, OakExternalException, OpRecord, RowStore } from "../types";
+import { AsyncContext, AsyncRowStore } from '../store/AsyncRowStore';
+import { SyncContext } from '../store/SyncRowStore';
+import { Connector, EntityDict, OakException, OakExternalException, OpRecord } from "../types";
 
 function makeContentTypeAndBody(data: any) {
     return {
@@ -10,21 +11,21 @@ function makeContentTypeAndBody(data: any) {
     };
 }
 
-export class SimpleConnector<ED extends EntityDict, Cxt extends UniversalContext<ED>> extends Connector<ED, Cxt> {
+export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
     static ROUTER = '/aspect';
     private serverUrl: string;
     private makeException: (exceptionData: any) => OakException;
-    private contextBuilder: (str: string | undefined) => (store: RowStore<ED, Cxt>) => Promise<Cxt>;
+    private contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>;
 
-    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: RowStore<ED, Cxt>) => Promise<Cxt>) {
+    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>) {
         super();
         this.serverUrl = `${serverUrl}${SimpleConnector.ROUTER}`;
         this.makeException = makeException;
         this.contextBuilder = contextBuilder;
     }
 
-    async callAspect(name: string, params: any, context: Cxt): Promise<{ result: any; opRecords: OpRecord<ED>[]; }> {
-        const cxtStr = await context.toString();
+    async callAspect(name: string, params: any, context: FrontCxt): Promise<{ result: any; opRecords: OpRecord<ED>[]; }> {
+        const cxtStr = context.toString();
 
         const { contentType, body } = makeContentTypeAndBody(params);
         const response = await global.fetch(this.serverUrl, {
@@ -61,7 +62,7 @@ export class SimpleConnector<ED extends EntityDict, Cxt extends UniversalContext
         return SimpleConnector.ROUTER;
     }
 
-    async parseRequest(headers: IncomingHttpHeaders, body: any, store: RowStore<ED, Cxt>): Promise<{ name: string; params: any; context: Cxt; }> {        
+    async parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{ name: string; params: any; context: BackCxt; }> {        
         const { 'oak-cxt': oakCxtStr, 'oak-aspect': aspectName } = headers;
         assert(typeof oakCxtStr === 'string' || oakCxtStr === undefined);
         assert(typeof aspectName === 'string');
@@ -74,7 +75,7 @@ export class SimpleConnector<ED extends EntityDict, Cxt extends UniversalContext
         };
     }
     
-    serializeResult(result: any, context: Cxt, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {
+    serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {
         return {
             body: {
                 result,

@@ -1,5 +1,7 @@
 import { StorageSchema } from '../types';
 import { EntityDict } from "../types/Entity";
+import { AsyncContext } from './AsyncRowStore';
+import { SyncContext } from './SyncRowStore';
 export declare function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]): ED[T]["Selection"]["filter"];
 export declare function unionFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]): ED[T]["Selection"]["filter"];
 export declare function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>, union?: true): ED[T]["Selection"]["filter"];
@@ -67,3 +69,4 @@ export declare function makeTreeAncestorFilter<ED extends EntityDict, T extends 
  * @param level
  */
 export declare function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof ED>(entity: T, parentKey: string, filter: ED[T]['Selection']['filter'], level?: number, includeAll?: boolean, includeSelf?: boolean): ED[T]['Selection']['filter'];
+export declare function checkFilterContains<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, contained: ED[T]['Selection']['filter'], filter?: ED[T]['Selection']['filter']): boolean | Promise<boolean>;

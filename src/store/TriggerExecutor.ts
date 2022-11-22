@@ -1,12 +1,17 @@
 import assert from 'assert';
 import { pull, unset } from "../utils/lodash";
-import { addFilterSegment } from "../store/filter";
-import { DeduceCreateOperation, EntityDict, OperateOption, SelectOption, SelectRowShape } from "../types/Entity";
+import { addFilterSegment, checkFilterContains, combineFilters } from "../store/filter";
+import { DeduceCreateOperation, EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
-import { Context } from '../types/Context';
-import { Trigger, Executor, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, CheckerType } from "../types/Trigger";
+import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, CheckerType, UpdateTriggerInTxn } from "../types/Trigger";
+import { AsyncContext } from './AsyncRowStore';
+import { GenericAction } from '../actions/action';
+import { OakRowInconsistencyException } from '../types';
+import { getFullProjection } from './actionDef';
+import { SyncContext } from './SyncRowStore';
+import { translateCheckerInAsyncContext } from './checker';
 
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
@@ -20,7 +25,7 @@ import { Trigger, Executor, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerI
     'stat': 'select',
 }; */
 
-export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends Context<ED>> extends Executor<ED, Cxt> {
+export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>> {
     private counter: number;
     private triggerMap: {
         [T in keyof ED]?: {
@@ -36,7 +41,6 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     private contextBuilder: (cxtString: string) => Promise<Cxt>;
 
     constructor(contextBuilder: (cxtString: string) => Promise<Cxt>, logger: Logger = console) {
-        super();
         this.contextBuilder = contextBuilder;
         this.logger = logger;
         this.triggerMap = {};
@@ -46,15 +50,16 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     }
 
     registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void {
-        const { entity, action, checker: checkFn, type } = checker;
+        const { entity, action, type } = checker;
         const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
-
+        const fn = translateCheckerInAsyncContext(checker);
         const trigger = {
             checkerType: type,
             name: triggerName,
+            priority: checker.priority || 2,        // checker的默认优先级稍高一点点
             entity,
-            action,
-            fn: checkFn,
+            action: action as 'create',
+            fn,
             when: 'before',
         } as CreateTriggerInTxn<ED, T, Cxt>;
         this.registerTrigger(trigger);
@@ -62,8 +67,8 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
 
     getCheckers<T extends keyof ED>(entity: T, action: ED[T]['Action'], checkerTypes?: CheckerType[]) {
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
-            trigger => (typeof trigger.action === 'string' && trigger.action === action || (trigger.action).includes(action as any))
-                && (!checkerTypes || trigger.checkerType && checkerTypes.includes(trigger.checkerType))
+            trigger => (typeof trigger.action === 'string' && trigger.action === action || trigger.action instanceof Array && trigger.action.includes(action as any)
+                && (!checkerTypes || trigger.checkerType && checkerTypes.includes(trigger.checkerType)))
         );
         return triggers;
     }
@@ -73,6 +78,9 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         if (this.triggerNameMap.hasOwnProperty(trigger.name)) {
             throw new Error(`不可有同名的触发器「${trigger.name}」`);
         }
+        if (typeof trigger.priority !== 'number') {
+            trigger.priority = 1;       // 默认最低
+        }
         Object.assign(this.triggerNameMap, {
             [trigger.name]: trigger,
         });
@@ -80,7 +88,14 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         const addTrigger = (action: string) => {
             const triggers = this.triggerMap[trigger.entity] && this.triggerMap[trigger.entity]![action];
             if (triggers) {
-                triggers.push(trigger);
+                let idx;
+                // 这里可以保持有序插入，后面取trigger的时候就不用排序了
+                for (idx = 0; idx < triggers.length; idx++) {
+                    if (triggers[idx].priority! > trigger.priority!) {
+                        break;
+                    }
+                }
+                triggers.splice(idx, 0, trigger);
             }
             else if (this.triggerMap[trigger.entity]) {
                 Object.assign(this.triggerMap[trigger.entity]!, {
@@ -143,7 +158,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         if ((trigger as CreateTriggerCrossTxn<ED, T, Cxt>).strict === 'makeSure') {
             switch (operation.action) {
                 case 'create': {
-                    if (operation.data.hasOwnProperty(Executor.dataAttr) || operation.data.hasOwnProperty(Executor.timestampAttr)) {
+                    if (operation.data.hasOwnProperty(TriggerDataAttribute) || operation.data.hasOwnProperty(TriggerTimestampAttribute)) {
                         throw new Error('同一行数据上不能存在两个跨事务约束');
                     }
                     break;
@@ -165,10 +180,9 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                             }
                         ],
                     }, filter);
-                    const { rowStore } = context;
-                    const count = await rowStore.count(entity, {
+                    const count = await context.count(entity, {
                         filter: filter2
-                    } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, context, {});
+                    } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, {});
                     if (count > 0) {
                         throw new Error(`对象${String(entity)}的行「${JSON.stringify(operation)}」上已经存在未完成的跨事务约束`);
                     }
@@ -177,58 +191,80 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
             }
 
             Object.assign(operation.data, {
-                [Executor.dataAttr]: {
+                [TriggerDataAttribute]: {
                     name: trigger.name,
                     operation,
-                    cxtStr: await context.toString(),
+                    cxtStr: context.toString(),
                     params: option,
                 },
-                [Executor.timestampAttr]: Date.now(),
+                [TriggerTimestampAttribute]: Date.now(),
             });
         }
     }
 
-    async preOperation<T extends keyof ED>(
+    preOperation<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         context: Cxt,
         option: OperateOption | SelectOption
-    ): Promise<void> {
+    ): Promise<void> | void {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
             trigger => typeof trigger.action === 'string' && trigger.action === operation.action || (trigger.action).includes(operation.action as any)
         );
         if (triggers) {
             const preTriggers = triggers.filter(
-                ele => ele.when === 'before' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as DeduceCreateOperation<ED[T]['Schema']>))
+                ele => ele.when === 'before' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as ED[T]['Create']))
             );
-
-            for (const trigger of preTriggers) {
-                const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as DeduceCreateOperation<ED[T]['Schema']> }, context, option as OperateOption);
-                if (number > 0) {
-                    this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
-                }
-            }
-
             const commitTriggers = triggers.filter(
-                ele => ele.when === 'commit' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as DeduceCreateOperation<ED[T]['Schema']>))
+                ele => ele.when === 'commit' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as ED[T]['Create']))
             );
 
-            for (const trigger of commitTriggers) {
-                await this.preCommitTrigger(entity, operation, trigger, context, option as OperateOption);
+            if (context instanceof SyncContext) {
+                for (const trigger of preTriggers) {
+                    const number = (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as ED[T]['Create'] }, context, option as OperateOption);
+                    if (number > 0) {
+                        this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
+                    }
+                }
+                assert(commitTriggers.length === 0, `前台不应有commitTrigger`);
+            }
+            else {
+                // 异步context
+                const execPreTrigger = async (idx: number): Promise<void> => {
+                    if (idx >= preTriggers.length) {
+                        return;
+                    }
+                    const trigger = preTriggers[idx];
+                    const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as ED[T]['Create'] }, context, option as OperateOption);
+                    if (number as number > 0) {
+                        this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
+                    }
+                    return execPreTrigger(idx + 1);
+                };
+                const execCommitTrigger = async (idx: number): Promise<void> => {
+                    if (idx >= commitTriggers.length) {
+                        return;
+                    }
+                    const trigger = commitTriggers[idx];
+                    await this.preCommitTrigger(entity, operation, trigger, context, option as OperateOption);
+                    return execCommitTrigger(idx + 1);
+                };
+                return execPreTrigger(0)
+                    .then(
+                        () => execCommitTrigger(0)
+                    );
             }
         }
     }
 
     private onCommit<T extends keyof ED>(
-        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' }, cxtStr: string, option: OperateOption) {
+        trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' }, context: AsyncContext<ED>, option: OperateOption) {
         return async () => {
-            const context = await this.contextBuilder(cxtStr);
             await context.begin();
-            const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({
+            const number = await (trigger as CreateTrigger<ED, T, AsyncContext<ED>>).fn({
                 operation: operation as DeduceCreateOperation<ED[T]['Schema']>,
             }, context, option);
-            const { rowStore } = context;
             if ((trigger as CreateTriggerCrossTxn<ED, T, Cxt>).strict === 'makeSure') {
                 // 如果是必须完成的trigger，在完成成功后要把trigger相关的属性置null;
                 let filter = {};
@@ -249,7 +285,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     Object.assign(filter, { filter: operation.filter });
                 }
 
-                await rowStore.operate(trigger.entity, {
+                await context.operate(trigger.entity, {
                     id: 'aaa',
                     action: 'update',
                     data: {
@@ -257,7 +293,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                         $$triggerData$$: null,
                     },
                     ...filter /** as Filter<'update', DeduceFilter<ED[T]['Schema']>> */,
-                }, context, {});
+                }, {});
             }
 
             await context.commit();
@@ -268,19 +304,19 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     private async postCommitTrigger<T extends keyof ED>(
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         trigger: Trigger<ED, T, Cxt>,
-        context: Cxt,
+        context: AsyncContext<ED>,
         option: OperateOption,
     ) {
-        context.on('commit', this.onCommit(trigger, operation, await context.toString(), option));
+        context.on('commit', this.onCommit(trigger, operation, context, option));
     }
 
-    async postOperation<T extends keyof ED>(
+    postOperation<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         context: Cxt,
         option: OperateOption | SelectOption,
-        result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[],
-    ): Promise<void> {
+        result?: Partial<ED[T]['Schema']>[],
+    ): Promise<void> | void {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
             trigger => typeof trigger.action === 'string' && trigger.action === operation.action || (trigger.action).includes(operation.action as any)
@@ -289,32 +325,58 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
             const postTriggers = triggers.filter(
                 ele => ele.when === 'after' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as DeduceCreateOperation<ED[T]['Schema']>))
             );
-
-            for (const trigger of postTriggers) {
-                const number = await (trigger as SelectTriggerAfter<ED, T, Cxt>).fn({
-                    operation: operation as ED[T]['Selection'],
-                    result: result!,
-                }, context, option as SelectOption);
-                if (number > 0) {
-                    this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
-                }
-            }
-
             const commitTriggers = (<Array<CreateTrigger<ED, T, Cxt>>>triggers).filter(
                 ele => ele.when === 'commit' && (!ele.check || ele.check(operation as DeduceCreateOperation<ED[T]['Schema']>))
             );
 
-            for (const trigger of commitTriggers) {
-                await this.postCommitTrigger(operation, trigger, context, option as OperateOption);
+            if (context instanceof SyncContext) {
+                for (const trigger of postTriggers) {
+                    const number = (trigger as SelectTriggerAfter<ED, T, Cxt>).fn({
+                        operation: operation as ED[T]['Selection'],
+                        result: result!,
+                    }, context, option as SelectOption);
+                    if (number > 0) {
+                        this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
+                    }
+                }
+                assert(commitTriggers.length === 0, '前台目前应当没有commitTrigger');
+            }
+            else {
+                // 异步context
+                const execPostTrigger = async (idx: number): Promise<void> => {
+                    if (idx >= postTriggers.length) {
+                        return;
+                    }
+                    const trigger = postTriggers[idx];
+                    const number = await (trigger as SelectTriggerAfter<ED, T, Cxt>).fn({
+                        operation: operation as ED[T]['Selection'],
+                        result: result!,
+                    }, context, option as SelectOption);
+                    if (number as number > 0) {
+                        this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
+                    }
+                    return execPostTrigger(idx + 1);
+                };
+                const execCommitTrigger = async (idx: number): Promise<void> => {
+                    if (idx >= commitTriggers.length) {
+                        return;
+                    }
+                    const trigger = commitTriggers[idx];
+                    await this.postCommitTrigger(operation, trigger, context, option as OperateOption);
+                    return execCommitTrigger(idx + 1);
+                };
+                return execPostTrigger(0)
+                    .then(
+                        () => execCommitTrigger(0)
+                    );
             }
         }
     }
 
     async checkpoint(context: Cxt, timestamp: number): Promise<number> {
         let result = 0;
-        const { rowStore } = context;
         for (const entity of this.volatileEntities) {
-            const { result: rows } = await rowStore.select(entity, {
+            const rows = await context.select(entity, {
                 data: {
                     id: 1,
                     $$triggerData$$: 1,
@@ -324,7 +386,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                         $gt: timestamp,
                     }
                 },
-            } as any, context, {
+            } as any, {
                 dontCollect: true,
                 forUpdate: true,
             });
@@ -332,7 +394,8 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                 const { $$triggerData$$ } = row;
                 const { name, operation, cxtStr, params } = $$triggerData$$!;
                 const trigger = this.triggerNameMap[name];
-                await this.onCommit(trigger, operation as ED[typeof entity]['Operation'], cxtStr, params)();
+                const context = await this.contextBuilder(cxtStr);
+                await this.onCommit(trigger, operation as ED[typeof entity]['Operation'], context as AsyncContext<ED>, params)();
             }
 
         }
