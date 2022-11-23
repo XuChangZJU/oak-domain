@@ -1982,7 +1982,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                                     undefined,
                                     n,
                                     q ? undefined : factory.createToken(ts.SyntaxKind.QuestionToken),
-                                    v || factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                                    v || factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
                                 )
                             }
                         )
@@ -2038,7 +2038,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                                     undefined,
                                     attr ? factory.createIdentifier(`${attr}Id`) : 'id',
                                     undefined,
-                                    factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                                    factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
                                 )
                             )
                         )
@@ -2222,7 +2222,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 undefined,
                 factory.createIdentifier("id"),
                 undefined,
-                factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
             )]
         ),
         // $$createAt$$: 1
@@ -2231,7 +2231,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 undefined,
                 factory.createIdentifier("$$createAt$$"),
                 undefined,
-                factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
             )]
         ),
         // $$seq$$: 1
@@ -2240,7 +2240,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 undefined,
                 factory.createIdentifier("$$seq$$"),
                 undefined,
-                factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
             )]
         ),
         // $$updateAt$$: 1
@@ -2249,7 +2249,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                 undefined,
                 factory.createIdentifier("$$updateAt$$"),
                 undefined,
-                factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
             )]
         ),
     ];
@@ -2273,7 +2273,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                     case 'Datetime':
                     case 'Image':
                     case 'File': {
-                        type2 = factory.createLiteralTypeNode(factory.createNumericLiteral("1"));
+                        type2 = factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
                         break;
                     }
                     default: {
@@ -2292,14 +2292,14 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                                         undefined,
                                         factory.createIdentifier(`${(<ts.Identifier>name).text}Id`),
                                         undefined,
-                                        factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
                                     )]
                                 )
                             );
                         }
                         else if (!['Object'].includes(text)) {
                             // todo 对State的专门处理
-                            type2 = factory.createLiteralTypeNode(factory.createNumericLiteral("1"));
+                            type2 = factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
                         }
                     }
                 }
@@ -2324,7 +2324,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                         undefined,
                         name,
                         undefined,
-                        factory.createLiteralTypeNode(factory.createNumericLiteral("1"))
+                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
                     )]
                 )
             );

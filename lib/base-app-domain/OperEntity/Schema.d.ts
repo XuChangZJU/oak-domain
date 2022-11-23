@@ -39,14 +39,14 @@ export declare type Filter<E = Q_EnumValue<"modi" | "user" | string>> = MakeFilt
 export declare type Projection = {
     "#id"?: NodeId;
     [k: string]: any;
-    id: 1;
-    $$createAt$$?: 1;
-    $$updateAt$$?: 1;
-    $$seq$$?: 1;
-    operId?: 1;
+    id: number;
+    $$createAt$$?: number;
+    $$updateAt$$?: number;
+    $$seq$$?: number;
+    operId?: number;
     oper?: Oper.Projection;
-    entity?: 1;
-    entityId?: 1;
+    entity?: number;
+    entityId?: number;
     modi?: Modi.Projection;
     user?: User.Projection;
 } & Partial<ExprOp<OpAttr | string>>;
@@ -65,33 +65,33 @@ export declare type ExportProjection = {
     user?: User.ExportProjection;
 } & Partial<ExprOp<OpAttr | string>>;
 declare type OperEntityIdProjection = OneOf<{
-    id: 1;
+    id: number;
 }>;
 declare type OperIdProjection = OneOf<{
-    operId: 1;
+    operId: number;
 }>;
 declare type ModiIdProjection = OneOf<{
-    entityId: 1;
+    entityId: number;
 }>;
 declare type UserIdProjection = OneOf<{
-    entityId: 1;
+    entityId: number;
 }>;
 export declare type SortAttr = {
-    id: 1;
+    id: number;
 } | {
-    $$createAt$$: 1;
+    $$createAt$$: number;
 } | {
-    $$seq$$: 1;
+    $$seq$$: number;
 } | {
-    $$updateAt$$: 1;
+    $$updateAt$$: number;
 } | {
-    operId: 1;
+    operId: number;
 } | {
     oper: Oper.SortAttr;
 } | {
-    entity: 1;
+    entity: number;
 } | {
-    entityId: 1;
+    entityId: number;
 } | {
     modi: Modi.SortAttr;
 } | {

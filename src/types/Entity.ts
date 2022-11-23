@@ -111,7 +111,7 @@ export interface OtmSubProjection extends Omit<DeduceSelection<any>, 'action'> {
 type DeduceProjection<SH extends GeneralEntityShape> = {
     '#id'?: NodeId;
 } & {
-    [K in keyof SH]?: 1 | OtmSubProjection | any;
+    [K in keyof SH]?: number | OtmSubProjection | any;
 } & Partial<ExprOp<keyof SH>>;
 
 
@@ -122,7 +122,7 @@ export type AttrFilter<SH extends GeneralEntityShape> = {
 export type DeduceFilter<SH extends GeneralEntityShape> = MakeFilter<AttrFilter<SH> & ExprOp<keyof SH>>;
 
 export type DeduceSorterAttr<SH extends GeneralEntityShape> = OneOf<{
-    [K: string]: 1 | object | undefined;
+    [K: string]: number | object | undefined;
 } & ExprOp<keyof SH>>;
 
 export type DeduceSorterItem<SH extends GeneralEntityShape> = {

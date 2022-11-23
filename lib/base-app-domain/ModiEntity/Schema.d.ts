@@ -36,14 +36,14 @@ export declare type Filter<E = Q_EnumValue<"user" | string>> = MakeFilter<AttrFi
 export declare type Projection = {
     "#id"?: NodeId;
     [k: string]: any;
-    id: 1;
-    $$createAt$$?: 1;
-    $$updateAt$$?: 1;
-    $$seq$$?: 1;
-    modiId?: 1;
+    id: number;
+    $$createAt$$?: number;
+    $$updateAt$$?: number;
+    $$seq$$?: number;
+    modiId?: number;
     modi?: Modi.Projection;
-    entity?: 1;
-    entityId?: 1;
+    entity?: number;
+    entityId?: number;
     user?: User.Projection;
 } & Partial<ExprOp<OpAttr | string>>;
 export declare type ExportProjection = {
@@ -60,30 +60,30 @@ export declare type ExportProjection = {
     user?: User.ExportProjection;
 } & Partial<ExprOp<OpAttr | string>>;
 declare type ModiEntityIdProjection = OneOf<{
-    id: 1;
+    id: number;
 }>;
 declare type ModiIdProjection = OneOf<{
-    modiId: 1;
+    modiId: number;
 }>;
 declare type UserIdProjection = OneOf<{
-    entityId: 1;
+    entityId: number;
 }>;
 export declare type SortAttr = {
-    id: 1;
+    id: number;
 } | {
-    $$createAt$$: 1;
+    $$createAt$$: number;
 } | {
-    $$seq$$: 1;
+    $$seq$$: number;
 } | {
-    $$updateAt$$: 1;
+    $$updateAt$$: number;
 } | {
-    modiId: 1;
+    modiId: number;
 } | {
     modi: Modi.SortAttr;
 } | {
-    entity: 1;
+    entity: number;
 } | {
-    entityId: 1;
+    entityId: number;
 } | {
     user: User.SortAttr;
 } | {
