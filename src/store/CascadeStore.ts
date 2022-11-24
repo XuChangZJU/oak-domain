@@ -76,7 +76,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 });
                 if (supportMtoJoin) {
                     cascadeSelectionFns.push(
-                        async (result) => {
+                        (result) => {
                             if (!toModi) {
                                 result.forEach(
                                     (ele) => {
@@ -116,7 +116,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
                 else {
                     cascadeSelectionFns.push(
-                        async (result) => {
+                        (result) => {
                             const dealWithSubRows = (subRows: Partial<ED[T]['Schema']>[]) => {
                                 assert(subRows.length <= entityIds.length);
                                 if (subRows.length < entityIds.length && !toModi) {
@@ -187,7 +187,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     if (!toModi) {
                         // 如果不是modi，要保证外键没有空指针
                         cascadeSelectionFns.push(
-                            async (result) => {
+                            (result) => {
                                 if (!toModi) {
                                     result.forEach(
                                         (ele) => {
@@ -225,7 +225,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
                 else {
                     cascadeSelectionFns.push(
-                        async (result) => {
+                        (result) => {
                             const dealWithSubRows = (subRows: Partial<ED[keyof ED]['Schema']>[]) => {
                                 assert(subRows.length <= ids.length);
                                 if (subRows.length < ids.length && !toModi) {
@@ -340,7 +340,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 else {
                     // 基于entity的多对一
                     cascadeSelectionFns.push(
-                        async (result) => {
+                        (result) => {
                             const ids = result.map(
                                 ele => ele.id
                             ) as string[];
