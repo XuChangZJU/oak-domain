@@ -25,22 +25,22 @@ import { translateCheckerInAsyncContext } from './checker';
     'stat': 'select',
 }; */
 
-export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>> {
+export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
     private counter: number;
     private triggerMap: {
         [T in keyof ED]?: {
-            [A: string]: Array<Trigger<ED, T, Cxt>>;
+            [A: string]: Array<Trigger<ED, T, AsyncContext<ED>>>;
         };
     };
     private triggerNameMap: {
-        [N: string]: Trigger<ED, keyof ED, Cxt>;
+        [N: string]: Trigger<ED, keyof ED, AsyncContext<ED>>;
     };
     private volatileEntities: Array<keyof ED>;
 
     private logger: Logger;
-    private contextBuilder: (cxtString: string) => Promise<Cxt>;
+    private contextBuilder: (cxtString: string) => Promise<AsyncContext<ED>>;
 
-    constructor(contextBuilder: (cxtString: string) => Promise<Cxt>, logger: Logger = console) {
+    constructor(contextBuilder: (cxtString: string) => Promise<AsyncContext<ED>>, logger: Logger = console) {
         this.contextBuilder = contextBuilder;
         this.logger = logger;
         this.triggerMap = {};
@@ -49,7 +49,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         this.counter = 0;
     }
 
-    registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void {
+    registerChecker<T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>): void {
         const { entity, action, type } = checker;
         const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
         const fn = translateCheckerInAsyncContext(checker);
@@ -73,7 +73,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         return triggers;
     }
 
-    registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void {
+    registerTrigger<T extends keyof ED, Cxt extends AsyncContext<ED>>(trigger: Trigger<ED, T, Cxt>): void {
         // trigger的两种访问方式: by name, by entity/action
         if (this.triggerNameMap.hasOwnProperty(trigger.name)) {
             throw new Error(`不可有同名的触发器「${trigger.name}」`);
@@ -95,7 +95,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                         break;
                     }
                 }
-                triggers.splice(idx, 0, trigger);
+                triggers.splice(idx, 0, trigger as Trigger<ED, T, AsyncContext<ED>>);
             }
             else if (this.triggerMap[trigger.entity]) {
                 Object.assign(this.triggerMap[trigger.entity]!, {
@@ -126,7 +126,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         }
     }
 
-    unregisterTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void {
+    unregisterTrigger<T extends keyof ED, Cxt extends AsyncContext<ED>>(trigger: Trigger<ED, T, Cxt>): void {
         assert(trigger.when !== 'commit' || trigger.strict !== 'makeSure', 'could not remove strict volatile triggers');
 
         const removeTrigger = (action: string) => {
@@ -147,7 +147,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         }
     }
 
-    private async preCommitTrigger<T extends keyof ED>(
+    private async preCommitTrigger<T extends keyof ED, Cxt extends AsyncContext<ED>>(
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         trigger: Trigger<ED, T, Cxt>,
@@ -202,7 +202,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         }
     }
 
-    preOperation<T extends keyof ED>(
+    preOperation<T extends keyof ED, Cxt extends AsyncContext<ED>>(
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         context: Cxt,
@@ -258,7 +258,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         }
     }
 
-    private onCommit<T extends keyof ED>(
+    private onCommit<T extends keyof ED, Cxt extends AsyncContext<ED>>(
         trigger: Trigger<ED, T, Cxt>, operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' }, context: AsyncContext<ED>, option: OperateOption) {
         return async () => {
             await context.begin();
@@ -301,7 +301,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         };
     }
 
-    private async postCommitTrigger<T extends keyof ED>(
+    private async postCommitTrigger<T extends keyof ED, Cxt extends AsyncContext<ED>>(
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         trigger: Trigger<ED, T, Cxt>,
         context: AsyncContext<ED>,
@@ -310,7 +310,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         context.on('commit', this.onCommit(trigger, operation, context, option));
     }
 
-    postOperation<T extends keyof ED>(
+    postOperation<T extends keyof ED, Cxt extends AsyncContext<ED>>(
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
         context: Cxt,
@@ -373,7 +373,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         }
     }
 
-    async checkpoint(context: Cxt, timestamp: number): Promise<number> {
+    async checkpoint<Cxt extends AsyncContext<ED>>(context: Cxt, timestamp: number): Promise<number> {
         let result = 0;
         for (const entity of this.volatileEntities) {
             const rows = await context.select(entity, {
