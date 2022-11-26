@@ -109,6 +109,10 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
         return this.rowStore.count(entity, selection, this, option);
     }
 
+    mergeMultipleResults(toBeMerged: OperationResult<ED>[]) {
+        return this.rowStore.mergeMultipleResults(toBeMerged);
+    }
+    
     getCurrentTxnId() {
         return this.uuid;
     }

@@ -28,6 +28,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     operate<T extends keyof ED, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], option: OP): Promise<OperationResult<ED>>;
     select<T extends keyof ED, OP extends SelectOption>(entity: T, selection: ED[T]['Selection'], option: OP): Promise<Partial<ED[T]["Schema"]>[]>;
     count<T extends keyof ED, OP extends SelectOption>(entity: T, selection: Pick<ED[T]['Selection'], 'filter' | 'count'>, option: OP): Promise<number>;
+    mergeMultipleResults(toBeMerged: OperationResult<ED>[]): OperationResult<ED>;
     getCurrentTxnId(): string | undefined;
     getSchema(): import("../types").StorageSchema<ED>;
     abstract isRoot(): boolean;
