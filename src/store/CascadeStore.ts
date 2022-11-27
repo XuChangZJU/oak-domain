@@ -974,11 +974,11 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     $in: ['create', 'update'],
                                 },
                                 iState: 'active',
-                                filter: {
+                                filter: ids.length > 0 ? {
                                     id: {
                                         $in: ids,
                                     },
-                                }
+                                } : filter,
                             },
                             sorter: [
                                 {
@@ -1017,11 +1017,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 action,
                                 data,
                                 iState: 'active',
-                                filter: {
-                                    id: {
-                                        $in: ids,
-                                    },
-                                },
+                                filter,
                                 modiEntity$modi: {
                                     id: 'dummy',
                                     action: 'create',
