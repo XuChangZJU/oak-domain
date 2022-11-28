@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { addFilterSegment, checkFilterContains, combineFilters } from "../store/filter";
 import { OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
-import { Checker, CreateTriggerInTxn, EntityDict, Trigger, UpdateTriggerInTxn } from "../types";
+import { Checker, CreateTriggerInTxn, EntityDict, OperateOption, SelectOption, Trigger, UpdateTriggerInTxn } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
 import { getFullProjection } from './actionDef';
@@ -23,10 +23,10 @@ export function translateCheckerInAsyncContext<
         }
         case 'row': {
             const { filter, errMsg, inconsistentRows } = checker;
-            return (async ({ operation }, context) => {
+            return (async ({ operation }, context, option) => {
                 const { filter: operationFilter } = operation;
                 assert(operationFilter);
-                const filter2 = typeof filter === 'function' ? filter(context) : filter;
+                const filter2 = typeof filter === 'function' ? filter(context, option) : filter;
                 if (await checkFilterContains(entity, context, filter2, operationFilter)) {
                     return 0;
                 }
@@ -72,12 +72,12 @@ export function translateCheckerInAsyncContext<
         }
         case 'relation': {
             const { relationFilter } = checker;
-            return (async ({ operation }, context) => {
+            return (async ({ operation }, context, option) => {
                 if (context.isRoot()) {
                     return 0;
                 }
                 // 对后台而言，将生成的relationFilter加到filter之上(select可以在此加以权限的过滤)
-                operation.filter = combineFilters([operation.filter, relationFilter(context)]);
+                operation.filter = combineFilters([operation.filter, relationFilter(context, option)]);
                 return 0;
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
         }
@@ -91,7 +91,7 @@ export function translateCheckerInSyncContext<
     ED extends EntityDict & BaseEntityDict,
     T extends keyof ED,
     Cxt extends SyncContext<ED> | AsyncContext<ED>
->(checker: Checker<ED, T, Cxt>): (operation: ED[T]['Operation'], context: Cxt) => void {    
+>(checker: Checker<ED, T, Cxt>): (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => void {    
     const { entity, type } = checker;
     switch (type) {
         case 'data': {
@@ -100,9 +100,9 @@ export function translateCheckerInSyncContext<
         }
         case 'row': {
             const { filter, errMsg } = checker;
-            return (operation, context) => {
+            return (operation, context, option) => {
                 const { filter: operationFilter } = operation;
-                const filter2 = typeof filter === 'function' ? filter(context) : filter;
+                const filter2 = typeof filter === 'function' ? filter(context, option) : filter;
                 assert(operationFilter);
                 if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter)) {
                     return;
@@ -112,11 +112,11 @@ export function translateCheckerInSyncContext<
         }
         case 'relation': {
             const { relationFilter: filter, errMsg } = checker;
-            return (operation, context) => {
+            return (operation, context, option) => {
                 if (context.isRoot()) {
                     return;
                 }
-                const filter2 = typeof filter === 'function' ? filter(context) : filter;
+                const filter2 = typeof filter === 'function' ? filter(context, option) : filter;
                 const { filter: operationFilter } = operation;
                 assert(operationFilter);
                 if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter)) {

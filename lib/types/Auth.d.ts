@@ -1,6 +1,6 @@
 import { AsyncContext } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
-import { EntityDict } from "../types/Entity";
+import { EntityDict, OperateOption, SelectOption } from "../types/Entity";
 export declare type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'data';
@@ -13,7 +13,7 @@ export declare type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt ex
     type: 'row';
     entity: T;
     action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
-    filter: ED[T]['Selection']['filter'] | ((context: Cxt) => ED[T]['Selection']['filter']);
+    filter: ED[T]['Selection']['filter'] | ((context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter']);
     errMsg?: string;
     inconsistentRows?: {
         entity: keyof ED;
@@ -25,7 +25,7 @@ export declare type RelationChecker<ED extends EntityDict, T extends keyof ED, C
     type: 'relation';
     entity: T;
     action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
-    relationFilter: (context: Cxt) => ED[T]['Selection']['filter'];
+    relationFilter: (context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'];
     errMsg: string;
 };
 export declare type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt>;

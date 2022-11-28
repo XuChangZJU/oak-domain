@@ -1,6 +1,6 @@
 import { AsyncContext } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
-import { EntityDict } from "../types/Entity";
+import { EntityDict, OperateOption, SelectOption } from "../types/Entity";
 
 export type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
@@ -15,7 +15,7 @@ export type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends As
     type: 'row';
     entity: T;
     action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
-    filter: ED[T]['Selection']['filter'] | ((context: Cxt) => ED[T]['Selection']['filter']);       // 对行的额外检查条件
+    filter: ED[T]['Selection']['filter'] | ((context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter']);       // 对行的额外检查条件
     errMsg?: string;
     inconsistentRows?: { // 因为这里的限制不一定在本row上，如果不传这个exception，则默认返回本row上的exception        
         entity: keyof ED;
@@ -28,7 +28,7 @@ export type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt exten
     type: 'relation';
     entity: T;
     action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
-    relationFilter: (context: Cxt) => ED[T]['Selection']['filter'];       // 生成一个额外的relation相关的filter，加在原先的filter上
+    relationFilter: (context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'];       // 生成一个额外的relation相关的filter，加在原先的filter上
     errMsg: string;
 };
 

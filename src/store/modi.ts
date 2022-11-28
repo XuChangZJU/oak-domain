@@ -77,22 +77,32 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
             entity,
             action: restActions as any,
             type: 'row',
-            filter: {
-                id: {
-                    $nin: {
-                        entity: 'modiEntity',
-                        data: {
-                            entityId: 1,
+            filter: (context, option) =>{
+                if ((<OperateOption>option).modiParentId && (<OperateOption>option).modiParentEntity) {
+                    // 如果本身也是创建modi就允许通过
+                    return {
+                        id: {
+                            $exists: true,
                         },
-                        filter: {
-                            entity,
-                            modi: {
-                                iState: 'active',
-                            }
+                    };
+                }
+                return {
+                    id: {
+                        $nin: {
+                            entity: 'modiEntity',
+                            data: {
+                                entityId: 1,
+                            },
+                            filter: {
+                                entity,
+                                modi: {
+                                    iState: 'active',
+                                }
+                            },
                         },
-                    },
-                },
-            } as ED[keyof ED]['Selection']['filter'],
+                    }
+                };
+            },
             errMsg: `更新的对象${entity}上有尚未结束的modi`,
         })
     }
