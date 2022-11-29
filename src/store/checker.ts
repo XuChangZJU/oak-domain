@@ -24,49 +24,61 @@ export function translateCheckerInAsyncContext<
         case 'row': {
             const { filter, errMsg, inconsistentRows } = checker;
             return (async ({ operation }, context, option) => {
-                const { filter: operationFilter } = operation;
+                const { filter: operationFilter, action } = operation;
                 assert(operationFilter);
                 const filter2 = typeof filter === 'function' ? filter(context, option) : filter;
-                if (await checkFilterContains(entity, context, filter2, operationFilter)) {
+                if (['select', 'count', 'stat'].includes(action)) {
+                    operation.filter = addFilterSegment(operationFilter, filter2);
                     return 0;
                 }
-                if (inconsistentRows) {
-                    const { entity: entity2, selection: selection2 } = inconsistentRows;
-                    const rows2 = await context.select(entity2, selection2(operationFilter), { dontCollect: true });
-                    const data = {};
-                    rows2.forEach(
-                        ele => Object.assign(data, {
-                            [ele.id as string]: ele,
-                        })
-                    );
-
-                    throw new OakRowInconsistencyException({
-                        a: 's',
-                        d: {
-                            [entity2]: data,
-                        }
-                    }, errMsg);
-                }
                 else {
-                    const rows2 = await context.select(entity, {
-                        data: getFullProjection(entity, context.getSchema()),
-                        filter: Object.assign({}, operationFilter, {
-                            $not: filter2,
-                        })
-                    }, { dontCollect: true });
-                    const data = {};
-                    rows2.forEach(
-                        ele => Object.assign(data, {
-                            [ele.id as string]: ele,
-                        })
-                    );
-
-                    throw new OakRowInconsistencyException({
-                        a: 's',
-                        d: {
-                            [entity]: data,
-                        }
-                    }, errMsg);
+                    if (await checkFilterContains(entity, context, filter2, operationFilter)) {
+                        return 0;
+                    }
+                    if (inconsistentRows) {
+                        const { entity: entity2, selection: selection2 } = inconsistentRows;
+                        const rows2 = await context.select(entity2, selection2(operationFilter), { 
+                            dontCollect: true,
+                            blockTrigger: true,
+                        });
+                        const data = {};
+                        rows2.forEach(
+                            ele => Object.assign(data, {
+                                [ele.id as string]: ele,
+                            })
+                        );
+    
+                        throw new OakRowInconsistencyException({
+                            a: 's',
+                            d: {
+                                [entity2]: data,
+                            }
+                        }, errMsg);
+                    }
+                    else {
+                        const rows2 = await context.select(entity, {
+                            data: getFullProjection(entity, context.getSchema()),
+                            filter: Object.assign({}, operationFilter, {
+                                $not: filter2,
+                            })
+                        }, {
+                            dontCollect: true,
+                            blockTrigger: true,
+                        });
+                        const data = {};
+                        rows2.forEach(
+                            ele => Object.assign(data, {
+                                [ele.id as string]: ele,
+                            })
+                        );
+    
+                        throw new OakRowInconsistencyException({
+                            a: 's',
+                            d: {
+                                [entity]: data,
+                            }
+                        }, errMsg);
+                    }
                 }
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
         }
@@ -101,13 +113,19 @@ export function translateCheckerInSyncContext<
         case 'row': {
             const { filter, errMsg } = checker;
             return (operation, context, option) => {
-                const { filter: operationFilter } = operation;
+                const { filter: operationFilter, action } = operation;
                 const filter2 = typeof filter === 'function' ? filter(context, option) : filter;
                 assert(operationFilter);
-                if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter)) {
-                    return;
+                if (['select', 'count', 'stat'].includes(action)) {
+                    operation.filter = addFilterSegment(operationFilter, filter2);
+                    return 0;
                 }
-                throw new OakRowInconsistencyException(undefined, errMsg);
+                else {
+                    if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter)) {
+                        return;
+                    }
+                    throw new OakRowInconsistencyException(undefined, errMsg);
+                }
             };
         }
         case 'relation': {

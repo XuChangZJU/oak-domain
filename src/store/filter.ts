@@ -321,6 +321,7 @@ export function checkFilterContains<ED extends EntityDict, T extends keyof ED, C
         filter: filter2,
     }, {
         dontCollect: true,
+        blockTrigger: true,
     });
     if (count instanceof Promise) {
         return count.then(
