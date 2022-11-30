@@ -6,6 +6,7 @@ export declare function addFilterSegment<ED extends EntityDict, T extends keyof 
 export declare function unionFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]): ED[T]["Selection"]["filter"];
 export declare function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>, union?: true): ED[T]["Selection"]["filter"];
 /**
+ *
  * 判断filter是否包含conditionalFilter中的查询条件，即filter查询的结果一定满足conditionalFilter的约束
  * filter = {
  *      a: 1
@@ -20,6 +21,7 @@ export declare function combineFilters<ED extends EntityDict, T extends keyof ED
  * @param schema
  * @param filter
  * @param conditionalFilter
+ * @returns
  */
 export declare function contains<ED extends EntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filter: ED[T]['Selection']['filter'], conditionalFilter: ED[T]['Selection']['filter']): boolean;
 /**
