@@ -6,6 +6,31 @@ export declare function addFilterSegment<ED extends EntityDict, T extends keyof 
 export declare function unionFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]): ED[T]["Selection"]["filter"];
 export declare function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>, union?: true): ED[T]["Selection"]["filter"];
 /**
+ * 判断value1表达的单个属性查询与同属性上value2表达的查询是包容还是相斥
+ * 相容即value1所表达的查询结果一定被value2表达的查询结果所包含，例如：
+ * value1: {
+ *  $eq: 12
+ * }
+ * value2: {
+ *  $gt: 8,
+ * }
+ * 此时value1相容value2
+ *
+ * 相斥即value1所表达的查询结果与value2一定毫无联系，例如：
+ * value1: {
+ *  $gt: 8,
+ * }
+ * value2: {
+ *  $lt: 2,
+ * }
+ *
+ *
+ * @param value1
+ * @param value2
+ * @attention: 1)这里的测试不够充分，有些算子之间的相容或相斥可能有遗漏, 2)有新的算子加入需要修改代码
+ */
+export declare function judgeValueRelation(value1: any, value2: any, contained: boolean): boolean;
+/**
  *
  * 判断filter是否包含conditionalFilter中的查询条件，即filter查询的结果一定满足conditionalFilter的约束
  * filter = {

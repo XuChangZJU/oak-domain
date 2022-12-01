@@ -1378,10 +1378,10 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 const data: Partial<ED[T]['Schema']> = {}
                 const rel = this.judgeRelation(entity, attr);
                 if (rel === 2) {
-                    this.addToResultSelections(attr, rows.map(ele => ele[attr]!), context);
+                    this.addToResultSelections(attr, rows.map(ele => ele[attr]!).filter(ele => !!ele), context);
                 }
                 else if (typeof rel === 'string') {
-                    this.addToResultSelections(rel, rows.map(ele => ele[attr]!), context);
+                    this.addToResultSelections(rel, rows.map(ele => ele[attr]!).filter(ele => !!ele), context);
                 }
                 else if (rel instanceof Array) {
                     this.addToResultSelections(rel[0], rows.map(ele => ele[attr]!).reduce((prev, current) => prev.concat(current), [] as any[]), context);
