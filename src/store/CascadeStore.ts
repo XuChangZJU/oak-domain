@@ -557,7 +557,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         entity,
                                         data: {
                                             [`${attr}Id`]: 1,
-                                        },
+                                        }, 
                                         filter,
                                     }
                                 },
@@ -597,6 +597,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                         else if (actionOtm === 'create') {
                             // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
+                            // todo 这个假设成立吗？等遇到create/create一对多的case再完善
                             const { id } = filter!;
                             assert(typeof id === 'string');
                             if (dataOtm instanceof Array) {
@@ -616,6 +617,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                         else {
                             // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
+                            // 这个倒是好像不可能出现create/update的一对多，如果遇到了再完善
                             const { id } = filter!;
                             Object.assign(otm, {
                                 filter: addFilterSegment({
@@ -650,6 +652,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                         else if (actionOtm === 'create') {
                             // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
+                            // todo 这个假设成立吗？等遇到create/create一对多的case再完善
                             const { id } = filter!;
                             assert(typeof id === 'string');
                             if (dataOtm instanceof Array) {
@@ -667,6 +670,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                         else {
                             // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
+                            // 这个倒是好像不可能出现create/update的一对多，如果遇到了再完善
                             const { id } = filter!;
                             Object.assign(otm, {
                                 filter: addFilterSegment({
