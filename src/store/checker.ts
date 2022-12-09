@@ -9,7 +9,7 @@ import { SyncContext } from './SyncRowStore';
 
 export function translateCheckerInAsyncContext<
     ED extends EntityDict & BaseEntityDict,
-    Cxt extends AsyncContext<ED> | SyncContext<ED>
+    Cxt extends AsyncContext<ED>
 >(checker: Checker<ED, keyof ED, Cxt>): Trigger<ED, keyof ED, Cxt>['fn'] {
     const { entity, type } = checker;
     switch (type) {
@@ -26,7 +26,7 @@ export function translateCheckerInAsyncContext<
             return (async ({ operation }, context, option) => {
                 const { filter: operationFilter, action } = operation;
                 assert(operationFilter);
-                const filter2 = typeof filter === 'function' ? filter(context, option) : filter;
+                const filter2 = typeof filter === 'function' ? filter(operation, context, option) : filter;
                 if (['select', 'count', 'stat'].includes(action)) {
                     operation.filter = addFilterSegment(operationFilter, filter2);
                     return 0;
@@ -37,7 +37,7 @@ export function translateCheckerInAsyncContext<
                     }
                     if (inconsistentRows) {
                         const { entity: entity2, selection: selection2 } = inconsistentRows;
-                        const rows2 = await context.select(entity2, selection2(operationFilter), { 
+                        const rows2 = await context.select(entity2, selection2(operationFilter), {
                             dontCollect: true,
                             blockTrigger: true,
                         });
@@ -47,7 +47,7 @@ export function translateCheckerInAsyncContext<
                                 [ele.id as string]: ele,
                             })
                         );
-    
+
                         throw new OakRowInconsistencyException({
                             a: 's',
                             d: {
@@ -71,7 +71,7 @@ export function translateCheckerInAsyncContext<
                                 [ele.id as string]: ele,
                             })
                         );
-    
+
                         throw new OakRowInconsistencyException({
                             a: 's',
                             d: {
@@ -89,7 +89,28 @@ export function translateCheckerInAsyncContext<
                     return 0;
                 }
                 // 对后台而言，将生成的relationFilter加到filter之上(select可以在此加以权限的过滤)
-                operation.filter = combineFilters([operation.filter, relationFilter(context, option)]);
+                operation.filter = combineFilters([operation.filter, relationFilter(operation, context, option)]);
+                return 0;
+            }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
+        }    
+        case 'expression': 
+        case 'expressionRelation': {
+            const { expression, errMsg } = checker;
+            return (async ({ operation }, context, option) => {
+                if (context.isRoot() && type === 'expressionRelation') {
+                    return 0;
+                }
+                const { entity: expressionEntity, expr, filter: expressionFilter } = expression(operation, context, option);
+                const [result] = await context.select(expressionEntity, {
+                    data: {
+                        $expr: expr,
+                    },
+                    filter: expressionFilter,
+                }, Object.assign({}, option, { dontCollect: true }));
+                if (!result) {
+                    // 条件判定为假，抛异常
+                    throw new OakRowInconsistencyException(undefined, errMsg);
+                }
                 return 0;
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
         }
@@ -102,19 +123,19 @@ export function translateCheckerInAsyncContext<
 export function translateCheckerInSyncContext<
     ED extends EntityDict & BaseEntityDict,
     T extends keyof ED,
-    Cxt extends SyncContext<ED> | AsyncContext<ED>
->(checker: Checker<ED, T, Cxt>): (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => void {    
+    Cxt extends SyncContext<ED>
+>(checker: Checker<ED, T, Cxt>): (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => void {
     const { entity, type } = checker;
     switch (type) {
         case 'data': {
             const { checker: checkerFn } = checker;
-            return (operation, context) =>checkerFn(operation.data, context);
+            return (operation, context) => checkerFn(operation.data, context);
         }
         case 'row': {
             const { filter, errMsg } = checker;
             return (operation, context, option) => {
                 const { filter: operationFilter, action } = operation;
-                const filter2 = typeof filter === 'function' ? filter(context, option) : filter;
+                const filter2 = typeof filter === 'function' ? filter(operation, context, option) : filter;
                 assert(operationFilter);
                 if (['select', 'count', 'stat'].includes(action)) {
                     operation.filter = addFilterSegment(operationFilter, filter2);
@@ -134,13 +155,34 @@ export function translateCheckerInSyncContext<
                 if (context.isRoot()) {
                     return;
                 }
-                const filter2 = typeof filter === 'function' ? filter(context, option) : filter;
+                const filter2 = typeof filter === 'function' ? filter(operation, context, option) : filter;
                 const { filter: operationFilter } = operation;
                 assert(operationFilter);
                 if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter)) {
                     return;
                 }
                 throw new OakUserUnpermittedException(errMsg);
+            };
+        }   
+        case 'expression': 
+        case 'expressionRelation': {
+            const { expression, errMsg } = checker;
+            return (operation, context, option) => {
+                if (context.isRoot() && type === 'expressionRelation') {
+                    return;
+                }
+                const { entity: expressionEntity, expr, filter: expressionFilter } = expression(operation, context, option);
+                const [result] = context.select(expressionEntity, {
+                    data: {
+                        $expr: expr,
+                    },
+                    filter: expressionFilter,
+                }, Object.assign({}, option, { dontCollect: true })) as any[];
+                if (!result.$expr) {
+                    // 条件判定为假，抛异常
+                    throw new OakRowInconsistencyException(undefined, errMsg);
+                }
+                return;
             };
         }
         default: {

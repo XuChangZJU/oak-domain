@@ -4,8 +4,8 @@ import { addFilterSegment, checkFilterContains, combineFilters } from "../store/
 import { DeduceCreateOperation, EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
-import { Checker } from '../types/Auth';
-import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, CheckerType, UpdateTriggerInTxn } from "../types/Trigger";
+import { Checker, CheckerType } from '../types/Auth';
+import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTriggerInTxn } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
 import { GenericAction } from '../actions/action';
 import { OakRowInconsistencyException } from '../types';

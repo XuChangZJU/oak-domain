@@ -1,8 +1,8 @@
 import { EntityDict, OperateOption, SelectOption } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
-import { Checker } from '../types/Auth';
-import { Trigger, CheckerType } from "../types/Trigger";
+import { Checker, CheckerType } from '../types/Auth';
+import { Trigger } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger

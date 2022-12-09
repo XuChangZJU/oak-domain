@@ -77,7 +77,7 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
             entity,
             action: restActions as any,
             type: 'row',
-            filter: (context, option) =>{
+            filter: (operation, context, option) =>{
                 if ((<OperateOption>option).modiParentId && (<OperateOption>option).modiParentEntity) {
                     // 如果本身也是创建modi就允许通过
                     return {

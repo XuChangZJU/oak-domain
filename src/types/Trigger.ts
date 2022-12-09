@@ -1,11 +1,9 @@
-import { SelectOption } from ".";
+import { SelectOption, CheckerType } from ".";
 import { GenericAction } from "../actions/action";
 import { AsyncContext, AsyncRowStore } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OperateOption } from "../types/Entity";
 import { EntityShape } from "../types/Entity";
-
-export type CheckerType = 'relation' | 'row' | 'data';
 
 interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
     checkerType?: CheckerType;
