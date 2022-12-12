@@ -49,6 +49,17 @@ export function reinforceSelection<ED extends EntityDict>(schema: StorageSchema<
                 else if (attr === '$not') {
                     checkFilterNode(entity2, filterNode[attr]!, projectionNode);
                 }
+                else if (attr === '$text') {
+                    // 全文检索首先要有fulltext索引，其次要把fulltext的相关属性加到projection里
+                    const { indexes } = schema[entity2];
+
+                    const fulltextIndex = indexes!.find(
+                        ele => ele.config && ele.config.type === 'fulltext'
+                    );
+
+                    const { attributes } = fulltextIndex!;
+                    necessaryAttrs.push(...(attributes.map(ele => ele.name as string)));
+                }
                 else {
                     if (attr.toLowerCase().startsWith(EXPRESSION_PREFIX)) {
                         const exprResult = getAttrRefInExpression(filterNode[attr]!);
