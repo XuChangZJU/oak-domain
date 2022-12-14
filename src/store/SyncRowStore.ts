@@ -56,6 +56,8 @@ export abstract class SyncContext<ED extends EntityDict> implements Context {
     mergeMultipleResults(toBeMerged: OperationResult<ED>[]) {
         return this.rowStore.mergeMultipleResults(toBeMerged);
     }
+
+    abstract allowUserUpdate(): boolean;
 };
 
 

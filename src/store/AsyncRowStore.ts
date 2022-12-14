@@ -126,6 +126,8 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
     
     abstract toString(): string;
+
+    abstract allowUserUpdate(): boolean;
 };
 
 export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> extends RowStore<ED> {

@@ -15,6 +15,7 @@ export declare abstract class SyncContext<ED extends EntityDict> implements Cont
     select<T extends keyof ED, OP extends SelectOption>(entity: T, selection: ED[T]['Selection'], option: OP): Partial<ED[T]["Schema"]>[];
     count<T extends keyof ED, OP extends SelectOption>(entity: T, selection: Pick<ED[T]['Selection'], 'filter' | 'count'>, option: OP): number;
     mergeMultipleResults(toBeMerged: OperationResult<ED>[]): OperationResult<ED>;
+    abstract allowUserUpdate(): boolean;
 }
 export interface SyncRowStore<ED extends EntityDict, Cxt extends Context> extends RowStore<ED> {
     operate<T extends keyof ED, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): OperationResult<ED>;
