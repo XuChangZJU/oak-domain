@@ -7,7 +7,7 @@ export declare type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt e
     priority?: number;
     type: 'data';
     entity: T;
-    action: Omit<ED[T]['Action'], 'remove'>;
+    action: Omit<ED[T]['Action'], 'remove'> | Array<Omit<ED[T]['Action'], 'remove'>>;
     checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => void;
 };
 export declare type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {

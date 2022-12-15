@@ -9,7 +9,7 @@ export type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt extends A
     priority?: number;
     type: 'data';
     entity: T;
-    action: Omit<ED[T]['Action'], 'remove'>;
+    action: Omit<ED[T]['Action'], 'remove'> | Array<Omit<ED[T]['Action'], 'remove'>>;
     checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => void;
 };
 
