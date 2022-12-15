@@ -7,12 +7,10 @@ import { assign, cloneDeep, difference, identity, intersection, keys, uniq, uniq
 import * as ts from 'typescript';
 const { factory } = ts;
 import {
-    ENTITY_PATH_IN_OAK_GENERAL_BUSINESS,
     ACTION_CONSTANT_IN_OAK_DOMAIN,
     TYPE_PATH_IN_OAK_DOMAIN,
     RESERVED_ENTITIES,
     STRING_LITERAL_MAX_LENGTH,
-    ENTITY_PATH_IN_OAK_DOMAIN,
     NUMERICAL_LITERL_DEFAULT_PRECISION,
     NUMERICAL_LITERL_DEFAULT_SCALE,
     INT_LITERL_DEFAULT_WIDTH,
@@ -515,13 +513,13 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     // 编译后的路径默认要深一层
                     const moduleSpecifier2Text = relativePath
                         ? PathLib.join(
-                              relativePath,
-                              moduleSpecifier.text
-                          ).replace(/\\/g, '/')
+                            relativePath,
+                            moduleSpecifier.text
+                        ).replace(/\\/g, '/')
                         : PathLib.join('..', moduleSpecifier.text).replace(
-                              /\\/g,
-                              '/'
-                          );
+                            /\\/g,
+                            '/'
+                        );
                     additionalImports.push(
                         factory.updateImportDeclaration(
                             node,
@@ -543,7 +541,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 let hasEntityAttr = false;
                 let hasEntityIdAttr = false;
                 const { members, heritageClauses } = node;
-                assert(['EntityShape', 'FileCarrierEntityShape'].includes((<ts.Identifier>heritageClauses![0].types![0].expression).text));
+                assert(['EntityShape'].includes((<ts.Identifier>heritageClauses![0].types![0].expression).text), moduleName);
                 members.forEach(
                     (attrNode) => {
                         const { type, name, questionToken } = <ts.PropertySignature>attrNode;
@@ -622,40 +620,35 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                             }
                         }
 
-                        if (attrName === 'entity'
-                            && ts.isTypeReferenceNode(type!)
-                            && ts.isIdentifier(type.typeName)) {
+                        if (attrName === 'entity') {
+                            assert(ts.isTypeReferenceNode(type!) && ts.isIdentifier(type.typeName), `「${moduleName}」中entity属性的定义不是String<32>类型，entity是系统用于表示反指指针的保留属性，请勿他用`);
                             const { typeArguments } = type;
-                            if (type.typeName.text === 'String'
+                            assert(type.typeName.text === 'String'
                                 && typeArguments
-                                && typeArguments.length === 1) {
-                                const [node] = typeArguments;
-                                if (ts.isLiteralTypeNode(node) && ts.isNumericLiteral(node.literal)) {
-                                    if (parseInt(node.literal.text) > 32) {
-                                        console.warn(`「」中entity属性定义的长度大于32，请确认它不是一个反指对象`);
-                                    }
-                                    else {
-                                        hasEntityAttr = true;
-                                    }
+                                && typeArguments.length === 1, `「${moduleName}」中entity属性的定义不是String<32>类型，entity是系统用于表示反指指针的保留属性，请勿他用`);
+                            const [node] = typeArguments;
+                            if (ts.isLiteralTypeNode(node) && ts.isNumericLiteral(node.literal)) {
+                                if (parseInt(node.literal.text) > 32) {
+                                    assert(false, `「${moduleName}」中entity属性的定义不是String<32>类型，entity是系统用于表示反指指针的保留属性，请勿他用`);
+                                }
+                                else {
+                                    hasEntityAttr = true;
                                 }
                             }
                         }
 
-                        if (attrName === 'entityId'
-                            && ts.isTypeReferenceNode(type!)
-                            && ts.isIdentifier(type.typeName)) {
+                        if (attrName === 'entityId') {
+                            assert(ts.isTypeReferenceNode(type!) && ts.isIdentifier(type.typeName), `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
                             const { typeArguments } = type;
-                            if (type.typeName.text === 'String'
-                                && typeArguments
-                                && typeArguments.length === 1) {
-                                const [node] = typeArguments;
-                                if (ts.isLiteralTypeNode(node) && ts.isNumericLiteral(node.literal)) {
-                                    if (parseInt(node.literal.text) !== 64) {
-                                        console.warn(`「${filename}」中entityId属性定义的长度不等于64，请确认它不是一个反指对象`);
-                                    }
-                                    else {
-                                        hasEntityIdAttr = true;
-                                    }
+                            assert(type.typeName.text === 'String' && typeArguments && typeArguments.length === 1, `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
+                            
+                            const [node] = typeArguments;
+                            if (ts.isLiteralTypeNode(node) && ts.isNumericLiteral(node.literal)) {
+                                if (parseInt(node.literal.text) !== 64) {
+                                    assert(false, `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
+                                }
+                                else {
+                                    hasEntityIdAttr = true;
                                 }
                             }
                         }
