@@ -19,17 +19,17 @@ let _lastNSecs = 0;
 const byteToHex: string[] = [];
 
 for (let i = 0; i < 256; ++i) {
-  byteToHex.push((i + 0x100).toString(16).slice(1));
+    byteToHex.push((i + 0x100).toString(16).slice(1));
 }
 
 function unsafeStringify(arr: number[], offset = 0) {
-  // Note: Be careful editing this code!  It's been tuned for performance
-  // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
-  return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
+    // Note: Be careful editing this code!  It's been tuned for performance
+    // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
+    return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
 }
 
 // See https://github.com/uuidjs/uuid for API details
-export function sequentialUuid({ random} : { random: Uint8Array }) {
+export function sequentialUuid({ random }: { random: Uint8Array }) {
     let i = 0;
     const b = new Array(16);
 
@@ -169,10 +169,24 @@ export function setGenerateIdOption(option: GenerateIdOption) {
 }
 
 export function generateNewId() {
-    assert(ID_BUFFER.length > 0, '缓存的id已经用完，请提前调用produceIds以确保缓冲池中有足够的预分配id');
-    const id = ID_BUFFER.pop()!;
-    if (ID_BUFFER.length < 64) {
-        produceIds();
+    if (ID_BUFFER.length > 0) {
+        const id = ID_BUFFER.pop()!;
+        if (ID_BUFFER.length < 64) {
+            produceIds();
+        }
+        return id;
     }
-    return id;
+    else {
+        // 如果没来的及填满缓冲池，这里用一个简单的算法产生同步id（在小程序环境下跑出来过）
+        const random = new Uint8Array(16);
+        let iter = 0;
+        do {
+            random[iter] = Math.ceil(Math.random() * 1000) % 128;
+        } while (++iter < 16);
+     
+        if (ID_OPTION?.shuffle || process.env.NODE_ENV === 'development') {
+            return v4({ random });
+        }
+        return sequentialUuid({ random });
+    }
 }
