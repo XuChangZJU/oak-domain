@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord } from "../types";
+import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult } from "../types";
 import { IncomingHttpHeaders } from "http";
 export declare abstract class AsyncContext<ED extends EntityDict> implements Context {
     private rowStore;
@@ -39,6 +39,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
 export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> extends RowStore<ED> {
     operate<T extends keyof ED, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): Promise<OperationResult<ED>>;
     select<T extends keyof ED, OP extends SelectOption>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Promise<Partial<ED[T]['Schema']>[]>;
+    aggregate<T extends keyof ED, OP extends SelectOption>(entity: T, aggregation: ED[T]['Aggregation'], context: Cxt, option: OP): Promise<AggregationResult<ED[T]['Schema']>>;
     count<T extends keyof ED, OP extends SelectOption>(entity: T, selection: Pick<ED[T]['Selection'], 'filter' | 'count'>, context: Cxt, option: OP): Promise<number>;
     begin(option?: TxnOption): Promise<string>;
     commit(txnId: string): Promise<void>;

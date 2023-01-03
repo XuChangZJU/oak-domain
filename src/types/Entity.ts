@@ -92,6 +92,7 @@ export interface EntityDef {
     Action: string;
     ParticularAction?: string;
     Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
+    Aggregation: Omit<DeduceAggregation<this['Schema'], DeduceProjection<this['Schema']>, DeduceFilter<this['Schema']>, DeduceSorter<this['Schema']>>, 'action'>;
     Operation: DeduceOperation<this['Schema']>;
     Create: DeduceCreateOperation<this['Schema']>;
     CreateSingle: DeduceCreateSingleOperation<this['Schema']>;
@@ -112,8 +113,21 @@ type DeduceProjection<SH extends GeneralEntityShape> = {
     '#id'?: NodeId;
 } & {
     [K in keyof SH]?: number | OtmSubProjection | any;
-} & Partial<ExprOp<keyof SH>>;
+} & Partial<ExprOp<keyof SH | string>>;
 
+export type AggregationOp = `$max-${number}` | `$min-${number}` | `$avg-${number}` | `$count-${number}` | `$sum-${number}`;
+
+export type DeduceAggregationData<SH extends GeneralEntityShape, P extends DeduceProjection<SH>> = {
+    [A in AggregationOp]?: P;
+} & {
+    $aggr?: P;
+};
+
+export type AggregationResult<SH extends GeneralEntityShape> = Array<{
+    [A in AggregationOp]?: number | string;
+} & {
+    data?: Partial<SH>
+}>;
 
 export type AttrFilter<SH extends GeneralEntityShape> = {
     [K in keyof SH]: any;
@@ -133,6 +147,12 @@ export type DeduceSorterItem<SH extends GeneralEntityShape> = {
 export type DeduceSorter<SH extends GeneralEntityShape> = Array<DeduceSorterItem<SH>>;
 
 export type DeduceSelection<SH extends GeneralEntityShape> = Selection<DeduceProjection<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
+
+export type DeduceAggregation<
+    SH extends GeneralEntityShape,
+    P extends DeduceProjection<SH>,
+    F extends DeduceFilter<SH>,
+    S extends DeduceSorter<SH>> = Omit<Operation<'aggregate', DeduceAggregationData<SH, P>, F, S>, 'action'>;
 
 export type DeduceCreateOperationData<SH extends GeneralEntityShape> = {
     id: string;

@@ -641,7 +641,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                             assert(ts.isTypeReferenceNode(type!) && ts.isIdentifier(type.typeName), `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
                             const { typeArguments } = type;
                             assert(type.typeName.text === 'String' && typeArguments && typeArguments.length === 1, `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
-                            
+
                             const [node] = typeArguments;
                             if (ts.isLiteralTypeNode(node) && ts.isNumericLiteral(node.literal)) {
                                 if (parseInt(node.literal.text) !== 64) {
@@ -1738,7 +1738,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
 function constructProjection(statements: Array<ts.Statement>, entity: string) {
     const { schemaAttrs } = Schema[entity];
     const properties: Array<[string | ts.PropertyName, boolean, ts.TypeNode?, ts.TypeNode?]> = [
-        ['id', true],
+        ['id', false],
         ['$$createAt$$', false],
         ['$$updateAt$$', false],
         ['$$seq$$', false],
@@ -2778,6 +2778,39 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         ]
                     ),
                     factory.createLiteralTypeNode(factory.createStringLiteral("action"))
+                ]
+            )
+        ),
+        factory.createTypeAliasDeclaration(
+            undefined,
+            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+            factory.createIdentifier("Aggregation"),
+            undefined,
+            factory.createTypeReferenceNode(
+                factory.createIdentifier("Omit"),
+                [
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("DeduceAggregation"),
+                        [
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("Schema"),
+                                undefined
+                            ),
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("Projection"),
+                                undefined
+                            ),
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("Filter"),
+                                undefined
+                            ),
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("Sorter"),
+                                undefined
+                            )
+                        ]
+                    ),
+                    factory.createLiteralTypeNode(factory.createStringLiteral("id"))
                 ]
             )
         )
@@ -4397,6 +4430,11 @@ const initialStatements = () => [
                 ),
                 factory.createImportSpecifier(
                     false,
+                    undefined,
+                    factory.createIdentifier("DeduceAggregation")
+                ),
+                factory.createImportSpecifier(
+                    false,
                     factory.createIdentifier("Operation"),
                     factory.createIdentifier("OakOperation")
                 ),
@@ -4831,6 +4869,15 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 undefined,
                 factory.createTypeReferenceNode(
                     factory.createIdentifier("Selection"),
+                    undefined
+                )
+            ),
+            factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("Aggregation"),
+                undefined,
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("Aggregation"),
                     undefined
                 )
             ),

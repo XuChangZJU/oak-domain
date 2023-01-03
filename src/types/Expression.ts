@@ -467,9 +467,14 @@ export function getAttrRefInExpression(expression: Expression<any>) {
                 });
             }
         }
+        else if (node instanceof Array) {
+            for (const subNode of node) {
+                check(subNode);
+            }
+        }
         else {
-            for (const attr in expression) {
-                check((expression as any)[attr]);
+            for (const attr in node) {
+                check((node as any)[attr]);
             }
         }
     };

@@ -1,6 +1,5 @@
 import assert from 'assert';
-import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, TxnOption, Context } from "../types";
-import { AsyncContext } from './AsyncRowStore';
+import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, TxnOption, Context, AggregationResult } from "../types";
 
 export abstract class SyncContext<ED extends EntityDict> implements Context {
     private rowStore: SyncRowStore<ED, this>;
@@ -83,6 +82,13 @@ export interface SyncRowStore<ED extends EntityDict, Cxt extends Context> extend
         context: Cxt,
         option: OP
     ): number;
+
+    aggregate<T extends keyof ED, OP extends SelectOption> (
+        entity: T,
+        aggregation: ED[T]['Aggregation'],
+        context: Cxt,
+        option: OP
+    ): AggregationResult<ED[T]['Schema']>;
 
 
     begin(option?: TxnOption): string;

@@ -1,5 +1,5 @@
 
-import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord } from "../types";
+import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult } from "../types";
 import assert from "assert";
 import { IncomingHttpHeaders } from "http";
 
@@ -144,6 +144,13 @@ export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> exten
         context: Cxt,
         option: OP
     ): Promise<Partial<ED[T]['Schema']>[]>;
+
+    aggregate<T extends keyof ED, OP extends SelectOption> (
+        entity: T,
+        aggregation: ED[T]['Aggregation'],
+        context: Cxt,
+        option: OP
+    ): Promise<AggregationResult<ED[T]['Schema']>>;
 
     count<T extends keyof ED, OP extends SelectOption> (
         entity: T,

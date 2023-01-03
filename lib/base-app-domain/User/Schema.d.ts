@@ -2,7 +2,7 @@ import { String, Text } from "../../types/DataType";
 import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
-import { FormCreateData, FormUpdateData, Operation as OakOperation, MakeAction as OakMakeAction, EntityShape } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, MakeAction as OakMakeAction, EntityShape } from "../../types/Entity";
 import { GenericAction, RelationAction } from "../../actions/action";
 import * as Oper from "../Oper/Schema";
 import * as OperEntity from "../OperEntity/Schema";
@@ -36,7 +36,7 @@ export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
 export declare type Projection = {
     "#id"?: NodeId;
     [k: string]: any;
-    id: number;
+    id?: number;
     $$createAt$$?: number;
     $$updateAt$$?: number;
     $$seq$$?: number;
@@ -100,6 +100,7 @@ export declare type SortNode = {
 export declare type Sorter = SortNode[];
 export declare type SelectOperation<P extends Object = Projection> = Omit<OakOperation<"select", P, Filter, Sorter>, "id">;
 export declare type Selection<P extends Object = Projection> = Omit<SelectOperation<P>, "action">;
+export declare type Aggregation = Omit<DeduceAggregation<Schema, Projection, Filter, Sorter>, "id">;
 export declare type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
 export declare type CreateOperationData = FormCreateData<OpSchema> & {
     oper$operator?: OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">[]> | Array<OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">>>;
@@ -127,6 +128,7 @@ export declare type EntityDef = {
     OpSchema: OpSchema;
     Action: OakMakeAction<GenericAction | RelationAction> | string;
     Selection: Selection;
+    Aggregation: Aggregation;
     Operation: Operation;
     Create: CreateOperation;
     Update: UpdateOperation;

@@ -1,4 +1,4 @@
-import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, TxnOption, Context } from "../types";
+import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, TxnOption, Context, AggregationResult } from "../types";
 export declare abstract class SyncContext<ED extends EntityDict> implements Context {
     private rowStore;
     private uuid?;
@@ -21,6 +21,7 @@ export interface SyncRowStore<ED extends EntityDict, Cxt extends Context> extend
     operate<T extends keyof ED, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): OperationResult<ED>;
     select<T extends keyof ED, OP extends SelectOption>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Partial<ED[T]['Schema']>[];
     count<T extends keyof ED, OP extends SelectOption>(entity: T, selection: Pick<ED[T]['Selection'], 'filter' | 'count'>, context: Cxt, option: OP): number;
+    aggregate<T extends keyof ED, OP extends SelectOption>(entity: T, aggregation: ED[T]['Aggregation'], context: Cxt, option: OP): AggregationResult<ED[T]['Schema']>;
     begin(option?: TxnOption): string;
     commit(txnId: string): void;
     rollback(txnId: string): void;
