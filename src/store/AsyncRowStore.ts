@@ -101,6 +101,13 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     ) {
         return this.rowStore.select(entity, selection, this, option);
     }
+    aggregate<T extends keyof ED, OP extends SelectOption> (
+        entity: T,
+        aggregation: ED[T]['Aggregation'],
+        option: OP
+    ) {
+        return this.rowStore.aggregate(entity, aggregation, this, option);
+    }
     count<T extends keyof ED, OP extends SelectOption> (
         entity: T,
         selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,

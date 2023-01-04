@@ -29,7 +29,7 @@ const Schema: Record<string, {
     actionType: string;
     static: boolean;
     inModi: boolean;
-    hasRelationDef: boolean;
+    hasRelationDef: false | ts.TypeAliasDeclaration;
     enumStringAttrs: string[],
     additionalImports: ts.ImportDeclaration[],
 }> = {};
@@ -486,7 +486,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     let indexes: ts.ArrayLiteralExpression;
     let beforeSchema = true;
     let hasActionDef = false;
-    let hasRelationDef = false;
+    let hasRelationDef: boolean | ts.TypeAliasDeclaration = false;
     let hasActionOrStateDef = false;
     let toModi = false;
     let actionType = 'crud';
@@ -738,7 +738,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     ),
                     sourceFile!
                 );
-                dealWithActions(moduleName, filename, node.type, program, sourceFile!, hasRelationDef || moduleName === 'User');
+                dealWithActions(moduleName, filename, node.type, program, sourceFile!, !!hasRelationDef || moduleName === 'User');
             }
             else if (node.name.text === 'Relation') {
                 assert(!hasActionDef, `【${filename}】action定义须在Relation之后`);
@@ -782,20 +782,41 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         undefined,
                         factory.createIdentifier('relation'),
                         undefined,
-                        node.type
+                        factory.createTypeReferenceNode(
+                            factory.createIdentifier("Relation"),
+                            undefined
+                        )
                     ),
                 ];
                 assign(Schema, {
                     [relationEntityName]: {
                         schemaAttrs: relationSchemaAttrs,
                         sourceFile,
+                        enumStringAttrs: ['relation'],
                         actionType: 'excludeUpdate',
+                        additionalImports: [
+                            factory.createImportDeclaration(
+                                undefined,
+                                undefined,
+                                factory.createImportClause(
+                                    false,
+                                    undefined,
+                                    factory.createNamedImports([factory.createImportSpecifier(
+                                        false,
+                                        undefined,
+                                        factory.createIdentifier("Relation")
+                                    )])
+                                ),
+                                factory.createStringLiteral(`../${moduleName}/Schema`),
+                                undefined
+                            )
+                        ],
                     },
                 });
                 addRelationship(relationEntityName, 'User', 'user', true);
                 addRelationship(relationEntityName, moduleName, entityLc, true);
 
-                hasRelationDef = true;
+                hasRelationDef = node;
             }
             else if (node.name.text.endsWith('Action') || node.name.text.endsWith('State')) {
                 assert(!localeDef, `【${filename}】locale定义须在Action/State之后`);
@@ -4804,6 +4825,21 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
             statements.push(...additionalImports);
         }
 
+        // Relation定义加入
+        if (typeof Schema[entity].hasRelationDef === 'object' && ts.isTypeAliasDeclaration(Schema[entity].hasRelationDef as ts.Node)) {
+            const node = Schema[entity].hasRelationDef as ts.TypeAliasDeclaration;
+            statements.push(
+                factory.updateTypeAliasDeclaration(
+                    node,
+                    undefined,
+                    [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                    node.name,
+                    node.typeParameters,
+                    node.type
+                )
+            );
+        }
+
         constructSchema(statements, entity);
         constructFilter(statements, entity);
         constructProjection(statements, entity);
@@ -5269,7 +5305,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                 );
                             }
                             else {
-                                if (enumStringAttrs.includes((<ts.Identifier>name).text)) {
+                                if (enumStringAttrs && enumStringAttrs.includes((<ts.Identifier>name).text)) {
                                     attrAssignments.push(
                                         factory.createPropertyAssignment(
                                             factory.createIdentifier("type"),
