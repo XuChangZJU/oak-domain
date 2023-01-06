@@ -25,14 +25,13 @@ export function translateCheckerInAsyncContext<
             const { filter, errMsg, inconsistentRows } = checker;
             return (async ({ operation }, context, option) => {
                 const { filter: operationFilter, action } = operation;
-                assert(operationFilter);
                 const filter2 = typeof filter === 'function' ? filter(operation, context, option) : filter;
                 if (['select', 'count', 'stat'].includes(action)) {
-                    operation.filter = addFilterSegment(operationFilter, filter2);
+                    operation.filter = addFilterSegment(operationFilter || {}, filter2);
                     return 0;
                 }
                 else {
-                    if (await checkFilterContains(entity, context, filter2, operationFilter)) {
+                    if (await checkFilterContains(entity, context, filter2, operationFilter || {})) {
                         return 0;
                     }
                     if (inconsistentRows) {
