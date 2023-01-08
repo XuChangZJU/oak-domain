@@ -115,18 +115,18 @@ type DeduceProjection<SH extends GeneralEntityShape> = {
     [K in keyof SH]?: number | OtmSubProjection | any;
 } & Partial<ExprOp<keyof SH | string>>;
 
-export type AggregationOp = `$max-${number}` | `$min-${number}` | `$avg-${number}` | `$count-${number}` | `$sum-${number}`;
+export type AggregationOp = `#max-${number}` | `#min-${number}` | `#avg-${number}` | `#count-${number}` | `#sum-${number}`;
 
 export type DeduceAggregationData<SH extends GeneralEntityShape, P extends DeduceProjection<SH>> = {
     [A in AggregationOp]?: P;
 } & {
-    $aggr?: P;
+    '#aggr'?: P;
 };
 
 export type AggregationResult<SH extends GeneralEntityShape> = Array<{
     [A in AggregationOp]?: number | string;
 } & {
-    data?: Partial<SH>
+    '#data'?: Partial<SH>
 }>;
 
 export type AttrFilter<SH extends GeneralEntityShape> = {
