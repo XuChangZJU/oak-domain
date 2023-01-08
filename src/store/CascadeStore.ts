@@ -1,7 +1,7 @@
 import assert from "assert";
 import {
     EntityDict,
-    OperateOption, SelectOption, OperationResult, DeduceFilter, CreateAtAttribute, UpdateAtAttribute
+    OperateOption, SelectOption, OperationResult, DeduceFilter, CreateAtAttribute, UpdateAtAttribute, AggregationResult
 } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { RowStore } from '../types/RowStore';
@@ -49,11 +49,23 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         context: Cxt,
         option: OP): Promise<number>;
 
-    protected destructCascadeSelect<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED> | AsyncContext<ED>, R>(
+    protected abstract aggregateSync<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
+        entity: T,
+        aggregation: ED[T]['Aggregation'],
+        context: Cxt,
+        option: OP): AggregationResult<ED[T]['Schema']>;
+
+    protected abstract aggregateAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        aggregation: ED[T]['Aggregation'],
+        context: Cxt,
+        option: OP): Promise<AggregationResult<ED[T]['Schema']>>;
+
+    protected destructCascadeSelect<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
         entity: T,
         projection2: ED[T]['Selection']['data'],
         context: Cxt,
-        cascadeSelect: <T2 extends keyof ED>(entity2: T2, selection: ED[T2]['Selection'], context: Cxt, op: OP) => R,
+        cascadeSelectFn: <T2 extends keyof ED>(entity2: T2, selection: ED[T2]['Selection'], context: Cxt, op: OP) => Partial<ED[T2]['Schema']>[] | Promise<Partial<ED[T2]['Schema']>[]>,
         option: OP) {
         const projection: ED[T]['Selection']['data'] = {};
         const cascadeSelectionFns: Array<(result: Partial<ED[T]['Schema']>[]) => Promise<void> | void> = [];
@@ -102,7 +114,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     const {
                         projection: subProjection,
                         cascadeSelectionFns: subCascadeSelectionFns,
-                    } = this.destructCascadeSelect(attr, projection2[attr], context, cascadeSelect, option);
+                    } = this.destructCascadeSelect(attr, projection2[attr], context, cascadeSelectFn, option);
                     Object.assign(projection, {
                         [attr]: subProjection,
                     });
@@ -159,7 +171,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 ele => ele.entityId
                             ) as string[]);
 
-                            const subRows = cascadeSelect.call(this, attr as any, {
+                            const subRows = cascadeSelectFn.call(this, attr as any, {
                                 data: projection2[attr],
                                 filter: {
                                     id: {
@@ -211,7 +223,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     const {
                         projection: subProjection,
                         cascadeSelectionFns: subCascadeSelectionFns,
-                    } = this.destructCascadeSelect(relation, projection2[attr], context, cascadeSelect, option);
+                    } = this.destructCascadeSelect(relation, projection2[attr], context, cascadeSelectFn, option);
                     Object.assign(projection, {
                         [attr]: subProjection,
                     });
@@ -273,7 +285,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 ele => ele[`${attr}Id`]
                             ) as string[]);
 
-                            const subRows = cascadeSelect.call(this, relation, {
+                            const subRows = cascadeSelectFn.call(this, relation, {
                                 data: projection2[attr],
                                 filter: {
                                     id: {
@@ -317,7 +329,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 );
                             };
 
-                            const subRows = cascadeSelect.call(this, entity2, {
+                            const subRows = cascadeSelectFn.call(this, entity2, {
                                 data: subProjection,
                                 filter: combineFilters([{
                                     [foreignKey]: {
@@ -358,7 +370,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 );
                             };
 
-                            const subRows = cascadeSelect.call(this, entity2, {
+                            const subRows = cascadeSelectFn.call(this, entity2, {
                                 data: subProjection,
                                 filter: combineFilters([{
                                     entity,
@@ -557,7 +569,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         entity,
                                         data: {
                                             [`${attr}Id`]: 1,
-                                        }, 
+                                        },
                                         filter,
                                     }
                                 },
@@ -1375,7 +1387,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
      * @param rows 
      * @param context 
      */
-     private addToResultSelections<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, rows: Partial<ED[T]['Schema']>[], context: Cxt) {
+    private addToResultSelections<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, rows: Partial<ED[T]['Schema']>[], context: Cxt) {
         if (this.supportManyToOneJoin()) {
             const attrsToPick: string[] = [];
             for (const attr in rows[0]) {
@@ -1453,7 +1465,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             [entity]: entityBranch,
         });
     }
-    
+
     protected async cascadeSelectAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
         entity: T,
         selection: ED[T]['Selection'],

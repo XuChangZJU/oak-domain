@@ -1361,6 +1361,21 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                             ),
                         )
                     );
+                    const aggrIdentifier = `${entityNameLc}$${foreignKey}$$aggr`;
+                    members2.push(
+                        factory.createPropertySignature(
+                            undefined,
+                            aggrIdentifier,
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("AggregationResult"),
+                                [factory.createTypeReferenceNode(
+                                    createForeignRef(entity, entityName, 'Schema'),
+                                    undefined
+                                )]
+                            )
+                        )
+                    )
                 }
             );
         }
@@ -1758,7 +1773,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
  */
 function constructProjection(statements: Array<ts.Statement>, entity: string) {
     const { schemaAttrs } = Schema[entity];
-    const properties: Array<[string | ts.PropertyName, boolean, ts.TypeNode?, ts.TypeNode?]> = [
+    const properties: Array<[string | ts.PropertyName, boolean, ts.TypeNode?/* , ts.TypeNode? */]> = [
         ['id', false],
         ['$$createAt$$', false],
         ['$$updateAt$$', false],
@@ -1808,9 +1823,9 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                                 [`${attrName}Id`, false, undefined],
                                 [name, false, factory.createTypeReferenceNode(
                                     createForeignRef(entity, text2, 'Projection')
-                                ), factory.createTypeReferenceNode(
+                                )/* , factory.createTypeReferenceNode(
                                     createForeignRef(entity, text2, 'ExportProjection')
-                                )]
+                                ) */]
                             );
                             if (foreignKeyProperties.hasOwnProperty(text2)) {
                                 foreignKeyProperties[text2].push(attrName);
@@ -1858,9 +1873,9 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                 properties.push(
                     [firstLetterLowerCase(one), false, factory.createTypeReferenceNode(
                         createForeignRef(entity, one, 'Projection')
-                    ), factory.createTypeReferenceNode(
+                    )/* , factory.createTypeReferenceNode(
                         createForeignRef(entity, one, 'ExportProjection')
-                    )]
+                    ) */]
                 );
                 if (foreignKeyProperties.hasOwnProperty(one)) {
                     foreignKeyProperties[text2].push('entity');
@@ -1894,6 +1909,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
             foreignKeySet[entityName].forEach(
                 (foreignKey) => {
                     const identifier = `${entityNameLc}$${foreignKey}`;
+                    const aggrIdentifier = `${entityNameLc}$${foreignKey}$$aggr`;
                     properties.push(
                         [identifier, false,
                             factory.createIntersectionTypeNode([
@@ -1909,10 +1925,26 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                                         factory.createLiteralTypeNode(factory.createStringLiteral(firstLetterLowerCase(entityName)))
                                     )
                                 ])
-                            ]),
+                            ])/* ,
                             factory.createIntersectionTypeNode([
                                 factory.createTypeReferenceNode(
                                     createForeignRef(entity, entityName, 'Exportation'),
+                                    undefined
+                                ),
+                                factory.createTypeLiteralNode([
+                                    factory.createPropertySignature(
+                                        undefined,
+                                        factory.createIdentifier("$entity"),
+                                        undefined,
+                                        factory.createLiteralTypeNode(factory.createStringLiteral(firstLetterLowerCase(entityName)))
+                                    )
+                                ])
+                            ]) */
+                        ],
+                        [aggrIdentifier, false,
+                            factory.createIntersectionTypeNode([
+                                factory.createTypeReferenceNode(
+                                    createForeignRef(entity, entityName, 'Aggregation'),
                                     undefined
                                 ),
                                 factory.createTypeLiteralNode([
@@ -1952,7 +1984,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
         ]
     );
 
-    const MetaPropertySignaturs: ts.TypeElement[] = [
+    const MetaPropertySignatures: ts.TypeElement[] = [
         factory.createPropertySignature(
             undefined,
             factory.createStringLiteral("#id"),
@@ -1963,7 +1995,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
         )
     ];
     if (process.env.COMPLING_AS_LIB) {
-        MetaPropertySignaturs.push(
+        MetaPropertySignatures.push(
             factory.createIndexSignature(
                 undefined,
                 undefined,
@@ -1989,7 +2021,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
             undefined,
             factory.createIntersectionTypeNode([
                 factory.createTypeLiteralNode(
-                    MetaPropertySignaturs.concat(
+                    MetaPropertySignatures.concat(
                         properties.map(
                             ([n, q, v]) => {
                                 return factory.createPropertySignature(
@@ -2007,8 +2039,9 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
         )
     );
 
-    // ExportProjection，下载查询的投影
-    statements.push(
+    // ExportProjection，下载查询的投影 
+    // 已经废弃。By Xc 2023.01.08
+    /* statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -2032,7 +2065,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                 exprNode,
             ])
         )
-    );
+    ); */
 
     // ${Entity}Projection，外键查询的专用投影
     for (const foreignKey in foreignKeyProperties) {
@@ -2838,32 +2871,33 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     );
 
     // Exportation
-    statements.push(
-        factory.createTypeAliasDeclaration(
-            undefined,
-            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-            factory.createIdentifier("Exportation"),
-            undefined,
-            factory.createTypeReferenceNode(
-                factory.createIdentifier("OakOperation"),
-                [
-                    factory.createLiteralTypeNode(factory.createStringLiteral("export")),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("ExportProjection"),
-                        undefined
-                    ),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("Filter"),
-                        undefined
-                    ),
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("Sorter"),
-                        undefined
-                    )
-                ]
-            )
-        )
-    );
+    // 已经废弃，by Xc 2023.01.08
+    /*  statements.push(
+         factory.createTypeAliasDeclaration(
+             undefined,
+             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+             factory.createIdentifier("Exportation"),
+             undefined,
+             factory.createTypeReferenceNode(
+                 factory.createIdentifier("OakOperation"),
+                 [
+                     factory.createLiteralTypeNode(factory.createStringLiteral("export")),
+                     factory.createTypeReferenceNode(
+                         factory.createIdentifier("ExportProjection"),
+                         undefined
+                     ),
+                     factory.createTypeReferenceNode(
+                         factory.createIdentifier("Filter"),
+                         undefined
+                     ),
+                     factory.createTypeReferenceNode(
+                         factory.createIdentifier("Sorter"),
+                         undefined
+                     )
+                 ]
+             )
+         )
+     ); */
 
     const { [entity]: manyToOneSet } = ManyToOne;
     const { [entity]: oneToManySet } = OneToMany;
@@ -4468,6 +4502,11 @@ const initialStatements = () => [
                     false,
                     undefined,
                     factory.createIdentifier("EntityShape")
+                ),
+                factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("AggregationResult")
                 ),
             ])
         ),

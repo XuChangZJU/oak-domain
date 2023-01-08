@@ -27,9 +27,10 @@ export function judgeRelation<ED extends {
     }
 
     if (attr.includes('$')) {
-        const entity2 = attr.slice(0, attr.indexOf('$'));
+        const firstDelimiter = attr.indexOf('$');        
+        const entity2 = attr.slice(0, firstDelimiter);
         assert (schema.hasOwnProperty(entity2));
-        const foreignKey = attr.slice(attr.indexOf('$') + 1);
+        const foreignKey = attr.slice(firstDelimiter + 1, attr.indexOf('$', firstDelimiter + 1));
         const { [entity2]: { attributes: attributes2 } } = schema;
 
         if (foreignKey === 'entity') {

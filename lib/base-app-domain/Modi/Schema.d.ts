@@ -2,7 +2,7 @@ import { String } from "../../types/DataType";
 import { Q_DateValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
-import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, MakeAction as OakMakeAction, EntityShape } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
 import { Action, ParticularAction, IState } from "./Action";
 import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
@@ -27,7 +27,9 @@ export declare type Schema = EntityShape & {
     extra?: Object | null;
     iState?: IState | null;
     modiEntity$modi?: Array<ModiEntity.Schema>;
+    modiEntity$modi$$aggr?: AggregationResult<ModiEntity.Schema>;
     operEntity$entity?: Array<OperEntity.Schema>;
+    operEntity$entity$$aggr?: AggregationResult<OperEntity.Schema>;
 } & {
     [A in ExpressionKey]?: any;
 };
@@ -64,29 +66,13 @@ export declare type Projection = {
     modiEntity$modi?: ModiEntity.Selection & {
         $entity: "modiEntity";
     };
+    modiEntity$modi$$aggr?: ModiEntity.Aggregation & {
+        $entity: "modiEntity";
+    };
     operEntity$entity?: OperEntity.Selection & {
         $entity: "operEntity";
     };
-} & Partial<ExprOp<OpAttr | string>>;
-export declare type ExportProjection = {
-    "#id"?: NodeId;
-    [k: string]: any;
-    id?: string;
-    $$createAt$$?: string;
-    $$updateAt$$?: string;
-    $$seq$$?: string;
-    targetEntity?: string;
-    entity?: string;
-    entityId?: string;
-    action?: string;
-    data?: string;
-    filter?: string;
-    extra?: string;
-    iState?: string;
-    modiEntity$modi?: ModiEntity.Exportation & {
-        $entity: "modiEntity";
-    };
-    operEntity$entity?: OperEntity.Exportation & {
+    operEntity$entity$$aggr?: OperEntity.Aggregation & {
         $entity: "operEntity";
     };
 } & Partial<ExprOp<OpAttr | string>>;
@@ -122,7 +108,6 @@ export declare type Sorter = SortNode[];
 export declare type SelectOperation<P extends Object = Projection> = Omit<OakOperation<"select", P, Filter, Sorter>, "id">;
 export declare type Selection<P extends Object = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Aggregation = Omit<DeduceAggregation<Schema, Projection, Filter, Sorter>, "id">;
-export declare type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
 export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "entityId">> & ({
     entity?: string;
     entityId?: string;

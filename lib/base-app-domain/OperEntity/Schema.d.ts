@@ -50,20 +50,6 @@ export declare type Projection = {
     modi?: Modi.Projection;
     user?: User.Projection;
 } & Partial<ExprOp<OpAttr | string>>;
-export declare type ExportProjection = {
-    "#id"?: NodeId;
-    [k: string]: any;
-    id?: string;
-    $$createAt$$?: string;
-    $$updateAt$$?: string;
-    $$seq$$?: string;
-    operId?: string;
-    oper?: Oper.ExportProjection;
-    entity?: string;
-    entityId?: string;
-    modi?: Modi.ExportProjection;
-    user?: User.ExportProjection;
-} & Partial<ExprOp<OpAttr | string>>;
 declare type OperEntityIdProjection = OneOf<{
     id: number;
 }>;
@@ -107,7 +93,6 @@ export declare type Sorter = SortNode[];
 export declare type SelectOperation<P extends Object = Projection> = Omit<OakOperation<"select", P, Filter, Sorter>, "id">;
 export declare type Selection<P extends Object = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Aggregation = Omit<DeduceAggregation<Schema, Projection, Filter, Sorter>, "id">;
-export declare type Exportation = OakOperation<"export", ExportProjection, Filter, Sorter>;
 export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "entityId" | "operId">> & (({
     operId?: never;
     oper: Oper.CreateSingleOperation;

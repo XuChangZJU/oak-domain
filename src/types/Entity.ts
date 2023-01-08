@@ -252,14 +252,14 @@ export type Exportation<ED extends EntityDict, T extends keyof ED, K extends str
     id: string;
     entity: T;
     projection: ED[T]['Selection']['data'];
-    header: K[];
-    fn: (data: ED[T]['Schema']) => Record<K, string | number | boolean | null>;
+    headers: K[];
+    fn: (data: ED[T]['Schema']) => Partial<Record<K, string | number | boolean | null>>;
 };
 
 export type Importation<ED extends EntityDict, T extends keyof ED, K extends string> = {
     name: string;
     id: string;
     entity: T;
-    header: K[];
-    fn: (data: Record<K, string | number | boolean>) => ED[T]['CreateSingle']['data'];
+    headers: K[];
+    fn: (data: Partial<Record<K, string | number | boolean>>) => ED[T]['CreateSingle']['data'];
 };
