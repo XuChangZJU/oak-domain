@@ -169,4 +169,19 @@ export declare type Configuration = {
     actionType?: ActionType;
     static?: boolean;
 };
+export declare type Exportation<ED extends EntityDict, T extends keyof ED, K extends string> = {
+    name: string;
+    id: string;
+    entity: T;
+    projection: ED[T]['Selection']['data'];
+    header: K[];
+    fn: (data: ED[T]['Schema']) => Record<K, string | number | boolean | null>;
+};
+export declare type Importation<ED extends EntityDict, T extends keyof ED, K extends string> = {
+    name: string;
+    id: string;
+    entity: T;
+    header: K[];
+    fn: (data: Record<K, string | number | boolean>) => ED[T]['CreateSingle']['data'];
+};
 export {};
