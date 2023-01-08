@@ -1,10 +1,17 @@
 import assert from 'assert';
 import { IncomingHttpHeaders } from "http";
+import { Stream } from 'stream';
 import { AsyncContext, AsyncRowStore } from '../store/AsyncRowStore';
 import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException, OakExternalException, OpRecord } from "../types";
 
 function makeContentTypeAndBody(data: any) {
+    if (data instanceof FormData) {
+        return {
+            contentType: 'multipart/form-data',
+            body: data,
+        };
+    }
     return {
         contentType: 'application/json',
         body: JSON.stringify(data),
@@ -76,6 +83,11 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
     }
     
     serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {
+        if (result instanceof Stream) {
+            return {
+                body: result,
+            };
+        }
         return {
             body: {
                 result,
