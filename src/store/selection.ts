@@ -177,7 +177,7 @@ export function reinforceSelection<ED extends EntityDict>(schema: StorageSchema<
                         necessaryAttrs.push(`${attr}Id`);
                         checkProjectionNode(rel, projectionNode[attr]);
                     }
-                    else if (rel instanceof Array) {
+                    else if (rel instanceof Array && !attr.endsWith('$$aggr')) {
                         const { data } = projectionNode[attr];
                         if (rel[1]) {
                             checkNode(data, [rel[1]]);
@@ -185,7 +185,7 @@ export function reinforceSelection<ED extends EntityDict>(schema: StorageSchema<
                         else {
                             checkNode(data, ['entity', 'entityId']);
                         }
-                        checkProjectionNode(rel[0], data);
+                        reinforceSelection(schema, rel[0], projectionNode[attr]);
                     }
                 }
             }
