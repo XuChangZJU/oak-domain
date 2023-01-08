@@ -40,6 +40,7 @@
         "typescript": "~4.7.4"
     },
     "dependencies": {
+        "@datasert/cronjs-matcher": "^1.2.0",
         "dayjs": "^1.11.5",
         "lodash": "^4.17.21",
         "uuid": "^9.0.0"
