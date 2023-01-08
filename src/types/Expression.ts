@@ -472,7 +472,7 @@ export function getAttrRefInExpression(expression: Expression<any>) {
                 check(subNode);
             }
         }
-        else {
+        else if (typeof node === 'object') {
             for (const attr in node) {
                 check((node as any)[attr]);
             }
