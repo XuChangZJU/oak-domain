@@ -6,12 +6,16 @@ import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException, OakExternalException, OpRecord } from "../types";
 
 function makeContentTypeAndBody(data: any) {
-    if (data instanceof FormData) {
-        return {
-            contentType: 'multipart/form-data',
-            body: data,
-        };
+    //
+    if (process.env.OAK_PLATFORM !== 'wechatMp') {
+        if (data instanceof FormData) {
+            return {
+                contentType: 'multipart/form-data',
+                body: data,
+            };
+        }
     }
+
     return {
         contentType: 'application/json',
         body: JSON.stringify(data),
