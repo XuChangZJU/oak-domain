@@ -1,11 +1,12 @@
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { OpSchema as Modi, Filter } from '../base-app-domain/Modi/Schema';
-import { Checker, Operation, StorageSchema, RowChecker, EntityDict, OakRowLockedException, Context, OperateOption, Trigger, RemoveTrigger } from '../types';
+import { Checker, Operation, StorageSchema, RowChecker, EntityDict, OakRowLockedException, Context, OperateOption, Trigger, RemoveTrigger, RelationChecker, ExpressionChecker, ExpressionRelationChecker, OakUserUnpermittedException } from '../types';
 import { appendOnlyActions } from '../actions/action';
 import { difference } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
 import { generateNewIdAsync } from "../utils/uuid";
 import { SyncContext } from './SyncRowStore';
+import { firstLetterUpperCase } from '../utils/string';
 
 export function createOperationsFromModies(modies: Modi[]): Array<{
     operation: Operation<string, Object, Object>,
@@ -108,6 +109,68 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
     }
 
     return checkers;
+}
+
+export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
+    const checkers: ExpressionRelationChecker<ED, keyof ED, Cxt>[] = [];
+
+    for (const entity in schema) {
+        const { relationHierarchy } = schema[entity];
+        if (relationHierarchy) {
+            // 先build反向hierarchy的map
+            const reverseHierarchy = {} as Record<string, string[]>;
+            for (const r in relationHierarchy) {
+                if (!reverseHierarchy[r]) {
+                    reverseHierarchy[r] = [];
+                }
+                for (const r2 of relationHierarchy[r]) {
+                    if (!reverseHierarchy[r2]) {
+                        reverseHierarchy[r2] = [r];
+                    }
+                    else {
+                        reverseHierarchy[r2].push(r);
+                    }
+                }
+            }
+
+            // 对userEntity对象的授权和回收建立checker
+            const userEntityName = `user${firstLetterUpperCase(entity)}`;
+            const entityIdAttr = `${entity}Id`;
+            /* checkers.push({
+                entity: userEntityName as keyof ED,
+                action: ['create', 'remove'] as ED[keyof ED]['Action'][],
+                type: 'expressionRelation',
+                expression: (operation, context) => {
+                    const userId = context.getCurrentUserId();
+                    const { action, data, filter } = operation as ED[keyof ED]['Operation'];
+                    if (action === 'create') {
+                        const { relation, [entityIdAttr]: entityId } = data as Record<string, string>;
+                        const legalRelations = reverseHierarchy[relation];
+                        if (legalRelations.length === 0) {
+                            throw new OakUserUnpermittedException();
+                        }
+                        return {
+                            entity: userEntityName,
+                            expr: {
+                                $gt: [{
+                                    '#attr': '$$createAt$$',
+                                }, 0]
+                            },
+                            filter: {
+                                filter: {
+                                    userId,
+                                    [entityIdAttr]: entityId,
+                                    relation: {
+                                        $in: legalRelations,
+                                    }
+                                },
+                            }
+                        }
+                    }
+                }
+            }) */
+        }
+    }
 }
 
 export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>>(schema: StorageSchema<ED>) {

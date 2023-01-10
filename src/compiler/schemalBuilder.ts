@@ -25,6 +25,7 @@ const Schema: Record<string, {
     states: string[];
     sourceFile: ts.SourceFile;
     locale: ts.ObjectLiteralExpression;
+    relationHierarchy?: ts.ObjectLiteralExpression;
     toModi: boolean;
     actionType: string;
     static: boolean;
@@ -496,6 +497,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     const localEnumStringTypes: string[] = [];
     const additionalImports: ts.ImportDeclaration[] = [];
     let localeDef: ts.ObjectLiteralExpression | undefined = undefined;
+    let relationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
             const entityImported = getEntityImported(node);
@@ -1121,6 +1123,13 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                             _static = true;     // static如果有值只能为true
                         }
                     }
+                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'RelationHierarchy') {
+                        // RelationHierary
+                        assert(hasRelationDef, `${moduleName}中的Relation定义在RelationHierarchy之后`);
+                        const { initializer } = declaration;
+                        assert(ts.isObjectLiteralExpression(initializer!), `${moduleName}中的RelationHierarchy的定义必须是初始化为ObjectLiteralExpress`);
+                        relationHierarchy = initializer;
+                    }
                     else {
                         throw new Error(`${moduleName}：不能理解的定义内容${declaration.name.getText()}`);
                     }
@@ -1163,6 +1172,15 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
         assign(schema, {
             locale: localeDef,
         });
+    }
+    if (hasRelationDef) {
+        assert(relationHierarchy, `${filename}中缺少了relationHierarchy定义`);
+        assign(schema, {
+            relationHierarchy,
+        });
+    }
+    else {
+        assert(!relationHierarchy, `${filename}中具有relationHierarchy定义但没有Relation定义`);
     }
 
     assign(Schema, {
@@ -5620,7 +5638,23 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
 
     for (const entity in Schema) {
         const indexExpressions: ts.Expression[] = [];
-        const { sourceFile, inModi, indexes, toModi, actionType, static: _static } = Schema[entity];
+        const { sourceFile, inModi, indexes, toModi, actionType, static: _static, relationHierarchy } = Schema[entity];
+        const fromSchemaSpecifiers = [
+            factory.createImportSpecifier(
+                false,
+                undefined,
+                factory.createIdentifier("OpSchema")
+            )
+        ];
+        if (relationHierarchy) {
+            fromSchemaSpecifiers.push(
+                factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("Relation")
+                )
+            );
+        }
         const statements: ts.Statement[] = [
             factory.createImportDeclaration(
                 undefined,
@@ -5643,11 +5677,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 factory.createImportClause(
                     false,
                     undefined,
-                    factory.createNamedImports([factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier("OpSchema")
-                    )])
+                    factory.createNamedImports(fromSchemaSpecifiers)
                 ),
                 factory.createStringLiteral("./Schema"),
                 undefined
@@ -5825,6 +5855,28 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 )
             );
         }
+        if (relationHierarchy) {
+            propertyAssignments.push(
+                factory.createPropertyAssignment(
+                    factory.createIdentifier("relationHierarchy"),
+                    relationHierarchy,
+                )
+            );
+        }
+        const sdTypeArguments = [
+            factory.createTypeReferenceNode(
+                factory.createIdentifier("OpSchema"),
+                undefined
+            )
+        ];
+        if (relationHierarchy) {
+            sdTypeArguments.push(
+                factory.createTypeReferenceNode(
+                    factory.createIdentifier("Relation"),
+                    undefined
+                )
+            )
+        }
         statements.push(
             factory.createVariableStatement(
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -5834,12 +5886,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                         undefined,
                         factory.createTypeReferenceNode(
                             factory.createIdentifier("StorageDesc"),
-                            [
-                                factory.createTypeReferenceNode(
-                                    factory.createIdentifier("OpSchema"),
-                                    undefined
-                                )
-                            ]
+                            sdTypeArguments
                         ),
                         factory.createObjectLiteralExpression(
                             propertyAssignments,

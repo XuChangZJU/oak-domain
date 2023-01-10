@@ -150,6 +150,9 @@ export declare type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = 
     e: T;
     f?: DeduceFilter<ED[T]['Schema']>;
 };
+export declare type RelationHierarchy<R extends string> = {
+    [K in R]: R[];
+};
 export declare type SelectOpResult<ED extends EntityDict> = {
     a: 's';
     d: {

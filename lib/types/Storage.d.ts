@@ -1,5 +1,5 @@
 import { ActionType } from '.';
-import { EntityDict, EntityShape, InstinctiveAttributes } from './Entity';
+import { EntityDict, EntityShape, InstinctiveAttributes, RelationHierarchy } from './Entity';
 import { DataType, DataTypeParams } from './schema/DataTypes';
 export declare type Ref = 'ref';
 export interface Column<SH extends EntityShape> {
@@ -36,7 +36,7 @@ export declare type UniqConstraint<SH extends EntityShape> = {
     attributes: Array<keyof SH>;
     type?: string;
 };
-export interface StorageDesc<SH extends EntityShape> {
+export interface StorageDesc<SH extends EntityShape, Relation extends string = ''> {
     storageName?: string;
     comment?: string;
     attributes: Attributes<SH>;
@@ -48,8 +48,9 @@ export interface StorageDesc<SH extends EntityShape> {
     static?: true;
     actions: string[];
     actionType: ActionType;
+    relationHierarchy?: RelationHierarchy<Relation>;
     view?: true;
 }
 export declare type StorageSchema<ED extends EntityDict> = {
-    [K in keyof ED]: StorageDesc<ED[K]['OpSchema']>;
+    [K in keyof ED]: StorageDesc<ED[K]['OpSchema'], any>;
 };
