@@ -909,3 +909,32 @@ export function checkFilterContains<ED extends EntityDict, T extends keyof ED, C
     }
     return count === 0;
 }
+
+export function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
+    entity: T,
+    context: Cxt,
+    filter1: ED[T]['Selection']['filter'],
+    filter2: ED[T]['Selection']['filter']): boolean | Promise<boolean> {
+    if (!filter2) {
+        throw new OakRowInconsistencyException();
+    }
+    const schema = context.getSchema();
+    // 优先判断两个条件是否相容
+    if (repel(entity, schema, filter2, filter1)) {
+        return true;
+    }
+    // 再判断两者同时成立时取得的行数是否为0
+    const filter3 = combineFilters([filter2, filter1]);
+    const count = context.count(entity, {
+        filter: filter3,
+    }, {
+        dontCollect: true,
+        blockTrigger: true,
+    });
+    if (count instanceof Promise) {
+        return count.then(
+            (count2) => count2 !== 0
+        );
+    }
+    return count !== 0;
+}

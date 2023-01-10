@@ -78,7 +78,7 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
             entity,
             action: restActions as any,
             type: 'row',
-            filter: (operation, context, option) =>{
+            filter: (operation, context, option) => {
                 if ((<OperateOption>option).modiParentId && (<OperateOption>option).modiParentEntity) {
                     // 如果本身也是创建modi就允许通过
                     return {
@@ -136,41 +136,79 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
             // 对userEntity对象的授权和回收建立checker
             const userEntityName = `user${firstLetterUpperCase(entity)}`;
             const entityIdAttr = `${entity}Id`;
-            /* checkers.push({
+            checkers.push({
                 entity: userEntityName as keyof ED,
-                action: ['create', 'remove'] as ED[keyof ED]['Action'][],
+                action: 'create',
                 type: 'expressionRelation',
-                expression: (operation, context) => {
+                expression: <T2 extends keyof ED>(operation: any, context: Cxt) => {
                     const userId = context.getCurrentUserId();
                     const { action, data, filter } = operation as ED[keyof ED]['Operation'];
-                    if (action === 'create') {
-                        const { relation, [entityIdAttr]: entityId } = data as Record<string, string>;
-                        const legalRelations = reverseHierarchy[relation];
+                    const { relation, [entityIdAttr]: entityId } = data as Record<string, string>;
+                    const legalRelations = reverseHierarchy[relation];
+                    if (legalRelations.length === 0) {
+                        throw new OakUserUnpermittedException();
+                    }
+                    return {
+                        entity: userEntityName as T2,
+                        expr: {
+                            $gt: [{
+                                '#attr': '$$createAt$$',
+                            }, 0]
+                        },
+                        filter: {
+                            userId,
+                            [entityIdAttr]: entityId,
+                            relation: {
+                                $in: legalRelations,
+                            }
+                        }
+                    }
+                },
+                errMsg: '越权操作',
+            });
+            for (const r in reverseHierarchy) {
+                checkers.push({
+                    entity: userEntityName as keyof ED,
+                    action: 'remove',
+                    type: 'expressionRelation',
+                    expression: <T2 extends keyof ED>(operation: any, context: Cxt) => {
+                        const userId = context.getCurrentUserId();
+                        const { filter } = operation as ED[keyof ED]['Remove'];
+                        const legalRelations = reverseHierarchy[r];
                         if (legalRelations.length === 0) {
-                            throw new OakUserUnpermittedException();
+                            throw new OakUserUnpermittedException('越权操作');
                         }
                         return {
-                            entity: userEntityName,
+                            entity: userEntityName as T2,
                             expr: {
                                 $gt: [{
                                     '#attr': '$$createAt$$',
                                 }, 0]
                             },
                             filter: {
-                                filter: {
-                                    userId,
-                                    [entityIdAttr]: entityId,
-                                    relation: {
-                                        $in: legalRelations,
+                                userId,
+                                [entityIdAttr]: {
+                                    $in: {
+                                        entity: userEntityName,
+                                        data: {
+                                            [entityIdAttr]: 1,
+                                        },
+                                        filter,
                                     }
                                 },
+                                relation: {
+                                    $in: legalRelations,
+                                }
                             }
                         }
-                    }
-                }
-            }) */
+                    },
+                    errMsg: '越权操作',
+                });
+            }
         }
     }
+
+    return checkers;
 }
 
 export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>>(schema: StorageSchema<ED>) {

@@ -5,12 +5,17 @@ import { RefOrExpression } from "./Expression";
 
 export type CheckerType = 'relation' | 'row' | 'data' | 'expression' | 'expressionRelation';
 
+/**
+ * conditionalFilter是指该action发生时，operation所操作的行中有满足conditionalFilter的行
+ * 被转化成trigger的filter条件，详细可看trigger中的说明
+ */
 export type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'data';
     entity: T;
     action: Omit<ED[T]['Action'], 'remove'> | Array<Omit<ED[T]['Action'], 'remove'>>;
     checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => void;
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 
 export type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
@@ -24,6 +29,7 @@ export type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends As
         entity: keyof ED;
         selection: (filter?: ED[T]['Selection']['filter']) => ED[keyof ED]['Selection'];
     };
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 
 export type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
@@ -33,6 +39,7 @@ export type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt exten
     action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
     relationFilter: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'];       // 生成一个额外的relation相关的filter，加在原先的filter上
     errMsg: string;
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 
 export type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
@@ -46,6 +53,7 @@ export type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt ext
         filter: ED[T2]['Selection']['filter'];
     };       // 生成一个带表达式的查询任务，结果为true代表可以过，为false不可以
     errMsg: string;
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 
 
@@ -60,6 +68,7 @@ export type ExpressionRelationChecker<ED extends EntityDict, T extends keyof ED,
         filter: ED[T2]['Selection']['filter'];
     };       // 生成一个带表达式的查询任务，结果为true代表可以过，为false不可以
     errMsg: string;
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 
 

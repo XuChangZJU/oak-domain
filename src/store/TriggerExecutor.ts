@@ -1,15 +1,12 @@
 import assert from 'assert';
 import { pull, unset } from "../utils/lodash";
-import { addFilterSegment, checkFilterContains, combineFilters } from "../store/filter";
+import { addFilterSegment, checkFilterRepel } from "../store/filter";
 import { DeduceCreateOperation, EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
 import { Checker, CheckerType } from '../types/Auth';
-import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTriggerInTxn } from "../types/Trigger";
+import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTrigger } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
-import { GenericAction } from '../actions/action';
-import { OakRowInconsistencyException } from '../types';
-import { getFullProjection } from './actionDef';
 import { SyncContext } from './SyncRowStore';
 import { translateCheckerInAsyncContext } from './checker';
 
@@ -50,7 +47,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
     }
 
     registerChecker<T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>): void {
-        const { entity, action, type } = checker;
+        const { entity, action, type, conditionalFilter } = checker;
         const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
         const fn = translateCheckerInAsyncContext(checker);
         const trigger = {
@@ -58,10 +55,11 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
             name: triggerName,
             priority: checker.priority || 2,        // checker的默认优先级稍高一点点
             entity,
-            action: action as 'create',
+            action: action as 'update',
             fn,
             when: 'before',
-        } as CreateTriggerInTxn<ED, T, Cxt>;
+            filter: conditionalFilter,
+        } as UpdateTrigger<ED, T, Cxt>;
         this.registerTrigger(trigger);
     }
 
@@ -80,6 +78,11 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
         }
         if (typeof trigger.priority !== 'number') {
             trigger.priority = 1;       // 默认最低
+        }
+        if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
+            assert(typeof trigger.action === 'string' && trigger.action !== 'create'
+                || trigger.action instanceof Array && !(trigger.action as any[]).includes('create'), `trigger【${trigger.name}】是create类型但却带有filter`);
+            assert(trigger.when === 'before' || trigger.when === 'commit', `定义了filter的trigger【${trigger.name}】的when只能是before或者commit`);
         }
         Object.assign(this.triggerNameMap, {
             [trigger.name]: trigger,
@@ -222,6 +225,16 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
 
             if (context instanceof SyncContext) {
                 for (const trigger of preTriggers) {
+                    if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
+                        // trigger只对满足条件的前项进行判断，如果确定不满足可以pass
+                        assert(operation.action !== 'create');
+                        const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
+                        const filterr = typeof filter === 'function' ? filter(operation, context, option) : filter;
+                        const filterRepelled = checkFilterRepel(entity, context, filterr, operation.filter) as boolean
+                        if (filterRepelled) {
+                            continue;
+                        }
+                    }
                     const number = (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as ED[T]['Create'] }, context, option as OperateOption);
                     if (number > 0) {
                         this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
@@ -236,6 +249,15 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                         return;
                     }
                     const trigger = preTriggers[idx];
+                    if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
+                        assert(operation.action !== 'create');
+                        const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
+                        const filterr = typeof filter === 'function' ? filter(operation, context, option) : filter;
+                        const filterRepelled = await (checkFilterRepel(entity, context, filterr, operation.filter) as Promise<boolean>);
+                        if (filterRepelled) {
+                            return execPreTrigger(idx + 1);
+                        }
+                    }
                     const number = await (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as ED[T]['Create'] }, context, option as OperateOption);
                     if (number as number > 0) {
                         this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
@@ -247,6 +269,15 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                         return;
                     }
                     const trigger = commitTriggers[idx];
+                    if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
+                        assert(operation.action !== 'create');
+                        const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
+                        const filterr = typeof filter === 'function' ? filter(operation, context, option) : filter;
+                        const filterRepelled = await (checkFilterRepel(entity, context, filterr, operation.filter) as Promise<boolean>);
+                        if (filterRepelled) {
+                            return execCommitTrigger(idx + 1);
+                        }
+                    }
                     await this.preCommitTrigger(entity, operation, trigger, context, option as OperateOption);
                     return execCommitTrigger(idx + 1);
                 };
