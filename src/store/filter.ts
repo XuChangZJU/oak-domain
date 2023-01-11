@@ -515,7 +515,7 @@ function judgeFilter2ValueRelation<ED extends EntityDict, T extends keyof ED>(
                         (logicQuery) => judgeFilter2ValueRelation(entity, schema, attr, logicQuery, conditionalFilterAttrValue, contained)
                     );
                     // 如果filter的多个算子是and关系，则只要有一个包含此条件就是包含，只要有一个与此条件相斥就是相斥
-                    // 如果filter的多个算子是or关系，则必须所有的条件都包含此条件才是包含，必须所有的条件都与此条件相斥才是相斥
+                    // 如果filter的多个算子是or关系，则必须所有的条件都包含此条件才是包含，必须所有的条件都与此条件相斥才是相斥                    
                     if (attr2 === '$and') {
                         if (results.includes(true)) {
                             return true;
@@ -533,26 +533,18 @@ function judgeFilter2ValueRelation<ED extends EntityDict, T extends keyof ED>(
                 }
                 case '$not': {
                     /* 
-                    * 若filter的not条件被conditionalFilterAttrValue包容，则说明两者互斥
-                    * 若filter的not条件被conditionalFilterAttrValue的not条件所包容，则说明此条件包容conditionalFilterAttrValue
-                    *   但两条规则都没法应用，会无限递归
+                    * 若filter的not条件被conditionalFilterAttrValue条件包容，则说明两者互斥
+                    * filter包容conditionalFilterAttrValue条件暂时无法由其not条件推论出来
                     */
 
                     const logicQuery = filter[attr2] as ED[T]['Selection']['filter'];
-                    /* if (contained && judgeFilterRelation(entity, schema, {
-                        [attr2]: {
-                            $not: conditionalFilterAttrValue
-                        }
-                    }, logicQuery, contained)) {
-                        return true;
-                    } */                    
-                    if (!contained && judgeFilterRelation(entity, schema, { [attr2]: conditionalFilterAttrValue }, logicQuery, contained)) {
+                    if (!contained && judgeFilterRelation(entity, schema, logicQuery, { [attr]: conditionalFilterAttrValue }, true)) {
                         return true;
                     }
                     break;
                 }
                 default: {
-                    break;
+                    assert(false);
                 }
             }
         }
@@ -581,6 +573,7 @@ function judgeFilter2ValueRelation<ED extends EntityDict, T extends keyof ED>(
         }
     }
 
+    // 到这里说明无法判断相容或者相斥，安全起见全返回false
     return false;
 }
 /**
@@ -606,13 +599,15 @@ function judgeFilterRelation<ED extends EntityDict, T extends keyof ED>(
                         (logicQuery) => judgeFilterRelation(entity, schema, filter, logicQuery, contained)
                     );
                     if (contained) {
-                        // 如果是包容关系，and只需要一个被包容，or需要全部被包容
-                        return (attr === '$and' && results.includes(true) || attr === '$or' && !results.includes(false));
+                        // 如果是包容关系，or和and需要全部被包容
+                        if(results.includes(false)) {
+                            return false;
+                        }
                     }
                     else if (!contained) {
-                        // 如果是相斥关系，则无论and还是or，conditionalFilter中的任何一个查询条件都应当与filter所相斥
-                        if (!results.includes(true)) {
-                            return false;
+                        // 如果是相斥关系，and只需要和一个相斥，or需要和全部相斥
+                        if (attr === '$and' && results.includes(true) || attr === '$or' && !results.includes(false)) {
+                            return true;
                         }
                     }
                     else {
@@ -622,12 +617,21 @@ function judgeFilterRelation<ED extends EntityDict, T extends keyof ED>(
                 }
                 case '$not': {
                     /**
-                     * 若filter与conditionalFilter not所定义的部分相斥，则filter与conditionalFilter一定不相容
-                     * （一定相容的判断比较麻烦，先不写了）
-                     * 若filter被conditionalFilter not所定义的部分包容，则filter与conditionalFilter相斥
+                     * 若filter与conditionalFilter not所定义的部分相斥，则filter与conditionalFilter相容
+                     * 若filter将conditionalFilter not所定义的部分包容，则filter与conditionalFilter相斥
                      */
                     const logicQuery = conditionalFilter[attr] as ED[T]['Selection']['filter'];
-                    return (!contained && judgeFilterRelation(entity, schema, logicQuery, filter, contained) || false);
+                    if (contained) {
+                        if (!judgeFilterRelation(entity, schema, filter, logicQuery, false)) {
+                            return false;
+                        }
+                    }
+                    else {
+                        if (judgeFilterRelation(entity, schema, filter, logicQuery, true)) {
+                            return true;
+                        }
+                    }
+                    break;
                 }
                 default: {
                     throw new Error(`暂不支持的逻辑算子${attr}`);
@@ -678,8 +682,8 @@ export function contains<ED extends EntityDict, T extends keyof ED>(
     schema: StorageSchema<ED>,
     filter: ED[T]['Selection']['filter'],
     conditionalFilter: ED[T]['Selection']['filter']) {
-    // return judgeFilterRelation(entity, schema, filter, conditionalFilter, true);
-    return false;
+    return judgeFilterRelation(entity, schema, filter, conditionalFilter, true);
+    // return false;
 }
 
 /**
@@ -702,8 +706,8 @@ export function repel<ED extends EntityDict, T extends keyof ED>(
     filter1: ED[T]['Selection']['filter'],
     filter2: ED[T]['Selection']['filter']) {
     // todo
-    // judgeFilterRelation(entity, schema, filter1, filter2, false);
-    return false;
+    return judgeFilterRelation(entity, schema, filter1, filter2, false);
+    // return false;
 }
 
 /**
