@@ -1,6 +1,7 @@
 import { EntityDict } from '../base-app-domain';
 import { AsyncContext } from '../store/AsyncRowStore';
-import { createModiRelatedCheckers, createRelationHierarchyCheckers } from '../store/modi';
+import { createRelationHierarchyCheckers } from '../store/checker';
+import { createModiRelatedCheckers } from '../store/modi';
 import { SyncContext } from '../store/SyncRowStore';
 import { StorageSchema, EntityDict as BaseEntityDict, Checker } from '../types';
 

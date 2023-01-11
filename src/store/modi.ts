@@ -6,7 +6,6 @@ import { difference } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
 import { generateNewIdAsync } from "../utils/uuid";
 import { SyncContext } from './SyncRowStore';
-import { firstLetterUpperCase } from '../utils/string';
 
 export function createOperationsFromModies(modies: Modi[]): Array<{
     operation: Operation<string, Object, Object>,
@@ -111,105 +110,6 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
     return checkers;
 }
 
-export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
-    const checkers: ExpressionRelationChecker<ED, keyof ED, Cxt>[] = [];
-
-    for (const entity in schema) {
-        const { relationHierarchy } = schema[entity];
-        if (relationHierarchy) {
-            // 先build反向hierarchy的map
-            const reverseHierarchy = {} as Record<string, string[]>;
-            for (const r in relationHierarchy) {
-                if (!reverseHierarchy[r]) {
-                    reverseHierarchy[r] = [];
-                }
-                for (const r2 of relationHierarchy[r]) {
-                    if (!reverseHierarchy[r2]) {
-                        reverseHierarchy[r2] = [r];
-                    }
-                    else {
-                        reverseHierarchy[r2].push(r);
-                    }
-                }
-            }
-
-            // 对userEntity对象的授权和回收建立checker
-            const userEntityName = `user${firstLetterUpperCase(entity)}`;
-            const entityIdAttr = `${entity}Id`;
-            checkers.push({
-                entity: userEntityName as keyof ED,
-                action: 'create',
-                type: 'expressionRelation',
-                expression: <T2 extends keyof ED>(operation: any, context: Cxt) => {
-                    const userId = context.getCurrentUserId();
-                    const { action, data, filter } = operation as ED[keyof ED]['Operation'];
-                    const { relation, [entityIdAttr]: entityId } = data as Record<string, string>;
-                    const legalRelations = reverseHierarchy[relation];
-                    if (legalRelations.length === 0) {
-                        throw new OakUserUnpermittedException();
-                    }
-                    return {
-                        entity: userEntityName as T2,
-                        expr: {
-                            $gt: [{
-                                '#attr': '$$createAt$$',
-                            }, 0]
-                        },
-                        filter: {
-                            userId,
-                            [entityIdAttr]: entityId,
-                            relation: {
-                                $in: legalRelations,
-                            }
-                        }
-                    }
-                },
-                errMsg: '越权操作',
-            });
-            for (const r in reverseHierarchy) {
-                checkers.push({
-                    entity: userEntityName as keyof ED,
-                    action: 'remove',
-                    type: 'expressionRelation',
-                    expression: <T2 extends keyof ED>(operation: any, context: Cxt) => {
-                        const userId = context.getCurrentUserId();
-                        const { filter } = operation as ED[keyof ED]['Remove'];
-                        const legalRelations = reverseHierarchy[r];
-                        if (legalRelations.length === 0) {
-                            throw new OakUserUnpermittedException('越权操作');
-                        }
-                        return {
-                            entity: userEntityName as T2,
-                            expr: {
-                                $gt: [{
-                                    '#attr': '$$createAt$$',
-                                }, 0]
-                            },
-                            filter: {
-                                userId,
-                                [entityIdAttr]: {
-                                    $in: {
-                                        entity: userEntityName,
-                                        data: {
-                                            [entityIdAttr]: 1,
-                                        },
-                                        filter,
-                                    }
-                                },
-                                relation: {
-                                    $in: legalRelations,
-                                }
-                            }
-                        }
-                    },
-                    errMsg: '越权操作',
-                });
-            }
-        }
-    }
-
-    return checkers;
-}
 
 export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>>(schema: StorageSchema<ED>) {
     const triggers: Trigger<ED, keyof ED, Cxt>[] = [];

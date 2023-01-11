@@ -202,7 +202,7 @@ export type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
 };
 
 export type RelationHierarchy<R extends string> = {
-    [K in R]: R[];
+    [K in R]?: R[];
 };
 
 // Select的级联可以去重，压缩返回的数据大小

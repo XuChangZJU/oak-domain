@@ -46,7 +46,7 @@ export declare type ExpressionChecker<ED extends EntityDict, T extends keyof ED,
         entity: T2;
         expr: RefOrExpression<keyof ED[T2]['OpSchema']>;
         filter: ED[T2]['Selection']['filter'];
-    };
+    } | undefined | string;
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
@@ -59,7 +59,7 @@ export declare type ExpressionRelationChecker<ED extends EntityDict, T extends k
         entity: T2;
         expr: RefOrExpression<keyof ED[T2]['OpSchema']>;
         filter: ED[T2]['Selection']['filter'];
-    };
+    } | undefined | string;
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };

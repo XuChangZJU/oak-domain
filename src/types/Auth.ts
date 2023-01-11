@@ -51,7 +51,7 @@ export type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt ext
         entity: T2;
         expr: RefOrExpression<keyof ED[T2]['OpSchema']>;
         filter: ED[T2]['Selection']['filter'];
-    };       // 生成一个带表达式的查询任务，结果为true代表可以过，为false不可以
+    } | undefined | string;       // 生成一个带表达式的查询任务，结果为true代表可以过，为false不可以。如果返回undefined直接过，返回string直接挂
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
@@ -66,7 +66,7 @@ export type ExpressionRelationChecker<ED extends EntityDict, T extends keyof ED,
         entity: T2;
         expr: RefOrExpression<keyof ED[T2]['OpSchema']>;
         filter: ED[T2]['Selection']['filter'];
-    };       // 生成一个带表达式的查询任务，结果为true代表可以过，为false不可以
+    } | undefined | string;       // 生成一个带表达式的查询任务，结果为true代表可以过。如果返回undefined直接过，返回string直接挂
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };

@@ -606,10 +606,8 @@ function judgeFilterRelation<ED extends EntityDict, T extends keyof ED>(
                         (logicQuery) => judgeFilterRelation(entity, schema, filter, logicQuery, contained)
                     );
                     if (contained) {
-                        // 如果是包容关系，则无论and还是or，conditionalFilter中的任何一个查询条件都应当被filter所包容
-                        if (results.includes(false)) {
-                            return false;
-                        }
+                        // 如果是包容关系，and只需要一个被包容，or需要全部被包容
+                        return (attr === '$and' && results.includes(true) || attr === '$or' && !results.includes(false));
                     }
                     else if (!contained) {
                         // 如果是相斥关系，则无论and还是or，conditionalFilter中的任何一个查询条件都应当与filter所相斥
@@ -624,14 +622,12 @@ function judgeFilterRelation<ED extends EntityDict, T extends keyof ED>(
                 }
                 case '$not': {
                     /**
-                     * 若filter与not所定义的filter相斥，则filter与conditionalFilter相容
-                     * 若filter与not所定义的filter相容，则filter与conditionalFilter相斥
+                     * 若filter与conditionalFilter not所定义的部分相斥，则filter与conditionalFilter一定不相容
+                     * （一定相容的判断比较麻烦，先不写了）
+                     * 若filter被conditionalFilter not所定义的部分包容，则filter与conditionalFilter相斥
                      */
                     const logicQuery = conditionalFilter[attr] as ED[T]['Selection']['filter'];
-                    if (judgeFilterRelation(entity, schema, filter, logicQuery, !contained)) {
-                        return true;
-                    }
-                    break;
+                    return (!contained && judgeFilterRelation(entity, schema, logicQuery, filter, contained) || false);
                 }
                 default: {
                     throw new Error(`暂不支持的逻辑算子${attr}`);
@@ -706,7 +702,7 @@ export function repel<ED extends EntityDict, T extends keyof ED>(
     filter1: ED[T]['Selection']['filter'],
     filter2: ED[T]['Selection']['filter']) {
     // todo
-    // return judgeFilterRelation(entity, schema, filter1, filter2, false);
+    // judgeFilterRelation(entity, schema, filter1, filter2, false);
     return false;
 }
 
