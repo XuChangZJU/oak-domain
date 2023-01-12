@@ -1,6 +1,6 @@
 import assert from 'assert';
 import { addFilterSegment, checkFilterContains, combineFilters } from "../store/filter";
-import { OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
+import { OakDataException, OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
 import { Checker, CreateTriggerInTxn, EntityDict, ExpressionRelationChecker, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
@@ -211,7 +211,7 @@ export function translateCheckerInSyncContext<
 
 
 export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
-    const checkers: ExpressionRelationChecker<ED, keyof ED, Cxt>[] = [];
+    const checkers: Checker<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
         const { relationHierarchy } = schema[entity];
@@ -304,6 +304,39 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
                     errMsg: '越权操作',
                 });
             }
+
+            // 一个人不能授权给自己，也不能删除自己的授权
+            checkers.push({
+                entity: userEntityName as keyof ED,
+                action: 'create' as ED[keyof ED]['Action'],
+                type: 'data',
+                checker: (data, context) => {
+                    assert(!(data instanceof Array));
+                    const { userId } = data as ED[keyof ED]['CreateSingle']['data'];
+                    const userId2 = context.getCurrentUserId();
+                    if (userId === userId2) {
+                        throw new OakDataException('不允许授权给自己');
+                    }
+                }
+            });
+
+            checkers.push({
+                entity: userEntityName as keyof ED,
+                action: 'remove' as ED[keyof ED]['Action'],
+                type: 'row',
+                filter: (operation, context) => {
+                    const userId = context.getCurrentUserId();
+                    return {
+                        userId: {
+                            $ne: userId,
+                        },
+                    };
+                },
+                errMsg: '不允许回收自己的授权',
+            });
+
+            // 转让现在用update动作，只允许update userId给其它人
+            // todo 等实现的时候再写
         }
     }
 
