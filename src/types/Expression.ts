@@ -240,7 +240,7 @@ export function isExpression<A>(expression: any): expression is Expression<A> {
 export function opMultipleParams(op: string) {
     return !['$year', '$month', '$weekday', '$weekOfYear', '$day', '$dayOfMonth',
         '$dayOfWeek', '$dayOfYear', '$not', '$true', '$false', '$abs',
-        '$round', '$floor', '$ceil', '$concat'].includes(op);
+        '$round', '$floor', '$ceil'].includes(op);
 }
 
 export function execOp(op: string, params: any, obscure?: boolean): ExpressionConstant {
