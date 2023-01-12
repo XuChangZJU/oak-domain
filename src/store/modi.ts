@@ -52,14 +52,14 @@ export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt e
         action: 'abandon',
         data: {},
         filter,
-        sorter: [
+        /* sorter: [
             {
                 $attr: {
                     $$createAt$$: 1,
                 },
                 $direction: 'asc',
             }
-        ]
+        ] */
     }, Object.assign({}, option, {
         blockTrigger: false,
     }));

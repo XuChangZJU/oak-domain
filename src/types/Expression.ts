@@ -16,7 +16,7 @@ export type RefOrExpression<A> = RefAttr<A> | Expression<A>;
 type MathType<A> = RefOrExpression<A> | number;
 type StringType<A> = RefOrExpression<A> | string
 interface Add<A> {
-    $add: (MathType<A> | StringType<A>)[];
+    $add: (MathType<A>)[];
 };
 interface Subtract<A> {
     $subtract: [MathType<A>, MathType<A>];
