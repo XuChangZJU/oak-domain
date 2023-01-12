@@ -78,14 +78,14 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
             action: restActions as any,
             type: 'row',
             filter: (operation, context, option) => {
-                if ((<OperateOption>option).modiParentId && (<OperateOption>option).modiParentEntity) {
+                /* if ((<OperateOption>option).modiParentId && (<OperateOption>option).modiParentEntity) {
                     // 如果本身也是创建modi就允许通过
                     return {
                         id: {
                             $exists: true,
                         },
                     };
-                }
+                } */
                 return {
                     id: {
                         $nin: {
@@ -103,7 +103,7 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
                     }
                 };
             },
-            errMsg: `更新的对象${entity}上有尚未结束的modi`,
+            errMsg: '您请求的更新对象上还有正在申请的更新，请等该更新结束后再试',
         })
     }
 

@@ -305,7 +305,7 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
                 });
             }
 
-            // 一个人不能授权给自己，也不能删除自己的授权
+            /* // 一个人不能授权给自己，也不能删除自己的授权
             checkers.push({
                 entity: userEntityName as keyof ED,
                 action: 'create' as ED[keyof ED]['Action'],
@@ -313,7 +313,7 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
                 checker: (data, context) => {
                     assert(!(data instanceof Array));
                     const { userId } = data as ED[keyof ED]['CreateSingle']['data'];
-                    const userId2 = context.getCurrentUserId();
+                    const userId2 = context.getCurrentUserId(true);
                     if (userId === userId2) {
                         throw new OakDataException('不允许授权给自己');
                     }
@@ -325,17 +325,21 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
                 action: 'remove' as ED[keyof ED]['Action'],
                 type: 'row',
                 filter: (operation, context) => {
-                    const userId = context.getCurrentUserId();
-                    return {
-                        userId: {
-                            $ne: userId,
-                        },
-                    };
+                    const userId = context.getCurrentUserId(true);
+                    if (userId) {
+                        return {
+                            userId: {
+                                $ne: userId,
+                            },
+                        };
+                    }
+                    console.warn(`没有当前用户但在删除权限，请检查。对象是${entity}`);
+                    return {};
                 },
                 errMsg: '不允许回收自己的授权',
-            });
+            }); */
 
-            // 转让现在用update动作，只允许update userId给其它人
+            // 转让权限现在用update动作，只允许update userId给其它人
             // todo 等实现的时候再写
         }
     }
