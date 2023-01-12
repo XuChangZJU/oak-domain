@@ -1,7 +1,7 @@
 import assert from "assert";
 import {
     EntityDict,
-    OperateOption, SelectOption, OperationResult, DeduceFilter, CreateAtAttribute, UpdateAtAttribute, AggregationResult
+    OperateOption, SelectOption, OperationResult, DeduceFilter, CreateAtAttribute, UpdateAtAttribute, AggregationResult, DeleteAtAttribute
 } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { RowStore } from '../types/RowStore';
@@ -816,6 +816,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             Object.assign(data2, {
                 [CreateAtAttribute]: now,
                 [UpdateAtAttribute]: now,
+                [DeleteAtAttribute]: null,
             });
         }
         if (data instanceof Array) {
