@@ -933,8 +933,8 @@ export function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt 
     });
     if (count instanceof Promise) {
         return count.then(
-            (count2) => count2 !== 0
+            (count2) => count2 === 0
         );
     }
-    return count !== 0;
+    return count === 0;
 }

@@ -270,6 +270,9 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
                     entity: userEntityName as keyof ED,
                     action: 'remove',
                     type: 'expressionRelation',
+                    conditionalFilter: {
+                        relation: r,
+                    } as ED[keyof ED]['Update']['filter'],
                     expression: <T2 extends keyof ED>(operation: any, context: Cxt) => {
                         const userId = context.getCurrentUserId();
                         const { filter } = operation as ED[keyof ED]['Remove'];
