@@ -864,6 +864,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
                 if (option.modiParentEntity && !['modi', 'modiEntity', 'oper', 'operEntity'].includes(entity as string)) {
                     // 变成对modi的插入
+                    assert(option.modiParentId);
                     const modiCreate: CreateModiOperation = {
                         id: 'dummy',
                         action: 'create',
@@ -1073,6 +1074,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 action: {
                                     $in: ['create', 'update'],
                                 },
+                                entity: option.modiParentEntity!,
+                                entityId: option.modiParentId!,
                                 iState: 'active',
                                 filter: ids.length > 0 ? {
                                     id: {

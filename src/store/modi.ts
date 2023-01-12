@@ -6,6 +6,7 @@ import { difference } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
 import { generateNewIdAsync } from "../utils/uuid";
 import { SyncContext } from './SyncRowStore';
+import assert from 'assert';
 
 export function createOperationsFromModies(modies: Modi[]): Array<{
     operation: Operation<string, Object, Object>,
@@ -78,14 +79,47 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
             action: restActions as any,
             type: 'row',
             filter: (operation, context, option) => {
-                /* if ((<OperateOption>option).modiParentId && (<OperateOption>option).modiParentEntity) {
-                    // 如果本身也是创建modi就允许通过
+                /**
+                 * 只有一种情况可以通过，即当前是在更新和active的modi所指向同一个父更新对象。
+                 * 比如：先申请了一个公司（company），再申请修改公司（companyApplyment），这时所有的active modi都指向此条companyApplyment
+                 *      这时：
+                 *          1）再申请一条新的修改公司（create companyApplyment），应被拒绝
+                 *          2）申请修改原来的companyApplyment(update companyApplyment)，可以通过
+                 *          3）在其它路径上对此company对象进行直接的更新，应被拒绝
+                 */
+                if ((<OperateOption>option).modiParentEntity) {
+                    const { modiParentEntity, modiParentId } = <OperateOption>option;
+                    assert(modiParentEntity);
+                    assert(modiParentId);
                     return {
                         id: {
-                            $exists: true,
-                        },
-                    };
-                } */
+                            $nin: {
+                                entity: 'modiEntity',
+                                data: {
+                                    entityId: 1,
+                                },
+                                filter: {
+                                    entity,
+                                    modi: {
+                                        iState: 'active',
+                                        $or: [
+                                            {
+                                                entity: {
+                                                    $ne: modiParentEntity,
+                                                },
+                                            },
+                                            {
+                                                entityId: {
+                                                    $ne: modiParentId,
+                                                },
+                                            }
+                                        ],
+                                    },
+                                },
+                            },
+                        }
+                    }
+                }
                 return {
                     id: {
                         $nin: {
