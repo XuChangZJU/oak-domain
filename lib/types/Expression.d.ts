@@ -111,6 +111,10 @@ interface DateFloor<A> {
     $dateFloor: [RefOrExpression<A> | Date | number, 'y' | 'M' | 'd' | 'h' | 'm' | 's'];
 }
 declare type DateExpression<A> = DateYear<A> | DateMonth<A> | DateWeekday<A> | DateWeekOfYear<A> | DateDay<A> | DateDayOfYear<A> | DateDayOfMonth<A> | DateDayOfWeek<A> | DateDiff<A> | DateCeiling<A> | DateFloor<A>;
+interface StringConcat<A> {
+    $concat: StringType<A>[];
+}
+declare type StringExpression<A> = StringConcat<A>;
 interface GeoContains<A> {
     $contains: [RefOrExpression<A> | Geo, RefOrExpression<A> | Geo];
 }
@@ -118,7 +122,7 @@ interface GeoDistance<A> {
     $distance: [RefOrExpression<A> | Geo, RefOrExpression<A> | Geo];
 }
 declare type GeoExpression<A> = GeoContains<A> | GeoDistance<A>;
-export declare type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> | BoolExpression<A> | CompareExpression<A> | MathExpression<A>;
+export declare type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A>;
 export declare type ExpressionConstant = Geo | number | Date | string | boolean;
 export declare function isGeoExpression<A>(expression: any): expression is GeoExpression<A>;
 export declare function isDateExpression<A>(expression: any): expression is DateExpression<A>;
@@ -126,6 +130,7 @@ export declare function isLogicExpression<A>(expression: any): expression is Log
 export declare function isBoolExpression<A>(expression: any): expression is BoolExpression<A>;
 export declare function isCompareExpression<A>(expression: any): expression is CompareExpression<A>;
 export declare function isMathExpression<A>(expression: any): expression is MathExpression<A>;
+export declare function isStringExpression<A>(expression: any): expression is StringExpression<A>;
 export declare function isExpression<A>(expression: any): expression is Expression<A>;
 export declare function opMultipleParams(op: string): boolean;
 export declare function execOp(op: string, params: any, obscure?: boolean): ExpressionConstant;
