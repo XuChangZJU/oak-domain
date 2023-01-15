@@ -230,6 +230,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                         assert(operation.action !== 'create');
                         const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
                         const filterr = typeof filter === 'function' ? filter(operation, context, option) : filter;
+                        assert(!(filterr instanceof Promise));
                         const filterRepelled = checkFilterRepel(entity, context, filterr, operation.filter) as boolean
                         if (filterRepelled) {
                             continue;
@@ -252,7 +253,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                     if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
                         assert(operation.action !== 'create');
                         const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
-                        const filterr = typeof filter === 'function' ? filter(operation, context, option) : filter;
+                        const filterr = typeof filter === 'function' ? await filter(operation, context, option) : filter;
                         const filterRepelled = await (checkFilterRepel(entity, context, filterr, operation.filter) as Promise<boolean>);
                         if (filterRepelled) {
                             return execPreTrigger(idx + 1);
@@ -272,7 +273,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                     if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
                         assert(operation.action !== 'create');
                         const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
-                        const filterr = typeof filter === 'function' ? filter(operation, context, option) : filter;
+                        const filterr = typeof filter === 'function' ? await filter(operation, context, option) : filter;
                         const filterRepelled = await (checkFilterRepel(entity, context, filterr, operation.filter) as Promise<boolean>);
                         if (filterRepelled) {
                             return execCommitTrigger(idx + 1);

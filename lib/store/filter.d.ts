@@ -96,5 +96,14 @@ export declare function makeTreeAncestorFilter<ED extends EntityDict, T extends 
  * @param level
  */
 export declare function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof ED>(entity: T, parentKey: string, filter: ED[T]['Selection']['filter'], level?: number, includeAll?: boolean, includeSelf?: boolean): ED[T]['Selection']['filter'];
-export declare function checkFilterContains<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, contained: ED[T]['Selection']['filter'], filter?: ED[T]['Selection']['filter']): boolean | Promise<boolean>;
-export declare function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter']): boolean | Promise<boolean>;
+/**
+ * 检查filter是否包含contained（filter查询的数据一定满足contained）
+ * @param entity
+ * @param context
+ * @param contained
+ * @param filter
+ * @param dataCompare
+ * @returns
+ */
+export declare function checkFilterContains<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, contained: ED[T]['Selection']['filter'], filter?: ED[T]['Selection']['filter'], dataCompare?: true): boolean | Promise<boolean>;
+export declare function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter'], dataCompare?: true): boolean | Promise<boolean>;

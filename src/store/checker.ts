@@ -1,12 +1,13 @@
 import assert from 'assert';
 import { addFilterSegment, checkFilterContains, combineFilters } from "../store/filter";
 import { OakDataException, OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
-import { Checker, CreateTriggerInTxn, EntityDict, ExpressionRelationChecker, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn } from "../types";
+import { Checker, CreateTriggerInTxn, EntityDict, ExpressionRelationChecker, OperateOption, RefOrExpression, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
 import { getFullProjection } from './actionDef';
 import { SyncContext } from './SyncRowStore';
 import { firstLetterUpperCase } from '../utils/string';
+import { intersection, uniq } from '../utils/lodash';
 
 export function translateCheckerInAsyncContext<
     ED extends EntityDict & BaseEntityDict,
@@ -18,7 +19,7 @@ export function translateCheckerInAsyncContext<
             const { checker: checkerFn } = checker;
             return (async ({ operation }, context) => {
                 const { data } = operation;
-                checkerFn(data, context);
+                await checkerFn(data, context);
                 return 0;
             }) as CreateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
         }
@@ -26,13 +27,13 @@ export function translateCheckerInAsyncContext<
             const { filter, errMsg, inconsistentRows } = checker;
             return (async ({ operation }, context, option) => {
                 const { filter: operationFilter, action } = operation;
-                const filter2 = typeof filter === 'function' ? filter(operation, context, option) : filter;
+                const filter2 = typeof filter === 'function' ? await filter(operation, context, option) : filter;
                 if (['select', 'count', 'stat'].includes(action)) {
                     operation.filter = addFilterSegment(operationFilter || {}, filter2);
                     return 0;
                 }
                 else {
-                    if (await checkFilterContains(entity, context, filter2, operationFilter || {})) {
+                    if (await checkFilterContains(entity, context, filter2, operationFilter || {}, true)) {
                         return 0;
                     }
                     if (inconsistentRows) {
@@ -89,7 +90,7 @@ export function translateCheckerInAsyncContext<
                     return 0;
                 }
                 // 对后台而言，将生成的relationFilter加到filter之上(select可以在此加以权限的过滤)
-                operation.filter = combineFilters([operation.filter, relationFilter(operation, context, option)]);
+                operation.filter = combineFilters([operation.filter, await relationFilter(operation, context, option)]);
                 return 0;
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
         }    
@@ -100,7 +101,7 @@ export function translateCheckerInAsyncContext<
                 if (context.isRoot() && type === 'expressionRelation') {
                     return 0;
                 }
-                const exprResult = expression(operation, context, option);
+                const exprResult = await expression(operation, context, option);
                 if (typeof exprResult === 'string') {
                     throw new OakUserUnpermittedException(exprResult || errMsg);
                 }
@@ -117,7 +118,12 @@ export function translateCheckerInAsyncContext<
                     }, Object.assign({}, option, { dontCollect: true }));
                     if (!result) {
                         // 条件判定为假，抛异常
-                        throw new OakUserUnpermittedException(errMsg);
+                        if (type === 'expression') {
+                            throw new OakRowInconsistencyException(undefined, errMsg);
+                        }
+                        else {
+                            throw new OakUserUnpermittedException(errMsg);
+                        }
                     }
                 }
                 return 0;
@@ -151,7 +157,8 @@ export function translateCheckerInSyncContext<
                     return 0;
                 }
                 else {
-                    if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter)) {
+                    assert(!(filter2 instanceof Promise));
+                    if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter, true)) {
                         return;
                     }
                     throw new OakRowInconsistencyException(undefined, errMsg);
@@ -167,7 +174,8 @@ export function translateCheckerInSyncContext<
                 const filter2 = typeof filter === 'function' ? filter(operation, context, option) : filter;
                 const { filter: operationFilter } = operation;
                 assert(operationFilter);
-                if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter)) {
+                assert(!(filter2 instanceof Promise));
+                if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter, true)) {
                     return;
                 }
                 throw new OakUserUnpermittedException(errMsg);
@@ -188,6 +196,7 @@ export function translateCheckerInSyncContext<
                     return 0;
                 }
                 else {
+                    assert(!(exprResult instanceof Promise));
                     const { entity: expressionEntity, expr, filter: expressionFilter } = exprResult;
                     const [result] = context.select(expressionEntity, {
                         data: {
@@ -197,7 +206,12 @@ export function translateCheckerInSyncContext<
                     }, Object.assign({}, option, { dontCollect: true })) as any[];
                     if (!result.$expr) {
                         // 条件判定为假，抛异常
-                        throw new OakRowInconsistencyException(undefined, errMsg);
+                        if (type === 'expression') {
+                            throw new OakRowInconsistencyException(undefined, errMsg);
+                        }
+                        else {
+                            throw new OakUserUnpermittedException(errMsg);
+                        }
                     }
                     return;
                 }
@@ -270,9 +284,6 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
                     entity: userEntityName as keyof ED,
                     action: 'remove',
                     type: 'expressionRelation',
-                    conditionalFilter: {
-                        relation: r,
-                    } as ED[keyof ED]['Update']['filter'],
                     expression: <T2 extends keyof ED>(operation: any, context: Cxt) => {
                         const userId = context.getCurrentUserId();
                         const { filter } = operation as ED[keyof ED]['Remove'];
@@ -280,29 +291,51 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
                         if (legalRelations.length === 0) {
                             return '这是不应该跑出来的情况，请杀程序员祭天';
                         }
-                        return {
-                            entity: userEntityName as T2,
-                            expr: {
-                                $gt: [{
-                                    '#attr': '$$createAt$$',
-                                }, 0]
-                            },
-                            filter: {
-                                userId,
-                                [entityIdAttr]: {
-                                    $in: {
-                                        entity: userEntityName,
-                                        data: {
-                                            [entityIdAttr]: 1,
-                                        },
-                                        filter,
+                        const makeFilterFromRows = (rows: Partial<ED[T2]['Schema']>[]) => {
+                            const relations = uniq(rows.map(ele => ele.relation));
+                            const entityIds = uniq(rows.map(ele => ele[entityIdAttr]));
+                            assert(entityIds.length === 1, `在回收${userEntityName}上权限时，单次回收涉及到了不同的对象，此操作不被允许`);
+                            const legalRelationss = relations.map(
+                                ele => {
+                                    if (reverseHierarchy[ele!]) {
+                                        return reverseHierarchy[ele!];
+                                    }
+                                    assert(false, `在回收${userEntityName}上类型为${ele}的权限时，找不到对应的定义，不应该出现的情况`);
+                                }
+                            );
+                            // 如果要删除多个不同的权限，这里必须要有它们共同的上级权限
+                            const legaRelations = intersection(legalRelationss);
+                            return {
+                                entity: userEntityName as T2,
+                                expr: {
+                                    $gt: [{
+                                        '#attr': '$$createAt$$',
+                                    }, 0]
+                                } as RefOrExpression<keyof ED[T2]['OpSchema']>,
+                                filter: {
+                                    userId,
+                                    [entityIdAttr]: entityIds[0],
+                                    relation: {
+                                        $in: legaRelations,
                                     }
                                 },
-                                relation: {
-                                    $in: legalRelations,
-                                }
+                            }
+                        };
+
+                        const toBeRemoved = context.select(userEntityName, {
+                            data: {
+                                id: 1,
+                                relation: 1,
+                                [entityIdAttr]: 1,
                             },
+                            filter,
+                        }, { dontCollect: true });
+                        if (toBeRemoved instanceof Promise) {
+                            return toBeRemoved.then(
+                                (rows) => makeFilterFromRows(rows)
+                            );
                         }
+                        return makeFilterFromRows(toBeRemoved);
                     },
                     errMsg: '越权操作',
                 });

@@ -879,11 +879,21 @@ export function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof 
     return currentLevelInFilter;
 }
 
+/**
+ * 检查filter是否包含contained（filter查询的数据一定满足contained）
+ * @param entity 
+ * @param context 
+ * @param contained 
+ * @param filter 
+ * @param dataCompare 
+ * @returns 
+ */
 export function checkFilterContains<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
     entity: T,
     context: Cxt,
     contained: ED[T]['Selection']['filter'],
-    filter?: ED[T]['Selection']['filter']): boolean | Promise<boolean> {
+    filter?: ED[T]['Selection']['filter'],
+    dataCompare?: true): boolean | Promise<boolean> {
     if (!filter) {
         throw new OakRowInconsistencyException();
     }
@@ -892,29 +902,34 @@ export function checkFilterContains<ED extends EntityDict, T extends keyof ED, C
     if (contains(entity, schema, filter, contained)) {
         return true;
     }
-    // 再判断加上了conditionalFilter后取得的行数是否缩减
-    const filter2 = combineFilters([filter, {
-        $not: contained,
-    }]);
-    const count = context.count(entity, {
-        filter: filter2,
-    }, {
-        dontCollect: true,
-        blockTrigger: true,
-    });
-    if (count instanceof Promise) {
-        return count.then(
-            (count2) => count2 === 0
-        );
+    if (dataCompare) {
+        // 再判断加上了conditionalFilter后取得的行数是否缩减
+        const filter2 = combineFilters([filter, {
+            $not: contained,
+        }]);
+        const count = context.count(entity, {
+            filter: filter2,
+        }, {
+            dontCollect: true,
+            blockTrigger: true,
+        });
+        if (count instanceof Promise) {
+            return count.then(
+                (count2) => count2 === 0
+            );
+        }
+        return count === 0;
     }
-    return count === 0;
+    return false;
 }
 
 export function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
     entity: T,
     context: Cxt,
     filter1: ED[T]['Selection']['filter'],
-    filter2: ED[T]['Selection']['filter']): boolean | Promise<boolean> {
+    filter2: ED[T]['Selection']['filter'],
+    dataCompare?: true
+): boolean | Promise<boolean> {
     if (!filter2) {
         throw new OakRowInconsistencyException();
     }
@@ -924,17 +939,20 @@ export function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt 
         return true;
     }
     // 再判断两者同时成立时取得的行数是否为0
-    const filter3 = combineFilters([filter2, filter1]);
-    const count = context.count(entity, {
-        filter: filter3,
-    }, {
-        dontCollect: true,
-        blockTrigger: true,
-    });
-    if (count instanceof Promise) {
-        return count.then(
-            (count2) => count2 === 0
-        );
+    if (dataCompare) {
+        const filter3 = combineFilters([filter2, filter1]);
+        const count = context.count(entity, {
+            filter: filter3,
+        }, {
+            dontCollect: true,
+            blockTrigger: true,
+        });
+        if (count instanceof Promise) {
+            return count.then(
+                (count2) => count2 === 0
+            );
+        }
+        return count === 0;
     }
-    return count === 0;
+    return false;
 }

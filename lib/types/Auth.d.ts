@@ -12,41 +12,42 @@ export declare type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt e
     type: 'data';
     entity: T;
     action: Omit<ED[T]['Action'], 'remove'> | Array<Omit<ED[T]['Action'], 'remove'>>;
-    checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => void;
-    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
+    checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => void | Promise<void>;
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Selection']['filter']>);
 };
 export declare type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'row';
     entity: T;
     action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
-    filter: ED[T]['Selection']['filter'] | ((operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter']);
+    filter: ED[T]['Selection']['filter'] | ((operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'] | Promise<ED[T]['Selection']['filter']>);
     errMsg?: string;
     inconsistentRows?: {
         entity: keyof ED;
         selection: (filter?: ED[T]['Selection']['filter']) => ED[keyof ED]['Selection'];
     };
-    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Update']['filter']>);
 };
 export declare type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'relation';
     entity: T;
     action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
-    relationFilter: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'];
+    relationFilter: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'] | Promise<ED[T]['Selection']['filter']>;
     errMsg: string;
-    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Selection']['filter']>);
+};
+declare type ExpressionResult<ED extends EntityDict, T extends keyof ED> = {
+    entity: T;
+    expr: RefOrExpression<keyof ED[T]['OpSchema']>;
+    filter: ED[T]['Selection']['filter'];
 };
 export declare type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'expression';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
-    expression: <T2 extends keyof ED>(operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => {
-        entity: T2;
-        expr: RefOrExpression<keyof ED[T2]['OpSchema']>;
-        filter: ED[T2]['Selection']['filter'];
-    } | undefined | string;
+    expression: <T2 extends keyof ED>(operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ExpressionResult<ED, T2> | Promise<ExpressionResult<ED, T2>> | undefined | string;
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
@@ -55,12 +56,9 @@ export declare type ExpressionRelationChecker<ED extends EntityDict, T extends k
     type: 'expressionRelation';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
-    expression: <T2 extends keyof ED>(operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => {
-        entity: T2;
-        expr: RefOrExpression<keyof ED[T2]['OpSchema']>;
-        filter: ED[T2]['Selection']['filter'];
-    } | undefined | string;
+    expression: <T2 extends keyof ED>(operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ExpressionResult<ED, T2> | Promise<ExpressionResult<ED, T2>> | undefined | string;
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 export declare type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt> | ExpressionChecker<ED, T, Cxt> | ExpressionRelationChecker<ED, T, Cxt>;
+export {};
