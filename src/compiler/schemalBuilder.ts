@@ -26,6 +26,7 @@ const Schema: Record<string, {
     sourceFile: ts.SourceFile;
     locale: ts.ObjectLiteralExpression;
     relationHierarchy?: ts.ObjectLiteralExpression;
+    reverseCascadeRelationHierarchy?: ts.ObjectLiteralExpression;
     toModi: boolean;
     actionType: string;
     static: boolean;
@@ -498,6 +499,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     const additionalImports: ts.ImportDeclaration[] = [];
     let localeDef: ts.ObjectLiteralExpression | undefined = undefined;
     let relationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
+    let reverseCascadeRelationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
             const entityImported = getEntityImported(node);
@@ -1130,6 +1132,13 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         assert(ts.isObjectLiteralExpression(initializer!), `${moduleName}中的RelationHierarchy的定义必须是初始化为ObjectLiteralExpress`);
                         relationHierarchy = initializer;
                     }
+                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ReverseCascadeRelationHierarchy') {
+                        // ReverseCascadeRelationHierarchy
+                        assert(hasRelationDef, `${moduleName}中的Relation定义在ReverseCascadeRelationHierarchy之后`);
+                        const { initializer } = declaration;
+                        assert(ts.isObjectLiteralExpression(initializer!), `${moduleName}中的RelationHierarchy的定义必须是初始化为ObjectLiteralExpress`);
+                        reverseCascadeRelationHierarchy = initializer;
+                    }
                     else {
                         throw new Error(`${moduleName}：不能理解的定义内容${declaration.name.getText()}`);
                     }
@@ -1174,13 +1183,23 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
         });
     }
     if (hasRelationDef) {
-        assert(relationHierarchy, `${filename}中缺少了relationHierarchy定义`);
-        assign(schema, {
-            relationHierarchy,
-        });
+        if(!relationHierarchy && !reverseCascadeRelationHierarchy){
+            console.warn(`${filename}中定义了Relation,但并没有relationHierarchy或reverseCascadeRelationHierarchy的定义，请注意自主编写权限分配的checker`);
+        }
+        if (relationHierarchy) {
+            assign(schema, {
+                relationHierarchy,
+            });
+        }
+        if (reverseCascadeRelationHierarchy) {
+            assign(schema, {
+                reverseCascadeRelationHierarchy,
+            });
+        }
     }
     else {
         assert(!relationHierarchy, `${filename}中具有relationHierarchy定义但没有Relation定义`);
+        assert(!reverseCascadeRelationHierarchy, `${filename}中具有reverseCascadeRelationHierarchy定义但没有Relation定义`)
     }
 
     assign(Schema, {
@@ -3078,6 +3097,13 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     const reverseOneNodes: ts.TypeNode[] = [];
     if (ReversePointerEntities[entity]) {
         if (ReversePointerRelations[entity]) {
+            const { schemaAttrs } = Schema[entity];
+            const { questionToken } = schemaAttrs.find(
+                ele => {
+                    const { name } = ele;
+                    return (<ts.Identifier>name).text === 'entity'
+                }
+            )!;
             for (const one of ReversePointerRelations[entity]) {
                 const cascadeCreateNode = factory.createTypeLiteralNode(
                     [
@@ -3136,14 +3162,14 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier('entity'),
-                            undefined,          // 反向指针好像不能为空，以后或许会有特例  by Xc
+                            questionToken,
                             factory.createLiteralTypeNode(factory.createStringLiteral(`${firstLetterLowerCase(one)}`)
                             )
                         ),
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier('entityId'),
-                            undefined,           // 反向指针好像不能为空，以后或许会有特例  by Xc
+                            questionToken,
                             factory.createTypeReferenceNode(
                                 factory.createIdentifier("String"),
                                 [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
@@ -5638,7 +5664,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
 
     for (const entity in Schema) {
         const indexExpressions: ts.Expression[] = [];
-        const { sourceFile, inModi, indexes, toModi, actionType, static: _static, relationHierarchy } = Schema[entity];
+        const { sourceFile, inModi, indexes, toModi, actionType, static: _static, relationHierarchy, reverseCascadeRelationHierarchy } = Schema[entity];
         const fromSchemaSpecifiers = [
             factory.createImportSpecifier(
                 false,
@@ -5646,7 +5672,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 factory.createIdentifier("OpSchema")
             )
         ];
-        if (relationHierarchy) {
+        if (relationHierarchy || reverseCascadeRelationHierarchy) {
             fromSchemaSpecifiers.push(
                 factory.createImportSpecifier(
                     false,
@@ -5860,6 +5886,14 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 factory.createPropertyAssignment(
                     factory.createIdentifier("relationHierarchy"),
                     relationHierarchy,
+                )
+            );
+        }
+        if (reverseCascadeRelationHierarchy) {
+            propertyAssignments.push(
+                factory.createPropertyAssignment(
+                    factory.createIdentifier("reverseCascadeRelationHierarchy"),
+                    reverseCascadeRelationHierarchy,
                 )
             );
         }

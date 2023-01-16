@@ -205,6 +205,15 @@ export type RelationHierarchy<R extends string> = {
     [K in R]?: R[];
 };
 
+export type CascadeRelationItem = {
+    cascadePath: string;
+    relations: string[];
+};
+
+export type ReverseCascadeRelationHierarchy<R extends string> = {
+    [K in R]?: CascadeRelationItem | (CascadeRelationItem | CascadeRelationItem[])[];
+};
+
 // Select的级联可以去重，压缩返回的数据大小
 export type SelectOpResult<ED extends EntityDict> = {
     a: 's',

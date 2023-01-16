@@ -50,11 +50,13 @@ export type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt exten
     );
 };
 
-type ExpressionResult<ED extends EntityDict, T extends keyof ED> = {
+export type ExpressionTask<ED extends EntityDict, T extends keyof ED> = {
     entity: T;
     expr: RefOrExpression<keyof ED[T]['OpSchema']>;
     filter: ED[T]['Selection']['filter'];
 };
+
+export type ExpressionTaskCombination<ED extends EntityDict> = ExpressionTask<ED, keyof ED>[][];
 
 export type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
@@ -65,7 +67,7 @@ export type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt ext
         operation: ED[T]['Operation'] | ED[T]['Selection'],
         context: Cxt,
         option: OperateOption | SelectOption
-    ) => ExpressionResult<ED, T2> | Promise<ExpressionResult<ED, T2>> | undefined | string;       // 生成一个带表达式的查询任务，结果为true代表可以过，为false不可以。如果返回undefined直接过，返回string直接挂
+    ) => ExpressionTaskCombination<ED> | undefined | string | Promise<ExpressionTaskCombination<ED> | string | undefined> ;       // 生成一个带表达式的查询任务数组，表达式结果为true代表可以过（or关系）。如果返回undefined直接过，返回string直接挂
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
@@ -79,7 +81,7 @@ export type ExpressionRelationChecker<ED extends EntityDict, T extends keyof ED,
         operation: ED[T]['Operation'] | ED[T]['Selection'],
         context: Cxt,
         option: OperateOption | SelectOption
-    ) => ExpressionResult<ED, T2> | Promise<ExpressionResult<ED, T2>> | undefined | string;       // 生成一个带表达式的查询任务，结果为true代表可以过。如果返回undefined直接过，返回string直接挂
+    ) => ExpressionTaskCombination<ED> | undefined | string | Promise<ExpressionTaskCombination<ED> | string | undefined> ;       // 生成一个带表达式的查询任务数组，表达式结果为true代表可以过（or关系）。如果返回undefined直接过，返回string直接挂
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };

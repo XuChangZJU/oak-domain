@@ -1,5 +1,5 @@
 import { ActionType } from '.';
-import { EntityDict, EntityShape, InstinctiveAttributes, RelationHierarchy } from './Entity';
+import { EntityDict, EntityShape, InstinctiveAttributes, RelationHierarchy, ReverseCascadeRelationHierarchy } from './Entity';
 import { DataType, DataTypeParams } from './schema/DataTypes';
 
 export type Ref = 'ref';
@@ -60,6 +60,7 @@ export interface StorageDesc<SH extends EntityShape, Relation extends string = '
     actions: string[];
     actionType: ActionType;
     relationHierarchy?: RelationHierarchy<Relation>;
+    reverseCascadeRelationHierarchy?: ReverseCascadeRelationHierarchy<Relation>;
     // view 相关
     view?: true;
 }

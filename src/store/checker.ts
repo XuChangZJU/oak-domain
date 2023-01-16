@@ -1,13 +1,14 @@
 import assert from 'assert';
 import { addFilterSegment, checkFilterContains, combineFilters } from "../store/filter";
 import { OakDataException, OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
-import { Checker, CreateTriggerInTxn, EntityDict, ExpressionRelationChecker, OperateOption, RefOrExpression, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn } from "../types";
+import { CascadeRelationItem, Checker, CreateTriggerInTxn, EntityDict, ExpressionRelationChecker, ExpressionTask, ExpressionTaskCombination, OperateOption, RefOrExpression, RelationHierarchy, ReverseCascadeRelationHierarchy, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
 import { getFullProjection } from './actionDef';
 import { SyncContext } from './SyncRowStore';
 import { firstLetterUpperCase } from '../utils/string';
 import { intersection, uniq } from '../utils/lodash';
+import { judgeRelation } from './relation';
 
 export function translateCheckerInAsyncContext<
     ED extends EntityDict & BaseEntityDict,
@@ -93,8 +94,8 @@ export function translateCheckerInAsyncContext<
                 operation.filter = combineFilters([operation.filter, await relationFilter(operation, context, option)]);
                 return 0;
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
-        }    
-        case 'expression': 
+        }
+        case 'expression':
         case 'expressionRelation': {
             const { expression, errMsg } = checker;
             return (async ({ operation }, context, option) => {
@@ -109,14 +110,31 @@ export function translateCheckerInAsyncContext<
                     return 0;
                 }
                 else {
-                    const { entity: expressionEntity, expr, filter: expressionFilter } = exprResult;
-                    const [result] = await context.select(expressionEntity, {
-                        data: {
-                            $expr: expr,
-                        },
-                        filter: expressionFilter,
-                    }, Object.assign({}, option, { dontCollect: true }));
-                    if (!result) {
+                    const result2 = await Promise.all(
+                        exprResult.map(
+                            (e1) => Promise.all(
+                                e1.map(
+                                    async (e2) => {
+                                        const { entity: expressionEntity, expr, filter: expressionFilter } = e2;
+                                        const [result] = await context.select(expressionEntity, {
+                                            data: {
+                                                $expr: expr,
+                                            },
+                                            filter: expressionFilter,
+                                        }, Object.assign({}, option, { dontCollect: true }));
+                                        return result ? result.$expr as boolean : false;
+                                    }
+                                )
+                            )
+                        )
+                    );
+                    // exprResult外层是or，里层是and关系
+                    const isLegal = result2.find(
+                        (r1) => r1.every(
+                            (r2) => r2 === true
+                        )
+                    );
+                    if (!isLegal) {
                         // 条件判定为假，抛异常
                         if (type === 'expression') {
                             throw new OakRowInconsistencyException(undefined, errMsg);
@@ -180,8 +198,8 @@ export function translateCheckerInSyncContext<
                 }
                 throw new OakUserUnpermittedException(errMsg);
             };
-        }   
-        case 'expression': 
+        }
+        case 'expression':
         case 'expressionRelation': {
             const { expression, errMsg } = checker;
             return (operation, context, option) => {
@@ -197,14 +215,27 @@ export function translateCheckerInSyncContext<
                 }
                 else {
                     assert(!(exprResult instanceof Promise));
-                    const { entity: expressionEntity, expr, filter: expressionFilter } = exprResult;
-                    const [result] = context.select(expressionEntity, {
-                        data: {
-                            $expr: expr,
-                        },
-                        filter: expressionFilter,
-                    }, Object.assign({}, option, { dontCollect: true })) as any[];
-                    if (!result.$expr) {
+                    const result2 = exprResult.map(
+                        (e1) => e1.map(
+                            (e2) => {
+                                const { entity: expressionEntity, expr, filter: expressionFilter } = e2;
+                                const [result] = context.select(expressionEntity, {
+                                    data: {
+                                        $expr: expr,
+                                    },
+                                    filter: expressionFilter,
+                                }, Object.assign({}, option, { dontCollect: true }));
+                                return result ? result.$expr as boolean : false;
+                            }
+                        )
+                    );
+                    // exprResult外层是or，里层是and关系
+                    const isLegal = result2.find(
+                        (r1) => r1.every(
+                            (r2) => r2 === true
+                        )
+                    );
+                    if (!isLegal) {
                         // 条件判定为假，抛异常
                         if (type === 'expression') {
                             throw new OakRowInconsistencyException(undefined, errMsg);
@@ -213,7 +244,6 @@ export function translateCheckerInSyncContext<
                             throw new OakUserUnpermittedException(errMsg);
                         }
                     }
-                    return;
                 }
             };
         }
@@ -224,26 +254,174 @@ export function translateCheckerInSyncContext<
 }
 
 
+function buildReverseHierarchyMap(relationHierarchy: RelationHierarchy<any>) {
+    const reverseHierarchy = {} as Record<string, string[]>;
+    for (const r in relationHierarchy) {
+        for (const r2 of relationHierarchy[r]!) {
+            if (!reverseHierarchy[r2]) {
+                reverseHierarchy[r2] = [r];
+            }
+            else {
+                reverseHierarchy[r2].push(r);
+            }
+        }
+    }
+    return reverseHierarchy;
+}
+
+function translateSingleCascadeRelationItem<ED extends EntityDict & BaseEntityDict>(
+    schema: StorageSchema<ED>,
+    lch: CascadeRelationItem,
+    entity2: keyof ED,
+    entityId: string,
+    userId: string): ExpressionTask<ED, keyof ED> {
+    const { cascadePath, relations } = lch;
+    const paths = cascadePath.split('.');
+
+    const translateFilterIter = <T extends keyof ED>(entity: keyof ED, iter: number): ED[T]['Selection']['filter'] => {
+        const relation = judgeRelation(schema, entity, paths[iter]);
+        if (iter === paths.length - 1) {
+            if (relation === 2) {
+                return {
+                    entity: paths[iter],
+                    entityId: {
+                        $in: {
+                            entity: `user${firstLetterUpperCase(paths[iter])}`,
+                            data: {
+                                [`${paths[iter]}Id`]: 1,
+                            },
+                            filter: {
+                                userId,
+                                relation: {
+                                    $in: relations,
+                                },
+                            },
+                        },
+                    }
+                };
+            }
+            assert(typeof relation === 'string');
+            return {
+                [`${paths[iter]}Id`]: {
+                    $in: {
+                        entity: `user${firstLetterUpperCase(relation)}`,
+                        data: {
+                            [`${relation}Id`]: 1,
+                        },
+                        filter: {
+                            userId,
+                            relation: {
+                                $in: relations,
+                            },
+                        },
+                    },
+                }
+            };
+        }
+        else {
+            const subFilter = translateFilterIter(paths[iter], iter + 1);
+            if (iter === 0) {
+                return {
+                    [paths[iter]]: subFilter,
+                    id: entityId,
+                };
+            }
+            return {
+                [paths[iter]]: subFilter,
+            };
+        }
+    };
+    const filter = translateFilterIter(entity2, 0);
+    return {
+        entity: entity2,
+        filter,
+        expr: {
+            $gt: [{
+                '#attr': '$$createAt$$',
+            }, 0]
+        },
+    };
+}
+
+function translateFromCascadeRelationHierarchy<ED extends EntityDict & BaseEntityDict>(
+    schema: StorageSchema<ED>,
+    legalCascadeHierarchies: CascadeRelationItem | (CascadeRelationItem | CascadeRelationItem[])[],
+    entity: keyof ED,
+    entityId: string,
+    userId: string): ExpressionTaskCombination<ED> {
+    if (legalCascadeHierarchies instanceof Array) {
+        return legalCascadeHierarchies.map(
+            ele => {
+                if (ele instanceof Array) {
+                    return ele.map(
+                        ele2 => translateSingleCascadeRelationItem(schema, ele2, entity, entityId, userId)
+                    );
+                }
+                return [translateSingleCascadeRelationItem(schema, ele, entity, entityId, userId)];
+            }
+        )
+    }
+    else {
+        return [[translateSingleCascadeRelationItem(schema, legalCascadeHierarchies, entity, entityId, userId)]];
+    }
+}
+
+function makeRelationExpressionCombination<ED extends EntityDict & BaseEntityDict>(
+    schema: StorageSchema<ED>,
+    entity: keyof ED,
+    entityId: string,
+    userId: string,
+    relation: string,
+    reverseHierarchy?: Record<string, string[]>,
+    reverseCascadeRelationHierarchy?: ReverseCascadeRelationHierarchy<any>,
+) {
+    const userEntityName = `user${firstLetterUpperCase(entity as string)}`;
+    const entityIdAttr = `${entity as string}Id`;
+    const legalRelations = reverseHierarchy && reverseHierarchy[relation];
+    const legalCascadeHierarchies = reverseCascadeRelationHierarchy && reverseCascadeRelationHierarchy[relation];
+    if (!legalRelations && !legalCascadeHierarchies) {
+        return undefined;
+    }
+    if (legalRelations?.length === 0) {
+        throw new Error('这是不应该跑出来的情况，请杀程序员祭天');
+    }
+    const expressionCombination: ExpressionTaskCombination<ED> = [];
+    if (legalRelations && legalRelations.length > 0) {
+        expressionCombination.push([{
+            entity: userEntityName as keyof ED,
+            expr: {
+                $gt: [{
+                    '#attr': '$$createAt$$',
+                }, 0]
+            },
+            filter: {
+                userId,
+                [entityIdAttr]: entityId,
+                relation: {
+                    $in: legalRelations,
+                }
+            }
+        }]);
+    }
+    if (legalCascadeHierarchies) {
+        expressionCombination.push(...translateFromCascadeRelationHierarchy<ED>(
+            schema,
+            legalCascadeHierarchies,
+            entity,
+            entityId,
+            userId!
+        ));
+    }
+    return expressionCombination;
+}
+
 export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
     const checkers: Checker<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
-        const { relationHierarchy } = schema[entity];
-        if (relationHierarchy) {
-            // 先build反向hierarchy的map
-            const reverseHierarchy = {} as Record<string, string[]>;
-            for (const r in relationHierarchy) {
-                for (const r2 of relationHierarchy[r]!) {
-                    if (!reverseHierarchy[r2]) {
-                        reverseHierarchy[r2] = [r];
-                    }
-                    else {
-                        reverseHierarchy[r2].push(r);
-                    }
-                }
-            }
-
-            // 对userEntity对象的授权和回收建立checker
+        const { relationHierarchy, reverseCascadeRelationHierarchy } = schema[entity];
+        if (relationHierarchy || reverseCascadeRelationHierarchy) {
+            const reverseHierarchy = relationHierarchy && buildReverseHierarchyMap(relationHierarchy);
             const userEntityName = `user${firstLetterUpperCase(entity)}`;
             const entityIdAttr = `${entity}Id`;
             checkers.push({
@@ -251,95 +429,76 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
                 action: 'create',
                 type: 'expressionRelation',
                 expression: <T2 extends keyof ED>(operation: any, context: Cxt) => {
-                    const { data } = operation as ED[keyof ED]['Operation'];
-                    const { relation, [entityIdAttr]: entityId } = data as Record<string, string>;
-                    const legalRelations = reverseHierarchy[relation];
-                    if (!legalRelations) {
-                        return undefined;
-                    }
-                    if (legalRelations.length === 0) {
-                        return '这是不应该跑出来的情况，请杀程序员祭天';
-                    }
+                    const { data } = operation as ED[keyof ED]['Create'];
+                    assert(!(data instanceof Array));
+                    const { relation, [entityIdAttr]: entityId } = data;
                     const userId = context.getCurrentUserId();
-                    return {
-                        entity: userEntityName as T2,
-                        expr: {
-                            $gt: [{
-                                '#attr': '$$createAt$$',
-                            }, 0]
-                        },
-                        filter: {
-                            userId,
-                            [entityIdAttr]: entityId,
-                            relation: {
-                                $in: legalRelations,
-                            }
-                        }
-                    }
+                    const schema = context.getSchema();
+                    return makeRelationExpressionCombination(schema, entity, entityId, userId!, relation, reverseHierarchy, reverseCascadeRelationHierarchy);
                 },
                 errMsg: '越权操作',
             });
-            for (const r in reverseHierarchy) {
-                checkers.push({
-                    entity: userEntityName as keyof ED,
-                    action: 'remove',
-                    type: 'expressionRelation',
-                    expression: <T2 extends keyof ED>(operation: any, context: Cxt) => {
-                        const userId = context.getCurrentUserId();
-                        const { filter } = operation as ED[keyof ED]['Remove'];
-                        const legalRelations = reverseHierarchy[r];
-                        if (legalRelations.length === 0) {
-                            return '这是不应该跑出来的情况，请杀程序员祭天';
-                        }
-                        const makeFilterFromRows = (rows: Partial<ED[T2]['Schema']>[]) => {
-                            const relations = uniq(rows.map(ele => ele.relation));
-                            const entityIds = uniq(rows.map(ele => ele[entityIdAttr]));
-                            assert(entityIds.length === 1, `在回收${userEntityName}上权限时，单次回收涉及到了不同的对象，此操作不被允许`);
-                            const legalRelationss = relations.map(
-                                ele => {
-                                    if (reverseHierarchy[ele!]) {
-                                        return reverseHierarchy[ele!];
-                                    }
-                                    assert(false, `在回收${userEntityName}上类型为${ele}的权限时，找不到对应的定义，不应该出现的情况`);
+            checkers.push({
+                entity: userEntityName as keyof ED,
+                action: 'remove',
+                type: 'expressionRelation',
+                expression: <T2 extends keyof ED>(operation: any, context: Cxt) => {
+                    const userId = context.getCurrentUserId();
+                    const { filter } = operation as ED[keyof ED]['Remove'];
+                    const makeFilterFromRows = (rows: Partial<ED[T2]['Schema']>[]) => {
+                        const relations = uniq(rows.map(ele => ele.relation));
+                        const entityIds = uniq(rows.map(ele => ele[entityIdAttr]));
+                        assert(entityIds.length === 1, `在回收${userEntityName}上权限时，单次回收涉及到了不同的对象，此操作不被允许`);
+                        const entityId = entityIds[0]!;
+                        const schema = context.getSchema();
+                        const exprComb = relations.map(
+                            (relation) => makeRelationExpressionCombination(
+                                schema,
+                                entity,
+                                entityId,
+                                userId!,
+                                relation!,
+                                reverseHierarchy,
+                                reverseCascadeRelationHierarchy,
+                            )
+                        );
+                        //  对每个relation求出其相应的exprComb，此操作对多行进行expr，需要对之进行类似于笛卡尔积的相乘
+                        const result = exprComb.reduce(
+                            (accu, current) => {
+                                if (!current) {
+                                    return accu;
                                 }
-                            );
-                            // 如果要删除多个不同的权限，这里必须要有它们共同的上级权限
-                            const legaRelations = intersection(legalRelationss);
-                            return {
-                                entity: userEntityName as T2,
-                                expr: {
-                                    $gt: [{
-                                        '#attr': '$$createAt$$',
-                                    }, 0]
-                                } as RefOrExpression<keyof ED[T2]['OpSchema']>,
-                                filter: {
-                                    userId,
-                                    [entityIdAttr]: entityIds[0],
-                                    relation: {
-                                        $in: legaRelations,
+                                const result2 = [] as ExpressionTaskCombination<ED>;
+                                for (const c of current) {
+                                    for (const a of accu!) {
+                                        result2.push(a.concat(c));
                                     }
-                                },
-                            }
-                        };
-
-                        const toBeRemoved = context.select(userEntityName, {
-                            data: {
-                                id: 1,
-                                relation: 1,
-                                [entityIdAttr]: 1,
+                                }
+                                return result2;
                             },
-                            filter,
-                        }, { dontCollect: true });
-                        if (toBeRemoved instanceof Promise) {
-                            return toBeRemoved.then(
-                                (rows) => makeFilterFromRows(rows)
-                            );
-                        }
-                        return makeFilterFromRows(toBeRemoved);
-                    },
-                    errMsg: '越权操作',
-                });
-            }
+                            [[]] as ExpressionTaskCombination<ED>,
+                        );
+
+                        return result && result.length > 0 ? result : undefined;
+                    };
+
+                    const toBeRemoved = context.select(userEntityName, {
+                        data: {
+                            id: 1,
+                            relation: 1,
+                            [entityIdAttr]: 1,
+                        },
+                        filter,
+                    }, { dontCollect: true });
+                    if (toBeRemoved instanceof Promise) {
+                        return toBeRemoved.then(
+                            (rows) => makeFilterFromRows(rows)
+                        );
+                    }
+                    return makeFilterFromRows(toBeRemoved);
+                },
+                errMsg: '越权操作',
+            });
 
             /* // 一个人不能授权给自己，也不能删除自己的授权
             checkers.push({
@@ -355,7 +514,7 @@ export function createRelationHierarchyCheckers<ED extends EntityDict & BaseEnti
                     }
                 }
             });
-
+    
             checkers.push({
                 entity: userEntityName as keyof ED,
                 action: 'remove' as ED[keyof ED]['Action'],
