@@ -26,6 +26,18 @@ export class OakDataException extends OakException {
     // 表示由数据层发现的异常
 }
 
+export class OakImportDataParseException extends OakException {
+    line: number;
+    header?: string;
+
+    // message必传，描述具体错误的数据内容
+    constructor(message: string, line: number, header?: string) {
+        super(message);
+        this.line = line;
+        this.header = header;
+    }
+}
+
 export class OakOperExistedException extends OakDataException {
     // 进行操作时发现同样id的Oper对象已经存在
 }
@@ -219,6 +231,9 @@ export function makeException(data: {
         }
         case 'OakDeadlock': {
             return new OakDeadlock(data.message);
+        }
+        case 'OakImportDataParseException': {
+            return new OakImportDataParseException(data.message!, data.line, data.header);
         }
         default:
             return;

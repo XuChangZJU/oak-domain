@@ -17,3 +17,4 @@ export * from './Watcher';
 export * from './AppLoader';
 export * from './Connector';
 export * from './Timer';
+export * from './Port';

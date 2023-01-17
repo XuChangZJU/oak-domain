@@ -5,6 +5,11 @@ export declare class OakException extends Error {
 }
 export declare class OakDataException extends OakException {
 }
+export declare class OakImportDataParseException extends OakException {
+    line: number;
+    header?: string;
+    constructor(message: string, line: number, header?: string);
+}
 export declare class OakOperExistedException extends OakDataException {
 }
 export declare class OakRowUnexistedException extends OakDataException {
