@@ -80,6 +80,7 @@ export interface EntityDef {
     CreateMulti: DeduceCreateMultipleOperation<this['Schema']>;
     Update: DeduceUpdateOperation<this['Schema']>;
     Remove: DeduceRemoveOperation<this['Schema']>;
+    Relation?: string;
 }
 export interface EntityDict {
     [E: string]: EntityDef;
@@ -104,7 +105,7 @@ export declare type AggregationResult<SH extends GeneralEntityShape> = Array<{
     '#data'?: Partial<SH>;
 }>;
 export declare type AttrFilter<SH extends GeneralEntityShape> = {
-    [K in keyof SH]: any;
+    [K in keyof SH]?: any;
 };
 export declare type DeduceFilter<SH extends GeneralEntityShape> = MakeFilter<AttrFilter<SH> & ExprOp<keyof SH>>;
 export declare type DeduceSorterAttr<SH extends GeneralEntityShape> = OneOf<{
@@ -155,9 +156,9 @@ export declare type RelationHierarchy<R extends string> = {
 };
 export declare type CascadeRelationItem = {
     cascadePath: string;
-    relations: string[];
+    relations?: string[];
 };
-export declare type ReverseCascadeRelationHierarchy<R extends string> = {
+export declare type CascadeRelationAuth<R extends string> = {
     [K in R]?: CascadeRelationItem | (CascadeRelationItem | CascadeRelationItem[])[];
 };
 export declare type SelectOpResult<ED extends EntityDict> = {

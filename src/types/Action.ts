@@ -1,4 +1,4 @@
-import { EntityDict } from "./Entity";
+import { CascadeRelationItem, EntityDict } from "./Entity";
 import { GenericAction } from '../actions/action';
 
 export type Action = string;
@@ -17,11 +17,7 @@ export type ActionDictOfEntityDict<E extends EntityDict> = {
     };
 };
 
-export type CascadeActionItem = {
-    cascadePath: string;
-    relation: string[];
-}
-
+// 即在cascadePath指向的对象上，有relation关系。若relation为空则不限定关系
 export type CascadeActionAuth<A extends Action = ''> = {
-    [K in A | GenericAction]?: CascadeActionItem | (CascadeActionItem | CascadeActionItem[])[];
+    [K in A | GenericAction]?: CascadeRelationItem | (CascadeRelationItem | CascadeRelationItem[])[];
 };

@@ -1,4 +1,4 @@
-import { EntityDict } from "./Entity";
+import { CascadeRelationItem, EntityDict } from "./Entity";
 import { GenericAction } from '../actions/action';
 export declare type Action = string;
 export declare type State = string;
@@ -13,10 +13,6 @@ export declare type ActionDictOfEntityDict<E extends EntityDict> = {
         [A in keyof E[T]['OpSchema']]?: ActionDef<string, string>;
     };
 };
-export declare type CascadeActionItem = {
-    cascadePath: string;
-    relation: string[];
-};
 export declare type CascadeActionAuth<A extends Action = ''> = {
-    [K in A | GenericAction]?: CascadeActionItem | (CascadeActionItem | CascadeActionItem[])[];
+    [K in A | GenericAction]?: CascadeRelationItem | (CascadeRelationItem | CascadeRelationItem[])[];
 };

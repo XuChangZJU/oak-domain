@@ -1,3 +1,4 @@
+import { CascadeActionAuth, RelationHierarchy, CascadeRelationAuth } from ".";
 import { AsyncContext } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OperateOption, SelectOption } from "../types/Entity";
@@ -56,7 +57,7 @@ export type ExpressionTask<ED extends EntityDict, T extends keyof ED> = {
     filter: ED[T]['Selection']['filter'];
 };
 
-export type ExpressionTaskCombination<ED extends EntityDict> = ExpressionTask<ED, keyof ED>[][];
+export type ExpressionTaskCombination<ED extends EntityDict> = ExpressionTask<ED, keyof ED>;
 
 export type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
@@ -89,3 +90,13 @@ export type ExpressionRelationChecker<ED extends EntityDict, T extends keyof ED,
 
 export type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> =
     DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt> | ExpressionChecker<ED, T, Cxt> | ExpressionRelationChecker<ED, T, Cxt>;
+
+
+export type AuthDef<ED extends EntityDict, T extends keyof ED> = {
+    relationAuth?: CascadeRelationAuth<NonNullable<ED[T]['Relation']>>;
+    actionAuth?: CascadeActionAuth<ED[T]['Action']>;
+};
+
+export type AuthDefDict<ED extends EntityDict> = {
+    [K in keyof ED]?: AuthDef<ED, K>;
+};

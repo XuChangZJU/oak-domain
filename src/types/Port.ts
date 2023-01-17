@@ -16,5 +16,6 @@ export type Importation<ED extends EntityDict, T extends keyof ED, K extends str
     id: string;
     entity: T;
     headers: K[];
+    // 解析过程中如果出错，请抛出OakImportDataParseException异常
     fn: (data: Partial<Record<K, string | number | boolean>>[], context: AsyncContext<ED>, option?: Record<string, any> ) => Promise<ED[T]['CreateMulti']['data']>;
 };

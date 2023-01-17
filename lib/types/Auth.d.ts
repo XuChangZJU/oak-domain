@@ -1,3 +1,4 @@
+import { CascadeActionAuth, CascadeRelationAuth } from ".";
 import { AsyncContext } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OperateOption, SelectOption } from "../types/Entity";
@@ -42,7 +43,7 @@ export declare type ExpressionTask<ED extends EntityDict, T extends keyof ED> = 
     expr: RefOrExpression<keyof ED[T]['OpSchema']>;
     filter: ED[T]['Selection']['filter'];
 };
-export declare type ExpressionTaskCombination<ED extends EntityDict> = ExpressionTask<ED, keyof ED>[][];
+export declare type ExpressionTaskCombination<ED extends EntityDict> = ExpressionTask<ED, keyof ED>;
 export declare type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'expression';
@@ -62,3 +63,10 @@ export declare type ExpressionRelationChecker<ED extends EntityDict, T extends k
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 export declare type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt> | ExpressionChecker<ED, T, Cxt> | ExpressionRelationChecker<ED, T, Cxt>;
+export declare type AuthDef<ED extends EntityDict, T extends keyof ED> = {
+    relationAuth?: CascadeRelationAuth<NonNullable<ED[T]['Relation']>>;
+    actionAuth?: CascadeActionAuth<ED[T]['Action']>;
+};
+export declare type AuthDefDict<ED extends EntityDict> = {
+    [K in keyof ED]?: AuthDef<ED, K>;
+};

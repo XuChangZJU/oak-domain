@@ -25,8 +25,8 @@ const Schema: Record<string, {
     states: string[];
     sourceFile: ts.SourceFile;
     locale: ts.ObjectLiteralExpression;
-    relationHierarchy?: ts.ObjectLiteralExpression;
-    reverseCascadeRelationHierarchy?: ts.ObjectLiteralExpression;
+    // relationHierarchy?: ts.ObjectLiteralExpression;
+    // reverseCascadeRelationHierarchy?: ts.ObjectLiteralExpression;
     toModi: boolean;
     actionType: string;
     static: boolean;
@@ -498,8 +498,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     const localEnumStringTypes: string[] = [];
     const additionalImports: ts.ImportDeclaration[] = [];
     let localeDef: ts.ObjectLiteralExpression | undefined = undefined;
-    let relationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
-    let reverseCascadeRelationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
+    // let relationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
+    // let reverseCascadeRelationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
             const entityImported = getEntityImported(node);
@@ -1125,7 +1125,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                             _static = true;     // static如果有值只能为true
                         }
                     }
-                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'RelationHierarchy') {
+                    /* else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'RelationHierarchy') {
                         // RelationHierary
                         assert(hasRelationDef, `${moduleName}中的Relation定义在RelationHierarchy之后`);
                         const { initializer } = declaration;
@@ -1138,9 +1138,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         const { initializer } = declaration;
                         assert(ts.isObjectLiteralExpression(initializer!), `${moduleName}中的RelationHierarchy的定义必须是初始化为ObjectLiteralExpress`);
                         reverseCascadeRelationHierarchy = initializer;
-                    }
+                    } */
                     else {
-                        throw new Error(`${moduleName}：不能理解的定义内容${declaration.name.getText()}`);
+                        throw new Error(`${moduleName}：不能理解的定义内容${(declaration.name as ts.Identifier).text}`);
                     }
                 }
             );
@@ -1182,7 +1182,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
             locale: localeDef,
         });
     }
-    if (hasRelationDef) {
+    /* if (hasRelationDef) {
         if(!relationHierarchy && !reverseCascadeRelationHierarchy){
             console.warn(`${filename}中定义了Relation,但并没有relationHierarchy或reverseCascadeRelationHierarchy的定义，请注意自主编写权限分配的checker`);
         }
@@ -1200,7 +1200,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     else {
         assert(!relationHierarchy, `${filename}中具有relationHierarchy定义但没有Relation定义`);
         assert(!reverseCascadeRelationHierarchy, `${filename}中具有reverseCascadeRelationHierarchy定义但没有Relation定义`)
-    }
+    } */
 
     assign(Schema, {
         [moduleName]: schema,
@@ -5664,7 +5664,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
 
     for (const entity in Schema) {
         const indexExpressions: ts.Expression[] = [];
-        const { sourceFile, inModi, indexes, toModi, actionType, static: _static, relationHierarchy, reverseCascadeRelationHierarchy } = Schema[entity];
+        const { sourceFile, inModi, indexes, toModi, actionType, static: _static, hasRelationDef } = Schema[entity];
         const fromSchemaSpecifiers = [
             factory.createImportSpecifier(
                 false,
@@ -5672,7 +5672,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 factory.createIdentifier("OpSchema")
             )
         ];
-        if (relationHierarchy || reverseCascadeRelationHierarchy) {
+        /* if (relationHierarchy || reverseCascadeRelationHierarchy) {
             fromSchemaSpecifiers.push(
                 factory.createImportSpecifier(
                     false,
@@ -5680,7 +5680,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                     factory.createIdentifier("Relation")
                 )
             );
-        }
+        } */
         const statements: ts.Statement[] = [
             factory.createImportDeclaration(
                 undefined,
@@ -5881,7 +5881,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 )
             );
         }
-        if (relationHierarchy) {
+        /* if (relationHierarchy) {
             propertyAssignments.push(
                 factory.createPropertyAssignment(
                     factory.createIdentifier("relationHierarchy"),
@@ -5896,21 +5896,32 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                     reverseCascadeRelationHierarchy,
                 )
             );
-        }
+        } */
+        if (hasRelationDef) {
+            const { type } = hasRelationDef;
+            assert(ts.isUnionTypeNode(type));
+            const { types } = type;
+            const relationTexts = types.map(
+                ele => {
+                    assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
+                    return ele.literal.text;
+                }
+            )
+            propertyAssignments.push(
+                factory.createPropertyAssignment(
+                    factory.createIdentifier("relation"),
+                    factory.createArrayLiteralExpression(relationTexts.map(
+                        ele => factory.createStringLiteral(ele)
+                    )),
+                )
+            );
+        } 
         const sdTypeArguments = [
             factory.createTypeReferenceNode(
                 factory.createIdentifier("OpSchema"),
                 undefined
             )
         ];
-        if (relationHierarchy) {
-            sdTypeArguments.push(
-                factory.createTypeReferenceNode(
-                    factory.createIdentifier("Relation"),
-                    undefined
-                )
-            )
-        }
         statements.push(
             factory.createVariableStatement(
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
