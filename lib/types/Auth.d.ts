@@ -47,6 +47,7 @@ export declare type ExpressionTaskCombination<ED extends EntityDict> = Expressio
 export declare type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'expression';
+    when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
     expression: <T2 extends keyof ED>(operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ExpressionTaskCombination<ED> | undefined | string | Promise<ExpressionTaskCombination<ED> | string | undefined>;
@@ -56,6 +57,7 @@ export declare type ExpressionChecker<ED extends EntityDict, T extends keyof ED,
 export declare type ExpressionRelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'expressionRelation';
+    when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
     expression: <T2 extends keyof ED>(operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ExpressionTaskCombination<ED> | undefined | string | Promise<ExpressionTaskCombination<ED> | string | undefined>;

@@ -398,7 +398,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                         const filter = raFilterMakerDict[relation]!(userId!);
                         return {
                             entity,
-                            filter,
+                            filter: combineFilters([filter, { id: entityId }]),
                             expr: {
                                 $gt: [{
                                     '#attr': '$$createAt$$',
@@ -458,36 +458,54 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
             }
 
             if (actionAuth) {
-                const aaFilterMakerDict = {} as Record<string, (suserId: string) => ED[keyof ED]['Selection']['filter']>;
                 for (const a in actionAuth) {
-                    Object.assign(aaFilterMakerDict, {
-                        [a]: translateActionAuthFilterMaker(schema, actionAuth[a as ED[keyof ED]['Action']]!, entity),
-                    });
-
+                    const filterMaker = translateActionAuthFilterMaker(schema, actionAuth[a as ED[keyof ED]['Action']]!, entity);
                     if (a === 'create') {
                         /**
-                         * create动作所增加的auth约束只可能在外键的对象上，所以需要对此外键对象进行查找
+                         * create动作所增加的auth约束只可能在外键的对象上，但因为还有级联和触发器，不太容易在创建前检查，先放在创建后
                          */
                         const { } = actionAuth[a as ED[keyof ED]['Action']]!;
-                        /* checkers.push({
+                        checkers.push({
                             entity,
                             action: a,
                             type: 'expressionRelation',
+                            when: 'after',
                             expression: (operation, context) => {
-                                // create要保证数据的外键指向关系满足filter的约束，因为这行还没有插入，所以要
-
-                            }
-                        }); */
+                                // 在插入后检查
+                                const makeExprInner = (data: ED[keyof ED]['CreateSingle']['data']) => {
+                                    const { id } = data;
+                                    return {
+                                        entity,
+                                        filter: combineFilters([filter, { id }]),
+                                        expr: {
+                                            $gt: [{
+                                                '#attr': '$$createAt$$',
+                                            }, 0] as any
+                                        },
+                                    };
+                                };
+                                const filter = filterMaker(context.getCurrentUserId()!);
+                                const { data } = operation as ED[keyof ED]['Create'];
+                                if (data instanceof Array) {
+                                    throw new Error('需要expr支持count');
+                                }
+                                return makeExprInner(data);
+                            },
+                            errMsg: '定义的actionAuth中检查出来越权操作',
+                        });
                     }
                     else {
-                        /* checkers.push({
+                        checkers.push({
                             entity,
-                            action: a,
+                            action: a as ED[keyof ED]['Action'],
                             type: 'relation',
                             relationFilter: (operation, context) => {
-                                const { filter } = operation;
-                            }
-                        }); */
+                                // const { filter } = operation;
+                                const filter = filterMaker(context.getCurrentUserId()!);
+                                return filter;
+                            },
+                            errMsg: '定义的actionAuth中检查出来越权操作',
+                        });
                     }
                 }
             }

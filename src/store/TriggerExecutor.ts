@@ -4,7 +4,7 @@ import { addFilterSegment, checkFilterRepel } from "../store/filter";
 import { DeduceCreateOperation, EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
-import { Checker, CheckerType } from '../types/Auth';
+import { Checker, CheckerType, ExpressionChecker, RelationChecker } from '../types/Auth';
 import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTrigger } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
@@ -53,11 +53,11 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
         const trigger = {
             checkerType: type,
             name: triggerName,
-            priority: checker.priority || 2,        // checker的默认优先级稍高一点点
+            priority: checker.priority || 20,        // checker的默认优先级稍高
             entity,
             action: action as 'update',
             fn,
-            when: 'before',
+            when: (checker as ExpressionChecker<ED, T, Cxt>).when || 'before',
             filter: conditionalFilter,
         } as UpdateTrigger<ED, T, Cxt>;
         this.registerTrigger(trigger);
@@ -77,7 +77,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
             throw new Error(`不可有同名的触发器「${trigger.name}」`);
         }
         if (typeof trigger.priority !== 'number') {
-            trigger.priority = 1;       // 默认最低
+            trigger.priority = 10;       // 默认值
         }
         if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
             assert(typeof trigger.action === 'string' && trigger.action !== 'create'

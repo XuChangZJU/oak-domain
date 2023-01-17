@@ -154,8 +154,31 @@ interface GeoDistance<A> {
 
 type GeoExpression<A> = GeoContains<A> | GeoDistance<A>;
 
+//// Aggr
+interface AggrCountExpression<A> {
+    $$count: RefOrExpression<A>;
+};
+
+interface AggrSumExpression<A> {
+    $$sum: RefOrExpression<A>;
+}
+
+interface AggrMaxExpression<A> {
+    $$max: RefOrExpression<A>;
+}
+
+interface AggrMinExpression<A> {
+    $$min: RefOrExpression<A>;
+}
+
+interface AggrAvgExpression<A> {
+    $$avg: RefOrExpression<A>;
+}
+
+export type AggrExpression<A> = AggrAvgExpression<A> | AggrCountExpression<A> | AggrSumExpression<A> | AggrMaxExpression<A> | AggrMinExpression<A>;
+
 export type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> 
-    | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A>;
+    | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A> | AggrExpression<A>;
 
 export type ExpressionConstant = Geo | number | Date | string | boolean;
 
@@ -233,6 +256,16 @@ export function isStringExpression<A>(expression: any): expression is StringExpr
     return false;
 }
 
+export function isAggrExpression<A>(expression: any): expression is AggrExpression<A> {
+    if (Object.keys(expression).length == 1) {
+        const op = Object.keys(expression)[0];
+        if (['$$max', '$$min', '$$sum', '$$avg', '$$count'].includes(op)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 export function isExpression<A>(expression: any): expression is Expression<A> {
     return typeof expression === 'object' && Object.keys(expression).length === 1 && Object.keys(expression)[0].startsWith('$');
 }
@@ -240,7 +273,7 @@ export function isExpression<A>(expression: any): expression is Expression<A> {
 export function opMultipleParams(op: string) {
     return !['$year', '$month', '$weekday', '$weekOfYear', '$day', '$dayOfMonth',
         '$dayOfWeek', '$dayOfYear', '$not', '$true', '$false', '$abs',
-        '$round', '$floor', '$ceil'].includes(op);
+        '$round', '$floor', '$ceil', '$$max', '$$min', '$$sum', '$$avg', '$$count'].includes(op);
 }
 
 export function execOp(op: string, params: any, obscure?: boolean): ExpressionConstant {

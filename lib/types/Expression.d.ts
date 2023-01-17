@@ -122,7 +122,23 @@ interface GeoDistance<A> {
     $distance: [RefOrExpression<A> | Geo, RefOrExpression<A> | Geo];
 }
 declare type GeoExpression<A> = GeoContains<A> | GeoDistance<A>;
-export declare type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A>;
+interface AggrCountExpression<A> {
+    $$count: RefOrExpression<A>;
+}
+interface AggrSumExpression<A> {
+    $$sum: RefOrExpression<A>;
+}
+interface AggrMaxExpression<A> {
+    $$max: RefOrExpression<A>;
+}
+interface AggrMinExpression<A> {
+    $$min: RefOrExpression<A>;
+}
+interface AggrAvgExpression<A> {
+    $$avg: RefOrExpression<A>;
+}
+export declare type AggrExpression<A> = AggrAvgExpression<A> | AggrCountExpression<A> | AggrSumExpression<A> | AggrMaxExpression<A> | AggrMinExpression<A>;
+export declare type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A> | AggrExpression<A>;
 export declare type ExpressionConstant = Geo | number | Date | string | boolean;
 export declare function isGeoExpression<A>(expression: any): expression is GeoExpression<A>;
 export declare function isDateExpression<A>(expression: any): expression is DateExpression<A>;
@@ -131,6 +147,7 @@ export declare function isBoolExpression<A>(expression: any): expression is Bool
 export declare function isCompareExpression<A>(expression: any): expression is CompareExpression<A>;
 export declare function isMathExpression<A>(expression: any): expression is MathExpression<A>;
 export declare function isStringExpression<A>(expression: any): expression is StringExpression<A>;
+export declare function isAggrExpression<A>(expression: any): expression is AggrExpression<A>;
 export declare function isExpression<A>(expression: any): expression is Expression<A>;
 export declare function opMultipleParams(op: string): boolean;
 export declare function execOp(op: string, params: any, obscure?: boolean): ExpressionConstant;

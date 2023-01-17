@@ -62,6 +62,7 @@ export type ExpressionTaskCombination<ED extends EntityDict> = ExpressionTask<ED
 export type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'expression';
+    when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
     expression: <T2 extends keyof ED>(
@@ -76,6 +77,7 @@ export type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt ext
 export type ExpressionRelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'expressionRelation';
+    when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
     expression: <T2 extends keyof ED>(
