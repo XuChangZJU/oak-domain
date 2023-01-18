@@ -49,7 +49,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
     registerChecker<T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>): void {
         const { entity, action, type, conditionalFilter } = checker;
         const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
-        const fn = translateCheckerInAsyncContext(checker);
+        const { fn, when } = translateCheckerInAsyncContext(checker);
         const trigger = {
             checkerType: type,
             name: triggerName,
@@ -57,7 +57,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
             entity,
             action: action as 'update',
             fn,
-            when: (checker as LogicalChecker<ED, T, Cxt>).when || 'before',
+            when,
             filter: conditionalFilter,
         } as UpdateTrigger<ED, T, Cxt>;
         this.registerTrigger(trigger);

@@ -4,7 +4,7 @@ import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OperateOption, SelectOption } from "../types/Entity";
 import { RefOrExpression } from "./Expression";
 
-export type CheckerType = 'relation' | 'row' | 'data' | 'expression' | 'expressionRelation';
+export type CheckerType = 'relation' | 'row' | 'data' | 'logical' | 'logicalRelation';
 
 /**
  * conditionalFilter是指该action发生时，operation所操作的行中有满足conditionalFilter的行
@@ -51,14 +51,6 @@ export type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt exten
         (operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Selection']['filter']>
     );
 };
-
-export type ExpressionTask<ED extends EntityDict, T extends keyof ED> = {
-    entity: T;
-    expr: RefOrExpression<keyof ED[T]['OpSchema']>;
-    filter: ED[T]['Selection']['filter'];
-};
-
-export type ExpressionTaskCombination<ED extends EntityDict> = ExpressionTask<ED, keyof ED>;
 
 export type LogicalChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;

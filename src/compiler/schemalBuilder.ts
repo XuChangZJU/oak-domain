@@ -5068,6 +5068,19 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 )
             );
         }
+        if (typeof Schema[entity].hasRelationDef === 'object' && ts.isTypeAliasDeclaration(Schema[entity].hasRelationDef as ts.Node)) {
+            EntityDefAttrs.push(
+                factory.createPropertySignature(
+                    undefined,
+                    factory.createIdentifier("Relation"),
+                    undefined,
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier('Relation'),
+                        undefined
+                    )
+                )
+            );
+        }
         statements.push(
             factory.createTypeAliasDeclaration(
                 undefined,

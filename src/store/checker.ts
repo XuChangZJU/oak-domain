@@ -1,32 +1,41 @@
 import assert from 'assert';
 import { addFilterSegment, checkFilterContains, combineFilters } from "../store/filter";
-import { OakDataException, OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
-import { AuthDef, AuthDefDict, CascadeRelationItem, Checker, CreateTriggerInTxn, EntityDict, LogicalRelationChecker, ExpressionTask, ExpressionTaskCombination, OperateOption, RefOrExpression, RelationHierarchy, CascadeRelationAuth, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn } from "../types";
+import { OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
+import { AuthDefDict, CascadeRelationItem, Checker, CreateTriggerInTxn, 
+    EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn, RelationHierarchy } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
 import { getFullProjection } from './actionDef';
 import { SyncContext } from './SyncRowStore';
 import { firstLetterUpperCase } from '../utils/string';
-import { intersection, uniq } from '../utils/lodash';
+import { uniq } from '../utils/lodash';
 import { judgeRelation } from './relation';
 
 export function translateCheckerInAsyncContext<
     ED extends EntityDict & BaseEntityDict,
     Cxt extends AsyncContext<ED>
->(checker: Checker<ED, keyof ED, Cxt>): Trigger<ED, keyof ED, Cxt>['fn'] {
-    const { entity, type } = checker;
+>(checker: Checker<ED, keyof ED, Cxt>): {
+    fn: Trigger<ED, keyof ED, Cxt>['fn'];
+    when: 'before' | 'after';
+} {
+    const { entity, type, action } = checker;
+    const when = ((action === 'create' || action instanceof Array && action.includes('create')) && ['relation'].includes(type)) ? 'after' : 'before'
     switch (type) {
         case 'data': {
             const { checker: checkerFn } = checker;
-            return (async ({ operation }, context) => {
+            const fn = (async ({ operation }, context) => {
                 const { data } = operation;
                 await checkerFn(data, context);
                 return 0;
             }) as CreateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
+            return {
+                fn,
+                when,
+            };
         }
         case 'row': {
             const { filter, errMsg, inconsistentRows } = checker;
-            return (async ({ operation }, context, option) => {
+            const fn = (async ({ operation }, context, option) => {
                 const { filter: operationFilter, action } = operation;
                 const filter2 = typeof filter === 'function' ? await filter(operation, context, option) : filter;
                 if (['select', 'count', 'stat'].includes(action)) {
@@ -83,10 +92,14 @@ export function translateCheckerInAsyncContext<
                     }
                 }
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
+            return {
+                fn,
+                when,
+            };
         }
         case 'relation': {
             const { relationFilter } = checker;
-            return (async ({ operation }, context, option) => {
+            const fn = (async ({ operation }, context, option) => {
                 if (context.isRoot()) {
                     return 0;
                 }
@@ -95,17 +108,25 @@ export function translateCheckerInAsyncContext<
                 operation.filter = combineFilters([operation.filter, await relationFilter(operation, context, option)]);
                 return 0;
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
+            return {
+                fn,
+                when,
+            };
         }
         case 'logical':
         case 'logicalRelation': {
             const { checker: checkerFn } = checker;
-            return (async ({ operation }, context, option) => {
+            const fn = (async ({ operation }, context, option) => {
                 if (context.isRoot() && type === 'logicalRelation') {
                     return 0;
                 }
                 await checkerFn(operation, context, option);
                 return 0;
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
+            return {
+                fn,
+                when,
+            };
         }
         default: {
             assert(false);
@@ -117,16 +138,24 @@ export function translateCheckerInSyncContext<
     ED extends EntityDict & BaseEntityDict,
     T extends keyof ED,
     Cxt extends SyncContext<ED>
->(checker: Checker<ED, T, Cxt>): (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => void {
-    const { entity, type } = checker;
+>(checker: Checker<ED, T, Cxt>): {
+    fn: (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => void;
+    when: 'before' | 'after';
+} {
+    const { entity, type, action } = checker;
+    const when = ((action === 'create' || action instanceof Array && action.includes('create')) && ['relation'].includes(type)) ? 'after' : 'before'
     switch (type) {
         case 'data': {
             const { checker: checkerFn } = checker;
-            return (operation, context) => checkerFn(operation.data, context);
+            const fn = (operation: ED[T]['Operation'], context: Cxt) => checkerFn(operation.data, context);
+            return {
+                fn,
+                when,
+            }
         }
         case 'row': {
             const { filter, errMsg } = checker;
-            return (operation, context, option) => {
+            const fn = (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => {
                 const { filter: operationFilter, action } = operation;
                 const filter2 = typeof filter === 'function' ? filter(operation, context, option) : filter;
                 assert(operationFilter);
@@ -142,10 +171,14 @@ export function translateCheckerInSyncContext<
                     throw new OakRowInconsistencyException(undefined, errMsg);
                 }
             };
+            return {
+                fn,
+                when,
+            };
         }
         case 'relation': {
             const { relationFilter: filter, errMsg } = checker;
-            return (operation, context, option) => {
+            const fn = (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => {
                 if (context.isRoot()) {
                     return;
                 }
@@ -158,15 +191,23 @@ export function translateCheckerInSyncContext<
                 }
                 throw new OakUserUnpermittedException(errMsg);
             };
+            return {
+                fn,
+                when,
+            };
         }
         case 'logical':
         case 'logicalRelation': {
             const { checker: checkerFn } = checker;
-            return (operation, context, option) => {
+            const fn = (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => {
                 if (context.isRoot() && type === 'logicalRelation') {
                     return;
                 }
                 checkerFn(operation, context, option);
+            };
+            return {
+                fn,
+                when,
             };
         }
         default: {
@@ -175,26 +216,10 @@ export function translateCheckerInSyncContext<
     }
 }
 
-
-function buildReverseHierarchyMap(relationHierarchy: RelationHierarchy<any>) {
-    const reverseHierarchy = {} as Record<string, string[]>;
-    for (const r in relationHierarchy) {
-        for (const r2 of relationHierarchy[r]!) {
-            if (!reverseHierarchy[r2]) {
-                reverseHierarchy[r2] = [r];
-            }
-            else {
-                reverseHierarchy[r2].push(r);
-            }
-        }
-    }
-    return reverseHierarchy;
-}
-
 function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityDict>(
     schema: StorageSchema<ED>,
     lch: CascadeRelationItem,
-    entity2: keyof ED): (userId: string) => ExpressionTask<ED, keyof ED>['filter'] {
+    entity2: keyof ED): (userId: string) => ED[keyof ED]['Selection']['filter'] {
     const { cascadePath, relations } = lch;
     const paths = cascadePath.split('.');
 
@@ -315,6 +340,7 @@ function translateActionAuthFilterMaker<ED extends EntityDict & BaseEntityDict>(
     return (userId) => filterMaker(userId);
 }
 
+
 export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
     schema: StorageSchema<ED>,
     authDict: AuthDefDict<ED>) {
@@ -361,7 +387,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                             const relations = uniq(rows.map(ele => ele.relation));
                             const entityIds = uniq(rows.map(ele => ele[entityIdAttr]));
                             assert(entityIds.length === 1, `在回收${userEntityName}上权限时，单次回收涉及到了不同的对象，此操作不被允许`);
-                            const entityId = entityIds[0]!;
+                            // const entityId = entityIds[0]!;
 
                             // 所有的relation条件要同时满足and关系（注意这里的filter翻译出来是在entity对象上，不是在userEntity对象上）
                             return {
@@ -400,54 +426,18 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
 
             if (actionAuth) {
                 for (const a in actionAuth) {
-                    const filterMaker = translateActionAuthFilterMaker(schema, actionAuth[a as ED[keyof ED]['Action']]!, entity);
-                    if (a === 'create') {
-                        /**
-                         * create动作所增加的auth约束只可能在外键的对象上，但因为还有级联和触发器，不太容易在创建前检查，先放在创建后
-                         */
-                        const { } = actionAuth[a as ED[keyof ED]['Action']]!;
-                        /* checkers.push({
-                            entity,
-                            action: a,
-                            type: 'expressionRelation',
-                            when: 'after',
-                            expression: (operation, context) => {
-                                // 在插入后检查
-                                const makeExprInner = (data: ED[keyof ED]['CreateSingle']['data']) => {
-                                    const { id } = data;
-                                    return {
-                                        entity,
-                                        filter: combineFilters([filter, { id }]),
-                                        expr: {
-                                            $gt: [{
-                                                '#attr': '$$createAt$$',
-                                            }, 0] as any
-                                        },
-                                    };
-                                };
-                                const filter = filterMaker(context.getCurrentUserId()!);
-                                const { data } = operation as ED[keyof ED]['Create'];
-                                if (data instanceof Array) {
-                                    throw new Error('需要expr支持count');
-                                }
-                                return makeExprInner(data);
-                            },
-                            errMsg: '定义的actionAuth中检查出来越权操作',
-                        }); */
-                    }
-                    else {
-                        checkers.push({
-                            entity,
-                            action: a as ED[keyof ED]['Action'],
-                            type: 'relation',
-                            relationFilter: (operation, context) => {
-                                // const { filter } = operation;
-                                const filter = filterMaker(context.getCurrentUserId()!);
-                                return filter;
-                            },
-                            errMsg: '定义的actionAuth中检查出来越权操作',
-                        });
-                    }
+                    const filterMaker = translateActionAuthFilterMaker(schema, actionAuth[a as ED[keyof ED]['Action']]!, entity);                    
+                    checkers.push({
+                        entity,
+                        action: a as ED[keyof ED]['Action'],
+                        type: 'relation',                           
+                        relationFilter: (operation, context) => {
+                            // const { filter } = operation;
+                            const filter = filterMaker(context.getCurrentUserId()!);
+                            return filter;
+                        },
+                        errMsg: '定义的actionAuth中检查出来越权操作',
+                    });
                 }
             }
         }
