@@ -4929,7 +4929,8 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         constructSorter(statements, entity);
         constructActions(statements, entity);
         constructQuery(statements, entity);
-        constructFullAttrs(statements, entity);
+        // 现在FullAttrs和NativeAttrs似乎没什么用，还会引起递归
+        // constructFullAttrs(statements, entity);
 
         const makeActionArguments: ts.TypeNode[] = [];
         if (ActionAsts[entity]) {

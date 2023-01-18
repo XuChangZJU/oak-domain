@@ -162,8 +162,6 @@ export declare type OperIdSubQuery = Selection<OperIdProjection>;
 export declare type ModiIdSubQuery = Selection<ModiIdProjection>;
 export declare type UserIdSubQuery = Selection<UserIdProjection>;
 export declare type OperEntityIdSubQuery = Selection<OperEntityIdProjection>;
-export declare type NativeAttr = OpAttr | `oper.${Oper.NativeAttr}` | `entity.${Modi.NativeAttr}` | `entity.${User.NativeAttr}`;
-export declare type FullAttr = NativeAttr;
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;

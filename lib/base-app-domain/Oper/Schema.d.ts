@@ -128,8 +128,6 @@ export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData
 export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation | SelectOperation;
 export declare type UserIdSubQuery = Selection<UserIdProjection>;
 export declare type OperIdSubQuery = Selection<OperIdProjection>;
-export declare type NativeAttr = OpAttr | `operator.${User.NativeAttr}`;
-export declare type FullAttr = NativeAttr | `operEntitys$${number}.${OperEntity.NativeAttr}`;
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;
