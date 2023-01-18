@@ -33,7 +33,8 @@ export declare type RelationChecker<ED extends EntityDict, T extends keyof ED, C
     priority?: number;
     type: 'relation';
     entity: T;
-    action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
+    when?: 'after';
+    action: ED[T]['Action'] | Array<ED[T]['Action']>;
     relationFilter: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'] | Promise<ED[T]['Selection']['filter']>;
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Selection']['filter']>);
@@ -44,27 +45,25 @@ export declare type ExpressionTask<ED extends EntityDict, T extends keyof ED> = 
     filter: ED[T]['Selection']['filter'];
 };
 export declare type ExpressionTaskCombination<ED extends EntityDict> = ExpressionTask<ED, keyof ED>;
-export declare type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
+export declare type LogicalChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
-    type: 'expression';
+    type: 'logical';
     when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
-    expression: <T2 extends keyof ED>(operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ExpressionTaskCombination<ED> | undefined | string | Promise<ExpressionTaskCombination<ED> | string | undefined>;
-    errMsg: string;
+    checker: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => void | Promise<void>;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
-export declare type ExpressionRelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
+export declare type LogicalRelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
-    type: 'expressionRelation';
+    type: 'logicalRelation';
     when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
-    expression: <T2 extends keyof ED>(operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ExpressionTaskCombination<ED> | undefined | string | Promise<ExpressionTaskCombination<ED> | string | undefined>;
-    errMsg: string;
+    checker: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => void | Promise<void>;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
-export declare type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt> | ExpressionChecker<ED, T, Cxt> | ExpressionRelationChecker<ED, T, Cxt>;
+export declare type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt> | LogicalChecker<ED, T, Cxt> | LogicalRelationChecker<ED, T, Cxt>;
 export declare type AuthDef<ED extends EntityDict, T extends keyof ED> = {
     relationAuth?: CascadeRelationAuth<NonNullable<ED[T]['Relation']>>;
     actionAuth?: CascadeActionAuth<ED[T]['Action']>;

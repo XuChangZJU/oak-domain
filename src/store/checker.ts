@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { addFilterSegment, checkFilterContains, combineFilters } from "../store/filter";
 import { OakDataException, OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
-import { AuthDef, AuthDefDict, CascadeRelationItem, Checker, CreateTriggerInTxn, EntityDict, ExpressionRelationChecker, ExpressionTask, ExpressionTaskCombination, OperateOption, RefOrExpression, RelationHierarchy, CascadeRelationAuth, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn } from "../types";
+import { AuthDef, AuthDefDict, CascadeRelationItem, Checker, CreateTriggerInTxn, EntityDict, LogicalRelationChecker, ExpressionTask, ExpressionTaskCombination, OperateOption, RefOrExpression, RelationHierarchy, CascadeRelationAuth, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
 import { getFullProjection } from './actionDef';
@@ -96,39 +96,14 @@ export function translateCheckerInAsyncContext<
                 return 0;
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
         }
-        case 'expression':
-        case 'expressionRelation': {
-            const { expression, errMsg } = checker;
+        case 'logical':
+        case 'logicalRelation': {
+            const { checker: checkerFn } = checker;
             return (async ({ operation }, context, option) => {
-                if (context.isRoot() && type === 'expressionRelation') {
+                if (context.isRoot() && type === 'logicalRelation') {
                     return 0;
                 }
-                const exprResult = await expression(operation, context, option);
-                if (typeof exprResult === 'string') {
-                    throw new OakUserUnpermittedException(exprResult || errMsg);
-                }
-                else if (exprResult === undefined) {
-                    return 0;
-                }
-                else {
-                    const { entity: expressionEntity, expr, filter: expressionFilter } = exprResult;
-                    const [result] = await context.select(expressionEntity, {
-                        data: {
-                            $expr: expr,
-                        },
-                        filter: expressionFilter,
-                    }, Object.assign({}, option, { dontCollect: true }));
-                    const isLegal = result ? result.$expr as boolean : false;
-                    if (!isLegal) {
-                        // 条件判定为假，抛异常
-                        if (type === 'expression') {
-                            throw new OakRowInconsistencyException(undefined, errMsg);
-                        }
-                        else {
-                            throw new OakUserUnpermittedException(errMsg);
-                        }
-                    }
-                }
+                await checkerFn(operation, context, option);
                 return 0;
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
         }
@@ -184,40 +159,14 @@ export function translateCheckerInSyncContext<
                 throw new OakUserUnpermittedException(errMsg);
             };
         }
-        case 'expression':
-        case 'expressionRelation': {
-            const { expression, errMsg } = checker;
+        case 'logical':
+        case 'logicalRelation': {
+            const { checker: checkerFn } = checker;
             return (operation, context, option) => {
-                if (context.isRoot() && type === 'expressionRelation') {
+                if (context.isRoot() && type === 'logicalRelation') {
                     return;
                 }
-                const exprResult = expression(operation, context, option);
-                if (typeof exprResult === 'string') {
-                    throw new OakUserUnpermittedException(exprResult || errMsg);
-                }
-                else if (exprResult === undefined) {
-                    return 0;
-                }
-                else {
-                    assert(!(exprResult instanceof Promise));
-                    const { entity: expressionEntity, expr, filter: expressionFilter } = exprResult;
-                    const [result] = context.select(expressionEntity, {
-                        data: {
-                            $expr: expr,
-                        },
-                        filter: expressionFilter,
-                    }, Object.assign({}, option, { dontCollect: true }));
-                    const isLegal = result ? result.$expr as boolean : false;
-                    if (!isLegal) {
-                        // 条件判定为假，抛异常
-                        if (type === 'expression') {
-                            throw new OakRowInconsistencyException(undefined, errMsg);
-                        }
-                        else {
-                            throw new OakUserUnpermittedException(errMsg);
-                        }
-                    }
-                }
+                checkerFn(operation, context, option);
             };
         }
         default: {
@@ -386,8 +335,8 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                 checkers.push({
                     entity: userEntityName as keyof ED,
                     action: 'create',
-                    type: 'expressionRelation',
-                    expression: (operation, context) => {
+                    type: 'relation',
+                    relationFilter:  (operation, context) => {
                         const { data } = operation as ED[keyof ED]['Create'];
                         assert(!(data instanceof Array));
                         const { relation, [entityIdAttr]: entityId } = data;
@@ -396,15 +345,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                             return;
                         }
                         const filter = raFilterMakerDict[relation]!(userId!);
-                        return {
-                            entity,
-                            filter: combineFilters([filter, { id: entityId }]),
-                            expr: {
-                                $gt: [{
-                                    '#attr': '$$createAt$$',
-                                }, 0]
-                            },
-                        }
+                        return filter;
                     },
                     errMsg: '越权操作',
                 });
@@ -465,7 +406,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                          * create动作所增加的auth约束只可能在外键的对象上，但因为还有级联和触发器，不太容易在创建前检查，先放在创建后
                          */
                         const { } = actionAuth[a as ED[keyof ED]['Action']]!;
-                        checkers.push({
+                        /* checkers.push({
                             entity,
                             action: a,
                             type: 'expressionRelation',
@@ -492,7 +433,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                                 return makeExprInner(data);
                             },
                             errMsg: '定义的actionAuth中检查出来越权操作',
-                        });
+                        }); */
                     }
                     else {
                         checkers.push({

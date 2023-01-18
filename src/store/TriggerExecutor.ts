@@ -4,7 +4,7 @@ import { addFilterSegment, checkFilterRepel } from "../store/filter";
 import { DeduceCreateOperation, EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
-import { Checker, CheckerType, ExpressionChecker, RelationChecker } from '../types/Auth';
+import { Checker, CheckerType, LogicalChecker, RelationChecker } from '../types/Auth';
 import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTrigger } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
@@ -57,7 +57,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
             entity,
             action: action as 'update',
             fn,
-            when: (checker as ExpressionChecker<ED, T, Cxt>).when || 'before',
+            when: (checker as LogicalChecker<ED, T, Cxt>).when || 'before',
             filter: conditionalFilter,
         } as UpdateTrigger<ED, T, Cxt>;
         this.registerTrigger(trigger);

@@ -43,7 +43,8 @@ export type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt exten
     priority?: number;
     type: 'relation';
     entity: T;
-    action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
+    when?: 'after';
+    action: ED[T]['Action'] | Array<ED[T]['Action']>;
     relationFilter: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'] | Promise<ED[T]['Selection']['filter']>;       // 生成一个额外的relation相关的filter，加在原先的filter上
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | (
@@ -59,39 +60,37 @@ export type ExpressionTask<ED extends EntityDict, T extends keyof ED> = {
 
 export type ExpressionTaskCombination<ED extends EntityDict> = ExpressionTask<ED, keyof ED>;
 
-export type ExpressionChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
+export type LogicalChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
-    type: 'expression';
+    type: 'logical';
     when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
-    expression: <T2 extends keyof ED>(
+    checker: (
         operation: ED[T]['Operation'] | ED[T]['Selection'],
         context: Cxt,
         option: OperateOption | SelectOption
-    ) => ExpressionTaskCombination<ED> | undefined | string | Promise<ExpressionTaskCombination<ED> | string | undefined> ;       // 生成一个带表达式的查询任务数组，表达式结果为true代表可以过（or关系）。如果返回undefined直接过，返回string直接挂
-    errMsg: string;
+    ) => void | Promise<void>;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 
-export type ExpressionRelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
+export type LogicalRelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
-    type: 'expressionRelation';
+    type: 'logicalRelation';
     when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
-    expression: <T2 extends keyof ED>(
+    checker: (
         operation: ED[T]['Operation'] | ED[T]['Selection'],
         context: Cxt,
         option: OperateOption | SelectOption
-    ) => ExpressionTaskCombination<ED> | undefined | string | Promise<ExpressionTaskCombination<ED> | string | undefined> ;       // 生成一个带表达式的查询任务数组，表达式结果为true代表可以过（or关系）。如果返回undefined直接过，返回string直接挂
-    errMsg: string;
+    ) => void | Promise<void>;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 
 
 export type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> =
-    DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt> | ExpressionChecker<ED, T, Cxt> | ExpressionRelationChecker<ED, T, Cxt>;
+    DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt> | LogicalChecker<ED, T, Cxt> | LogicalRelationChecker<ED, T, Cxt>;
 
 
 export type AuthDef<ED extends EntityDict, T extends keyof ED> = {

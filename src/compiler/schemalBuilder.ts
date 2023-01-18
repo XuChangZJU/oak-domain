@@ -5899,23 +5899,39 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
         } */
         if (hasRelationDef) {
             const { type } = hasRelationDef;
-            assert(ts.isUnionTypeNode(type));
-            const { types } = type;
-            const relationTexts = types.map(
-                ele => {
-                    assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
-                    return ele.literal.text;
-                }
-            )
-            propertyAssignments.push(
-                factory.createPropertyAssignment(
-                    factory.createIdentifier("relation"),
-                    factory.createArrayLiteralExpression(relationTexts.map(
-                        ele => factory.createStringLiteral(ele)
-                    )),
+            if (ts.isUnionTypeNode(type)) {
+                const { types } = type;
+                const relationTexts = types.map(
+                    ele => {
+                        assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
+                        return ele.literal.text;
+                    }
                 )
-            );
-        } 
+                propertyAssignments.push(
+                    factory.createPropertyAssignment(
+                        factory.createIdentifier("relation"),
+                        factory.createArrayLiteralExpression(relationTexts.map(
+                            ele => factory.createStringLiteral(ele)
+                        )),
+                    )
+                );
+            }
+            else {
+                assert(ts.isLiteralTypeNode(type));
+                assert(ts.isStringLiteral(type.literal));
+
+                propertyAssignments.push(
+                    factory.createPropertyAssignment(
+                        factory.createIdentifier("relation"),
+                        factory.createArrayLiteralExpression(
+                            [
+                                type.literal
+                            ]
+                        ),
+                    )
+                );
+            }
+        }
         const sdTypeArguments = [
             factory.createTypeReferenceNode(
                 factory.createIdentifier("OpSchema"),
