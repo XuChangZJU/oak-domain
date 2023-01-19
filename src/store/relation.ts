@@ -63,7 +63,7 @@ export function judgeRelation<ED extends {
         return 2;
     }
     else {
-        assert(initinctiveAttributes.includes(attr), `${attr}属性找不到`);
+        assert(initinctiveAttributes.includes(attr), `${entity as string}对象中的${attr}属性找不到`);
         return 1;
     }
 }
