@@ -16,7 +16,7 @@ export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
     private contextBuilder;
     constructor(contextBuilder: (cxtString: string) => Promise<AsyncContext<ED>>, logger?: Logger);
     registerChecker<T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>): void;
-    getCheckers<T extends keyof ED>(entity: T, action: ED[T]['Action'], checkerTypes?: CheckerType[]): Trigger<ED, T, AsyncContext<ED>>[];
+    getCheckers<T extends keyof ED>(entity: T, action: ED[T]['Action'], checkerTypes?: CheckerType[]): Trigger<ED, T, AsyncContext<ED>>[] | undefined;
     registerTrigger<T extends keyof ED, Cxt extends AsyncContext<ED>>(trigger: Trigger<ED, T, Cxt>): void;
     unregisterTrigger<T extends keyof ED, Cxt extends AsyncContext<ED>>(trigger: Trigger<ED, T, Cxt>): void;
     private preCommitTrigger;

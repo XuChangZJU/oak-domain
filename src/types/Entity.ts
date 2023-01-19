@@ -49,7 +49,7 @@ export type FormUpdateData<SH extends GeneralEntityShape> = Partial<{
     [K in keyof Omit<SH, InstinctiveAttributes>]: SH[K] | null;
 }>;
 
-export type FormCreateData<SH extends GeneralEntityShape> = Omit<SH, InstinctiveAttributes> & { id: string };
+export type FormCreateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>> & { id: string };
 
 export type Operation<A extends string,
     D extends Projection,
