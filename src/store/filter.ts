@@ -732,14 +732,14 @@ export function getRelevantIds<ED extends EntityDict, T extends keyof ED>(filter
 
     if (filter?.$and) {
         const idss = filter.$and.map(
-            ele => getRelevantIds(ele)
+            (ele: ED[T]['Selection']['filter']) => getRelevantIds(ele)
         );
         idsAnd = intersection(...idss);
     }
 
     if (filter?.$or) {
         const idss = filter.$or.map(
-            ele => getRelevantIds(ele)
+            (ele: ED[T]['Selection']['filter']) => getRelevantIds(ele)
         );
         idsOr = union(...idss);
     }

@@ -39,13 +39,13 @@ export function translateCheckerInAsyncContext<
             const { filter, errMsg, inconsistentRows } = checker;
             const fn = (async ({ operation }, context, option) => {
                 const { filter: operationFilter, action } = operation;
-                const filter2 = typeof filter === 'function' ? await filter(operation, context, option) : filter;
+                const filter2 = typeof filter === 'function' ? await (filter as Function)(operation, context, option) : filter;
                 if (['select', 'count', 'stat'].includes(action)) {
                     operation.filter = addFilterSegment(operationFilter || {}, filter2);
                     return 0;
                 }
                 else {
-                    if (await checkFilterContains(entity, context, filter2, operationFilter || {}, true)) {
+                    if (await checkFilterContains<ED, keyof ED, Cxt>(entity, context, filter2, operationFilter || {}, true)) {
                         return 0;
                     }
                     if (inconsistentRows) {
@@ -179,7 +179,7 @@ export function translateCheckerInSyncContext<
             const { filter, errMsg } = checker;
             const fn = (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => {
                 const { filter: operationFilter, action } = operation;
-                const filter2 = typeof filter === 'function' ? filter(operation, context, option) : filter;
+                const filter2 = typeof filter === 'function' ? (filter as Function)(operation, context, option) : filter;
                 assert(operationFilter);
                 if (['select', 'count', 'stat'].includes(action)) {
                     operation.filter = addFilterSegment(operationFilter, filter2);

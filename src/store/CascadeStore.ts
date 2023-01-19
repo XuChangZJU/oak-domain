@@ -1,7 +1,7 @@
 import assert from "assert";
 import {
     EntityDict,
-    OperateOption, SelectOption, OperationResult, DeduceFilter, CreateAtAttribute, UpdateAtAttribute, AggregationResult, DeleteAtAttribute
+    OperateOption, SelectOption, OperationResult, CreateAtAttribute, UpdateAtAttribute, AggregationResult, DeleteAtAttribute
 } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { RowStore } from '../types/RowStore';
@@ -525,7 +525,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             operation: ED[T2]['Operation'],
             context: Cxt,
             option: OP) => R,
-        filter?: DeduceFilter<ED[T]['Schema']>
+        filter?: ED[T]['Update']['filter']
     ) {
         const modiAttr = this.getSchema()[entity].toModi;
         const option2 = Object.assign({}, option);
@@ -830,7 +830,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     }
 
     // 对更新的数据，去掉所有的undefined属性
-    protected preProcessDataUpdated<T extends keyof ED>(data: ED[T]['Update']['data']) {
+    protected preProcessDataUpdated(data: Record<string, any>) {
         const undefinedKeys = Object.keys(data).filter(
             ele => data[ele] === undefined
         );
@@ -852,7 +852,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
      * @param option 
      */
     private async doUpdateSingleRowAsync<T extends keyof ED, OP extends OperateOption, Cxt extends AsyncContext<ED>>(entity: T,
-        operation: ED[T]['Operation'],
+        operation: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'],
         context: Cxt,
         option: OP
     ) {
@@ -1182,7 +1182,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     id: {
                                         $in: ids,
                                     }
-                                } as DeduceFilter<ED[T]['Schema']>,
+                                },
                             });
                         }
                     }
@@ -1202,7 +1202,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         id: {
                                             $in: ids,
                                         }
-                                    } as DeduceFilter<ED[T]['Schema']>,
+                                    },
                                 });
                             }
                         }

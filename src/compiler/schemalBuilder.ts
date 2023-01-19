@@ -2884,10 +2884,6 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         factory.createIdentifier("DeduceAggregation"),
                         [
                             factory.createTypeReferenceNode(
-                                factory.createIdentifier("Schema"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
                                 factory.createIdentifier("Projection"),
                                 undefined
                             ),
@@ -4318,10 +4314,6 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 factory.createTypeReferenceNode(
                     factory.createIdentifier("RemoveOperation"),
                     undefined
-                ),
-                factory.createTypeReferenceNode(
-                    factory.createIdentifier("SelectOperation"),
-                    undefined
                 )
             ])
         )
@@ -4562,23 +4554,6 @@ const initialStatements = () => [
 function outputSubQuery(outputDir: string, printer: ts.Printer) {
     const statements: ts.Statement[] = [];
     if (process.env.COMPLING_AS_LIB) {
-        statements.push(
-            factory.createImportDeclaration(
-                undefined,
-                undefined,
-                factory.createImportClause(
-                    false,
-                    undefined,
-                    factory.createNamedImports([factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier("Selection")
-                    )])
-                ),
-                factory.createStringLiteral(TYPE_PATH_IN_OAK_DOMAIN(1)),
-                undefined
-            )
-        );
     }
     for (const entity in Schema) {
         // import * as User from '../User/Schema';

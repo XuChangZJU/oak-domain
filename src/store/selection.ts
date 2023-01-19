@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { getAttrRefInExpression, StorageSchema } from '../types';
 import { EXPRESSION_PREFIX } from '../types/Demand';
-import { DeduceFilter, EntityDict } from '../types/Entity';
+import { EntityDict } from '../types/Entity';
 import { getRelevantIds } from './filter';
 import { judgeRelation } from './relation';
 
@@ -29,7 +29,7 @@ export function reinforceSelection<ED extends EntityDict>(schema: StorageSchema<
         const toBeAssignNode: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
         // filter当中所关联到的属性必须在projection中
         const filterNodeDict: Record<string, ED[keyof ED]['Selection']['data']> = {};
-        const checkFilterNode = (entity2: keyof ED, filterNode: DeduceFilter<ED[keyof ED]['Schema']>, projectionNode: ED[keyof ED]['Selection']['data']) => {
+        const checkFilterNode = (entity2: keyof ED, filterNode: ED[keyof ED]['Selection']['filter'], projectionNode: ED[keyof ED]['Selection']['data']) => {
             const necessaryAttrs: string[] = ['id'];
             for (const attr in filterNode) {
                 if (attr === '#id') {
