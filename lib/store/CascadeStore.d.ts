@@ -1,4 +1,4 @@
-import { EntityDict, OperateOption, SelectOption, OperationResult, DeduceFilter, AggregationResult } from "../types/Entity";
+import { EntityDict, OperateOption, SelectOption, OperationResult, AggregationResult } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { RowStore } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
@@ -51,14 +51,14 @@ export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDic
      * @param filter
      * @returns
      */
-    protected destructCascadeUpdate<T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>, OP extends OperateOption, R>(entity: T, action: ED[T]['Action'], data: ED[T]['CreateSingle']['data'] | ED[T]['Update']['data'] | ED[T]['Remove']['data'], context: Cxt, option: OP, cascadeUpdate: <T2 extends keyof ED>(entity: T2, operation: ED[T2]['Operation'], context: Cxt, option: OP) => R, filter?: DeduceFilter<ED[T]['Schema']>): {
+    protected destructCascadeUpdate<T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>, OP extends OperateOption, R>(entity: T, action: ED[T]['Action'], data: ED[T]['CreateSingle']['data'] | ED[T]['Update']['data'] | ED[T]['Remove']['data'], context: Cxt, option: OP, cascadeUpdate: <T2 extends keyof ED>(entity: T2, operation: ED[T2]['Operation'], context: Cxt, option: OP) => R, filter?: ED[T]['Update']['filter']): {
         data: Record<string, any>;
         beforeFns: (() => R)[];
         afterFns: (() => R)[];
     };
     protected preProcessDataCreated<T extends keyof ED>(entity: T, data: ED[T]['Create']['data']): void;
-    protected preProcessDataUpdated<T extends keyof ED>(data: ED[T]['Update']['data']): void;
-    judgeRelation(entity: keyof ED, attr: string): string | 2 | 1 | string[] | 0;
+    protected preProcessDataUpdated(data: Record<string, any>): void;
+    judgeRelation(entity: keyof ED, attr: string): string | 1 | 2 | string[] | 0;
     /**
      * 和具体的update过程无关的例程放在这里，包括对later动作的处理、对oper的记录以及对record的收集等
      * @param entity

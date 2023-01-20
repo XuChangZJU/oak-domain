@@ -37,7 +37,7 @@ export interface UpdateTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     fn: (event: {
         operation: ED[T]['Update'];
     }, context: Cxt, option: OperateOption) => Promise<number> | number;
-    filter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Update'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
+    filter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Update'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Update']['filter']>);
 }
 export interface UpdateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
@@ -58,7 +58,7 @@ export interface RemoveTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     fn: (event: {
         operation: ED[T]['Remove'];
     }, context: Cxt, option: OperateOption) => Promise<number> | number;
-    filter?: ED[T]['Remove']['filter'] | ((operation: ED[T]['Remove'], context: Cxt, option: OperateOption) => ED[T]['Remove']['filter']);
+    filter?: ED[T]['Remove']['filter'] | ((operation: ED[T]['Remove'], context: Cxt, option: OperateOption) => ED[T]['Remove']['filter'] | Promise<ED[T]['Remove']['filter']>);
 }
 export interface RemoveTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends RemoveTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';

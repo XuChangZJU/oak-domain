@@ -1,6 +1,6 @@
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { OpSchema as Modi, Filter } from '../base-app-domain/Modi/Schema';
-import { Checker, Operation, StorageSchema, RowChecker, EntityDict, OakRowLockedException, Context, OperateOption, Trigger, RemoveTrigger, RelationChecker, ExpressionChecker, ExpressionRelationChecker, OakUserUnpermittedException } from '../types';
+import { Checker, Operation, StorageSchema, RowChecker, EntityDict, OakRowLockedException, Context, OperateOption, Trigger, RemoveTrigger, RelationChecker, LogicalChecker, LogicalRelationChecker, OakUserUnpermittedException } from '../types';
 import { appendOnlyActions } from '../actions/action';
 import { difference } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
@@ -52,14 +52,14 @@ export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt e
         action: 'abandon',
         data: {},
         filter,
-        sorter: [
+        /* sorter: [
             {
                 $attr: {
                     $$createAt$$: 1,
                 },
                 $direction: 'asc',
             }
-        ]
+        ] */
     }, Object.assign({}, option, {
         blockTrigger: false,
     }));

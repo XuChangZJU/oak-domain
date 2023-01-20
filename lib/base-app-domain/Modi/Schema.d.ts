@@ -107,7 +107,7 @@ export declare type SortNode = {
 export declare type Sorter = SortNode[];
 export declare type SelectOperation<P extends Object = Projection> = Omit<OakOperation<"select", P, Filter, Sorter>, "id">;
 export declare type Selection<P extends Object = Projection> = Omit<SelectOperation<P>, "action">;
-export declare type Aggregation = Omit<DeduceAggregation<Schema, Projection, Filter, Sorter>, "id">;
+export declare type Aggregation = Omit<DeduceAggregation<Projection, Filter, Sorter>, "id">;
 export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "entityId">> & ({
     entity?: string;
     entityId?: string;
@@ -127,10 +127,8 @@ export declare type UpdateOperationData = FormUpdateData<OpSchema> & {
 export declare type UpdateOperation = OakOperation<"update" | ParticularAction | string, UpdateOperationData, Filter, Sorter>;
 export declare type RemoveOperationData = {};
 export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter, Sorter>;
-export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation | SelectOperation;
+export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation;
 export declare type ModiIdSubQuery = Selection<ModiIdProjection>;
-export declare type NativeAttr = OpAttr;
-export declare type FullAttr = NativeAttr | `modiEntitys$${number}.${ModiEntity.NativeAttr}` | `operEntitys$${number}.${OperEntity.NativeAttr}`;
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;

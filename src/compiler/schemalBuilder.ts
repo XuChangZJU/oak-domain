@@ -25,7 +25,8 @@ const Schema: Record<string, {
     states: string[];
     sourceFile: ts.SourceFile;
     locale: ts.ObjectLiteralExpression;
-    relationHierarchy?: ts.ObjectLiteralExpression;
+    // relationHierarchy?: ts.ObjectLiteralExpression;
+    // reverseCascadeRelationHierarchy?: ts.ObjectLiteralExpression;
     toModi: boolean;
     actionType: string;
     static: boolean;
@@ -497,7 +498,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     const localEnumStringTypes: string[] = [];
     const additionalImports: ts.ImportDeclaration[] = [];
     let localeDef: ts.ObjectLiteralExpression | undefined = undefined;
-    let relationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
+    // let relationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
+    // let reverseCascadeRelationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
             const entityImported = getEntityImported(node);
@@ -1123,15 +1125,22 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                             _static = true;     // static如果有值只能为true
                         }
                     }
-                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'RelationHierarchy') {
+                    /* else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'RelationHierarchy') {
                         // RelationHierary
                         assert(hasRelationDef, `${moduleName}中的Relation定义在RelationHierarchy之后`);
                         const { initializer } = declaration;
                         assert(ts.isObjectLiteralExpression(initializer!), `${moduleName}中的RelationHierarchy的定义必须是初始化为ObjectLiteralExpress`);
                         relationHierarchy = initializer;
                     }
+                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ReverseCascadeRelationHierarchy') {
+                        // ReverseCascadeRelationHierarchy
+                        assert(hasRelationDef, `${moduleName}中的Relation定义在ReverseCascadeRelationHierarchy之后`);
+                        const { initializer } = declaration;
+                        assert(ts.isObjectLiteralExpression(initializer!), `${moduleName}中的RelationHierarchy的定义必须是初始化为ObjectLiteralExpress`);
+                        reverseCascadeRelationHierarchy = initializer;
+                    } */
                     else {
-                        throw new Error(`${moduleName}：不能理解的定义内容${declaration.name.getText()}`);
+                        throw new Error(`${moduleName}：不能理解的定义内容${(declaration.name as ts.Identifier).text}`);
                     }
                 }
             );
@@ -1173,15 +1182,25 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
             locale: localeDef,
         });
     }
-    if (hasRelationDef) {
-        assert(relationHierarchy, `${filename}中缺少了relationHierarchy定义`);
-        assign(schema, {
-            relationHierarchy,
-        });
+    /* if (hasRelationDef) {
+        if(!relationHierarchy && !reverseCascadeRelationHierarchy){
+            console.warn(`${filename}中定义了Relation,但并没有relationHierarchy或reverseCascadeRelationHierarchy的定义，请注意自主编写权限分配的checker`);
+        }
+        if (relationHierarchy) {
+            assign(schema, {
+                relationHierarchy,
+            });
+        }
+        if (reverseCascadeRelationHierarchy) {
+            assign(schema, {
+                reverseCascadeRelationHierarchy,
+            });
+        }
     }
     else {
         assert(!relationHierarchy, `${filename}中具有relationHierarchy定义但没有Relation定义`);
-    }
+        assert(!reverseCascadeRelationHierarchy, `${filename}中具有reverseCascadeRelationHierarchy定义但没有Relation定义`)
+    } */
 
     assign(Schema, {
         [moduleName]: schema,
@@ -2865,10 +2884,6 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         factory.createIdentifier("DeduceAggregation"),
                         [
                             factory.createTypeReferenceNode(
-                                factory.createIdentifier("Schema"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
                                 factory.createIdentifier("Projection"),
                                 undefined
                             ),
@@ -3078,6 +3093,13 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     const reverseOneNodes: ts.TypeNode[] = [];
     if (ReversePointerEntities[entity]) {
         if (ReversePointerRelations[entity]) {
+            const { schemaAttrs } = Schema[entity];
+            const { questionToken } = schemaAttrs.find(
+                ele => {
+                    const { name } = ele;
+                    return (<ts.Identifier>name).text === 'entity'
+                }
+            )!;
             for (const one of ReversePointerRelations[entity]) {
                 const cascadeCreateNode = factory.createTypeLiteralNode(
                     [
@@ -3136,14 +3158,14 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier('entity'),
-                            undefined,          // 反向指针好像不能为空，以后或许会有特例  by Xc
+                            questionToken,
                             factory.createLiteralTypeNode(factory.createStringLiteral(`${firstLetterLowerCase(one)}`)
                             )
                         ),
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier('entityId'),
-                            undefined,           // 反向指针好像不能为空，以后或许会有特例  by Xc
+                            questionToken,
                             factory.createTypeReferenceNode(
                                 factory.createIdentifier("String"),
                                 [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
@@ -4292,10 +4314,6 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 factory.createTypeReferenceNode(
                     factory.createIdentifier("RemoveOperation"),
                     undefined
-                ),
-                factory.createTypeReferenceNode(
-                    factory.createIdentifier("SelectOperation"),
-                    undefined
                 )
             ])
         )
@@ -4536,23 +4554,6 @@ const initialStatements = () => [
 function outputSubQuery(outputDir: string, printer: ts.Printer) {
     const statements: ts.Statement[] = [];
     if (process.env.COMPLING_AS_LIB) {
-        statements.push(
-            factory.createImportDeclaration(
-                undefined,
-                undefined,
-                factory.createImportClause(
-                    false,
-                    undefined,
-                    factory.createNamedImports([factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier("Selection")
-                    )])
-                ),
-                factory.createStringLiteral(TYPE_PATH_IN_OAK_DOMAIN(1)),
-                undefined
-            )
-        );
     }
     for (const entity in Schema) {
         // import * as User from '../User/Schema';
@@ -4903,7 +4904,8 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         constructSorter(statements, entity);
         constructActions(statements, entity);
         constructQuery(statements, entity);
-        constructFullAttrs(statements, entity);
+        // 现在FullAttrs和NativeAttrs似乎没什么用，还会引起递归
+        // constructFullAttrs(statements, entity);
 
         const makeActionArguments: ts.TypeNode[] = [];
         if (ActionAsts[entity]) {
@@ -5037,6 +5039,19 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     undefined,
                     factory.createTypeReferenceNode(
                         factory.createIdentifier('ParticularAction'),
+                        undefined
+                    )
+                )
+            );
+        }
+        if (typeof Schema[entity].hasRelationDef === 'object' && ts.isTypeAliasDeclaration(Schema[entity].hasRelationDef as ts.Node)) {
+            EntityDefAttrs.push(
+                factory.createPropertySignature(
+                    undefined,
+                    factory.createIdentifier("Relation"),
+                    undefined,
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier('Relation'),
                         undefined
                     )
                 )
@@ -5638,7 +5653,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
 
     for (const entity in Schema) {
         const indexExpressions: ts.Expression[] = [];
-        const { sourceFile, inModi, indexes, toModi, actionType, static: _static, relationHierarchy } = Schema[entity];
+        const { sourceFile, inModi, indexes, toModi, actionType, static: _static, hasRelationDef } = Schema[entity];
         const fromSchemaSpecifiers = [
             factory.createImportSpecifier(
                 false,
@@ -5646,7 +5661,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 factory.createIdentifier("OpSchema")
             )
         ];
-        if (relationHierarchy) {
+        /* if (relationHierarchy || reverseCascadeRelationHierarchy) {
             fromSchemaSpecifiers.push(
                 factory.createImportSpecifier(
                     false,
@@ -5654,7 +5669,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                     factory.createIdentifier("Relation")
                 )
             );
-        }
+        } */
         const statements: ts.Statement[] = [
             factory.createImportDeclaration(
                 undefined,
@@ -5855,7 +5870,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 )
             );
         }
-        if (relationHierarchy) {
+        /* if (relationHierarchy) {
             propertyAssignments.push(
                 factory.createPropertyAssignment(
                     factory.createIdentifier("relationHierarchy"),
@@ -5863,20 +5878,55 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 )
             );
         }
+        if (reverseCascadeRelationHierarchy) {
+            propertyAssignments.push(
+                factory.createPropertyAssignment(
+                    factory.createIdentifier("reverseCascadeRelationHierarchy"),
+                    reverseCascadeRelationHierarchy,
+                )
+            );
+        } */
+        if (hasRelationDef) {
+            const { type } = hasRelationDef;
+            if (ts.isUnionTypeNode(type)) {
+                const { types } = type;
+                const relationTexts = types.map(
+                    ele => {
+                        assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
+                        return ele.literal.text;
+                    }
+                )
+                propertyAssignments.push(
+                    factory.createPropertyAssignment(
+                        factory.createIdentifier("relation"),
+                        factory.createArrayLiteralExpression(relationTexts.map(
+                            ele => factory.createStringLiteral(ele)
+                        )),
+                    )
+                );
+            }
+            else {
+                assert(ts.isLiteralTypeNode(type));
+                assert(ts.isStringLiteral(type.literal));
+
+                propertyAssignments.push(
+                    factory.createPropertyAssignment(
+                        factory.createIdentifier("relation"),
+                        factory.createArrayLiteralExpression(
+                            [
+                                type.literal
+                            ]
+                        ),
+                    )
+                );
+            }
+        }
         const sdTypeArguments = [
             factory.createTypeReferenceNode(
                 factory.createIdentifier("OpSchema"),
                 undefined
             )
         ];
-        if (relationHierarchy) {
-            sdTypeArguments.push(
-                factory.createTypeReferenceNode(
-                    factory.createIdentifier("Relation"),
-                    undefined
-                )
-            )
-        }
         statements.push(
             factory.createVariableStatement(
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],

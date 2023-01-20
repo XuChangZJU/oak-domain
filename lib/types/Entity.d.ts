@@ -1,6 +1,3 @@
-import { GenericAction } from '../actions/action';
-import { ExprOp, MakeFilter, NodeId } from './Demand';
-import { OneOf } from './Polyfill';
 import { PrimaryKey, Sequence } from './DataType';
 declare type TriggerDataAttributeType = '$$triggerData$$';
 declare type TriggerTimestampAttributeType = '$$triggerTimestamp$$';
@@ -18,7 +15,7 @@ export declare const DeleteAtAttribute = "$$deleteAt$$";
 export declare const SeqAttribute = "$$seq$$";
 export declare type InstinctiveAttributes = PrimaryKeyAttributeType | CreateAtAttributeType | UpdateAtAttributeType | DeleteAtAttributeType | TriggerDataAttributeType | TriggerTimestampAttributeType | SeqAttributeType;
 export declare const initinctiveAttributes: string[];
-export declare type Filter<A extends string, F extends Object | undefined = undefined> = {
+declare type FilterPart<A extends string, F extends Object | undefined> = {
     filter?: A extends 'create' ? undefined : F;
     indexFrom?: A extends 'create' ? undefined : number;
     count?: A extends 'create' ? undefined : number;
@@ -44,24 +41,21 @@ export declare type OperateOption = {
 export declare type FormUpdateData<SH extends GeneralEntityShape> = Partial<{
     [K in keyof Omit<SH, InstinctiveAttributes>]: SH[K] | null;
 }>;
-export declare type FormCreateData<SH extends GeneralEntityShape> = Omit<SH, InstinctiveAttributes> & {
+export declare type FormCreateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>> & {
     id: string;
 };
-export declare type Operation<A extends GenericAction | string, DATA extends Object, FILTER extends Object | undefined = undefined, SORTER extends Object | undefined = undefined> = {
+export declare type Operation<A extends string, D extends Projection, F extends Filter | undefined = undefined, S extends Sorter | undefined = undefined> = {
     id?: string;
     action: A;
-    data: DATA;
-    sorter?: SORTER;
-} & Filter<A, FILTER>;
-export declare type Selection<DATA extends Object, FILTER extends Object | undefined = undefined, SORT extends Object | undefined = undefined> = Operation<'select', DATA, FILTER, SORT>;
+    data: D;
+    sorter?: S;
+} & FilterPart<A, F>;
 export interface EntityShape {
     id: PrimaryKey;
     $$seq$$: Sequence;
     $$createAt$$: number | Date;
     $$updateAt$$: number | Date;
     $$deleteAt$$?: number | Date | null;
-}
-export interface FileCarrierEntityShape extends EntityShape {
 }
 interface GeneralEntityShape extends EntityShape {
     [K: string]: any;
@@ -72,28 +66,24 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<DeduceSelection<this['Schema']>, 'action'>;
-    Aggregation: Omit<DeduceAggregation<this['Schema'], DeduceProjection<this['Schema']>, DeduceFilter<this['Schema']>, DeduceSorter<this['Schema']>>, 'action'>;
-    Operation: DeduceOperation<this['Schema']>;
-    Create: DeduceCreateOperation<this['Schema']>;
-    CreateSingle: DeduceCreateSingleOperation<this['Schema']>;
-    CreateMulti: DeduceCreateMultipleOperation<this['Schema']>;
-    Update: DeduceUpdateOperation<this['Schema']>;
-    Remove: DeduceRemoveOperation<this['Schema']>;
+    Selection: Omit<Operation<'select', Projection, Filter, Sorter>, 'action'>;
+    Aggregation: Omit<DeduceAggregation<Projection, Filter, Sorter>, 'action'>;
+    Operation: CUDOperation;
+    Create: CreateOperation;
+    CreateSingle: CreateSingleOperation;
+    CreateMulti: CreateMultipleOperation;
+    Update: UpdateOperation;
+    Remove: RemoveOperation;
+    Relation?: string;
 }
 export interface EntityDict {
     [E: string]: EntityDef;
 }
-export interface OtmSubProjection extends Omit<DeduceSelection<any>, 'action'> {
+export interface OtmSubProjection extends Omit<Operation<'select', any, any, any>, 'action'> {
     $entity: string;
 }
-declare type DeduceProjection<SH extends GeneralEntityShape> = {
-    '#id'?: NodeId;
-} & {
-    [K in keyof SH]?: number | OtmSubProjection | any;
-} & Partial<ExprOp<keyof SH | string>>;
 export declare type AggregationOp = `#max-${number}` | `#min-${number}` | `#avg-${number}` | `#count-${number}` | `#sum-${number}`;
-export declare type DeduceAggregationData<SH extends GeneralEntityShape, P extends DeduceProjection<SH>> = {
+export declare type DeduceAggregationData<P extends Projection> = {
     [A in AggregationOp]?: P;
 } & {
     '#aggr'?: P;
@@ -104,36 +94,40 @@ export declare type AggregationResult<SH extends GeneralEntityShape> = Array<{
     '#data'?: Partial<SH>;
 }>;
 export declare type AttrFilter<SH extends GeneralEntityShape> = {
-    [K in keyof SH]: any;
+    [K in keyof SH]?: any;
 };
-export declare type DeduceFilter<SH extends GeneralEntityShape> = MakeFilter<AttrFilter<SH> & ExprOp<keyof SH>>;
-export declare type DeduceSorterAttr<SH extends GeneralEntityShape> = OneOf<{
-    [K: string]: number | object | undefined;
-} & ExprOp<keyof SH>>;
-export declare type DeduceSorterItem<SH extends GeneralEntityShape> = {
-    $attr: DeduceSorterAttr<SH>;
+declare type SortAttr = {
+    [K: string]: any;
+};
+declare type SorterItem = {
+    $attr: SortAttr;
     $direction?: "asc" | "desc";
 };
-export declare type DeduceSorter<SH extends GeneralEntityShape> = Array<DeduceSorterItem<SH>>;
-export declare type DeduceSelection<SH extends GeneralEntityShape> = Selection<DeduceProjection<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
-export declare type DeduceAggregation<SH extends GeneralEntityShape, P extends DeduceProjection<SH>, F extends DeduceFilter<SH>, S extends DeduceSorter<SH>> = Omit<Operation<'aggregate', DeduceAggregationData<SH, P>, F, S>, 'action'>;
-export declare type DeduceCreateOperationData<SH extends GeneralEntityShape> = {
+declare type Sorter = Array<SorterItem>;
+declare type Filter = {
+    [K: string]: any;
+};
+declare type Projection = {
+    [K: string]: any;
+};
+export declare type DeduceAggregation<P extends Projection, F extends Filter, S extends Sorter> = Omit<Operation<'aggregate', DeduceAggregationData<P>, F, S>, 'action'>;
+declare type CreateOperationData = {
     id: string;
-} & {
-    [k in keyof Omit<SH, InstinctiveAttributes>]?: any;
+    [K: string]: any;
 };
-export declare type DeduceCreateSingleOperation<SH extends GeneralEntityShape> = Operation<'create', DeduceCreateOperationData<SH>>;
-export declare type DeduceCreateMultipleOperation<SH extends GeneralEntityShape> = Operation<'create', Array<DeduceCreateOperationData<SH>>>;
-export declare type DeduceCreateOperation<SH extends GeneralEntityShape> = DeduceCreateSingleOperation<SH> | DeduceCreateMultipleOperation<SH>;
-export declare type DeduceUpdateOperationData<SH extends GeneralEntityShape> = {
-    [k in keyof Omit<SH, InstinctiveAttributes>]?: any;
+declare type CreateSingleOperation = Operation<'create', CreateOperationData, undefined, undefined>;
+declare type CreateMultipleOperation = Operation<'create', Array<CreateOperationData>, undefined, undefined>;
+declare type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
+declare type UpdateOperationData = {
+    id?: never;
+    [k: string]: any;
 };
-export declare type DeduceUpdateOperation<SH extends GeneralEntityShape> = Operation<'update' | string, DeduceUpdateOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
-export declare type DeduceRemoveOperationData<SH extends GeneralEntityShape> = {
-    [A in keyof Omit<SH, InstinctiveAttributes>]?: any;
+export declare type UpdateOperation = Operation<string, UpdateOperationData, Filter, Sorter>;
+declare type RemoveOperationData = {
+    [k: string]: any;
 };
-export declare type DeduceRemoveOperation<SH extends GeneralEntityShape> = Operation<'remove', DeduceRemoveOperationData<SH>, DeduceFilter<SH>, DeduceSorter<SH>>;
-export declare type DeduceOperation<SH extends GeneralEntityShape> = DeduceCreateOperation<SH> | DeduceUpdateOperation<SH> | DeduceRemoveOperation<SH>;
+export declare type RemoveOperation = Operation<'remove', RemoveOperationData, Filter, Sorter>;
+export declare type CUDOperation = CreateOperation | UpdateOperation | RemoveOperation;
 export declare type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'c';
     e: T;
@@ -142,16 +136,23 @@ export declare type CreateOpResult<ED extends EntityDict, T extends keyof ED> = 
 export declare type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'u';
     e: T;
-    d: DeduceUpdateOperationData<ED[T]['Schema']>;
-    f?: DeduceFilter<ED[T]['Schema']>;
+    d: UpdateOperationData;
+    f?: Filter;
 };
 export declare type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
     a: 'r';
     e: T;
-    f?: DeduceFilter<ED[T]['Schema']>;
+    f?: Filter;
 };
 export declare type RelationHierarchy<R extends string> = {
     [K in R]?: R[];
+};
+export declare type CascadeRelationItem = {
+    cascadePath: string;
+    relations?: string[];
+};
+export declare type CascadeRelationAuth<R extends string> = {
+    [K in R]?: CascadeRelationItem | (CascadeRelationItem | CascadeRelationItem[])[];
 };
 export declare type SelectOpResult<ED extends EntityDict> = {
     a: 's';
@@ -171,20 +172,5 @@ export declare type ActionType = 'readOnly' | 'appendOnly' | 'excludeUpdate' | '
 export declare type Configuration = {
     actionType?: ActionType;
     static?: boolean;
-};
-export declare type Exportation<ED extends EntityDict, T extends keyof ED, K extends string> = {
-    name: string;
-    id: string;
-    entity: T;
-    projection: ED[T]['Selection']['data'];
-    headers: K[];
-    fn: (data: ED[T]['Schema']) => Partial<Record<K, string | number | boolean | null>>;
-};
-export declare type Importation<ED extends EntityDict, T extends keyof ED, K extends string> = {
-    name: string;
-    id: string;
-    entity: T;
-    headers: K[];
-    fn: (data: Partial<Record<K, string | number | boolean>>) => ED[T]['CreateSingle']['data'];
 };
 export {};

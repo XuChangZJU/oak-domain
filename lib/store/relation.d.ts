@@ -10,4 +10,4 @@ import { StorageSchema } from "../types/Storage";
  */
 export declare function judgeRelation<ED extends {
     [E: string]: EntityDef;
-}>(schema: StorageSchema<ED>, entity: keyof ED, attr: string): string | 2 | 1 | string[] | 0;
+}>(schema: StorageSchema<ED>, entity: keyof ED, attr: string): string | 1 | 2 | string[] | 0;

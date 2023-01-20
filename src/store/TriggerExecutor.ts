@@ -1,10 +1,10 @@
 import assert from 'assert';
 import { pull, unset } from "../utils/lodash";
 import { addFilterSegment, checkFilterRepel } from "../store/filter";
-import { DeduceCreateOperation, EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
+import { EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
-import { Checker, CheckerType } from '../types/Auth';
+import { Checker, CheckerType, LogicalChecker, RelationChecker } from '../types/Auth';
 import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTrigger } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
@@ -49,15 +49,15 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
     registerChecker<T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>): void {
         const { entity, action, type, conditionalFilter } = checker;
         const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
-        const fn = translateCheckerInAsyncContext(checker);
+        const { fn, when } = translateCheckerInAsyncContext(checker);
         const trigger = {
             checkerType: type,
             name: triggerName,
-            priority: checker.priority || 2,        // checker的默认优先级稍高一点点
+            priority: checker.priority || 20,        // checker的默认优先级稍高
             entity,
             action: action as 'update',
             fn,
-            when: 'before',
+            when,
             filter: conditionalFilter,
         } as UpdateTrigger<ED, T, Cxt>;
         this.registerTrigger(trigger);
@@ -77,7 +77,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
             throw new Error(`不可有同名的触发器「${trigger.name}」`);
         }
         if (typeof trigger.priority !== 'number') {
-            trigger.priority = 1;       // 默认最低
+            trigger.priority = 10;       // 默认值
         }
         if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
             assert(typeof trigger.action === 'string' && trigger.action !== 'create'
@@ -229,8 +229,9 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                         // trigger只对满足条件的前项进行判断，如果确定不满足可以pass
                         assert(operation.action !== 'create');
                         const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
-                        const filterr = typeof filter === 'function' ? filter(operation, context, option) : filter;
-                        const filterRepelled = checkFilterRepel(entity, context, filterr, operation.filter) as boolean
+                        const filterr = typeof filter === 'function' ? filter(operation as ED[T]['Update'], context, option) : filter;
+                        assert(!(filterr instanceof Promise));
+                        const filterRepelled = checkFilterRepel<ED, T, Cxt>(entity, context, filterr, operation.filter) as boolean
                         if (filterRepelled) {
                             continue;
                         }
@@ -252,8 +253,8 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                     if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
                         assert(operation.action !== 'create');
                         const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
-                        const filterr = typeof filter === 'function' ? filter(operation, context, option) : filter;
-                        const filterRepelled = await (checkFilterRepel(entity, context, filterr, operation.filter) as Promise<boolean>);
+                        const filterr = typeof filter === 'function' ? await filter(operation as ED[T]['Update'], context, option) : filter;
+                        const filterRepelled = await (checkFilterRepel<ED, T, Cxt>(entity, context, filterr, operation.filter) as Promise<boolean>);
                         if (filterRepelled) {
                             return execPreTrigger(idx + 1);
                         }
@@ -272,8 +273,8 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                     if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
                         assert(operation.action !== 'create');
                         const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
-                        const filterr = typeof filter === 'function' ? filter(operation, context, option) : filter;
-                        const filterRepelled = await (checkFilterRepel(entity, context, filterr, operation.filter) as Promise<boolean>);
+                        const filterr = typeof filter === 'function' ? await filter(operation as ED[T]['Update'], context, option) : filter;
+                        const filterRepelled = await (checkFilterRepel<ED, T, Cxt>(entity, context, filterr, operation.filter) as Promise<boolean>);
                         if (filterRepelled) {
                             return execCommitTrigger(idx + 1);
                         }
@@ -294,7 +295,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
         return async () => {
             await context.begin();
             const number = await (trigger as CreateTrigger<ED, T, AsyncContext<ED>>).fn({
-                operation: operation as DeduceCreateOperation<ED[T]['Schema']>,
+                operation: operation as ED[T]['Create'],
             }, context, option);
             if ((trigger as CreateTriggerCrossTxn<ED, T, Cxt>).strict === 'makeSure') {
                 // 如果是必须完成的trigger，在完成成功后要把trigger相关的属性置null;
@@ -354,10 +355,10 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
         );
         if (triggers) {
             const postTriggers = triggers.filter(
-                ele => ele.when === 'after' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as DeduceCreateOperation<ED[T]['Schema']>))
+                ele => ele.when === 'after' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as ED[T]['Create']))
             );
             const commitTriggers = (<Array<CreateTrigger<ED, T, Cxt>>>triggers).filter(
-                ele => ele.when === 'commit' && (!ele.check || ele.check(operation as DeduceCreateOperation<ED[T]['Schema']>))
+                ele => ele.when === 'commit' && (!ele.check || ele.check(operation as ED[T]['Create']))
             );
 
             if (context instanceof SyncContext) {

@@ -16,7 +16,7 @@ export type RefOrExpression<A> = RefAttr<A> | Expression<A>;
 type MathType<A> = RefOrExpression<A> | number;
 type StringType<A> = RefOrExpression<A> | string
 interface Add<A> {
-    $add: (MathType<A> | StringType<A>)[];
+    $add: (MathType<A>)[];
 };
 interface Subtract<A> {
     $subtract: [MathType<A>, MathType<A>];
@@ -135,6 +135,15 @@ interface DateFloor<A> {
 type DateExpression<A> = DateYear<A> | DateMonth<A> | DateWeekday<A> | DateWeekOfYear<A> | DateDay<A> | DateDayOfYear<A>
     | DateDayOfMonth<A> | DateDayOfWeek<A> | DateDiff<A> | DateCeiling<A> | DateFloor<A>;
 
+// String
+interface StringConcat<A> {
+    $concat: StringType<A>[];
+}
+
+type StringExpression<A> = StringConcat<A>;
+
+
+
 //// Geo
 interface GeoContains<A> {
     $contains: [RefOrExpression<A> | Geo, RefOrExpression<A> | Geo];
@@ -145,7 +154,31 @@ interface GeoDistance<A> {
 
 type GeoExpression<A> = GeoContains<A> | GeoDistance<A>;
 
-export type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> | BoolExpression<A> | CompareExpression<A> | MathExpression<A>;
+//// Aggr
+interface AggrCountExpression<A> {
+    $$count: RefOrExpression<A>;
+};
+
+interface AggrSumExpression<A> {
+    $$sum: RefOrExpression<A>;
+}
+
+interface AggrMaxExpression<A> {
+    $$max: RefOrExpression<A>;
+}
+
+interface AggrMinExpression<A> {
+    $$min: RefOrExpression<A>;
+}
+
+interface AggrAvgExpression<A> {
+    $$avg: RefOrExpression<A>;
+}
+
+export type AggrExpression<A> = AggrAvgExpression<A> | AggrCountExpression<A> | AggrSumExpression<A> | AggrMaxExpression<A> | AggrMinExpression<A>;
+
+export type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> 
+    | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A> | AggrExpression<A>;
 
 export type ExpressionConstant = Geo | number | Date | string | boolean;
 
@@ -212,13 +245,35 @@ export function isMathExpression<A>(expression: any): expression is MathExpressi
     return false;
 }
 
+
+export function isStringExpression<A>(expression: any): expression is StringExpression<A> {
+    if (Object.keys(expression).length == 1) {
+        const op = Object.keys(expression)[0];
+        if (['$concat'].includes(op)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+export function isAggrExpression<A>(expression: any): expression is AggrExpression<A> {
+    if (Object.keys(expression).length == 1) {
+        const op = Object.keys(expression)[0];
+        if (['$$max', '$$min', '$$sum', '$$avg', '$$count'].includes(op)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 export function isExpression<A>(expression: any): expression is Expression<A> {
     return typeof expression === 'object' && Object.keys(expression).length === 1 && Object.keys(expression)[0].startsWith('$');
 }
 
 export function opMultipleParams(op: string) {
     return !['$year', '$month', '$weekday', '$weekOfYear', '$day', '$dayOfMonth',
-        '$dayOfWeek', '$dayOfYear', '$not', '$true', '$false', '$abs', '$round', '$floor', '$ceil'].includes(op);
+        '$dayOfWeek', '$dayOfYear', '$not', '$true', '$false', '$abs',
+        '$round', '$floor', '$ceil', '$$max', '$$min', '$$sum', '$$avg', '$$count'].includes(op);
 }
 
 export function execOp(op: string, params: any, obscure?: boolean): ExpressionConstant {
@@ -434,6 +489,9 @@ export function execOp(op: string, params: any, obscure?: boolean): ExpressionCo
         }
         case '$contains': {
             throw new Error('$contains类型未实现');
+        }
+        case '$concat': {
+            return params.join('');
         }
         default: {
             assert(false, `不能识别的expression运算符：${op}`);

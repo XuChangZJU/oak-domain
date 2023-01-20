@@ -1,5 +1,5 @@
 import { ActionType } from '.';
-import { EntityDict, EntityShape, InstinctiveAttributes, RelationHierarchy } from './Entity';
+import { EntityDict, EntityShape, InstinctiveAttributes, RelationHierarchy, CascadeRelationAuth } from './Entity';
 import { DataType, DataTypeParams } from './schema/DataTypes';
 
 export type Ref = 'ref';
@@ -47,7 +47,7 @@ export type UniqConstraint<SH extends EntityShape> = {
     type?: string;
 };
 
-export interface StorageDesc<SH extends EntityShape, Relation extends string = ''> {
+export interface StorageDesc<SH extends EntityShape> {
     storageName?: string,
     comment?: string,
     attributes: Attributes<SH>;
@@ -59,12 +59,14 @@ export interface StorageDesc<SH extends EntityShape, Relation extends string = '
     static?: true;          // 标识是维表（变动较小，相对独立）
     actions: string[];
     actionType: ActionType;
-    relationHierarchy?: RelationHierarchy<Relation>;
+    // relationHierarchy?: RelationHierarchy<Relation>;
+    // reverseCascadeRelationHierarchy?: ReverseCascadeRelationHierarchy<Relation>;
+    relation?: string[];
     // view 相关
     view?: true;
 }
 
 
 export type StorageSchema<ED extends EntityDict> = {
-    [K in keyof ED]: StorageDesc<ED[K]['OpSchema'], any>;
+    [K in keyof ED]: StorageDesc<ED[K]['OpSchema']>;
 }
