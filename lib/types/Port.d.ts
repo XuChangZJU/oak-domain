@@ -1,6 +1,6 @@
 import { AsyncContext } from "../store/AsyncRowStore";
 import { EntityDict } from "./Entity";
-export declare type Exportation<ED extends EntityDict, T extends keyof ED, K extends string> = {
+export type Exportation<ED extends EntityDict, T extends keyof ED, K extends string> = {
     name: string;
     id: string;
     entity: T;
@@ -8,7 +8,7 @@ export declare type Exportation<ED extends EntityDict, T extends keyof ED, K ext
     headers: K[];
     fn: (data: ED[T]['Schema']) => Partial<Record<K, string | number | boolean | null>>;
 };
-export declare type Importation<ED extends EntityDict, T extends keyof ED, K extends string> = {
+export type Importation<ED extends EntityDict, T extends keyof ED, K extends string> = {
     name: string;
     id: string;
     entity: T;
