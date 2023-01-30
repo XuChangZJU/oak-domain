@@ -1,6 +1,6 @@
 import { OperationResult, EntityDict } from './Entity';
 import { StorageSchema } from './Storage';
-export type TxnOption = {
+export declare type TxnOption = {
     isolationLevel: 'repeatable read' | 'serializable';
 };
 export declare abstract class RowStore<ED extends EntityDict> {
