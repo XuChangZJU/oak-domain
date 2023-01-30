@@ -24,7 +24,6 @@ function makeIntrinsicWatchers<ED extends EntityDict>(schema: StorageSchema<ED>)
     for (const entity in schema) {
         const { attributes } = schema[entity];
 
-        const now = Date.now();
         const { expiresAt, expired } = attributes;
         if (expiresAt && expiresAt.type === 'datetime' && expired && expired.type === 'boolean') {
             // 如果有定义expiresAt和expired，则自动生成一个检查的watcher
@@ -35,7 +34,7 @@ function makeIntrinsicWatchers<ED extends EntityDict>(schema: StorageSchema<ED>)
                     return {
                         expired: false,
                         expiresAt: {
-                            $lte: now,
+                            $lte: Date.now(),
                         },
                     };
                 },
