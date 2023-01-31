@@ -5,6 +5,16 @@ export declare class OakException extends Error {
 }
 export declare class OakDataException extends OakException {
 }
+export declare class OakUniqueViolationException extends OakException {
+    rows: Array<{
+        id?: string;
+        attrs: string[];
+    }>;
+    constructor(rows: Array<{
+        id?: string;
+        attrs: string[];
+    }>, message?: string);
+}
 export declare class OakImportDataParseException extends OakException {
     line: number;
     header?: string;

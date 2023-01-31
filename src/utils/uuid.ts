@@ -127,7 +127,7 @@ export function sequentialUuid({ random }: { random: Uint8Array }) {
 }
 
 export function shrinkUuidTo32Bytes(uuid: string) {
-    return uuid.replaceAll('-', '');
+    return uuid.replace(/\-/g, '');
 }
 
 export function expandUuidTo36Bytes(uuidShrinked: string) {

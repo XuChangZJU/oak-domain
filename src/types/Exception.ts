@@ -26,6 +26,20 @@ export class OakDataException extends OakException {
     // 表示由数据层发现的异常
 }
 
+export class OakUniqueViolationException extends OakException {
+    rows: Array<{
+        id?: string;
+        attrs: string[];
+    }>;
+    constructor(rows: Array<{
+        id?: string;
+        attrs: string[];
+    }>, message?: string) {
+        super(message || '您更新的数据违反了唯一性约束');
+        this.rows = rows;
+    }
+}
+
 export class OakImportDataParseException extends OakException {
     line: number;
     header?: string;
@@ -231,6 +245,12 @@ export function makeException(data: {
         }
         case 'OakDeadlock': {
             return new OakDeadlock(data.message);
+        }
+        case 'OakDataException': {
+            return new OakDataException(data.message);
+        }
+        case 'OakUniqueViolationException': {
+            return new OakUniqueViolationException(data.rows, data.message);
         }
         case 'OakImportDataParseException': {
             return new OakImportDataParseException(data.message!, data.line, data.header);

@@ -1,9 +1,8 @@
 import PathLib from 'path';
 import assert from 'assert';
-import { execSync } from 'child_process';
 import { writeFileSync, readdirSync, mkdirSync, fstat } from 'fs';
 import { emptydirSync } from 'fs-extra';
-import { assign, cloneDeep, difference, identity, intersection, keys, uniq, uniqBy } from 'lodash';
+import { assign, cloneDeep, difference, identity, intersection, keys, pull, uniq, uniqBy } from 'lodash';
 import * as ts from 'typescript';
 const { factory } = ts;
 import {
@@ -952,12 +951,12 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                                     }
                                 ) as ts.PropertyAssignment;
                                 assert(ts.isStringLiteral(nameProperty.initializer));
-                                const indexName = nameProperty.initializer.text;
-                                if (indexNameDict[indexName]) {
-                                    throw new Error(`「${filename}」索引定义重名「${indexName}」`);
+                                const nameText = nameProperty.initializer.text;
+                                if (indexNameDict[nameText]) {
+                                    throw new Error(`「${filename}」索引定义重名「${nameText}」`);
                                 }
                                 assign(indexNameDict, {
-                                    [indexName]: true,
+                                    [nameText]: true,
                                 });
 
                                 const configProperty = properties.find(
@@ -1010,11 +1009,11 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                                                 }
                                             ) as ts.PropertySignature;
                                             if (!schemaNode) {
-                                                throw new Error(`「${filename}」中索引「${indexName}」的属性「${indexAttrName}」定义非法`);
+                                                throw new Error(`「${filename}」中索引「${nameText}」的属性「${indexAttrName}」定义非法`);
                                             }
 
                                             const { type, name } = schemaNode;
-                                            const entity = firstLetterLowerCase(moduleName);
+                                            const entity = moduleName;
                                             const { [entity]: manyToOneSet } = ManyToOne;
                                             if (ts.isTypeReferenceNode(type!)) {
                                                 const { typeName } = type;
@@ -1027,14 +1026,19 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                                                     if (!manyToOneItem) {
                                                         // 如果不是外键，则不能是Text, File 
                                                         if (isFulltextIndex) {
-                                                            assert(['Text', 'String'].includes(text2), `「${filename}」中全文索引「${indexName}」定义的属性「${indexAttrName}」类型非法，只能是Text/String`);
+                                                            assert(['Text', 'String'].includes(text2), `「${filename}」中全文索引「${nameText}」定义的属性「${indexAttrName}」类型非法，只能是Text/String`);
                                                         }
                                                         else {
-                                                            assert(!unIndexedTypes.includes(text2), `「${filename}」中索引「${indexName}」的属性「${indexAttrName}」的类型为「${text2}」，不可索引`);
+                                                            assert(!unIndexedTypes.includes(text2), `「${filename}」中索引「${nameText}」的属性「${indexAttrName}」的类型为「${text2}」，不可索引`);
                                                         }
                                                     }
                                                     else {
-                                                        assert(!isFulltextIndex, `「${filename}」中全文索引「${indexName}」的属性「${indexAttrName}」类型非法，只能为Text/String`);
+                                                        assert(!isFulltextIndex, `「${filename}」中全文索引「${nameText}」的属性「${indexAttrName}」类型非法，只能为Text/String`);
+                                                        // 在这里把外键加上Id，这样storageSchema才能正常通过
+                                                        // 这里的写法不太好，未来TS版本高了可能会有问题。by Xc 20230131
+                                                        Object.assign(nameProperty, {
+                                                            initializer: factory.createStringLiteral(`${indexAttrName}Id`),
+                                                        });
                                                     }
                                                 }
                                                 else {
@@ -1042,8 +1046,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                                                 }
                                             }
                                             else {
-                                                assert(!isFulltextIndex, `「${filename}」中全文索引「${indexName}」的属性「${indexAttrName}」类型只能为Text/String`);
-                                                assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${entity}中索引「${indexName}」的属性${(<ts.Identifier>name).text}有定义非法`);
+                                                assert(!isFulltextIndex, `「${filename}」中全文索引「${nameText}」的属性「${indexAttrName}」类型只能为Text/String`);
+                                                assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${entity}中索引「${nameText}」的属性${(<ts.Identifier>name).text}有定义非法`);
                                             }
                                         }
                                     }
@@ -1587,6 +1591,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                         break;
                     }
                     case 'Int':
+                    case 'Uint':
                     case 'Float':
                     case 'Double': {
                         type2 = factory.createTypeReferenceNode(
@@ -2814,27 +2819,21 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 )
             ],
             factory.createTypeReferenceNode(
-                factory.createIdentifier("Omit"),
+                factory.createIdentifier("OakSelection"),
                 [
+                    factory.createLiteralTypeNode(factory.createStringLiteral("select")),
                     factory.createTypeReferenceNode(
-                        factory.createIdentifier("OakOperation"),
-                        [
-                            factory.createLiteralTypeNode(factory.createStringLiteral("select")),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("P"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Filter"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Sorter"),
-                                undefined
-                            )
-                        ]
+                        factory.createIdentifier("P"),
+                        undefined
                     ),
-                    factory.createLiteralTypeNode(factory.createStringLiteral("id"))
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Filter"),
+                        undefined
+                    ),
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Sorter"),
+                        undefined
+                    )
                 ]
             )
         ),
@@ -2878,26 +2877,20 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             factory.createIdentifier("Aggregation"),
             undefined,
             factory.createTypeReferenceNode(
-                factory.createIdentifier("Omit"),
+                factory.createIdentifier("DeduceAggregation"),
                 [
                     factory.createTypeReferenceNode(
-                        factory.createIdentifier("DeduceAggregation"),
-                        [
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Projection"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Filter"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Sorter"),
-                                undefined
-                            )
-                        ]
+                        factory.createIdentifier("Projection"),
+                        undefined
                     ),
-                    factory.createLiteralTypeNode(factory.createStringLiteral("id"))
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Filter"),
+                        undefined
+                    ),
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Sorter"),
+                        undefined
+                    )
                 ]
             )
         )
@@ -3775,7 +3768,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             const entityNameLc = firstLetterLowerCase(entityName);
             foreignKeySet[entityName].forEach(
                 (foreignKey) => {
-                    const identifier = `${entityNameLc}s$${foreignKey}`;
+                    const identifier = `${entityNameLc}$${foreignKey}`;
 
                     const otmCreateOperationDataNode = factory.createTypeReferenceNode(
                         factory.createIdentifier("Omit"),
@@ -4343,6 +4336,11 @@ const initialStatements = () => [
                     factory.createImportSpecifier(
                         false,
                         undefined,
+                        factory.createIdentifier('Uint')
+                    ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
                         factory.createIdentifier('Float')
                     ),
                     factory.createImportSpecifier(
@@ -4528,6 +4526,11 @@ const initialStatements = () => [
                     false,
                     factory.createIdentifier("Operation"),
                     factory.createIdentifier("OakOperation")
+                ),
+                factory.createImportSpecifier(
+                    false,
+                    factory.createIdentifier("Selection"),
+                    factory.createIdentifier("OakSelection")
                 ),
                 factory.createImportSpecifier(
                     false,

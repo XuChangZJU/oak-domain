@@ -24,7 +24,7 @@ const triggers: Trigger<EntityDict, 'modi', AsyncContext<EntityDict>>[] = [
             for (const modi of modies) {
                 const { targetEntity, id, action, data, filter} = modi;
                 await context.operate(targetEntity as keyof EntityDict, {
-                    id,
+                    id: id!,
                     action: action as EntityDict[keyof EntityDict]['Action'],
                     data: data as EntityDict[keyof EntityDict]['Update']['data'],
                     filter: filter as EntityDict[keyof EntityDict]['Update']['filter'],
