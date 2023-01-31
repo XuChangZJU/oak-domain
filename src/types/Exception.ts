@@ -35,7 +35,7 @@ export class OakUniqueViolationException extends OakException {
         id?: string;
         attrs: string[];
     }>, message?: string) {
-        super(message);
+        super(message || '您更新的数据违反了唯一性约束');
         this.rows = rows;
     }
 }
