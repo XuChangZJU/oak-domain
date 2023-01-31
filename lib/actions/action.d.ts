@@ -1,5 +1,5 @@
 import { ActionDef } from '../types/Action';
-export declare type ReadOnlyAction = 'select' | 'count' | 'stat' | 'download';
+export declare type ReadOnlyAction = 'select' | 'count' | 'stat' | 'download' | 'aggregate';
 export declare type AppendOnlyAction = ReadOnlyAction | 'create';
 export declare type ExcludeUpdateAction = AppendOnlyAction | 'remove';
 export declare type ExcludeRemoveAction = AppendOnlyAction | 'update';

@@ -2814,27 +2814,21 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 )
             ],
             factory.createTypeReferenceNode(
-                factory.createIdentifier("Omit"),
+                factory.createIdentifier("OakSelection"),
                 [
+                    factory.createLiteralTypeNode(factory.createStringLiteral("select")),
                     factory.createTypeReferenceNode(
-                        factory.createIdentifier("OakOperation"),
-                        [
-                            factory.createLiteralTypeNode(factory.createStringLiteral("select")),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("P"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Filter"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Sorter"),
-                                undefined
-                            )
-                        ]
+                        factory.createIdentifier("P"),
+                        undefined
                     ),
-                    factory.createLiteralTypeNode(factory.createStringLiteral("id"))
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Filter"),
+                        undefined
+                    ),
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Sorter"),
+                        undefined
+                    )
                 ]
             )
         ),
@@ -2878,26 +2872,20 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             factory.createIdentifier("Aggregation"),
             undefined,
             factory.createTypeReferenceNode(
-                factory.createIdentifier("Omit"),
+                factory.createIdentifier("DeduceAggregation"),
                 [
                     factory.createTypeReferenceNode(
-                        factory.createIdentifier("DeduceAggregation"),
-                        [
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Projection"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Filter"),
-                                undefined
-                            ),
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("Sorter"),
-                                undefined
-                            )
-                        ]
+                        factory.createIdentifier("Projection"),
+                        undefined
                     ),
-                    factory.createLiteralTypeNode(factory.createStringLiteral("id"))
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Filter"),
+                        undefined
+                    ),
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("Sorter"),
+                        undefined
+                    )
                 ]
             )
         )
@@ -3775,7 +3763,7 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
             const entityNameLc = firstLetterLowerCase(entityName);
             foreignKeySet[entityName].forEach(
                 (foreignKey) => {
-                    const identifier = `${entityNameLc}s$${foreignKey}`;
+                    const identifier = `${entityNameLc}$${foreignKey}`;
 
                     const otmCreateOperationDataNode = factory.createTypeReferenceNode(
                         factory.createIdentifier("Omit"),
@@ -4528,6 +4516,11 @@ const initialStatements = () => [
                     false,
                     factory.createIdentifier("Operation"),
                     factory.createIdentifier("OakOperation")
+                ),
+                factory.createImportSpecifier(
+                    false,
+                    factory.createIdentifier("Selection"),
+                    factory.createIdentifier("OakSelection")
                 ),
                 factory.createImportSpecifier(
                     false,

@@ -30,7 +30,7 @@ function makeIntrinsicWatchers<ED extends EntityDict>(schema: StorageSchema<ED>)
             watchers.push({
                 entity,
                 name: `对象${entity}上的过期自动watcher`,
-                filter: async () => {
+                filter: () => {
                     return {
                         expired: false,
                         expiresAt: {

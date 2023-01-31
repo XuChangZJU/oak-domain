@@ -669,7 +669,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 assert(relation instanceof Array);
                 const [entityOtm, foreignKey] = relation;
                 const otmOperations = data[attr];
-                const dealWithOneToMany = (otm: ED[keyof ED]['Update']) => {
+                const dealWithOneToMany = (otm: ED[keyof ED]['Update'] | ED[keyof ED]['Create']) => {
                     const { action: actionOtm, data: dataOtm, filter: filterOtm } = otm;
                     if (!foreignKey) {
                         // 基于entity/entityId的one-to-many
@@ -692,7 +692,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                         else if (actionOtm === 'create') {
                             // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
-                            // todo 这个假设成立吗？等遇到create/create一对多的case再完善
+                            // todo 这个假设对watcher等后台行为可能不成立，等遇到create/create一对多的case再完善
                             const { id } = filter!;
                             assert(typeof id === 'string');
                             if (dataOtm instanceof Array) {
@@ -713,11 +713,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         else {
                             // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
                             // 这个倒是好像不可能出现create/update的一对多，如果遇到了再完善
-                            const { id } = filter!;
                             Object.assign(otm, {
                                 filter: addFilterSegment({
-                                    entity,
-                                    entityId: id,
+                                    [entity]: filter,
                                 }, filterOtm),
                             });
                             if (action === 'remove' && actionOtm === 'update') {
@@ -747,7 +745,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                         else if (actionOtm === 'create') {
                             // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
-                            // todo 这个假设成立吗？等遇到create/create一对多的case再完善
+                            // todo 这个假设在后台可能不成立，等遇到了再说
                             const { id } = filter!;
                             assert(typeof id === 'string');
                             if (dataOtm instanceof Array) {
@@ -764,12 +762,10 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             }
                         }
                         else {
-                            // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
-                            // 这个倒是好像不可能出现create/update的一对多，如果遇到了再完善
-                            const { id } = filter!;
+                            // update可能出现上层filter不是根据id的（userEntityGrant的过期触发的wechatQrCode的过期，见general中的userEntityGrant的trigger）
                             Object.assign(otm, {
                                 filter: addFilterSegment({
-                                    [foreignKey]: id,
+                                    [foreignKey.slice(0, foreignKey.length - 2)]: filter,
                                 }, filterOtm),
                             });
                             if (action === 'remove' && actionOtm === 'update') {
@@ -780,7 +776,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                     }
 
-                    afterFns.push(() => cascadeUpdate.call(this, entityOtm!, otm, context, option2));
+                    beforeFns.push(() => cascadeUpdate.call(this, entityOtm!, otm, context, option2));
                 };
 
                 if (otmOperations instanceof Array) {

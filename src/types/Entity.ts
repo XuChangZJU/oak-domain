@@ -1,3 +1,4 @@
+import { ReadOnlyAction } from '../actions/action';
 import { PrimaryKey, Sequence } from './DataType';
 
 type TriggerDataAttributeType = '$$triggerData$$';
@@ -55,7 +56,17 @@ export type Operation<A extends string,
     D extends Projection,
     F extends Filter | undefined = undefined,
     S extends Sorter | undefined = undefined> = {
-        id?: string;     // 为了一致性，每个operation也应当保证唯一id
+        id: string;     // 为了一致性，每个operation也应当保证唯一id
+        action: A;
+        data: D;
+        sorter?: S;
+    } & FilterPart<A, F>;
+
+export type Selection<A extends ReadOnlyAction, 
+    D extends Projection,
+    F extends Filter | undefined = undefined,
+    S extends Sorter | undefined = undefined> = {
+        id?: string;     // selection的id可传可不传，如果传意味着该select会记录在oper中
         action: A;
         data: D;
         sorter?: S;
@@ -81,8 +92,8 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<Operation<'select', Projection, Filter, Sorter>, 'action'>;
-    Aggregation: Omit<DeduceAggregation<Projection, Filter, Sorter>, 'action'>;
+    Selection: Omit<Selection<'select', Projection, Filter, Sorter>, 'action'>;
+    Aggregation: DeduceAggregation<Projection, Filter, Sorter>;
     Operation: CUDOperation;
     Create: CreateOperation;
     CreateSingle: CreateSingleOperation;
@@ -140,7 +151,7 @@ type Projection = {
 export type DeduceAggregation<
     P extends Projection,
     F extends Filter,
-    S extends Sorter> = Omit<Operation<'aggregate', DeduceAggregationData<P>, F, S>, 'action'>;
+    S extends Sorter> = Omit<Selection<'aggregate', DeduceAggregationData<P>, F, S>, 'action'>;
 
 type CreateOperationData = {
     id: string;

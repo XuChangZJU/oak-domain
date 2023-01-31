@@ -1,3 +1,4 @@
+import { ReadOnlyAction } from '../actions/action';
 import { PrimaryKey, Sequence } from './DataType';
 declare type TriggerDataAttributeType = '$$triggerData$$';
 declare type TriggerTimestampAttributeType = '$$triggerTimestamp$$';
@@ -45,6 +46,12 @@ export declare type FormCreateData<SH extends GeneralEntityShape> = Partial<Omit
     id: string;
 };
 export declare type Operation<A extends string, D extends Projection, F extends Filter | undefined = undefined, S extends Sorter | undefined = undefined> = {
+    id: string;
+    action: A;
+    data: D;
+    sorter?: S;
+} & FilterPart<A, F>;
+export declare type Selection<A extends ReadOnlyAction, D extends Projection, F extends Filter | undefined = undefined, S extends Sorter | undefined = undefined> = {
     id?: string;
     action: A;
     data: D;
@@ -66,8 +73,8 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<Operation<'select', Projection, Filter, Sorter>, 'action'>;
-    Aggregation: Omit<DeduceAggregation<Projection, Filter, Sorter>, 'action'>;
+    Selection: Omit<Selection<'select', Projection, Filter, Sorter>, 'action'>;
+    Aggregation: DeduceAggregation<Projection, Filter, Sorter>;
     Operation: CUDOperation;
     Create: CreateOperation;
     CreateSingle: CreateSingleOperation;
@@ -110,7 +117,7 @@ declare type Filter = {
 declare type Projection = {
     [K: string]: any;
 };
-export declare type DeduceAggregation<P extends Projection, F extends Filter, S extends Sorter> = Omit<Operation<'aggregate', DeduceAggregationData<P>, F, S>, 'action'>;
+export declare type DeduceAggregation<P extends Projection, F extends Filter, S extends Sorter> = Omit<Selection<'aggregate', DeduceAggregationData<P>, F, S>, 'action'>;
 declare type CreateOperationData = {
     id: string;
     [K: string]: any;
