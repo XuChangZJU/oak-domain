@@ -1587,6 +1587,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                         break;
                     }
                     case 'Int':
+                    case 'Uint':
                     case 'Float':
                     case 'Double': {
                         type2 = factory.createTypeReferenceNode(
@@ -4327,6 +4328,11 @@ const initialStatements = () => [
                         false,
                         undefined,
                         factory.createIdentifier('Int')
+                    ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier('Uint')
                     ),
                     factory.createImportSpecifier(
                         false,
