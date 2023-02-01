@@ -10,7 +10,7 @@ import { AsyncContext } from "./AsyncRowStore";
 import { getFullProjection } from './actionDef';
 import { SyncContext } from './SyncRowStore';
 import { firstLetterUpperCase } from '../utils/string';
-import { uniq } from '../utils/lodash';
+import { uniq, difference } from '../utils/lodash';
 import { judgeRelation } from './relation';
 
 export function translateCheckerInAsyncContext<
@@ -255,8 +255,19 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
     const paths = cascadePath.split('.');
 
     const translateRelationFilter = <T extends keyof ED>(entity: T): (userId: string) => ED[T]['Selection']['filter'] => {
-        // 有两种情况，此entity和user有Relation定义，或是此entity上有userId
-        if (schema[entity].relation) {
+        // 有两种情况，此entity和user有Relation定义，或是此entity已经指向user
+        if (entity === 'user') {
+            return (userId) => ({
+                id: userId,                
+            });
+        }
+        else if (schema[entity].relation) {
+            if (relations) {
+                const diff = difference(relations, schema[entity].relation!);
+                if (diff.length > 0) {
+                    throw new Error(`${entity2 as string}上某auth定义的relations中含有不可识别的关系定义${diff.join(',')}， 请仔细检查`);
+                }
+            }
             const relationEntityName = `user${firstLetterUpperCase(entity as string)}`;
             return (userId) => {
                 const filter = relations ? {
@@ -280,12 +291,9 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                 }
             };
         }
-
-        const { attributes } = schema[entity];
-        assert(attributes.hasOwnProperty('userId') && attributes.userId.type === 'ref' && attributes.userId.ref === 'user', `在${entity as string}上既找不到userId，也没有relation定义`);
-        return (userId) => ({
-            userId,
-        });
+        else {
+            assert(false, `${entity2 as string}上某auth定义的cascadePath${cascadePath}不能定位到User对象或者和User关联的关系对象， 请仔细检查`);
+        }
     };
 
     const translateFilterMakerIter = <T extends keyof ED>(entity: T, iter: number): (userId: string) => ED[T]['Selection']['filter'] => {
@@ -294,30 +302,22 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
             if (relation === 2) {
                 const filterMaker = translateRelationFilter(paths[iter]);
                 return (userId) => {
-                    const filter = filterMaker(userId);
-                    if (filter!.$in) {
-                        return {
-                            entity: paths[iter],
-                            entityId: filter,
-                        };
-                    }
+                    const filter = filterMaker(userId)!;
+                    assert(filter.id);
                     return {
-                        [paths[iter]]: filter,
+                        entity: paths[iter],
+                        entityId: filter.id,
                     };
                 }
             }
             assert(typeof relation === 'string');
             const filterMaker = translateRelationFilter(relation);
             return (userId) => {
-                const filter = filterMaker(userId);
+                const filter = filterMaker(userId)!;
 
-                if (filter!.$in) {
-                    return {
-                        [`${paths[iter]}Id`]: filter
-                    };
-                }
+                assert(filter.id);
                 return {
-                    [paths[iter]]: filter,
+                    [`${paths[iter]}Id`]: filter.id,
                 };
             }
         }

@@ -228,5 +228,8 @@ export function reinforceSelection<ED extends EntityDict>(schema: StorageSchema<
                 }
             ]
         });
+        Object.assign(data, {
+            $$createAt$$: 1,
+        });
     }
 }
