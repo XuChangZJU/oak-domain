@@ -10,7 +10,7 @@ import { AsyncContext } from "./AsyncRowStore";
 import { getFullProjection } from './actionDef';
 import { SyncContext } from './SyncRowStore';
 import { firstLetterUpperCase } from '../utils/string';
-import { uniq } from '../utils/lodash';
+import { uniq, difference } from '../utils/lodash';
 import { judgeRelation } from './relation';
 
 export function translateCheckerInAsyncContext<
@@ -262,6 +262,12 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
             });
         }
         else if (schema[entity].relation) {
+            if (relations) {
+                const diff = difference(relations, schema[entity].relation!);
+                if (diff.length > 0) {
+                    throw new Error(`${entity2 as string}上某auth定义的relations中含有不可识别的关系定义${diff.join(',')}， 请仔细检查`);
+                }
+            }
             const relationEntityName = `user${firstLetterUpperCase(entity as string)}`;
             return (userId) => {
                 const filter = relations ? {
