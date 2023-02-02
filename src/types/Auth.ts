@@ -15,7 +15,7 @@ export type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt extends A
     type: 'data';
     entity: T;
     action: Omit<ED[T]['Action'], 'remove'> | Array<Omit<ED[T]['Action'], 'remove'>>;
-    checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => void | Promise<void>;
+    checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => any | Promise<any>;
     conditionalFilter?: ED[T]['Update']['filter'] | (
         (operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Selection']['filter']>
     );
@@ -62,7 +62,7 @@ export type LogicalChecker<ED extends EntityDict, T extends keyof ED, Cxt extend
         operation: ED[T]['Operation'] | ED[T]['Selection'],
         context: Cxt,
         option: OperateOption | SelectOption
-    ) => void | Promise<void>;
+    ) => any | Promise<any>;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 
@@ -76,7 +76,7 @@ export type LogicalRelationChecker<ED extends EntityDict, T extends keyof ED, Cx
         operation: ED[T]['Operation'] | ED[T]['Selection'],
         context: Cxt,
         option: OperateOption | SelectOption
-    ) => void | Promise<void>;
+    ) => any | Promise<any>;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 

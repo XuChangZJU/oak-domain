@@ -5222,6 +5222,26 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                     )
                                 )
                             );
+                            // 如果是entity，在这里处理一下ref
+                            if (ts.isIdentifier(name) && name.text === 'entity') {
+                                const mtoRelations = ReversePointerRelations[entity];
+                                if (mtoRelations) {
+                                    const mtoEntities = mtoRelations.map(
+                                        ele => firstLetterLowerCase(ele)
+                                    );
+                                    attrAssignments.push(
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("ref"),
+                                            factory.createArrayLiteralExpression(
+                                                mtoEntities.map(
+                                                    ele => factory.createStringLiteral(ele)
+                                                ),
+                                                false
+                                              )
+                                        )
+                                    );
+                                }
+                            }
                             break;
                         }
                         case 'Text':
