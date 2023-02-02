@@ -20,7 +20,7 @@ export interface Index<SH extends EntityShape> {
 export interface Attribute {
     type: DataType | Ref;
     params?: DataTypeParams;
-    ref?: string;
+    ref?: string | string[];
     onRefDelete?: 'delete' | 'setNull' | 'ignore';
     default?: string | number | boolean;
     notNull?: boolean;

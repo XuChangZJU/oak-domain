@@ -3,14 +3,14 @@ import { addFilterSegment, checkFilterContains, combineFilters } from "../store/
 import { OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
 import {
     AuthDefDict, CascadeRelationItem, Checker, CreateTriggerInTxn,
-    EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn, RelationHierarchy
+    EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn, RelationHierarchy, SelectOpResult
 } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
 import { getFullProjection } from './actionDef';
 import { SyncContext } from './SyncRowStore';
 import { firstLetterUpperCase } from '../utils/string';
-import { uniq, difference } from '../utils/lodash';
+import { intersection, uniq, difference } from '../utils/lodash';
 import { judgeRelation } from './relation';
 
 export function translateCheckerInAsyncContext<
@@ -111,7 +111,7 @@ export function translateCheckerInAsyncContext<
                     const filter2 = await relationFilter(operation, context, option);
 
                     const { data } = operation as ED[keyof ED]['Create'];
-                    const filter  = data instanceof Array ? {
+                    const filter = data instanceof Array ? {
                         id: {
                             $in: data.map(
                                 ele => ele.id,
@@ -258,7 +258,7 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
         // 有两种情况，此entity和user有Relation定义，或是此entity已经指向user
         if (entity === 'user') {
             return (userId) => ({
-                id: userId,                
+                id: userId,
             });
         }
         else if (schema[entity].relation) {
@@ -371,7 +371,12 @@ function translateActionAuthFilterMaker<ED extends EntityDict & BaseEntityDict>(
     return (userId) => filterMaker(userId);
 }
 
-
+/**
+ * 根据权限定义，创建出相应的checker
+ * @param schema 
+ * @param authDict 
+ * @returns 
+ */
 export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
     schema: StorageSchema<ED>,
     authDict: AuthDefDict<ED>) {
@@ -474,6 +479,182 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                 }
             }
         }
+    }
+
+    return checkers;
+}
+
+/**
+ * 对对象的删除，检查其是否会产生其他行上的空指针，不允许这种情况的出现
+ * @param schema 
+ * @returns 
+ * 如果有的对象允许删除，需要使用trigger来处理其相关联的外键对象，这些trigger写作before，则会在checker之前执行，仍然可以删除成功
+ */
+export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
+    const checkers: Checker<ED, keyof ED, Cxt>[] = [];
+
+    // 先建立所有的一对多的关系
+    const OneToManyMatrix: Partial<Record<keyof ED, Array<[keyof ED, string]>>> = {};
+    const OneToManyOnEntityMatrix: Partial<Record<keyof ED, Array<keyof ED>>> = {};
+
+    const addToMto = (e: keyof ED, f: keyof ED, attr: string) => {
+        if (OneToManyMatrix[f]) {
+            OneToManyMatrix[f]?.push([e, attr]);
+        }
+        else {
+            OneToManyMatrix[f] = [[e, attr]];
+        }
+    };
+
+    const addToMtoEntity = (e: keyof ED, fs: Array<keyof ED>) => {
+        for (const f of fs) {
+            if (!OneToManyOnEntityMatrix[f]) {
+                OneToManyOnEntityMatrix[f] = [e];
+            }
+            else {
+                OneToManyOnEntityMatrix[f]?.push(e);
+            }
+        }
+    };
+
+    for (const entity in schema) {
+        if (['operEntity'].includes(entity)) {
+            continue;       // OperEntity会指向每一个对象，不必处理
+        }
+        const { attributes } = schema[entity];
+        for (const attr in attributes) {
+            if (attributes[attr].type === 'ref') {
+                addToMto(entity, attributes[attr].ref as keyof ED, attr);
+            }
+            else if (attr === 'entity') {
+                if (attributes[attr].ref) {
+                    addToMtoEntity(entity, attributes[attr].ref as Array<keyof ED>);
+                }
+                else if (process.env.NODE_ENV === 'development') {
+                    console.warn(`${entity}的entity反指指针找不到有效的对象`);
+                }
+            }
+        }
+    }
+
+    // 当删除一时，要确认多上面没有指向一的数据
+    const entities = intersection(Object.keys(OneToManyMatrix), Object.keys(OneToManyOnEntityMatrix));
+    for (const entity of entities) {
+        checkers.push({
+            entity: entity as keyof ED,
+            action: 'remove',
+            type: 'logical',
+            checker: (operation, context, option) => {
+                const promises: Promise<void>[] = [];
+                if (OneToManyMatrix[entity]) {
+                    for (const otm of OneToManyMatrix[entity]!) {
+                        const [e, attr] = otm;
+                        const proj = {
+                            id: 1,
+                            [attr]: 1,
+                        };
+                        const filter = operation.filter && {
+                            [attr.slice(0, attr.length -2)]: operation.filter
+                        }
+                        const result = context.select(e, {
+                            data: proj,
+                            filter,
+                            indexFrom: 0,
+                            count: 1
+                        }, { dontCollect: true });
+                        if (result instanceof Promise) {
+                            promises.push(
+                                result.then(
+                                    ([row]) => {
+                                        if (row) {
+                                            const record = {
+                                                a: 's',
+                                                d: {
+                                                    [e]: {
+                                                        [row.id!]: row,
+                                                    }
+                                                }
+                                            } as SelectOpResult<ED>;
+                                            throw new OakRowInconsistencyException(record, `您无法删除存在有效数据「${e as string}」关联的行`);
+                                        }
+                                    }
+                                )
+                            );
+                        }
+                        else {
+                            const [row] = result;
+                            if (row) {
+                                const record = {
+                                    a: 's',
+                                    d: {
+                                        [e]: {
+                                            [row.id!]: row,
+                                        }
+                                    }
+                                } as SelectOpResult<ED>;
+                                throw new OakRowInconsistencyException(record, `您无法删除存在有效数据「${e as string}」关联的行`);
+                            }
+                        }
+                    }
+                }
+                if (OneToManyOnEntityMatrix[entity]) {
+                    for (const otm of OneToManyOnEntityMatrix[entity]!) {
+                        const proj = {
+                            id: 1,
+                            entity: 1,
+                            entityId: 1,
+                        };
+                        const filter = operation.filter && {
+                            [entity]: operation.filter
+                        }
+                        const result = context.select(otm, {
+                            data: proj,
+                            filter,
+                            indexFrom: 0,
+                            count: 1
+                        }, { dontCollect: true });
+                        if (result instanceof Promise) {
+                            promises.push(
+                                result.then(
+                                    ([row]) => {
+                                        if (row) {
+                                            const record = {
+                                                a: 's',
+                                                d: {
+                                                    [otm]: {
+                                                        [row.id!]: row,
+                                                    }
+                                                }
+                                            } as SelectOpResult<ED>;
+                                            throw new OakRowInconsistencyException(record, `您无法删除存在有效数据「${otm as string}」关联的行`);
+                                        }
+                                    }
+                                )
+                            );
+                        }
+                        else {
+                            const [row] = result;
+                            if (row) {
+                                const record = {
+                                    a: 's',
+                                    d: {
+                                        [otm]: {
+                                            [row.id!]: row,
+                                        }
+                                    }
+                                } as SelectOpResult<ED>;
+                                throw new OakRowInconsistencyException(record, `您无法删除存在有效数据「${otm as string}」关联的行`);
+                            }
+                        }
+                    }                    
+                }
+                if (promises.length > 0) {
+                    return Promise.all(promises).then(
+                        () => undefined
+                    );
+                }
+            }
+        })
     }
 
     return checkers;

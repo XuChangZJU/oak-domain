@@ -5,7 +5,7 @@ import { EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerT
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
 import { Checker, CheckerType, LogicalChecker, RelationChecker } from '../types/Auth';
-import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTrigger } from "../types/Trigger";
+import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTrigger, TRIGGER_DEFAULT_PRIORITY, CHECKER_DEFAULT_PRIORITY, DATA_CHECKER_DEFAULT_PRIORITY, TRIGGER_MAX_PRIORITY, TRIGGER_MIN_PRIORITY } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
 import { translateCheckerInAsyncContext } from './checker';
@@ -50,10 +50,11 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
         const { entity, action, type, conditionalFilter } = checker;
         const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
         const { fn, when } = translateCheckerInAsyncContext(checker);
+        const priority = type === 'data' ? DATA_CHECKER_DEFAULT_PRIORITY : CHECKER_DEFAULT_PRIORITY;        // checker的默认优先级最低（前面的trigger可能会赋上一些相应的值）
         const trigger = {
             checkerType: type,
             name: triggerName,
-            priority: checker.priority || 20,        // checker的默认优先级稍高
+            priority: checker.priority || priority,
             entity,
             action: action as 'update',
             fn,
@@ -77,7 +78,10 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
             throw new Error(`不可有同名的触发器「${trigger.name}」`);
         }
         if (typeof trigger.priority !== 'number') {
-            trigger.priority = 10;       // 默认值
+            trigger.priority = TRIGGER_DEFAULT_PRIORITY;       // 默认值
+        }
+        else {
+            assert(trigger.priority <= TRIGGER_MAX_PRIORITY && trigger.priority >= TRIGGER_MIN_PRIORITY, `trigger「${trigger.name}」的优先级定义越界，应该在${TRIGGER_MIN_PRIORITY}到${TRIGGER_MAX_PRIORITY}之间`);
         }
         if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
             assert(typeof trigger.action === 'string' && trigger.action !== 'create'

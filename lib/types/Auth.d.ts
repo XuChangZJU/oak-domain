@@ -12,7 +12,7 @@ export declare type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt e
     type: 'data';
     entity: T;
     action: Omit<ED[T]['Action'], 'remove'> | Array<Omit<ED[T]['Action'], 'remove'>>;
-    checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => void | Promise<void>;
+    checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => any | Promise<any>;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Selection']['filter']>);
 };
 export declare type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
@@ -44,7 +44,7 @@ export declare type LogicalChecker<ED extends EntityDict, T extends keyof ED, Cx
     when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
-    checker: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => void | Promise<void>;
+    checker: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => any | Promise<any>;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 export declare type LogicalRelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
@@ -53,7 +53,7 @@ export declare type LogicalRelationChecker<ED extends EntityDict, T extends keyo
     when?: 'after';
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
-    checker: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => void | Promise<void>;
+    checker: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => any | Promise<any>;
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
 };
 export declare type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = DataChecker<ED, T, Cxt> | RowChecker<ED, T, Cxt> | RelationChecker<ED, T, Cxt> | LogicalChecker<ED, T, Cxt> | LogicalRelationChecker<ED, T, Cxt>;

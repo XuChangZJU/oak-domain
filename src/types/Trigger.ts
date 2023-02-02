@@ -5,6 +5,15 @@ import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OperateOption } from "../types/Entity";
 import { EntityShape } from "../types/Entity";
 
+/**
+ * 优先级越小，越早执行。定义在1～99之间
+ */
+export const TRIGGER_DEFAULT_PRIORITY = 50;
+export const TRIGGER_MIN_PRIORITY = 1;
+export const TRIGGER_MAX_PRIORITY = 99;
+export const DATA_CHECKER_DEFAULT_PRIORITY = 60;
+export const CHECKER_DEFAULT_PRIORITY = 99;
+
 interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
     checkerType?: CheckerType;
     entity: T;
