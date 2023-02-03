@@ -518,8 +518,8 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
     };
 
     for (const entity in schema) {
-        if (['operEntity'].includes(entity)) {
-            continue;       // OperEntity会指向每一个对象，不必处理
+        if (['operEntity', 'modiEntity'].includes(entity)) {
+            continue;       // OperEntity和ModiEntity是系统数据，不用处理
         }
         const { attributes } = schema[entity];
         for (const attr in attributes) {
