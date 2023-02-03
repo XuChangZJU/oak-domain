@@ -10,7 +10,7 @@ import { AsyncContext } from "./AsyncRowStore";
 import { getFullProjection } from './actionDef';
 import { SyncContext } from './SyncRowStore';
 import { firstLetterUpperCase } from '../utils/string';
-import { intersection, uniq, difference } from '../utils/lodash';
+import { union, uniq, difference } from '../utils/lodash';
 import { judgeRelation } from './relation';
 
 export function translateCheckerInAsyncContext<
@@ -518,8 +518,8 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
     };
 
     for (const entity in schema) {
-        if (['operEntity', 'modiEntity'].includes(entity)) {
-            continue;       // OperEntity和ModiEntity是系统数据，不用处理
+        if (['operEntity', 'modiEntity', 'userEntityGrant'].includes(entity)) {
+            continue;       // 系统功能性数据，不用处理
         }
         const { attributes } = schema[entity];
         for (const attr in attributes) {
@@ -538,7 +538,7 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
     }
 
     // 当删除一时，要确认多上面没有指向一的数据
-    const entities = intersection(Object.keys(OneToManyMatrix), Object.keys(OneToManyOnEntityMatrix));
+    const entities = union(Object.keys(OneToManyMatrix), Object.keys(OneToManyOnEntityMatrix));
     for (const entity of entities) {
         checkers.push({
             entity: entity as keyof ED,

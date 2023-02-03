@@ -1,32 +1,21 @@
-import { String, Text, ForeignKey } from "../../types/DataType";
-import { Q_DateValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
+import { String } from "../../types/DataType";
+import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
 import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
-import { Action, ParticularAction, UserState } from "./Action";
-import { RelationAction } from "../../actions/action";
-import * as Oper from "../Oper/Schema";
+import { GenericAction } from "../../actions/action";
 import * as OperEntity from "../OperEntity/Schema";
 import * as ModiEntity from "../ModiEntity/Schema";
 export declare type OpSchema = EntityShape & {
-    name?: String<16> | null;
-    nickname?: String<64> | null;
-    password?: Text | null;
-    refId?: ForeignKey<"user"> | null;
-    userState?: UserState | null;
+    entity: String<32>;
+    entityId: String<64>;
+    relation: String<32>;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
-    name?: String<16> | null;
-    nickname?: String<64> | null;
-    password?: Text | null;
-    refId?: ForeignKey<"user"> | null;
-    userState?: UserState | null;
-    ref?: Schema | null;
-    oper$operator?: Array<Oper.Schema>;
-    oper$operator$$aggr?: AggregationResult<Oper.Schema>;
-    user$ref?: Array<Schema>;
-    user$ref$$aggr?: AggregationResult<Schema>;
+    entity: String<32>;
+    entityId: String<64>;
+    relation: String<32>;
     operEntity$entity?: Array<OperEntity.Schema>;
     operEntity$entity$$aggr?: AggregationResult<OperEntity.Schema>;
     modiEntity$entity?: Array<ModiEntity.Schema>;
@@ -35,16 +24,13 @@ export declare type Schema = EntityShape & {
     [A in ExpressionKey]?: any;
 };
 declare type AttrFilter = {
-    id: Q_StringValue | SubQuery.UserIdSubQuery;
+    id: Q_StringValue | SubQuery.UserEntityGrantIdSubQuery;
     $$createAt$$: Q_DateValue;
     $$seq$$: Q_StringValue;
     $$updateAt$$: Q_DateValue;
-    name: Q_StringValue;
-    nickname: Q_StringValue;
-    password: Q_StringValue;
-    refId: Q_StringValue | SubQuery.UserIdSubQuery;
-    ref: Filter;
-    userState: Q_EnumValue<UserState>;
+    entity: Q_StringValue;
+    entityId: Q_StringValue;
+    relation: Q_StringValue;
 };
 export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
 export declare type Projection = {
@@ -54,24 +40,9 @@ export declare type Projection = {
     $$createAt$$?: number;
     $$updateAt$$?: number;
     $$seq$$?: number;
-    name?: number;
-    nickname?: number;
-    password?: number;
-    refId?: number;
-    ref?: Projection;
-    userState?: number;
-    oper$operator?: Oper.Selection & {
-        $entity: "oper";
-    };
-    oper$operator$$aggr?: Oper.Aggregation & {
-        $entity: "oper";
-    };
-    user$ref?: Selection & {
-        $entity: "user";
-    };
-    user$ref$$aggr?: Aggregation & {
-        $entity: "user";
-    };
+    entity?: number;
+    entityId?: number;
+    relation?: number;
     operEntity$entity?: OperEntity.Selection & {
         $entity: "operEntity";
     };
@@ -85,9 +56,8 @@ export declare type Projection = {
         $entity: "modiEntity";
     };
 } & Partial<ExprOp<OpAttr | string>>;
-declare type UserIdProjection = OneOf<{
+declare type UserEntityGrantIdProjection = OneOf<{
     id: number;
-    refId: number;
 }>;
 export declare type SortAttr = {
     id: number;
@@ -98,17 +68,11 @@ export declare type SortAttr = {
 } | {
     $$updateAt$$: number;
 } | {
-    name: number;
+    entity: number;
 } | {
-    nickname: number;
+    entityId: number;
 } | {
-    password: number;
-} | {
-    refId: number;
-} | {
-    ref: SortAttr;
-} | {
-    userState: number;
+    relation: number;
 } | {
     [k: string]: any;
 } | OneOf<ExprOp<OpAttr | string>>;
@@ -120,53 +84,31 @@ export declare type Sorter = SortNode[];
 export declare type SelectOperation<P extends Object = Projection> = OakSelection<"select", P, Filter, Sorter>;
 export declare type Selection<P extends Object = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Aggregation = DeduceAggregation<Projection, Filter, Sorter>;
-export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "refId">> & (({
-    refId?: never;
-    ref?: CreateSingleOperation;
-} | {
-    refId: String<64>;
-    ref?: UpdateOperation;
-} | {
-    refId?: String<64>;
-})) & {
-    oper$operator?: OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">[]> | Array<OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">>>;
-    user$ref?: OakOperation<UpdateOperation["action"], Omit<UpdateOperationData, "ref" | "refId">, Filter> | OakOperation<"create", Omit<CreateOperationData, "ref" | "refId">[]> | Array<OakOperation<"create", Omit<CreateOperationData, "ref" | "refId">> | OakOperation<UpdateOperation["action"], Omit<UpdateOperationData, "ref" | "refId">, Filter>>;
+export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "entityId">> & ({
+    entity?: string;
+    entityId?: string;
+    [K: string]: any;
+}) & {
     operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
 };
 export declare type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export declare type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export declare type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "refId">> & (({
-    ref: CreateSingleOperation;
-    refId?: never;
-} | {
-    ref: UpdateOperation;
-    refId?: never;
-} | {
-    ref: RemoveOperation;
-    refId?: never;
-} | {
-    ref?: never;
-    refId?: String<64> | null;
-})) & {
+export declare type UpdateOperationData = FormUpdateData<OpSchema> & {
     [k: string]: any;
-    oper$operator?: OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">[]> | Array<OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">>>;
-    user$ref?: UpdateOperation | RemoveOperation | OakOperation<"create", Omit<CreateOperationData, "ref" | "refId">[]> | Array<OakOperation<"create", Omit<CreateOperationData, "ref" | "refId">> | UpdateOperation | RemoveOperation>;
     operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
 };
-export declare type UpdateOperation = OakOperation<"update" | ParticularAction | RelationAction | string, UpdateOperationData, Filter, Sorter>;
-export declare type RemoveOperationData = {} & (({
-    ref?: UpdateOperation | RemoveOperation;
-}));
+export declare type UpdateOperation = OakOperation<"update" | string, UpdateOperationData, Filter, Sorter>;
+export declare type RemoveOperationData = {};
 export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter, Sorter>;
 export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation;
-export declare type UserIdSubQuery = Selection<UserIdProjection>;
+export declare type UserEntityGrantIdSubQuery = Selection<UserEntityGrantIdProjection>;
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;
-    Action: OakMakeAction<Action | RelationAction> | string;
+    Action: OakMakeAction<GenericAction> | string;
     Selection: Selection;
     Aggregation: Aggregation;
     Operation: Operation;
@@ -175,6 +117,5 @@ export declare type EntityDef = {
     Remove: RemoveOperation;
     CreateSingle: CreateSingleOperation;
     CreateMulti: CreateMultipleOperation;
-    ParticularAction: ParticularAction;
 };
 export {};

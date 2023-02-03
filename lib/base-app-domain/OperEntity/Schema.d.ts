@@ -7,19 +7,21 @@ import { AppendOnlyAction } from "../../actions/action";
 import * as Oper from "../Oper/Schema";
 import * as Modi from "../Modi/Schema";
 import * as User from "../User/Schema";
+import * as UserEntityGrant from "../UserEntityGrant/Schema";
 export declare type OpSchema = EntityShape & {
     operId: ForeignKey<"oper">;
-    entity: "modi" | "user" | string;
+    entity: "modi" | "user" | "userEntityGrant" | string;
     entityId: String<64>;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
     operId: ForeignKey<"oper">;
-    entity: "modi" | "user" | string;
+    entity: "modi" | "user" | "userEntityGrant" | string;
     entityId: String<64>;
     oper: Oper.Schema;
     modi?: Modi.Schema;
     user?: User.Schema;
+    userEntityGrant?: UserEntityGrant.Schema;
 } & {
     [A in ExpressionKey]?: any;
 };
@@ -34,8 +36,9 @@ declare type AttrFilter<E> = {
     entityId: Q_StringValue;
     modi: Modi.Filter;
     user: User.Filter;
+    userEntityGrant: UserEntityGrant.Filter;
 };
-export declare type Filter<E = Q_EnumValue<"modi" | "user" | string>> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr | string>>;
+export declare type Filter<E = Q_EnumValue<"modi" | "user" | "userEntityGrant" | string>> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr | string>>;
 export declare type Projection = {
     "#id"?: NodeId;
     [k: string]: any;
@@ -49,6 +52,7 @@ export declare type Projection = {
     entityId?: number;
     modi?: Modi.Projection;
     user?: User.Projection;
+    userEntityGrant?: UserEntityGrant.Projection;
 } & Partial<ExprOp<OpAttr | string>>;
 declare type OperEntityIdProjection = OneOf<{
     id: number;
@@ -60,6 +64,9 @@ declare type ModiIdProjection = OneOf<{
     entityId: number;
 }>;
 declare type UserIdProjection = OneOf<{
+    entityId: number;
+}>;
+declare type UserEntityGrantIdProjection = OneOf<{
     entityId: number;
 }>;
 export declare type SortAttr = {
@@ -82,6 +89,8 @@ export declare type SortAttr = {
     modi: Modi.SortAttr;
 } | {
     user: User.SortAttr;
+} | {
+    userEntityGrant: UserEntityGrant.SortAttr;
 } | {
     [k: string]: any;
 } | OneOf<ExprOp<OpAttr | string>>;
@@ -121,6 +130,17 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity"
     entity: "user";
     entityId: String<64>;
 } | {
+    entity?: never;
+    entityId?: never;
+    userEntityGrant: UserEntityGrant.CreateSingleOperation;
+} | {
+    entity: "userEntityGrant";
+    entityId: String<64>;
+    userEntityGrant: UserEntityGrant.UpdateOperation;
+} | {
+    entity: "userEntityGrant";
+    entityId: String<64>;
+} | {
     entity?: string;
     entityId?: string;
     [K: string]: any;
@@ -143,7 +163,11 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity"
     entityId?: never;
     entity?: never;
 } | {
-    entity?: ("modi" | "user" | string) | null;
+    userEntityGrant?: UserEntityGrant.CreateSingleOperation | UserEntityGrant.UpdateOperation | UserEntityGrant.RemoveOperation;
+    entityId?: never;
+    entity?: never;
+} | {
+    entity?: ("modi" | "user" | "userEntityGrant" | string) | null;
     entityId?: String<64> | null;
 }) & {
     [k: string]: any;
@@ -154,6 +178,8 @@ export declare type RemoveOperationData = {} & ({
 } | {
     user?: User.UpdateOperation | User.RemoveOperation;
 } | {
+    userEntityGrant?: UserEntityGrant.UpdateOperation | UserEntityGrant.RemoveOperation;
+} | {
     [k: string]: any;
 });
 export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter, Sorter>;
@@ -161,6 +187,7 @@ export declare type Operation = CreateOperation | UpdateOperation | RemoveOperat
 export declare type OperIdSubQuery = Selection<OperIdProjection>;
 export declare type ModiIdSubQuery = Selection<ModiIdProjection>;
 export declare type UserIdSubQuery = Selection<UserIdProjection>;
+export declare type UserEntityGrantIdSubQuery = Selection<UserEntityGrantIdProjection>;
 export declare type OperEntityIdSubQuery = Selection<OperEntityIdProjection>;
 export declare type EntityDef = {
     Schema: Schema;

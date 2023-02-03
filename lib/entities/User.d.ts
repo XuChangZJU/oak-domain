@@ -4,4 +4,5 @@ export interface Schema extends EntityShape {
     name?: String<16>;
     nickname?: String<64>;
     password?: Text;
+    ref?: Schema;
 }

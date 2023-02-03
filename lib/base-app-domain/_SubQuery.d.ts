@@ -3,6 +3,7 @@ import * as ModiEntity from "./ModiEntity/Schema";
 import * as Oper from "./Oper/Schema";
 import * as OperEntity from "./OperEntity/Schema";
 import * as User from "./User/Schema";
+import * as UserEntityGrant from "./UserEntityGrant/Schema";
 export declare type ModiIdSubQuery = {
     [K in "$in" | "$nin"]?: (ModiEntity.ModiIdSubQuery & {
         entity: "modiEntity";
@@ -32,5 +33,12 @@ export declare type UserIdSubQuery = {
         entity: "oper";
     }) | (User.UserIdSubQuery & {
         entity: "user";
+    }) | (User.UserIdSubQuery & {
+        entity: "user";
+    }) | any;
+};
+export declare type UserEntityGrantIdSubQuery = {
+    [K in "$in" | "$nin"]?: (UserEntityGrant.UserEntityGrantIdSubQuery & {
+        entity: "userEntityGrant";
     }) | any;
 };
