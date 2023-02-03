@@ -12,6 +12,7 @@ export declare const TRIGGER_MIN_PRIORITY = 1;
 export declare const TRIGGER_MAX_PRIORITY = 99;
 export declare const DATA_CHECKER_DEFAULT_PRIORITY = 60;
 export declare const CHECKER_DEFAULT_PRIORITY = 99;
+export declare const REMOVE_CASCADE_PRIORITY = 70;
 interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
     checkerType?: CheckerType;
     entity: T;

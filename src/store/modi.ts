@@ -1,6 +1,6 @@
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
-import { OpSchema as Modi, Filter } from '../base-app-domain/Modi/Schema';
-import { Checker, Operation, StorageSchema, RowChecker, EntityDict, OakRowLockedException, Context, OperateOption, Trigger, RemoveTrigger, RelationChecker, LogicalChecker, LogicalRelationChecker, OakUserUnpermittedException } from '../types';
+import { OpSchema as Modi } from '../base-app-domain/Modi/Schema';
+import { Operation, StorageSchema, RowChecker, EntityDict, OperateOption, Trigger, RemoveTrigger, REMOVE_CASCADE_PRIORITY } from '../types';
 import { appendOnlyActions } from '../actions/action';
 import { difference } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
@@ -153,13 +153,25 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
         if (inModi) {
             // 当关联modi的对象被删除时，对应的modi也删除
             triggers.push({
-                name: `当删除${entity}对象时，删除相关联还活跃的modi`,
+                name: `当删除${entity}对象时，删除相关联的modi的modiEntity`,
                 action: 'remove',
                 entity,
                 when: 'after',
+                priority: REMOVE_CASCADE_PRIORITY,
                 fn: async ({ operation }, context, option) => {
                     const { data } = operation;
                     const { id } = data;
+                    await context.operate('modiEntity', {
+                        id: await generateNewIdAsync(),
+                        action: 'remove',
+                        data: {},
+                        filter: {
+                            modi: {
+                                entity,
+                                entityId: id,
+                            },
+                        }
+                    }, { dontCollect: true });
                     await context.operate('modi', {
                         id: await generateNewIdAsync(),
                         action: 'remove',
@@ -168,8 +180,8 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
                             entity,
                             entityId: id,
                         }
-                    }, option);
-                    return 1;
+                    }, { dontCollect: true });
+                    return 0;
                 },
             } as RemoveTrigger<ED, keyof ED, Cxt>);
         }

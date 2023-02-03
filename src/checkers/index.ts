@@ -8,7 +8,7 @@ import { StorageSchema, EntityDict as BaseEntityDict, Checker, AuthDef, AuthDefD
 export function createDynamicCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>, authDict?: AuthDefDict<ED>){
     const checkers: Checker<ED, keyof ED, Cxt>[] = [];
     checkers.push(...createModiRelatedCheckers<ED, Cxt>(schema));
-    // checkers.push(...createRemoveCheckers<ED, Cxt>(schema));
+    checkers.push(...createRemoveCheckers<ED, Cxt>(schema));
     if (authDict) {
         checkers.push(...createAuthCheckers<ED, Cxt>(schema, authDict));
     }

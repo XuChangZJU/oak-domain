@@ -139,6 +139,22 @@ function addRelationship(many: string, one: string, key: string, notNull: boolea
     }
 }
 
+/**
+ * 对relationship去重。一旦发生对象重定义这里就有可能重复
+ */
+function uniqRelationships() {
+    for (const entity in ManyToOne) {
+        ManyToOne[entity] = uniqBy(ManyToOne[entity], (ele) => `${ele[0]}-${ele[1]}`);
+    }
+    for (const entity in OneToMany) {
+        OneToMany[entity] = uniqBy(OneToMany[entity], (ele) => `${ele[0]}-${ele[1]}`);
+    }
+    for (const entity in ReversePointerRelations) {
+        OneToMany[entity] = uniq(OneToMany[entity]);
+    }
+}
+
+
 function createForeignRef(entity: string, foreignKey: string, ref: string) {
     if (entity === foreignKey) {
         return factory.createIdentifier(ref)
@@ -477,9 +493,10 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     const moduleName = filename.split('.')[0];
 
     if (Schema.hasOwnProperty(moduleName)) {
-        if (!path.includes('oak-general-business')) {
-            console.log(`出现了同名的Entity定义「${moduleName}」，将使用您所定义的对象结构取代掉默认对象，请确认`);
-        }
+        delete ActionAsts[moduleName];
+        delete SchemaAsts[moduleName];
+        // removeFromRelationShip(moduleName);
+        console.warn(`出现了同名的Entity定义「${moduleName}」，将使用${fullPath}取代掉默认对象，请检查新的对象结构及相关常量定义与原有的兼容，否则原有对象的相关逻辑会出现不可知异常`);
     }
     const referencedSchemas: string[] = [];
     const schemaAttrs: ts.TypeElement[] = [];
@@ -565,7 +582,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                                     `「${filename}」非法的属性定义「${attrName}」`);
                                 const reverseEntity = typeArguments![0].typeName.text;
                                 if (ReversePointerRelations[reverseEntity]) {
-                                    ReversePointerRelations[reverseEntity].push(moduleName);
+                                    if (!ReversePointerRelations[reverseEntity].includes(moduleName)) {
+                                        ReversePointerRelations[reverseEntity].push(moduleName);
+                                    }
                                 }
                                 else {
                                     assign(ReversePointerRelations, {
@@ -721,13 +740,18 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         'ParticularAction',
                         undefined
                     )
-                ];
+                ] as ts.TypeNode[];
                 if (hasRelationDef || moduleName === 'User') {
                     actionDefNodes.push(
                         factory.createTypeReferenceNode(
                             'RelationAction',
                             undefined
                         )
+                    );
+                }
+                if (process.env.COMPLING_AS_LIB) {
+                    actionDefNodes.push(
+                        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
                     );
                 }
                 pushStatementIntoActionAst(
@@ -819,21 +843,55 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 addRelationship(relationEntityName, 'User', 'user', true);
                 addRelationship(relationEntityName, moduleName, entityLc, true);
 
+                // 对UserEntityGrant对象，建立相应的反指关系
+                if (ReversePointerRelations['UserEntityGrant']) {
+                    if (!ReversePointerRelations['UserEntityGrant'].includes(moduleName)) {
+                        ReversePointerRelations['UserEntityGrant'].push(moduleName);
+                    }
+                }
+                else {
+                    assign(ReversePointerRelations, {
+                        ['UserEntityGrant']: [moduleName],
+                    });
+                }
+
                 hasRelationDef = node;
             }
             else if (node.name.text.endsWith('Action') || node.name.text.endsWith('State')) {
                 assert(!localeDef, `【${filename}】locale定义须在Action/State之后`);
                 hasActionOrStateDef = true;
-                pushStatementIntoActionAst(moduleName,
-                    factory.updateTypeAliasDeclaration(
-                        node,
-                        node.decorators,
-                        [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-                        node.name,
-                        node.typeParameters,
-                        node.type
-                    ),
-                    sourceFile!);
+                const { type } = node;
+                if (ts.isUnionTypeNode(type)) {
+                    pushStatementIntoActionAst(moduleName,
+                        factory.updateTypeAliasDeclaration(
+                            node,
+                            node.decorators,
+                            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                            node.name,
+                            node.typeParameters,
+                            process.env.COMPLING_AS_LIB ? factory.createUnionTypeNode([
+                                ...type.types,
+                                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                            ]) : type
+                        ),
+                        sourceFile!);
+                }
+                else {
+                    assert(ts.isLiteralTypeNode(type) || ts.isTypeReferenceNode(type), `${moduleName} - ${node.name}`);
+                    pushStatementIntoActionAst(moduleName,
+                        factory.updateTypeAliasDeclaration(
+                            node,
+                            node.decorators,
+                            [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                            node.name,
+                            node.typeParameters,
+                            process.env.COMPLING_AS_LIB ? factory.createUnionTypeNode([
+                                type,
+                                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+                            ]) : type
+                        ),
+                        sourceFile!);
+                }
             }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
@@ -5237,7 +5295,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                                     ele => factory.createStringLiteral(ele)
                                                 ),
                                                 false
-                                              )
+                                            )
                                         )
                                     );
                                 }
@@ -6146,6 +6204,7 @@ export function analyzeEntities(inputDir: string, relativePath?: string) {
         }
     );
     analyzeInModi();
+    uniqRelationships();
 }
 
 export function buildSchema(outputDir: string): void {
