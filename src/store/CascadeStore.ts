@@ -169,24 +169,32 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             const entityIds = uniq(result.filter(
                                 ele => ele.entity === attr
                             ).map(
-                                ele => ele.entityId
+                                ele => {
+                                    assert(ele.entityId !== null);
+                                    return ele.entityId;
+                                }
                             ) as string[]);
 
-                            const subRows = cascadeSelectFn.call(this, attr as any, {
-                                data: projection2[attr],
-                                filter: {
-                                    id: {
-                                        $in: entityIds
-                                    },
-                                } as any,
-                            }, context, option);
-                            if (subRows instanceof Promise) {
-                                return subRows.then(
-                                    (subRowss) => dealWithSubRows(subRowss)
-                                )
+                            if (entityIds.length > 0) {
+                                const subRows = cascadeSelectFn.call(this, attr as any, {
+                                    data: projection2[attr],
+                                    filter: {
+                                        id: {
+                                            $in: entityIds
+                                        },
+                                    } as any,
+                                }, context, option);
+                                if (subRows instanceof Promise) {
+                                    return subRows.then(
+                                        (subRowss) => dealWithSubRows(subRowss)
+                                    )
+                                }
+                                else {
+                                    dealWithSubRows(subRows as any);
+                                }
                             }
                             else {
-                                dealWithSubRows(subRows as any);
+
                             }
                         }
                     );
@@ -286,20 +294,22 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 ele => ele[`${attr}Id`]
                             ) as string[]);
 
-                            const subRows = cascadeSelectFn.call(this, relation, {
-                                data: projection2[attr],
-                                filter: {
-                                    id: {
-                                        $in: ids
-                                    },
-                                } as any,
-                            }, context, option);
-                            if (subRows instanceof Promise) {
-                                return subRows.then(
-                                    (subRowss) => dealWithSubRows(subRowss)
-                                );
+                            if (ids.length > 0) {
+                                const subRows = cascadeSelectFn.call(this, relation, {
+                                    data: projection2[attr],
+                                    filter: {
+                                        id: {
+                                            $in: ids
+                                        },
+                                    } as any,
+                                }, context, option);
+                                if (subRows instanceof Promise) {
+                                    return subRows.then(
+                                        (subRowss) => dealWithSubRows(subRowss)
+                                    );
+                                }
+                                dealWithSubRows(subRows as any);
                             }
-                            dealWithSubRows(subRows as any);
                         }
                     );
                 }
@@ -370,23 +380,25 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     );
                                 };
 
-                                const subRows = cascadeSelectFn.call(this, entity2, {
-                                    data: subProjection,
-                                    filter: combineFilters([{
-                                        [foreignKey]: {
-                                            $in: ids,
-                                        }
-                                    }, subFilter]),
-                                    sorter: subSorter,
-                                    indexFrom,
-                                    count
-                                }, context, option);
-                                if (subRows instanceof Promise) {
-                                    return subRows.then(
-                                        (subRowss) => dealWithSubRows(subRowss)
-                                    );
+                                if (ids.length > 0) {
+                                    const subRows = cascadeSelectFn.call(this, entity2, {
+                                        data: subProjection,
+                                        filter: combineFilters([{
+                                            [foreignKey]: {
+                                                $in: ids,
+                                            }
+                                        }, subFilter]),
+                                        sorter: subSorter,
+                                        indexFrom,
+                                        count
+                                    }, context, option);
+                                    if (subRows instanceof Promise) {
+                                        return subRows.then(
+                                            (subRowss) => dealWithSubRows(subRowss)
+                                        );
+                                    }
+                                    dealWithSubRows(subRows as any);
                                 }
-                                dealWithSubRows(subRows as any);
                             }
                         );
                     }
@@ -452,24 +464,26 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     );
                                 };
     
-                                const subRows = cascadeSelectFn.call(this, entity2, {
-                                    data: subProjection,
-                                    filter: combineFilters([{
-                                        entity,
-                                        entityId: {
-                                            $in: ids,
-                                        }
-                                    }, subFilter]),
-                                    sorter: subSorter,
-                                    indexFrom,
-                                    count
-                                }, context, option);
-                                if (subRows instanceof Promise) {
-                                    return subRows.then(
-                                        (subRowss) => dealWithSubRows(subRowss)
-                                    );
+                                if (ids.length > 0) {
+                                    const subRows = cascadeSelectFn.call(this, entity2, {
+                                        data: subProjection,
+                                        filter: combineFilters([{
+                                            entity,
+                                            entityId: {
+                                                $in: ids,
+                                            }
+                                        }, subFilter]),
+                                        sorter: subSorter,
+                                        indexFrom,
+                                        count
+                                    }, context, option);
+                                    if (subRows instanceof Promise) {
+                                        return subRows.then(
+                                            (subRowss) => dealWithSubRows(subRowss)
+                                        );
+                                    }
+                                    dealWithSubRows(subRows as any);
                                 }
-                                dealWithSubRows(subRows as any);
                             }
                         );
                     }
@@ -1116,22 +1130,24 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 action,
                                 data,
                                 iState: 'active',
-                                filter,
-                                modiEntity$modi: {
-                                    id: 'dummy',
-                                    action: 'create',
-                                    data: await Promise.all(
-                                        ids.map(
-                                            async (id) => ({
-                                                id: await generateNewIdAsync(),
-                                                entity: entity as string,
-                                                entityId: id,
-                                            })
-                                        )
-                                    ),
-                                },
+                                filter,                                
                             },
                         };
+                        if (ids.length > 0){
+                            modiUpsert.data.modiEntity$modi = {
+                                id: 'dummy',
+                                action: 'create',
+                                data: await Promise.all(
+                                    ids.map(
+                                        async (id) => ({
+                                            id: await generateNewIdAsync(),
+                                            entity: entity as string,
+                                            entityId: id,
+                                        })
+                                    )
+                                ),
+                            };
+                        }
                     }
                     await this.cascadeUpdateAsync('modi', modiUpsert!, context, option);
                     return 1;

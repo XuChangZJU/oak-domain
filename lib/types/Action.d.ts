@@ -13,6 +13,8 @@ export declare type ActionDictOfEntityDict<E extends EntityDict> = {
         [A in keyof E[T]['OpSchema']]?: ActionDef<string, string>;
     };
 };
+export declare type CascadeActionItem = CascadeRelationItem;
 export declare type CascadeActionAuth<A extends Action = ''> = {
-    [K in A | GenericAction]?: CascadeRelationItem | (CascadeRelationItem | CascadeRelationItem[])[];
+    [K in A | GenericAction]?: CascadeActionItem | (CascadeActionItem | CascadeActionItem[])[];
 };
+export declare type ActionOnRemove = 'setNull' | 'remove';

@@ -3,7 +3,7 @@ import { addFilterSegment, checkFilterContains, combineFilters } from "../store/
 import { OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
 import {
     AuthDefDict, CascadeRelationItem, Checker, CreateTriggerInTxn,
-    EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn, RelationHierarchy, SelectOpResult
+    EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn, RelationHierarchy, SelectOpResult, REMOVE_CASCADE_PRIORITY
 } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
@@ -12,6 +12,7 @@ import { SyncContext } from './SyncRowStore';
 import { firstLetterUpperCase } from '../utils/string';
 import { union, uniq, difference } from '../utils/lodash';
 import { judgeRelation } from './relation';
+import { generateNewId } from '../utils/uuid';
 
 export function translateCheckerInAsyncContext<
     ED extends EntityDict & BaseEntityDict,
@@ -387,12 +388,12 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
             const { relationAuth, actionAuth } = authDict[entity]!;
             if (relationAuth) {
                 const raFilterMakerDict = {} as Record<string, (userId: string) => ED[keyof ED]['Selection']['filter']>;
+                const userEntityName = `user${firstLetterUpperCase(entity)}`;
                 for (const r in relationAuth) {
                     Object.assign(raFilterMakerDict, {
                         [r]: translateActionAuthFilterMaker(schema, relationAuth[r as NonNullable<ED[keyof ED]['Relation']>]!, entity),
                     });
                 }
-                const userEntityName = `user${firstLetterUpperCase(entity)}`;
                 const entityIdAttr = `${entity}Id`;
                 checkers.push({
                     entity: userEntityName as keyof ED,
@@ -490,7 +491,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
  * @returns 
  * 如果有的对象允许删除，需要使用trigger来处理其相关联的外键对象，这些trigger写作before，则会在checker之前执行，仍然可以删除成功
  */
-export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
+export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>, authDict?: AuthDefDict<ED>) {
     const checkers: Checker<ED, keyof ED, Cxt>[] = [];
 
     // 先建立所有的一对多的关系
@@ -655,6 +656,126 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                 }
             }
         })
+    }
+
+    // 注入声明的cascade删除时的外键处理动作
+    for (const entity in authDict) {
+        const { cascadeRemove } = authDict[entity]!;
+        if (cascadeRemove) {
+            const entitiesOnEntityAttr = [] as Array<keyof ED>;
+            let hasAllEntity = false;
+            for (const attr in cascadeRemove) {
+                if (attr === '@entity') {
+                    hasAllEntity = true;
+                    continue;
+                }
+                const rel = judgeRelation(schema, entity, attr);
+                if (rel === 2) {
+                    entitiesOnEntityAttr.push(attr);
+                    checkers.push({
+                        entity: attr,
+                        action: 'remove',
+                        type: 'logical',
+                        priority: REMOVE_CASCADE_PRIORITY,       // 这个checker必须在检查外键不为空的checker之前执行，否则无法完成
+                        checker: (operation, context) => {
+                            const { filter } = operation;
+                            if (cascadeRemove[attr] === 'remove') {
+                                return context.operate(entity, {
+                                    id: generateNewId(),
+                                    action: 'remove',
+                                    data: {},
+                                    filter: filter ? {
+                                        [attr]: filter,
+                                    }: undefined,
+                                }, { dontCollect: true });
+                            }
+                            return context.operate(entity, {
+                                id: generateNewId(),
+                                action: 'update',
+                                data: {
+                                    entity: null,
+                                    entityId: null,
+                                },
+                                filter: filter ? {
+                                    [attr]: filter,
+                                }: undefined,
+                            }, { dontCollect: true });
+
+                        }
+                    });
+                }
+                else {
+                    assert(typeof rel === 'string');
+                    checkers.push({
+                        entity: rel,
+                        action: 'remove',
+                        type: 'logical',
+                        priority: REMOVE_CASCADE_PRIORITY,       // 这个checker必须在检查外键不为空的checker之前执行，否则无法完成
+                        checker: (operation, context) => {
+                            const { filter } = operation;
+                            if (cascadeRemove[attr] === 'remove') {
+                                return context.operate(entity, {
+                                    id: generateNewId(),
+                                    action: 'remove',
+                                    data: {},
+                                    filter: filter ? {
+                                        [attr]: filter,
+                                    }: undefined,
+                                }, { dontCollect: true });
+                            }
+                            return context.operate(entity, {
+                                id: generateNewId(),
+                                action: 'update',
+                                data: {
+                                    [`${attr}Id`]: null,
+                                },
+                                filter: filter ? {
+                                    [attr]: filter,
+                                }: undefined,
+                            }, { dontCollect: true });
+                        }
+                    });
+                }
+            }
+
+            if (hasAllEntity) {
+                const { attributes } = schema[entity];
+                const { ref } = attributes.entity;
+                const restEntities = difference(ref, entitiesOnEntityAttr);
+                for (const e of restEntities) {
+                    checkers.push({
+                        entity: e,
+                        action: 'remove',
+                        type: 'logical',
+                        priority: REMOVE_CASCADE_PRIORITY,       // 这个checker必须在检查外键不为空的checker之前执行，否则无法完成
+                        checker: (operation, context) => {
+                            const { filter } = operation;
+                            if (cascadeRemove['@entity'] === 'remove') {
+                                return context.operate(entity, {
+                                    id: generateNewId(),
+                                    action: 'remove',
+                                    data: {},
+                                    filter: filter ? {
+                                        [e]: filter,
+                                    }: undefined,
+                                }, { dontCollect: true });
+                            }
+                            return context.operate(entity, {
+                                id: generateNewId(),
+                                action: 'update',
+                                data: {
+                                    entity: null,
+                                    entityId: null,
+                                },
+                                filter: filter ? {
+                                    [e]: filter,
+                                }: undefined,
+                            }, { dontCollect: true });
+                        }
+                    });
+                }
+            }
+        }
     }
 
     return checkers;
