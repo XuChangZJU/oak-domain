@@ -88,8 +88,8 @@ export type Checker<ED extends EntityDict, T extends keyof ED, Cxt extends Async
 export type AuthDef<ED extends EntityDict, T extends keyof ED> = {
     relationAuth?: CascadeRelationAuth<NonNullable<ED[T]['Relation']>>;
     actionAuth?: CascadeActionAuth<ED[T]['Action']>;
-    onCasadeRemove?: {
-        [E in keyof ED[T]['OpSchema'] | '@all']?: ActionOnRemove;
+    cascadeRemove?: {
+        [E in keyof ED[T]['OpSchema'] | '@entity']?: ActionOnRemove;
     }
 };
 
