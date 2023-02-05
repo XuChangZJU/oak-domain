@@ -387,12 +387,12 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
             const { relationAuth, actionAuth } = authDict[entity]!;
             if (relationAuth) {
                 const raFilterMakerDict = {} as Record<string, (userId: string) => ED[keyof ED]['Selection']['filter']>;
+                const userEntityName = `user${firstLetterUpperCase(entity)}`;
                 for (const r in relationAuth) {
                     Object.assign(raFilterMakerDict, {
                         [r]: translateActionAuthFilterMaker(schema, relationAuth[r as NonNullable<ED[keyof ED]['Relation']>]!, entity),
                     });
                 }
-                const userEntityName = `user${firstLetterUpperCase(entity)}`;
                 const entityIdAttr = `${entity}Id`;
                 checkers.push({
                     entity: userEntityName as keyof ED,

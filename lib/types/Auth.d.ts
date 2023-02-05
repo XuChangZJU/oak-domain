@@ -1,4 +1,4 @@
-import { CascadeActionAuth, CascadeRelationAuth } from ".";
+import { CascadeActionAuth, CascadeRelationAuth, ActionOnRemove } from ".";
 import { AsyncContext } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OperateOption, SelectOption } from "../types/Entity";
@@ -60,6 +60,9 @@ export declare type Checker<ED extends EntityDict, T extends keyof ED, Cxt exten
 export declare type AuthDef<ED extends EntityDict, T extends keyof ED> = {
     relationAuth?: CascadeRelationAuth<NonNullable<ED[T]['Relation']>>;
     actionAuth?: CascadeActionAuth<ED[T]['Action']>;
+    onCasadeRemove?: {
+        [E in keyof ED[T]['OpSchema'] | '@all']?: ActionOnRemove;
+    };
 };
 export declare type AuthDefDict<ED extends EntityDict> = {
     [K in keyof ED]?: AuthDef<ED, K>;
