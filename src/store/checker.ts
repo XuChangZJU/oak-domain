@@ -55,19 +55,10 @@ export function translateCheckerInAsyncContext<
                             dontCollect: true,
                             blockTrigger: true,
                         });
-                        const data = {};
-                        rows2.forEach(
-                            ele => Object.assign(data, {
-                                [ele.id as string]: ele,
-                            })
-                        );
 
-                        throw new OakRowInconsistencyException({
-                            a: 's',
-                            d: {
-                                [entity2]: data,
-                            }
-                        }, errMsg);
+                        const e =  new OakRowInconsistencyException<ED>(undefined, errMsg);
+                        e.addData(entity2, rows2);
+                        throw e;
                     }
                     else {
                         const rows2 = await context.select(entity, {
@@ -79,19 +70,10 @@ export function translateCheckerInAsyncContext<
                             dontCollect: true,
                             blockTrigger: true,
                         });
-                        const data = {};
-                        rows2.forEach(
-                            ele => Object.assign(data, {
-                                [ele.id as string]: ele,
-                            })
-                        );
 
-                        throw new OakRowInconsistencyException({
-                            a: 's',
-                            d: {
-                                [entity]: data,
-                            }
-                        }, errMsg);
+                        const e = new OakRowInconsistencyException<ED>(undefined, errMsg);
+                        e.addData(entity, rows2);
+                        throw e;                        
                     }
                 }
             }) as UpdateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
@@ -191,7 +173,8 @@ export function translateCheckerInSyncContext<
                     if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter, true)) {
                         return;
                     }
-                    throw new OakRowInconsistencyException(undefined, errMsg);
+                    const e = new OakRowInconsistencyException(undefined, errMsg);
+                    throw e;                        
                 }
             };
             return {
@@ -566,18 +549,10 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                         if (result instanceof Promise) {
                             promises.push(
                                 result.then(
-                                    ([row]) => {
-                                        if (row) {
-                                            const record = {
-                                                a: 's',
-                                                d: {
-                                                    [e]: {
-                                                        [row.id!]: row,
-                                                    }
-                                                }
-                                            } as SelectOpResult<ED>;
-                                            throw new OakRowInconsistencyException(record, `您无法删除存在有效数据「${e as string}」关联的行`);
-                                        }
+                                    (rows) => {
+                                        const err = new OakRowInconsistencyException<ED>(undefined, `您无法删除存在有效数据「${e as string}」关联的行`);
+                                        err.addData(e, rows);
+                                        throw err;
                                     }
                                 )
                             );
@@ -585,15 +560,9 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                         else {
                             const [row] = result;
                             if (row) {
-                                const record = {
-                                    a: 's',
-                                    d: {
-                                        [e]: {
-                                            [row.id!]: row,
-                                        }
-                                    }
-                                } as SelectOpResult<ED>;
-                                throw new OakRowInconsistencyException(record, `您无法删除存在有效数据「${e as string}」关联的行`);
+                                const err = new OakRowInconsistencyException<ED>(undefined, `您无法删除存在有效数据「${e as string}」关联的行`);
+                                err.addData(e, [row]);
+                                throw err;
                             }
                         }
                     }
@@ -619,15 +588,9 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                                 result.then(
                                     ([row]) => {
                                         if (row) {
-                                            const record = {
-                                                a: 's',
-                                                d: {
-                                                    [otm]: {
-                                                        [row.id!]: row,
-                                                    }
-                                                }
-                                            } as SelectOpResult<ED>;
-                                            throw new OakRowInconsistencyException(record, `您无法删除存在有效数据「${otm as string}」关联的行`);
+                                            const e = new  OakRowInconsistencyException<ED>(undefined, `您无法删除存在有效数据「${otm as string}」关联的行`);
+                                            e.addData(otm, [row]);
+                                            throw e;
                                         }
                                     }
                                 )
@@ -644,7 +607,9 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                                         }
                                     }
                                 } as SelectOpResult<ED>;
-                                throw new OakRowInconsistencyException(record, `您无法删除存在有效数据「${otm as string}」关联的行`);
+                                const e = new OakRowInconsistencyException<ED>(undefined, `您无法删除存在有效数据「${otm as string}」关联的行`);
+                                e.addData(otm, [row]);
+                                throw e;
                             }
                         }
                     }                    

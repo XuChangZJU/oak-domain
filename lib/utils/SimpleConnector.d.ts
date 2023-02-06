@@ -8,7 +8,7 @@ export declare class SimpleConnector<ED extends EntityDict, BackCxt extends Asyn
     private serverUrl;
     private makeException;
     private contextBuilder;
-    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>);
+    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException<ED>, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>);
     callAspect(name: string, params: any, context: FrontCxt): Promise<{
         result: any;
         opRecords: OpRecord<ED>[];
@@ -23,7 +23,7 @@ export declare class SimpleConnector<ED extends EntityDict, BackCxt extends Asyn
         body: any;
         headers?: Record<string, any> | undefined;
     };
-    serializeException(exception: OakException, headers: IncomingHttpHeaders, body: any): {
+    serializeException(exception: OakException<ED>, headers: IncomingHttpHeaders, body: any): {
         body: any;
         headers?: Record<string, any> | undefined;
     };

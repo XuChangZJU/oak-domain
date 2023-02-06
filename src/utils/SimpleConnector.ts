@@ -25,10 +25,10 @@ function makeContentTypeAndBody(data: any) {
 export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
     static ROUTER = '/aspect';
     private serverUrl: string;
-    private makeException: (exceptionData: any) => OakException;
+    private makeException: (exceptionData: any) => OakException<ED>;
     private contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>;
 
-    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>) {
+    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException<ED>, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>) {
         super();
         this.serverUrl = `${serverUrl}${SimpleConnector.ROUTER}`;
         this.makeException = makeException;
@@ -100,7 +100,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         };
     }
 
-    serializeException(exception: OakException, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {        
+    serializeException(exception: OakException<ED>, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {        
         return {
             body: {
                 exception: exception.toString(),

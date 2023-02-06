@@ -216,7 +216,7 @@ export type SelectOpResult<ED extends EntityDict> = {
     a: 's',
     d: {
         [T in keyof ED]?: {
-            [ID: string]: ED[T]['OpSchema'];
+            [ID: string]: Partial<ED[T]['OpSchema']>;
         };
     };
 }
