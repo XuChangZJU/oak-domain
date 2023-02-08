@@ -2,7 +2,7 @@ import { EntityDict, OpRecord, SelectOpResult } from "./Entity";
 export declare class OakException<ED extends EntityDict> extends Error {
     opRecord: SelectOpResult<ED>;
     constructor(message?: string);
-    addData<T extends keyof ED>(entity: T, rows: ED[T]['OpSchema'][]): void;
+    addData<T extends keyof ED>(entity: T, rows: Partial<ED[T]['OpSchema']>[]): void;
     setOpRecords(opRecord: SelectOpResult<ED>): void;
     toString(): string;
 }
@@ -46,9 +46,7 @@ export declare class OakUserException<ED extends EntityDict> extends OakExceptio
  *
  */
 export declare class OakRowInconsistencyException<ED extends EntityDict> extends OakUserException<ED> {
-    private data?;
     constructor(data?: OpRecord<ED>, message?: string);
-    getData(): OpRecord<ED> | undefined;
     toString(): string;
 }
 /**
