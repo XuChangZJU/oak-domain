@@ -20,7 +20,7 @@ export abstract class Connector<ED extends EntityDict, BackCxt extends AsyncCont
         headers?: Record<string, any>;
     };
 
-    abstract serializeException(exception: OakException, headers: IncomingHttpHeaders, body: any): {
+    abstract serializeException(exception: OakException<ED>, headers: IncomingHttpHeaders, body: any): {
         body: any;
         headers?: Record<string, any>;
     };

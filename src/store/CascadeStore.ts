@@ -16,6 +16,7 @@ import { getRelevantIds } from "./filter";
 import { CreateOperation as CreateOperOperation } from '../base-app-domain/Oper/Schema';
 import { CreateOperation as CreateModiOperation, UpdateOperation as UpdateModiOperation } from '../base-app-domain/Modi/Schema';
 import { generateNewIdAsync } from "../utils/uuid";
+import { reinforceOperation, reinforceSelection } from "./selection";
 
 /**这个用来处理级联的select和update，对不同能力的 */
 export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> extends RowStore<ED> {
@@ -1311,6 +1312,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): OperationResult<ED> {
+        reinforceOperation(this.getSchema(), entity, operation);
         const { action, data, filter, id } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => any> = [];
@@ -1375,6 +1377,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): Promise<OperationResult<ED>> {
+        reinforceOperation(this.getSchema(), entity, operation);
         const { action, data, filter, id } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => Promise<any>> = [];
@@ -1437,6 +1440,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Partial<ED[T]['Schema']>[] {
+        reinforceSelection(this.getSchema(), entity, selection);
         const { data, filter, indexFrom, count, sorter } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
@@ -1576,6 +1580,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]> {
+        reinforceSelection(this.getSchema(), entity, selection);
         const { data, filter, indexFrom, count, sorter } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,

@@ -1,6 +1,8 @@
-import { EntityDict, OpRecord } from "./Entity";
+import assert from "assert";
+import { EntityDict, OpRecord, SelectOpResult } from "./Entity";
 
-export class OakException extends Error {
+export class OakException<ED extends EntityDict> extends Error {
+    opRecord: SelectOpResult<ED>;
     constructor(message?: string) {
         super(message);
         this.name = new.target.name;
@@ -12,21 +14,49 @@ export class OakException extends Error {
         } else {
             (this as any).__proto__ = new.target.prototype;
         }
+        this.opRecord = {
+            a: 's',
+            d: {},
+        };
+    }
+
+    addData<T extends keyof ED>(entity: T, rows: Partial<ED[T]['OpSchema']>[]) {
+        const { d } = this.opRecord;
+        const addSingleRow = (rowRoot: Record<string, Partial<ED[T]['OpSchema']>>, row: Partial<ED[T]['OpSchema']>) => {
+            const { id } = row;
+            if (rowRoot[id!]) {
+                Object.assign(rowRoot[id!], row);
+            }
+            else {
+                rowRoot[id!] = row;
+            }
+        };
+        if (!d[entity]) {
+            d[entity] = {};
+        }
+        rows.forEach(
+            row => addSingleRow(d[entity]!, row)
+        );
+    }
+
+    setOpRecords(opRecord: SelectOpResult<ED>) {
+        this.opRecord = opRecord;
     }
 
     toString() {
         return JSON.stringify({
             name: this.constructor.name,
             message: this.message,
+            opRecord: this.opRecord,
         });
     }
 }
 
-export class OakDataException extends OakException {
+export class OakDataException<ED extends EntityDict> extends OakException<ED> {
     // 表示由数据层发现的异常
 }
 
-export class OakUniqueViolationException extends OakException {
+export class OakUniqueViolationException<ED extends EntityDict> extends OakException<ED> {
     rows: Array<{
         id?: string;
         attrs: string[];
@@ -40,7 +70,7 @@ export class OakUniqueViolationException extends OakException {
     }
 }
 
-export class OakImportDataParseException extends OakException {
+export class OakImportDataParseException<ED extends EntityDict> extends OakException<ED> {
     line: number;
     header?: string;
 
@@ -52,11 +82,11 @@ export class OakImportDataParseException extends OakException {
     }
 }
 
-export class OakOperExistedException extends OakDataException {
+export class OakOperExistedException<ED extends EntityDict> extends OakDataException<ED> {
     // 进行操作时发现同样id的Oper对象已经存在
 }
 
-export class OakRowUnexistedException extends OakDataException {
+export class OakRowUnexistedException<ED extends EntityDict> extends OakDataException<ED> {
     private rows: Array<{
         entity: any;
         selection: any;
@@ -80,7 +110,7 @@ export class OakExternalException extends Error {
     // 表示由oak生态外部造成的异常，比如网络中断
 }
 
-export class OakUserException extends OakException {
+export class OakUserException<ED extends EntityDict> extends OakException<ED> {
     // 继承了这个类的异常统一视为“可接受的、由用户操作造成的异常”
 };
 
@@ -89,22 +119,16 @@ export class OakUserException extends OakException {
  * 数据不一致异常，系统认为现有的数据不允许相应的动作时抛此异常
  * 
  */
-export class OakRowInconsistencyException<ED extends EntityDict> extends OakUserException {
-    private data?: OpRecord<ED>;
+export class OakRowInconsistencyException<ED extends EntityDict> extends OakUserException<ED> {
     constructor(data?: OpRecord<ED>, message?: string) {
         super(message);
-        this.data = data;
-    }
-
-    getData() {
-        return this.data;
+        assert(!data, '现在使用addData接口来传数据');
     }
 
     toString(): string {
         return JSON.stringify({
             name: this.constructor.name,
             message: this.message,
-            data: this.data,
         });
     }
 };
@@ -112,7 +136,7 @@ export class OakRowInconsistencyException<ED extends EntityDict> extends OakUser
 /**
  * 当输入的数据非法时抛此异常，attributes表示非法的属性
  */
-export class OakInputIllegalException extends OakUserException {
+export class OakInputIllegalException<ED extends EntityDict> extends OakUserException<ED> {
     private attributes: string[];
     private entity: string;
     constructor(entity: string, attributes: string[], message?: string) {
@@ -148,14 +172,14 @@ export class OakInputIllegalException extends OakUserException {
 /**
  * 用户权限不够时抛的异常
  */
-export class OakUserUnpermittedException extends OakUserException {
+export class OakUserUnpermittedException<ED extends EntityDict> extends OakUserException<ED> {
 
 };
 
 /**
  * 用户未登录抛的异常
  */
-export class OakUnloggedInException extends OakUserException {
+export class OakUnloggedInException<ED extends EntityDict> extends OakUserException<ED> {
     constructor(message?: string) {
         super(message || '您尚未登录');
     }
@@ -165,7 +189,7 @@ export class OakUnloggedInException extends OakUserException {
 /**
  * 用户未登录抛的异常
  */
- export class OakRowLockedException extends OakUserException {
+ export class OakRowLockedException<ED extends EntityDict> extends OakUserException<ED> {
     constructor(message?: string) {
         super(message || '该行数据正在被更新中，请稍后再试');
     }
@@ -173,7 +197,7 @@ export class OakUnloggedInException extends OakUserException {
 /**
  * 要插入行时，发现已经有相同的行数据
  */
-export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> extends OakUserException {
+export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> extends OakUserException<ED> {
     private data: ED[T]['OpSchema'];
     private entity: T;
     constructor(entity: T, data: ED[T]['OpSchema'], message?: string) {
@@ -200,60 +224,84 @@ export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> ex
     }
 }
 
-export class OakDeadlock extends OakUserException {
+export class OakDeadlock<ED extends EntityDict> extends OakUserException<ED> {
     constructor(message?: string | undefined) {
         super(message || '发现死锁');
     }
 };
 
-export function makeException(data: {
+export function makeException<ED extends EntityDict>(data: {
     name: string;
     message?: string;
+    opRecords: SelectOpResult<ED>;
     [A: string]: any;
 }) {
     const { name } = data;
     switch (name) {
         case 'OakException': {
-            return new OakException(data.message);
+            const e = new OakException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakUserException': {
-            return new OakUserException(data.message);
-        }
-        case 'OakExternalException': {
-            return new OakExternalException(data.message);
+            const e = new OakUserException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakRowInconsistencyException': {
-            return new OakRowInconsistencyException(data.data, data.message);
+            const e = new OakRowInconsistencyException(data.data, data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakInputIllegalException': {
-            return new OakInputIllegalException(data.entity, data.attributes, data.message);
+            const e = new OakInputIllegalException(data.entity, data.attributes, data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakUserUnpermittedException': {
-            return new OakUserUnpermittedException(data.message);
+            const e = new OakUserUnpermittedException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakUnloggedInException': {
-            return new OakUnloggedInException(data.message);
+            const e = new OakUnloggedInException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakCongruentRowExists': {
-            return new OakCongruentRowExists(data.entity, data.data, data.message);
+            const e = new OakCongruentRowExists(data.entity, data.data, data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakRowLockedException': {
-            return new OakRowLockedException(data.message);
+            const e = new OakRowLockedException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakRowUnexistedException': {
-            return new OakRowUnexistedException(data.rows);
+            const e = new OakRowUnexistedException(data.rows);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakDeadlock': {
-            return new OakDeadlock(data.message);
+            const e = new OakDeadlock(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakDataException': {
-            return new OakDataException(data.message);
+            const e = new OakDataException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakUniqueViolationException': {
-            return new OakUniqueViolationException(data.rows, data.message);
+            const e = new OakUniqueViolationException(data.rows, data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         case 'OakImportDataParseException': {
-            return new OakImportDataParseException(data.message!, data.line, data.header);
+            const e = new OakImportDataParseException(data.message!, data.line, data.header);
+            e.setOpRecords(data.opRecords);
+            return e;
         }
         default:
             return;
