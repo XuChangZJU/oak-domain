@@ -35,6 +35,9 @@ function getOperationRewriters<ED extends EntityDict>() {
  */
 export function reinforceSelection<ED extends EntityDict>(schema: StorageSchema<ED>, entity: keyof ED, selection: ED[keyof ED]['Selection']) {
     const { filter, data, sorter } = selection;
+    Object.assign(data, {
+        '$$createAt$$': 1,
+    });     // 有的页面依赖于其它页面取数据，有时两个页面的filter的差异会导致有一个加createAt，有一个不加，此时可能产生前台取数据不完整的异常。先统一加上
 
     const checkNode = (projectionNode: ED[keyof ED]['Selection']['data'], attrs: string[]) => {
         attrs.forEach(
