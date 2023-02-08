@@ -549,10 +549,12 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                         if (result instanceof Promise) {
                             promises.push(
                                 result.then(
-                                    (rows) => {
-                                        const err = new OakRowInconsistencyException<ED>(undefined, `您无法删除存在有效数据「${e as string}」关联的行`);
-                                        err.addData(e, rows);
-                                        throw err;
+                                    ([row]) => {
+                                        if (row) {
+                                            const err = new OakRowInconsistencyException<ED>(undefined, `您无法删除存在有效数据「${e as string}」关联的行`);
+                                            err.addData(e, [row]);
+                                            throw err;
+                                        }
                                     }
                                 )
                             );
