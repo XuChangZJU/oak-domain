@@ -7,6 +7,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     opRecords: OpRecord<ED>[];
     private scene?;
     private headers?;
+    private message?;
     events: {
         commit: Array<() => Promise<void>>;
         rollback: Array<() => Promise<void>>;
@@ -32,6 +33,8 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     mergeMultipleResults(toBeMerged: OperationResult<ED>[]): OperationResult<ED>;
     getCurrentTxnId(): string | undefined;
     getSchema(): import("../types").StorageSchema<ED>;
+    setMessage(message: string): void;
+    getMessage(): string | undefined;
     abstract isRoot(): boolean;
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
     abstract toString(): string;

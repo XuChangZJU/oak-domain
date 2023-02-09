@@ -9,6 +9,7 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     opRecords: OpRecord<ED>[];
     private scene?: string;
     private headers?: IncomingHttpHeaders;
+    private message?: string;
     events: {
         commit: Array<() => Promise<void>>;
         rollback: Array<() => Promise<void>>;
@@ -126,6 +127,14 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
 
     getSchema() {
         return this.rowStore.getSchema();
+    }
+
+    setMessage(message: string) {
+        this.message = message;
+    }
+
+    getMessage() {
+        return this.message;
     }
 
     abstract isRoot(): boolean;
