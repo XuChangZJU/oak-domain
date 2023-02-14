@@ -791,7 +791,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                     }
 
-                    beforeFns.push(() => cascadeUpdate.call(this, entityOtm!, otm, context, option2));
+                    // 一对多的依赖应该后建，否则中间会出现空指针，导致checker等出错
+                    afterFns.push(() => cascadeUpdate.call(this, entityOtm!, otm, context, option2));
                 };
 
                 if (otmOperations instanceof Array) {
