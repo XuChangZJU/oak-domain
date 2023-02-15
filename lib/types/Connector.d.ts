@@ -7,7 +7,8 @@ import { OakException } from "./Exception";
 export declare abstract class Connector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> {
     abstract callAspect(name: string, params: any, context: FrontCxt): Promise<{
         result: any;
-        opRecords: OpRecord<ED>[];
+        opRecords?: OpRecord<ED>[];
+        message?: string | null;
     }>;
     abstract getRouter(): string;
     abstract parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{

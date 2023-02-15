@@ -61,7 +61,7 @@ export declare type AuthDef<ED extends EntityDict, T extends keyof ED> = {
     relationAuth?: CascadeRelationAuth<NonNullable<ED[T]['Relation']>>;
     actionAuth?: CascadeActionAuth<ED[T]['Action']>;
     cascadeRemove?: {
-        [E in (keyof ED | '@entity')]?: ActionOnRemove;
+        [E in (keyof ED | keyof ED[T]['Schema'] | '@entity')]?: ActionOnRemove;
     };
 };
 export declare type AuthDefDict<ED extends EntityDict> = {

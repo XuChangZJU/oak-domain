@@ -35,7 +35,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         this.contextBuilder = contextBuilder;
     }
 
-    async callAspect(name: string, params: any, context: FrontCxt): Promise<{ result: any; opRecords: OpRecord<ED>[]; }> {
+    async callAspect(name: string, params: any, context: FrontCxt) {
         const cxtStr = context.toString();
 
         const { contentType, body } = makeContentTypeAndBody(params);
@@ -53,20 +53,34 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
             throw err;
         }
 
-        // todo 处理各种返回的格式
-        const {
-            exception,
-            result,
-            opRecords
-        } = await response.json();
-
-        if (exception) {
-            throw this.makeException(exception);
+        const message = response.headers.get('oak-message');
+        const responseType = response.headers.get('Content-Type');
+        if (responseType?.toLocaleLowerCase().match(/application\/json/i)) {
+            const {
+                exception,
+                result,
+                opRecords,
+            } = await response.json();
+    
+            if (exception) {
+                throw this.makeException(exception);
+            }
+            return {
+                result,
+                opRecords,
+                message,
+            };
         }
-        return {
-            result,
-            opRecords,
-        };
+        else if (responseType?.toLocaleLowerCase().match(/application\/octet-stream/i)) {
+            const result = await response.arrayBuffer();
+            return {
+                result,
+                message,
+            };
+        }
+        else {
+            throw new Error(`尚不支持的content-type类型${responseType}`);
+        }
     }
 
     getRouter(): string {
@@ -96,6 +110,9 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
             body: {
                 result,
                 opRecords: context.opRecords,
+            },
+            headers: {
+                'oak-message': context.getMessage(),
             },
         };
     }

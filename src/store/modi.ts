@@ -151,7 +151,8 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
     for (const entity in schema) {
         const { inModi } = schema[entity];
         if (inModi) {
-            // 当关联modi的对象被删除时，对应的modi也删除
+            // 当关联modi的对象被删除时，对应的modi也删除。这里似乎只需要删除掉活跃对象？因为oper不能删除，所以oper和modi是必须要支持对deleted对象的容错？
+            // 这里没有想清楚，by Xc 20230209
             triggers.push({
                 name: `当删除${entity}对象时，删除相关联的modi的modiEntity`,
                 action: 'remove',
@@ -159,16 +160,15 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
                 when: 'after',
                 priority: REMOVE_CASCADE_PRIORITY,
                 fn: async ({ operation }, context, option) => {
-                    const { data } = operation;
-                    const { id } = data;
+                    const { filter } = operation;
                     await context.operate('modiEntity', {
                         id: await generateNewIdAsync(),
                         action: 'remove',
                         data: {},
                         filter: {
                             modi: {
-                                entity,
-                                entityId: id,
+                                [entity]: filter,
+                                iState: 'active',
                             },
                         }
                     }, { dontCollect: true });
@@ -177,8 +177,8 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
                         action: 'remove',
                         data: {},
                         filter: {
-                            entity,
-                            entityId: id,
+                            [entity]: filter,
+                            iState: 'active',
                         }
                     }, { dontCollect: true });
                     return 0;
