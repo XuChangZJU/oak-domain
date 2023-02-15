@@ -265,6 +265,15 @@ function checkActionDefNameConsistent(filename: string, actionDefNode: ts.Variab
     assert(adfName === aName && aName === sName, `文件${filename}中的ActionDef${name.text}中ActionDef, Action和State的命名规则不一致`);
 }
 
+
+function checkStringLiteralLegal(filename: string, obj: string, text: string, ele: ts.TypeNode) {
+    assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `${filename}中引用的${obj} ${text}中存在不是stringliteral的类型`);
+    assert(!ele.literal.text.includes('$'), `${filename}中引用的action${text}中的${obj}「${ele.literal.text}」包含非法字符$`);
+    assert(ele.literal.text.length > 0, `${filename}中引用的action${text}中的${obj}「${ele.literal.text}」长度非法`);
+    assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `${filename}中引用的${obj} ${text}中的「${ele.literal.text}」长度过长`);
+    return ele.literal.text;
+}
+
 function addActionSource(moduleName: string, name: ts.Identifier, node: ts.ImportDeclaration) {
     const ast = ActionAsts[moduleName];
     const { moduleSpecifier } = node;
@@ -308,24 +317,17 @@ function getStringTextFromUnionStringLiterals(moduleName: string, filename: stri
         });
     }
 
-    const getStringLiteral = (ele: ts.TypeNode) => {
-        assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `${filename}中引用的action${(<ts.Identifier>name).text}中存在不是stringliteral的类型`);
-        assert(!ele.literal.text.includes('$'), `${filename}中引用的action${(<ts.Identifier>name).text}中的action「${ele.literal.text}」包含非法字符$`);
-        assert(ele.literal.text.length > 0, `${filename}中引用的action${(<ts.Identifier>name).text}中的action「${ele.literal.text}」长度非法`);
-        assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `${filename}中引用的action${(<ts.Identifier>name).text}中的action「${ele.literal.text}」长度过长`);
-        return ele.literal.text;
-    }
 
     if (ts.isUnionTypeNode(type)) {
         const actions = type.types!.map(
-            ele => getStringLiteral(ele)
+            ele => checkStringLiteralLegal(filename, 'action', (<ts.Identifier>name).text, ele)
         );
 
         return actions;
     }
     else {
         assert(ts.isLiteralTypeNode(type!), `${filename}中引用的action「${(<ts.Identifier>name).text}」的定义不是union和stringLiteral类型`);
-        const action = getStringLiteral(type);
+        const action = checkStringLiteralLegal(filename, 'action', (<ts.Identifier>name).text, type);
         return [action];
     }
 }
@@ -487,6 +489,21 @@ function checkLocaleExpressionPropertyExists(root: ts.ObjectLiteralExpression, a
     )
 }
 
+function isEnumType(filename: string, node: ts.TypeAliasDeclaration) {
+    if (ts.isUnionTypeNode(node.type) && ts.isLiteralTypeNode(node.type.types[0])) {
+        node.type.types.forEach(
+            ele => checkStringLiteralLegal(filename, 'attribute', node.name.text, ele)
+        )
+        return true;
+    }
+    if (ts.isLiteralTypeNode(node.type)) {
+        checkStringLiteralLegal(filename, 'attribute', node.name.text, node.type);
+        return true;
+    }
+
+    return false;
+}
+
 function analyzeEntity(filename: string, path: string, program: ts.Program, relativePath?: string) {
     const fullPath = `${path}/${filename}`;
     const sourceFile = program.getSourceFile(fullPath);
@@ -601,6 +618,24 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                                 if (localEnumStringTypes.includes(type.typeName.text)) {
                                     enumStringAttrs.push((<ts.Identifier>name).text);
                                 }
+                                // 如果是从其它的文件引入的定义类型，在这里也要分析判定成enumStringAttrs
+                                else {
+                                    const checker = program.getTypeChecker();
+                                    const symbol = checker.getSymbolAtLocation(type.typeName);
+                                    const declaration = symbol?.getDeclarations()![0]!;
+                                    if (ts.isImportSpecifier(declaration)) {
+                                        const typee = checker.getDeclaredTypeOfSymbol(symbol!);
+                                        const declaration2 = typee.aliasSymbol?.getDeclarations()![0];
+                                        if (declaration2 && ts.isTypeAliasDeclaration(declaration2)) {
+                                            if (isEnumType(filename, declaration2)) {
+                                                enumStringAttrs.push((<ts.Identifier>name).text);
+                                            }
+                                        }
+                                        
+                                        // declaration = typee.aliasSymbol!.getDeclarations()![0];
+                                    }
+                                }
+
                             }
                         }
                         else if (ts.isArrayTypeNode(type!) && ts.isTypeReferenceNode(type.elementType) && ts.isIdentifier(type.elementType.typeName)) {
@@ -897,16 +932,18 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 // 本地规定的一些形状定义，直接使用
                 pushStatementIntoSchemaAst(moduleName, node, sourceFile!);
 
-                if (ts.isUnionTypeNode(node.type) && ts.isLiteralTypeNode(node.type.types[0]) && ts.isStringLiteral(node.type.types[0].literal)) {
+                if (isEnumType(filename, node)) {
                     // 本文件内定义的枚举类型
                     localEnumStringTypes.push(node.name.text);
 
-                    node.type.types.forEach(
-                        (ele) => {
-                            assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的常量定义「${node.name.text}」`);
-                            assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」中定义的常量枚举「${node.name.text}」的字符串长度应小于${STRING_LITERAL_MAX_LENGTH}`);
-                        }
-                    )
+                    if (ts.isUnionTypeNode(node.type)) {
+                        node.type.types.forEach(
+                            (ele) => {
+                                assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的常量定义「${node.name.text}」`);
+                                assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」中定义的常量枚举「${node.name.text}」的字符串长度应小于${STRING_LITERAL_MAX_LENGTH}`);
+                            }
+                        );
+                    }
                 }
             }
         }
