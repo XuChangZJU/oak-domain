@@ -327,7 +327,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         cascadeSelectionFns.push(
                             (result) => {
                                 const aggrResults = result.map(
-                                    (row) => {                                        
+                                    (row) => {
                                         const aggrResult = aggregateFn.call(this, entity2, {
                                             data: subProjection,
                                             filter: combineFilters([{
@@ -411,7 +411,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         cascadeSelectionFns.push(
                             (result) => {
                                 const aggrResults = result.map(
-                                    (row) => {                                        
+                                    (row) => {
                                         const aggrResult = aggregateFn.call(this, entity2, {
                                             data: subProjection,
                                             filter: combineFilters([{
@@ -464,7 +464,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         }
                                     );
                                 };
-    
+
                                 if (ids.length > 0) {
                                     const subRows = cascadeSelectFn.call(this, entity2, {
                                         data: subProjection,
@@ -726,13 +726,25 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             }
                         }
                         else {
-                            // 这里先假设A（必是update）的filter上一定有id，否则用户界面上应该设计不出来这样的操作
-                            // 这个倒是好像不可能出现create/update的一对多，如果遇到了再完善
-                            Object.assign(otm, {
-                                filter: addFilterSegment({
-                                    [entity]: filter,
-                                }, filterOtm),
-                            });
+                            // 这里优化一下，如果filter上有id，直接更新成根据entityId来过滤
+                            // 除了性能原因之外，还因为会制造出user: { id: xxx }这样的查询，general中不允许这样查询的出现
+                            if (filter) {
+                                if (filter.id && Object.keys(filter).length === 1) {
+                                    Object.assign(otm, {
+                                        filter: addFilterSegment({
+                                            entity,
+                                            entityId: filter.id,
+                                        }, filterOtm),
+                                    });
+                                }
+                                else {
+                                    Object.assign(otm, {
+                                        filter: addFilterSegment({
+                                            [entity]: filter,
+                                        }, filterOtm),
+                                    });
+                                }
+                            }
                             if (action === 'remove' && actionOtm === 'update') {
                                 Object.assign(dataOtm, {
                                     entity: null,
@@ -777,84 +789,97 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             }
                         }
                         else {
-                            // update可能出现上层filter不是根据id的（userEntityGrant的过期触发的wechatQrCode的过期，见general中的userEntityGrant的trigger）
-                            Object.assign(otm, {
-                                filter: addFilterSegment({
-                                    [foreignKey.slice(0, foreignKey.length - 2)]: filter,
-                                }, filterOtm),
-                            });
-                            if (action === 'remove' && actionOtm === 'update') {
-                                Object.assign(dataOtm, {
-                                    [foreignKey]: null,
+                            // 这里优化一下，如果filter上有id，直接更新成根据entityId来过滤
+                            // 除了性能原因之外，还因为会制造出user: { id: xxx }这样的查询，general中不允许这样查询的出现
+                            // 绝大多数情况都是id，但也有可能update可能出现上层filter不是根据id的（userEntityGrant的过期触发的wechatQrCode的过期，见general中的userEntityGrant的trigger）
+                            if (filter) {
+                                if (filter.id && Object.keys(filter).length === 1) {
+                                    Object.assign(otm, {
+                                        filter: addFilterSegment({
+                                            [foreignKey]: filter.id,
+                                        }, filterOtm),
+                                    });
+                            }
+                            else {
+                                Object.assign(otm, {
+                                    filter: addFilterSegment({
+                                        [foreignKey.slice(0, foreignKey.length - 2)]: filter,
+                                    }, filterOtm),
                                 });
                             }
                         }
-                    }
-
-                    // 一对多的依赖应该后建，否则中间会出现空指针，导致checker等出错
-                    afterFns.push(() => cascadeUpdate.call(this, entityOtm!, otm, context, option2));
-                };
-
-                if (otmOperations instanceof Array) {
-                    for (const oper of otmOperations) {
-                        dealWithOneToMany(oper);
+                        if (action === 'remove' && actionOtm === 'update') {
+                            Object.assign(dataOtm, {
+                                [foreignKey]: null,
+                            });
+                        }
                     }
                 }
-                else {
-                    dealWithOneToMany(otmOperations);
+
+                // 一对多的依赖应该后建，否则中间会出现空指针，导致checker等出错
+                afterFns.push(() => cascadeUpdate.call(this, entityOtm!, otm, context, option2));
+            };
+
+            if (otmOperations instanceof Array) {
+                for (const oper of otmOperations) {
+                    dealWithOneToMany(oper);
                 }
             }
+            else {
+                dealWithOneToMany(otmOperations);
+            }
         }
+    }
 
         return {
-            data: opData,
-            beforeFns,
-            afterFns,
-        };
+    data: opData,
+    beforeFns,
+    afterFns,
+};
     }
 
     // 对插入的数据，没有初始值的属性置null
     protected preProcessDataCreated<T extends keyof ED>(entity: T, data: ED[T]['Create']['data']) {
-        const now = Date.now();
-        const { attributes } = this.getSchema()[entity];
-        const processSingle = (data2: ED[T]['CreateSingle']['data']) => {
-            for (const key in attributes) {
-                if (data2[key] === undefined) {
-                    Object.assign(data2, {
-                        [key]: null,
-                    });
-                }
+    const now = Date.now();
+    const { attributes } = this.getSchema()[entity];
+    const processSingle = (data2: ED[T]['CreateSingle']['data']) => {
+        for (const key in attributes) {
+            if (data2[key] === undefined) {
+                Object.assign(data2, {
+                    [key]: null,
+                });
             }
-            Object.assign(data2, {
-                [CreateAtAttribute]: now,
-                [UpdateAtAttribute]: now,
-                [DeleteAtAttribute]: null,
-            });
         }
-        if (data instanceof Array) {
-            data.forEach(
-                ele => processSingle(ele)
-            );
-        }
-        else {
-            processSingle(data as ED[T]['CreateSingle']['data']);
-        }
+        Object.assign(data2, {
+            [CreateAtAttribute]: now,
+            [UpdateAtAttribute]: now,
+            [DeleteAtAttribute]: null,
+        });
     }
+    if (data instanceof Array) {
+        data.forEach(
+            ele => processSingle(ele)
+        );
+    }
+    else {
+        processSingle(data as ED[T]['CreateSingle']['data']);
+    }
+}
 
     // 对更新的数据，去掉所有的undefined属性
     protected preProcessDataUpdated(data: Record<string, any>) {
-        const undefinedKeys = Object.keys(data).filter(
-            ele => data[ele] === undefined
-        );
-        undefinedKeys.forEach(
-            ele => unset(data, ele)
-        );
-    }
+    const undefinedKeys = Object.keys(data).filter(
+        ele => data[ele] === undefined
+    );
+    undefinedKeys.forEach(
+        ele => unset(data, ele)
+    );
+}
 
 
-    judgeRelation(entity: keyof ED, attr: string) {
-        return judgeRelation(this.storageSchema, entity, attr);
-    }
+judgeRelation(entity: keyof ED, attr: string) {
+    return judgeRelation(this.storageSchema, entity, attr);
+}
 
     /**
      * 和具体的update过程无关的例程放在这里，包括对later动作的处理、对oper的记录以及对record的收集等
@@ -864,396 +889,45 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
      * @param option 
      */
     private async doUpdateSingleRowAsync<T extends keyof ED, OP extends OperateOption, Cxt extends AsyncContext<ED>>(entity: T,
-        operation: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'],
-        context: Cxt,
-        option: OP
-    ) {
-        const { data, action, id: operId, filter } = operation;
-        const now = Date.now();
+    operation: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'],
+    context: Cxt,
+    option: OP
+) {
+    const { data, action, id: operId, filter } = operation;
+    const now = Date.now();
 
-        switch (action) {
-            case 'create': {
-                this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
-                if (option.modiParentEntity && !['modi', 'modiEntity', 'oper', 'operEntity'].includes(entity as string)) {
-                    // 变成对modi的插入
-                    assert(option.modiParentId);
-                    const modiCreate: CreateModiOperation = {
-                        id: 'dummy',
-                        action: 'create',
-                        data: {
-                            id: operId!,
-                            targetEntity: entity as string,
-                            action,
-                            entity: option.modiParentEntity!,
-                            entityId: option.modiParentId!,
-                            filter: {
-                                id: {
-                                    $in: [(data as any).id as string],      //这里记录这个filter是为了后面update的时候直接在其上面update，参见本函数后半段关于modiUpsert相关的优化
-                                },
+    switch (action) {
+        case 'create': {
+            this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
+            if (option.modiParentEntity && !['modi', 'modiEntity', 'oper', 'operEntity'].includes(entity as string)) {
+                // 变成对modi的插入
+                assert(option.modiParentId);
+                const modiCreate: CreateModiOperation = {
+                    id: 'dummy',
+                    action: 'create',
+                    data: {
+                        id: operId!,
+                        targetEntity: entity as string,
+                        action,
+                        entity: option.modiParentEntity!,
+                        entityId: option.modiParentId!,
+                        filter: {
+                            id: {
+                                $in: [(data as any).id as string],      //这里记录这个filter是为了后面update的时候直接在其上面update，参见本函数后半段关于modiUpsert相关的优化
                             },
-                            data,
-                            iState: 'active',
                         },
-                    };
-                    await this.cascadeUpdateAsync('modi', modiCreate, context, option);
-                    return 1;
-                }
-                else {
-                    let result = 0;
-                    const createInner = async (operation2: ED[T]['Create']) => {
-                        try {
-                            result += await this.updateAbjointRowAsync(
-                                entity,
-                                operation2,
-                                context,
-                                option
-                            );
-                        }
-                        catch (e: any) {
-                            /* 这段代码是处理插入时有重复的行，现在看有问题，等实际需求出现再写
-                            if (e instanceof OakCongruentRowExists) {
-                                if (option.allowExists) {
-                                    // 如果允许存在，对已存在行进行update，剩下的行继续insert
-                                    const congruentRow = e.getData() as ED[T]['OpSchema'];
-                                    if (data instanceof Array) {
-                                        const rest = data.filter(
-                                            ele => ele.id !== congruentRow.id
-                                        );
-                                        if (rest.length === data.length) {
-                                            throw e;
-                                        }
-                                        const result2 = await this.updateAbjointRow(
-                                            entity,
-                                            Object.assign({}, operation, {
-                                                data: rest,
-                                            }),
-                                            context,
-                                            option
-                                        );
-
-                                        const row = data.find(
-                                            ele => ele.id === congruentRow.id
-                                        );
-                                        const updateData = omit(row, ['id', '$$createAt$$']);
-                                        const result3 = await this.updateAbjointRow(
-                                            entity,
-                                            {
-                                                id: await generateNewId(),
-                                                action: 'update',
-                                                data: updateData,
-                                                filter: {
-                                                    id: congruentRow.id,
-                                                } as any,
-                                            },
-                                            context,
-                                            option
-                                        );
-
-                                        return result2 + result3;
-                                    }
-                                    else {
-                                        if (data.id !== congruentRow.id) {
-                                            throw e;
-                                        }
-                                        const updateData = omit(data, ['id', '$$createAt$$']);
-                                        const result2 = await this.updateAbjointRow(
-                                            entity,
-                                            {
-                                                id: await generateNewId(),
-                                                action: 'update',
-                                                data: updateData,
-                                                filter: {
-                                                    id: congruentRow.id,
-                                                } as any,
-                                            },
-                                            context,
-                                            option
-                                        );
-                                        return result2;
-                                    }
-                                }
-                            } */
-                            throw e;
-                        }
-                    };
-
-                    if (data instanceof Array) {
-                        const multipleCreate = this.supportMultipleCreate();
-                        if (multipleCreate) {
-                            await createInner(operation as ED[T]['Create']);
-                        }
-                        else {
-                            for (const d of data) {
-                                const createSingleOper: ED[T]['CreateSingle'] = {
-                                    id: 'any',
-                                    action: 'create',
-                                    data: d,
-                                };
-                                await createInner(createSingleOper);
-                            }
-                        }
-                    }
-                    else {
-                        await createInner(operation as ED[T]['Create']);
-                    }
-
-                    if (!option.dontCollect) {
-                        context.opRecords.push({
-                            a: 'c',
-                            e: entity,
-                            d: data as ED[T]['OpSchema'] | ED[T]['OpSchema'][],
-                        });
-                    }
-                    if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
-                        // 按照框架要求生成Oper和OperEntity这两个内置的对象
-                        assert(operId);
-                        const operatorId = await context.getCurrentUserId(true);
-                        if (operatorId) {
-                            const createOper: CreateOperOperation = {
-                                id: 'dummy',
-                                action: 'create',
-                                data: {
-                                    id: operId,
-                                    action,
-                                    data,
-                                    operatorId,
-                                    operEntity$oper: data instanceof Array ? {
-                                        id: 'dummy',
-                                        action: 'create',
-                                        data: await Promise.all(
-                                            data.map(
-                                                async (ele) => ({
-                                                    id: await generateNewIdAsync(),
-                                                    entity: entity as string,
-                                                    entityId: ele.id,
-                                                })
-                                            )
-                                        ),
-                                    } : [{
-                                        id: 'dummy',
-                                        action: 'create',
-                                        data: {
-                                            id: await generateNewIdAsync(),
-                                            entity: entity as string,
-                                            entityId: (data as ED[T]['CreateSingle']['data']).id,
-                                        },
-                                    }]
-                                },
-                            };
-                            await this.cascadeUpdateAsync('oper', createOper, context, {
-                                dontCollect: true,
-                                dontCreateOper: true,
-                            });
-                        }
-                    }
-                    return result!;
-                }
+                        data,
+                        iState: 'active',
+                    },
+                };
+                await this.cascadeUpdateAsync('modi', modiCreate, context, option);
+                return 1;
             }
-            default: {
-                // 这里要优化一下，显式的对id的update/remove不要去查了，节省数据库层的性能（如果这些row是建立在一个create的modi上也查不到）
-                const ids = getRelevantIds(filter);
-                if (ids.length === 0) {
-                    const selection: ED[T]['Selection'] = {
-                        data: {
-                            id: 1,
-                        },
-                        filter: operation.filter,
-                        indexFrom: operation.indexFrom,
-                        count: operation.count,
-                    };
-                    const rows = await this.selectAbjointRowAsync(entity, selection, context, {
-                        dontCollect: true,
-                    });
-                    ids.push(...(rows.map(ele => ele.id! as string)));
-                }
-                if (data) {
-                    this.preProcessDataUpdated(data);
-                }
-
-                if (option.modiParentEntity && !['modi', 'modiEntity'].includes(entity as string)) {
-                    // 延时更新，变成对modi的插入
-                    // 变成对modi的插入
-                    // 优化，这里如果是对同一个targetEntity反复update，则变成对最后一条create/update的modi进行update，以避免发布文章这样的需求时产生过多的modi
-                    let modiUpsert: CreateModiOperation | UpdateModiOperation | undefined;
-                    if (action !== 'remove') {
-                        const upsertModis = await this.selectAbjointRowAsync('modi', {
-                            data: {
-                                id: 1,
-                                data: 1,
-                            },
-                            filter: {
-                                targetEntity: entity as string,
-                                action: {
-                                    $in: ['create', 'update'],
-                                },
-                                entity: option.modiParentEntity!,
-                                entityId: option.modiParentId!,
-                                iState: 'active',
-                                filter: ids.length > 0 ? {
-                                    id: {
-                                        $in: ids,
-                                    },
-                                } : filter,
-                            },
-                            sorter: [
-                                {
-                                    $attr: {
-                                        $$createAt$$: 1,
-                                    },
-                                    $direction: 'desc',
-                                }
-                            ],
-                            indexFrom: 0,
-                            count: 1,
-                        }, context, option);
-                        if (upsertModis.length > 0) {
-                            const { data: originData, id: originId } = upsertModis[0];
-                            modiUpsert = {
-                                id: 'dummy',
-                                action: 'update',
-                                data: {
-                                    data: Object.assign({}, originData, data),
-                                },
-                                filter: {
-                                    id: originId as string,
-                                }
-                            };
-                        }
-                    }
-                    if (!modiUpsert) {
-                        modiUpsert = {
-                            id: 'dummy',
-                            action: 'create',
-                            data: {
-                                id: operId,
-                                targetEntity: entity as string,
-                                entity: option.modiParentEntity!,
-                                entityId: option.modiParentId!,
-                                action,
-                                data,
-                                iState: 'active',
-                                filter,                                
-                            },
-                        };
-                        if (ids.length > 0){
-                            modiUpsert.data.modiEntity$modi = {
-                                id: 'dummy',
-                                action: 'create',
-                                data: await Promise.all(
-                                    ids.map(
-                                        async (id) => ({
-                                            id: await generateNewIdAsync(),
-                                            entity: entity as string,
-                                            entityId: id,
-                                        })
-                                    )
-                                ),
-                            };
-                        }
-                    }
-                    await this.cascadeUpdateAsync('modi', modiUpsert!, context, option);
-                    return 1;
-                }
-                else {
-                    const createOper = async () => {
-                        if (!option?.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
-                            // 按照框架要求生成Oper和OperEntity这两个内置的对象
-                            assert(operId);
-                            const createOper: CreateOperOperation = {
-                                id: 'dummy',
-                                action: 'create',
-                                data: {
-                                    id: operId,
-                                    action,
-                                    data,
-                                    operEntity$oper: {
-                                        id: 'dummy',
-                                        action: 'create',
-                                        data: await Promise.all(
-                                            ids.map(
-                                                async (ele) => ({
-                                                    id: await generateNewIdAsync(),
-                                                    entity: entity as string,
-                                                    entityId: ele,
-                                                })
-                                            )
-                                        )
-                                    },
-                                },
-                            }
-                            await this.cascadeUpdateAsync('oper', createOper, context, {
-                                dontCollect: true,
-                                dontCreateOper: true,
-                            });
-                        }
-                    };
-                    if (action === 'remove') {
-                        if (!option.dontCollect) {
-                            context.opRecords.push({
-                                a: 'r',
-                                e: entity,
-                                f: {
-                                    id: {
-                                        $in: ids,
-                                    }
-                                },
-                            });
-                        }
-                    }
-                    else {
-                        const updateAttrCount = Object.keys(data).length;
-                        if (updateAttrCount > 0) {
-                            // 优化一下，如果不更新任何属性，则不实际执行
-                            Object.assign(data, {
-                                $$updateAt$$: now,
-                            });
-                            if (!option.dontCollect) {
-                                context.opRecords.push({
-                                    a: 'u',
-                                    e: entity,
-                                    d: data as ED[T]['Update']['data'],
-                                    f: {
-                                        id: {
-                                            $in: ids,
-                                        }
-                                    },
-                                });
-                            }
-                        }
-                        else if (action !== 'update') {
-                            // 如果不是update动作而是用户自定义的动作，这里还是要记录oper
-                            await createOper();
-                            return 0;
-                        }
-                        else {
-                            return 0;
-                        }
-                    }
-
-                    const result = await this.updateAbjointRowAsync(entity, operation, context, option);
-                    await createOper();
-
-                    return result;
-                }
-            }
-        }
-    }
-
-    private doUpdateSingleRow<T extends keyof ED, OP extends OperateOption, Cxt extends SyncContext<ED>>(entity: T,
-        operation: ED[T]['Operation'],
-        context: Cxt,
-        option: OP
-    ) {
-        const { data, action, id: operId, filter } = operation;
-        const now = Date.now();
-
-        switch (action) {
-            case 'create': {
-                this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
+            else {
                 let result = 0;
-                const createInner = (operation2: ED[T]['Create']) => {
+                const createInner = async (operation2: ED[T]['Create']) => {
                     try {
-                        result += this.updateAbjointRow(
+                        result += await this.updateAbjointRowAsync(
                             entity,
                             operation2,
                             context,
@@ -1261,6 +935,69 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         );
                     }
                     catch (e: any) {
+                        /* 这段代码是处理插入时有重复的行，现在看有问题，等实际需求出现再写
+                        if (e instanceof OakCongruentRowExists) {
+                            if (option.allowExists) {
+                                // 如果允许存在，对已存在行进行update，剩下的行继续insert
+                                const congruentRow = e.getData() as ED[T]['OpSchema'];
+                                if (data instanceof Array) {
+                                    const rest = data.filter(
+                                        ele => ele.id !== congruentRow.id
+                                    );
+                                    if (rest.length === data.length) {
+                                        throw e;
+                                    }
+                                    const result2 = await this.updateAbjointRow(
+                                        entity,
+                                        Object.assign({}, operation, {
+                                            data: rest,
+                                        }),
+                                        context,
+                                        option
+                                    );
+
+                                    const row = data.find(
+                                        ele => ele.id === congruentRow.id
+                                    );
+                                    const updateData = omit(row, ['id', '$$createAt$$']);
+                                    const result3 = await this.updateAbjointRow(
+                                        entity,
+                                        {
+                                            id: await generateNewId(),
+                                            action: 'update',
+                                            data: updateData,
+                                            filter: {
+                                                id: congruentRow.id,
+                                            } as any,
+                                        },
+                                        context,
+                                        option
+                                    );
+
+                                    return result2 + result3;
+                                }
+                                else {
+                                    if (data.id !== congruentRow.id) {
+                                        throw e;
+                                    }
+                                    const updateData = omit(data, ['id', '$$createAt$$']);
+                                    const result2 = await this.updateAbjointRow(
+                                        entity,
+                                        {
+                                            id: await generateNewId(),
+                                            action: 'update',
+                                            data: updateData,
+                                            filter: {
+                                                id: congruentRow.id,
+                                            } as any,
+                                        },
+                                        context,
+                                        option
+                                    );
+                                    return result2;
+                                }
+                            }
+                        } */
                         throw e;
                     }
                 };
@@ -1268,7 +1005,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 if (data instanceof Array) {
                     const multipleCreate = this.supportMultipleCreate();
                     if (multipleCreate) {
-                        createInner(operation as ED[T]['Create']);
+                        await createInner(operation as ED[T]['Create']);
                     }
                     else {
                         for (const d of data) {
@@ -1277,17 +1014,216 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 action: 'create',
                                 data: d,
                             };
-                            createInner(createSingleOper);
+                            await createInner(createSingleOper);
                         }
                     }
                 }
                 else {
-                    createInner(operation as ED[T]['Create']);
+                    await createInner(operation as ED[T]['Create']);
                 }
-                return result;
+
+                if (!option.dontCollect) {
+                    context.opRecords.push({
+                        a: 'c',
+                        e: entity,
+                        d: data as ED[T]['OpSchema'] | ED[T]['OpSchema'][],
+                    });
+                }
+                if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
+                    // 按照框架要求生成Oper和OperEntity这两个内置的对象
+                    assert(operId);
+                    const operatorId = await context.getCurrentUserId(true);
+                    if (operatorId) {
+                        const createOper: CreateOperOperation = {
+                            id: 'dummy',
+                            action: 'create',
+                            data: {
+                                id: operId,
+                                action,
+                                data,
+                                operatorId,
+                                operEntity$oper: data instanceof Array ? {
+                                    id: 'dummy',
+                                    action: 'create',
+                                    data: await Promise.all(
+                                        data.map(
+                                            async (ele) => ({
+                                                id: await generateNewIdAsync(),
+                                                entity: entity as string,
+                                                entityId: ele.id,
+                                            })
+                                        )
+                                    ),
+                                } : [{
+                                    id: 'dummy',
+                                    action: 'create',
+                                    data: {
+                                        id: await generateNewIdAsync(),
+                                        entity: entity as string,
+                                        entityId: (data as ED[T]['CreateSingle']['data']).id,
+                                    },
+                                }]
+                            },
+                        };
+                        await this.cascadeUpdateAsync('oper', createOper, context, {
+                            dontCollect: true,
+                            dontCreateOper: true,
+                        });
+                    }
+                }
+                return result!;
             }
-            default: {
+        }
+        default: {
+            // 这里要优化一下，显式的对id的update/remove不要去查了，节省数据库层的性能（如果这些row是建立在一个create的modi上也查不到）
+            const ids = getRelevantIds(filter);
+            if (ids.length === 0) {
+                const selection: ED[T]['Selection'] = {
+                    data: {
+                        id: 1,
+                    },
+                    filter: operation.filter,
+                    indexFrom: operation.indexFrom,
+                    count: operation.count,
+                };
+                const rows = await this.selectAbjointRowAsync(entity, selection, context, {
+                    dontCollect: true,
+                });
+                ids.push(...(rows.map(ele => ele.id! as string)));
+            }
+            if (data) {
+                this.preProcessDataUpdated(data);
+            }
+
+            if (option.modiParentEntity && !['modi', 'modiEntity'].includes(entity as string)) {
+                // 延时更新，变成对modi的插入
+                // 变成对modi的插入
+                // 优化，这里如果是对同一个targetEntity反复update，则变成对最后一条create/update的modi进行update，以避免发布文章这样的需求时产生过多的modi
+                let modiUpsert: CreateModiOperation | UpdateModiOperation | undefined;
+                if (action !== 'remove') {
+                    const upsertModis = await this.selectAbjointRowAsync('modi', {
+                        data: {
+                            id: 1,
+                            data: 1,
+                        },
+                        filter: {
+                            targetEntity: entity as string,
+                            action: {
+                                $in: ['create', 'update'],
+                            },
+                            entity: option.modiParentEntity!,
+                            entityId: option.modiParentId!,
+                            iState: 'active',
+                            filter: ids.length > 0 ? {
+                                id: {
+                                    $in: ids,
+                                },
+                            } : filter,
+                        },
+                        sorter: [
+                            {
+                                $attr: {
+                                    $$createAt$$: 1,
+                                },
+                                $direction: 'desc',
+                            }
+                        ],
+                        indexFrom: 0,
+                        count: 1,
+                    }, context, option);
+                    if (upsertModis.length > 0) {
+                        const { data: originData, id: originId } = upsertModis[0];
+                        modiUpsert = {
+                            id: 'dummy',
+                            action: 'update',
+                            data: {
+                                data: Object.assign({}, originData, data),
+                            },
+                            filter: {
+                                id: originId as string,
+                            }
+                        };
+                    }
+                }
+                if (!modiUpsert) {
+                    modiUpsert = {
+                        id: 'dummy',
+                        action: 'create',
+                        data: {
+                            id: operId,
+                            targetEntity: entity as string,
+                            entity: option.modiParentEntity!,
+                            entityId: option.modiParentId!,
+                            action,
+                            data,
+                            iState: 'active',
+                            filter,
+                        },
+                    };
+                    if (ids.length > 0) {
+                        modiUpsert.data.modiEntity$modi = {
+                            id: 'dummy',
+                            action: 'create',
+                            data: await Promise.all(
+                                ids.map(
+                                    async (id) => ({
+                                        id: await generateNewIdAsync(),
+                                        entity: entity as string,
+                                        entityId: id,
+                                    })
+                                )
+                            ),
+                        };
+                    }
+                }
+                await this.cascadeUpdateAsync('modi', modiUpsert!, context, option);
+                return 1;
+            }
+            else {
+                const createOper = async () => {
+                    if (!option?.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
+                        // 按照框架要求生成Oper和OperEntity这两个内置的对象
+                        assert(operId);
+                        const createOper: CreateOperOperation = {
+                            id: 'dummy',
+                            action: 'create',
+                            data: {
+                                id: operId,
+                                action,
+                                data,
+                                operEntity$oper: {
+                                    id: 'dummy',
+                                    action: 'create',
+                                    data: await Promise.all(
+                                        ids.map(
+                                            async (ele) => ({
+                                                id: await generateNewIdAsync(),
+                                                entity: entity as string,
+                                                entityId: ele,
+                                            })
+                                        )
+                                    )
+                                },
+                            },
+                        }
+                        await this.cascadeUpdateAsync('oper', createOper, context, {
+                            dontCollect: true,
+                            dontCreateOper: true,
+                        });
+                    }
+                };
                 if (action === 'remove') {
+                    if (!option.dontCollect) {
+                        context.opRecords.push({
+                            a: 'r',
+                            e: entity,
+                            f: {
+                                id: {
+                                    $in: ids,
+                                }
+                            },
+                        });
+                    }
                 }
                 else {
                     const updateAttrCount = Object.keys(data).length;
@@ -1296,74 +1232,163 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         Object.assign(data, {
                             $$updateAt$$: now,
                         });
-                        this.preProcessDataUpdated(data);
+                        if (!option.dontCollect) {
+                            context.opRecords.push({
+                                a: 'u',
+                                e: entity,
+                                d: data as ED[T]['Update']['data'],
+                                f: {
+                                    id: {
+                                        $in: ids,
+                                    }
+                                },
+                            });
+                        }
+                    }
+                    else if (action !== 'update') {
+                        // 如果不是update动作而是用户自定义的动作，这里还是要记录oper
+                        await createOper();
+                        return 0;
                     }
                     else {
                         return 0;
                     }
                 }
 
-                return this.updateAbjointRow(entity, operation, context, option);
+                const result = await this.updateAbjointRowAsync(entity, operation, context, option);
+                await createOper();
+
+                return result;
             }
         }
     }
+}
+
+    private doUpdateSingleRow<T extends keyof ED, OP extends OperateOption, Cxt extends SyncContext<ED>>(entity: T,
+    operation: ED[T]['Operation'],
+    context: Cxt,
+    option: OP
+) {
+    const { data, action, id: operId, filter } = operation;
+    const now = Date.now();
+
+    switch (action) {
+        case 'create': {
+            this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
+            let result = 0;
+            const createInner = (operation2: ED[T]['Create']) => {
+                try {
+                    result += this.updateAbjointRow(
+                        entity,
+                        operation2,
+                        context,
+                        option
+                    );
+                }
+                catch (e: any) {
+                    throw e;
+                }
+            };
+
+            if (data instanceof Array) {
+                const multipleCreate = this.supportMultipleCreate();
+                if (multipleCreate) {
+                    createInner(operation as ED[T]['Create']);
+                }
+                else {
+                    for (const d of data) {
+                        const createSingleOper: ED[T]['CreateSingle'] = {
+                            id: 'any',
+                            action: 'create',
+                            data: d,
+                        };
+                        createInner(createSingleOper);
+                    }
+                }
+            }
+            else {
+                createInner(operation as ED[T]['Create']);
+            }
+            return result;
+        }
+        default: {
+            if (action === 'remove') {
+            }
+            else {
+                const updateAttrCount = Object.keys(data).length;
+                if (updateAttrCount > 0) {
+                    // 优化一下，如果不更新任何属性，则不实际执行
+                    Object.assign(data, {
+                        $$updateAt$$: now,
+                    });
+                    this.preProcessDataUpdated(data);
+                }
+                else {
+                    return 0;
+                }
+            }
+
+            return this.updateAbjointRow(entity, operation, context, option);
+        }
+    }
+}
 
     protected cascadeUpdate<T extends keyof ED, Cxt extends SyncContext<ED>, OP extends OperateOption>(
-        entity: T,
-        operation: ED[T]['Operation'],
-        context: Cxt,
-        option: OP): OperationResult<ED> {
+    entity: T,
+    operation: ED[T]['Operation'],
+    context: Cxt,
+    option: OP): OperationResult < ED > {
         reinforceOperation(this.getSchema(), entity, operation);
         const { action, data, filter, id } = operation;
         let opData: any;
-        const wholeBeforeFns: Array<() => any> = [];
-        const wholeAfterFns: Array<() => any> = [];
-        const result: OperationResult<ED> = {};
+        const wholeBeforeFns: Array<() => any> =[];
+const wholeAfterFns: Array<() => any> = [];
+const result: OperationResult<ED> = {};
 
-        if (['create', 'create-l'].includes(action) && data instanceof Array) {
-            opData = [];
-            for (const d of data) {
-                const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
-                    entity,
-                    action,
-                    d,
-                    context,
-                    option,
-                    this.cascadeUpdate,
-                );
-                opData.push(od);
-                wholeBeforeFns.push(...beforeFns);
-                wholeAfterFns.push(...afterFns);
-            }
-        }
-        else {
-            const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
-                entity,
-                action,
-                data,
-                context,
-                option,
-                this.cascadeUpdate,
-                filter
-            );
-            opData = od;
-            wholeBeforeFns.push(...beforeFns);
-            wholeAfterFns.push(...afterFns);
-        }
+if (['create', 'create-l'].includes(action) && data instanceof Array) {
+    opData = [];
+    for (const d of data) {
+        const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
+            entity,
+            action,
+            d,
+            context,
+            option,
+            this.cascadeUpdate,
+        );
+        opData.push(od);
+        wholeBeforeFns.push(...beforeFns);
+        wholeAfterFns.push(...afterFns);
+    }
+}
+else {
+    const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
+        entity,
+        action,
+        data,
+        context,
+        option,
+        this.cascadeUpdate,
+        filter
+    );
+    opData = od;
+    wholeBeforeFns.push(...beforeFns);
+    wholeAfterFns.push(...afterFns);
+}
 
-        const operation2: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'] =
-            Object.assign({}, operation as ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'], {
-                data: opData as ED[T]['OpSchema'],
-            });
+const operation2: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'] =
+    Object.assign({}, operation as ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'], {
+        data: opData as ED[T]['OpSchema'],
+    });
 
-        for (const before of wholeBeforeFns) {
-            before();
-        }
-        const count = this.doUpdateSingleRow(entity, operation2, context, option);
-        for (const after of wholeAfterFns) {
-            after();
-        }
-        return result;
+for (const before of wholeBeforeFns) {
+    before();
+}
+const count = this.doUpdateSingleRow(entity, operation2, context, option);
+for (const after of wholeAfterFns) {
+    after();
+}
+return result;
     }
 
     /**
@@ -1374,121 +1399,121 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
      * @param option 
      */
     protected async cascadeUpdateAsync<T extends keyof ED, Cxt extends AsyncContext<ED>, OP extends OperateOption>(
-        entity: T,
-        operation: ED[T]['Operation'],
-        context: Cxt,
-        option: OP): Promise<OperationResult<ED>> {
+    entity: T,
+    operation: ED[T]['Operation'],
+    context: Cxt,
+    option: OP): Promise < OperationResult < ED >> {
         reinforceOperation(this.getSchema(), entity, operation);
         const { action, data, filter, id } = operation;
         let opData: any;
-        const wholeBeforeFns: Array<() => Promise<any>> = [];
-        const wholeAfterFns: Array<() => Promise<any>> = [];
-        const result: OperationResult<ED> = {};
+        const wholeBeforeFns: Array<() => Promise<any>> =[];
+const wholeAfterFns: Array<() => Promise<any>> = [];
+const result: OperationResult<ED> = {};
 
-        if (['create', 'create-l'].includes(action) && data instanceof Array) {
-            opData = [];
-            for (const d of data) {
-                const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
-                    entity,
-                    action,
-                    d,
-                    context,
-                    option,
-                    this.cascadeUpdateAsync,
-                );
-                opData.push(od);
-                wholeBeforeFns.push(...beforeFns);
-                wholeAfterFns.push(...afterFns);
-            }
-        }
-        else {
-            const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
-                entity,
-                action,
-                data,
-                context,
-                option,
-                this.cascadeUpdateAsync,
-                filter
-            );
-            opData = od;
-            wholeBeforeFns.push(...beforeFns);
-            wholeAfterFns.push(...afterFns);
-        }
+if (['create', 'create-l'].includes(action) && data instanceof Array) {
+    opData = [];
+    for (const d of data) {
+        const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
+            entity,
+            action,
+            d,
+            context,
+            option,
+            this.cascadeUpdateAsync,
+        );
+        opData.push(od);
+        wholeBeforeFns.push(...beforeFns);
+        wholeAfterFns.push(...afterFns);
+    }
+}
+else {
+    const { data: od, beforeFns, afterFns } = this.destructCascadeUpdate(
+        entity,
+        action,
+        data,
+        context,
+        option,
+        this.cascadeUpdateAsync,
+        filter
+    );
+    opData = od;
+    wholeBeforeFns.push(...beforeFns);
+    wholeAfterFns.push(...afterFns);
+}
 
-        const operation2: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'] =
-            Object.assign({}, operation as ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'], {
-                data: opData as ED[T]['OpSchema'],
-            });
+const operation2: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'] =
+    Object.assign({}, operation as ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'], {
+        data: opData as ED[T]['OpSchema'],
+    });
 
-        for (const before of wholeBeforeFns) {
-            await before();
-        }
-        const count = await this.doUpdateSingleRowAsync(entity, operation2, context, option);
-        this.mergeOperationResult(result, {
-            [entity]: {
-                [operation2.action]: count,
-            }
-        } as OperationResult<ED>);
-        for (const after of wholeAfterFns) {
-            await after();
-        }
-        return result;
+for (const before of wholeBeforeFns) {
+    await before();
+}
+const count = await this.doUpdateSingleRowAsync(entity, operation2, context, option);
+this.mergeOperationResult(result, {
+    [entity]: {
+        [operation2.action]: count,
+    }
+} as OperationResult<ED>);
+for (const after of wholeAfterFns) {
+    await after();
+}
+return result;
     }
 
     protected cascadeSelect<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
-        entity: T,
-        selection: ED[T]['Selection'],
-        context: Cxt,
-        option: OP): Partial<ED[T]['Schema']>[] {
-        reinforceSelection(this.getSchema(), entity, selection);
-        const { data, filter, indexFrom, count, sorter } = selection;
-        const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
-            entity,
-            data,
-            context,
-            this.cascadeSelect,
-            this.aggregateSync,
-            option);
+    entity: T,
+    selection: ED[T]['Selection'],
+    context: Cxt,
+    option: OP): Partial < ED[T]['Schema'] > [] {
+    reinforceSelection(this.getSchema(), entity, selection);
+    const { data, filter, indexFrom, count, sorter } = selection;
+    const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
+        entity,
+        data,
+        context,
+        this.cascadeSelect,
+        this.aggregateSync,
+        option);
 
-        const rows = this.selectAbjointRow(entity, {
-            data: projection,
-            filter,
-            indexFrom,
-            count,
-            sorter
-        }, context, option);
+    const rows = this.selectAbjointRow(entity, {
+        data: projection,
+        filter,
+        indexFrom,
+        count,
+        sorter
+    }, context, option);
 
 
-        if (cascadeSelectionFns.length > 0) {
-            const ruException: Array<{
-                entity: keyof ED,
-                selection: ED[keyof ED]['Selection']
-            }> = [];
-            cascadeSelectionFns.forEach(
-                ele => {
-                    try {
-                        ele(rows);
+    if (cascadeSelectionFns.length > 0) {
+        const ruException: Array<{
+            entity: keyof ED,
+            selection: ED[keyof ED]['Selection']
+        }> = [];
+        cascadeSelectionFns.forEach(
+            ele => {
+                try {
+                    ele(rows);
+                }
+                catch (e) {
+                    if (e instanceof OakRowUnexistedException) {
+                        const rows = e.getRows();
+                        ruException.push(...rows);
                     }
-                    catch (e) {
-                        if (e instanceof OakRowUnexistedException) {
-                            const rows = e.getRows();
-                            ruException.push(...rows);
-                        }
-                        else {
-                            throw e;
-                        }
+                    else {
+                        throw e;
                     }
                 }
-            )
-
-            if (ruException.length > 0) {
-                throw new OakRowUnexistedException(ruException);
             }
-        }
+        )
 
-        return rows;
+        if (ruException.length > 0) {
+            throw new OakRowUnexistedException(ruException);
+        }
     }
+
+    return rows;
+}
 
     /**
      * 将一次查询的结果集加入result
@@ -1497,90 +1522,90 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
      * @param rows 
      * @param context 
      */
-    private addToResultSelections<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, rows: Partial<ED[T]['Schema']>[], context: Cxt) {
-        if (this.supportManyToOneJoin()) {
-            const attrsToPick: string[] = [];
-            for (const attr in rows[0]) {
-                const data: Partial<ED[T]['Schema']> = {}
-                const rel = this.judgeRelation(entity, attr);
-                if (rel === 2) {
-                    this.addToResultSelections(attr, rows.map(ele => ele[attr]!).filter(ele => !!ele), context);
-                }
-                else if (typeof rel === 'string') {
-                    this.addToResultSelections(rel, rows.map(ele => ele[attr]!).filter(ele => !!ele), context);
-                }
-                else if (rel instanceof Array) {
-                    this.addToResultSelections(rel[0], rows.map(ele => ele[attr]!).reduce((prev, current) => prev.concat(current), [] as any[]), context);
-                }
-                else {
-                    attrsToPick.push(attr);
-                }
+    private addToResultSelections<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, rows: Partial < ED[T]['Schema'] > [], context: Cxt) {
+    if (this.supportManyToOneJoin()) {
+        const attrsToPick: string[] = [];
+        for (const attr in rows[0]) {
+            const data: Partial<ED[T]['Schema']> = {}
+            const rel = this.judgeRelation(entity, attr);
+            if (rel === 2) {
+                this.addToResultSelections(attr, rows.map(ele => ele[attr]!).filter(ele => !!ele), context);
             }
-            const originRows = rows.map(
-                ele => pick(ele, attrsToPick)
-            ) as Partial<ED[T]['Schema']>[];
-            this.addSingleRowToResultSelections(entity, originRows, context);
+            else if (typeof rel === 'string') {
+                this.addToResultSelections(rel, rows.map(ele => ele[attr]!).filter(ele => !!ele), context);
+            }
+            else if (rel instanceof Array) {
+                this.addToResultSelections(rel[0], rows.map(ele => ele[attr]!).reduce((prev, current) => prev.concat(current), [] as any[]), context);
+            }
+            else {
+                attrsToPick.push(attr);
+            }
         }
-        else {
-            this.addSingleRowToResultSelections(entity, rows, context);
-        }
+        const originRows = rows.map(
+            ele => pick(ele, attrsToPick)
+        ) as Partial<ED[T]['Schema']>[];
+        this.addSingleRowToResultSelections(entity, originRows, context);
     }
+    else {
+        this.addSingleRowToResultSelections(entity, rows, context);
+    }
+}
 
-    private addSingleRowToResultSelections<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, rows: Partial<ED[T]['OpSchema']>[], context: Cxt) {
-        const { opRecords } = context;
+    private addSingleRowToResultSelections<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, rows: Partial < ED[T]['OpSchema'] > [], context: Cxt) {
+    const { opRecords } = context;
 
-        let lastOperation = opRecords[opRecords.length - 1];
-        if (lastOperation && lastOperation.a === 's') {
-            const entityBranch = lastOperation.d[entity];
-            if (entityBranch) {
-                rows.forEach(
-                    (row) => {
-                        if (row) {
-                            assert(row.id);
-                            const { id } = row;
-                            if (!entityBranch![id!]) {
-                                Object.assign(entityBranch!, {
-                                    [id!]: row,
-                                });
-                            }
-                            else {
-                                Object.assign(entityBranch[id], row);
-                            }
+    let lastOperation = opRecords[opRecords.length - 1];
+    if (lastOperation && lastOperation.a === 's') {
+        const entityBranch = lastOperation.d[entity];
+        if (entityBranch) {
+            rows.forEach(
+                (row) => {
+                    if (row) {
+                        assert(row.id);
+                        const { id } = row;
+                        if (!entityBranch![id!]) {
+                            Object.assign(entityBranch!, {
+                                [id!]: row,
+                            });
+                        }
+                        else {
+                            Object.assign(entityBranch[id], row);
                         }
                     }
-                );
-                return;
-            }
-        }
-        else {
-            lastOperation = {
-                a: 's',
-                d: {},
-            };
-            opRecords.push(lastOperation);
-        }
-
-        const entityBranch = {};
-        rows.forEach(
-            (row) => {
-                if (row) {
-                    const { id } = row as { id: string };
-                    Object.assign(entityBranch!, {
-                        [id!]: row,
-                    });
                 }
-            }
-        );
-        Object.assign(lastOperation.d, {
-            [entity]: entityBranch,
-        });
+            );
+            return;
+        }
+    }
+    else {
+        lastOperation = {
+            a: 's',
+            d: {},
+        };
+        opRecords.push(lastOperation);
     }
 
+    const entityBranch = {};
+    rows.forEach(
+        (row) => {
+            if (row) {
+                const { id } = row as { id: string };
+                Object.assign(entityBranch!, {
+                    [id!]: row,
+                });
+            }
+        }
+    );
+    Object.assign(lastOperation.d, {
+        [entity]: entityBranch,
+    });
+}
+
     protected async cascadeSelectAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
-        entity: T,
-        selection: ED[T]['Selection'],
-        context: Cxt,
-        option: OP): Promise<Partial<ED[T]['Schema']>[]> {
+    entity: T,
+    selection: ED[T]['Selection'],
+    context: Cxt,
+    option: OP): Promise < Partial < ED[T]['Schema'] > [] > {
         reinforceSelection(this.getSchema(), entity, selection);
         const { data, filter, indexFrom, count, sorter } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
@@ -1600,39 +1625,39 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         }, context, option);
 
 
-        if (!option.dontCollect) {
-            this.addToResultSelections(entity, rows, context);
-        }
+        if(!option.dontCollect) {
+    this.addToResultSelections(entity, rows, context);
+}
 
-        if (cascadeSelectionFns.length > 0) {
-            const ruException: Array<{
-                entity: keyof ED,
-                selection: ED[keyof ED]['Selection']
-            }> = [];
-            await Promise.all(
-                cascadeSelectionFns.map(
-                    async ele => {
-                        try {
-                            await ele(rows);
-                        }
-                        catch (e) {
-                            if (e instanceof OakRowUnexistedException) {
-                                const rows = e.getRows();
-                                ruException.push(...rows);
-                            }
-                            else {
-                                throw e;
-                            }
-                        }
+if (cascadeSelectionFns.length > 0) {
+    const ruException: Array<{
+        entity: keyof ED,
+        selection: ED[keyof ED]['Selection']
+    }> = [];
+    await Promise.all(
+        cascadeSelectionFns.map(
+            async ele => {
+                try {
+                    await ele(rows);
+                }
+                catch (e) {
+                    if (e instanceof OakRowUnexistedException) {
+                        const rows = e.getRows();
+                        ruException.push(...rows);
                     }
-                )
-            );
-
-            if (ruException.length > 0) {
-                throw new OakRowUnexistedException(ruException);
+                    else {
+                        throw e;
+                    }
+                }
             }
-        }
+        )
+    );
 
-        return rows;
+    if (ruException.length > 0) {
+        throw new OakRowUnexistedException(ruException);
+    }
+}
+
+return rows;
     }
 }
