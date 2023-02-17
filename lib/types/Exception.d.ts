@@ -92,6 +92,12 @@ export declare class OakCongruentRowExists<ED extends EntityDict, T extends keyo
 export declare class OakDeadlock<ED extends EntityDict> extends OakUserException<ED> {
     constructor(message?: string | undefined);
 }
+export declare class OakPreConditionUnsetException<ED extends EntityDict> extends OakUserException<ED> {
+    entity?: keyof ED;
+    code?: string;
+    constructor(message?: string | undefined, entity?: keyof ED | undefined, code?: string | undefined);
+    toString(): string;
+}
 export declare function makeException<ED extends EntityDict>(data: {
     name: string;
     message?: string;
