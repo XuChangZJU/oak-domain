@@ -229,9 +229,13 @@ type FilterMakeFn<ED extends EntityDict & BaseEntityDict> = (operation: ED[keyof
 function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityDict>(
     schema: StorageSchema<ED>,
     lch: CascadeRelationItem,
-    entity2: keyof ED): FilterMakeFn<ED> {
+    entity2: keyof ED,
+    pathPrefix?: string): FilterMakeFn<ED> {
     const { cascadePath, relations } = lch;
-    const paths = cascadePath.split('.');
+    const paths = cascadePath ? cascadePath.split('.') : [];
+    if (pathPrefix) {
+        paths.unshift(pathPrefix);
+    }
 
     const translateRelationFilter = <T extends keyof ED>(entity: T): (userId: string) => ED[T]['Selection']['filter'] => {
         // 有两种情况，此entity和user有Relation定义，或是此entity已经指向user
@@ -309,8 +313,8 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
         }
     };
 
-    const filterMaker = cascadePath ? translateFilterMakerIter(entity2, 0) : translateRelationFilter(entity2);
-    if (!cascadePath) {
+    const filterMaker = paths.length ? translateFilterMakerIter(entity2, 0) : translateRelationFilter(entity2);
+    if (!paths.length) {
         return (oper, userId) => filterMaker(userId);
     }
     /**
@@ -413,22 +417,23 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
 function translateActionAuthFilterMaker<ED extends EntityDict & BaseEntityDict>(
     schema: StorageSchema<ED>,
     relationItem: CascadeRelationItem | (CascadeRelationItem | CascadeRelationItem[])[],
-    entity: keyof ED
+    entity: keyof ED,
+    pathPrefix?: string,
 ): FilterMakeFn<ED> | (FilterMakeFn<ED> | FilterMakeFn<ED>[])[] {
     if (relationItem instanceof Array) {
         const maker = relationItem.map(
             ele => {
                 if (ele instanceof Array) {
                     return ele.map(
-                        ele2 => translateCascadeRelationFilterMaker(schema, ele2, entity)
+                        ele2 => translateCascadeRelationFilterMaker(schema, ele2, entity, pathPrefix)
                     );
                 }
-                return translateCascadeRelationFilterMaker(schema, ele, entity);
+                return translateCascadeRelationFilterMaker(schema, ele, entity, pathPrefix);
             }
         );
         return maker;
     }
-    const filterMaker = translateCascadeRelationFilterMaker(schema, relationItem, entity);
+    const filterMaker = translateCascadeRelationFilterMaker(schema, relationItem, entity, pathPrefix);
     return filterMaker;
 }
 
@@ -581,7 +586,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                 const userEntityName = `user${firstLetterUpperCase(entity)}`;
                 for (const r in relationAuth) {
                     Object.assign(raFilterMakerDict, {
-                        [r]: translateActionAuthFilterMaker(schema, relationAuth[r as NonNullable<ED[keyof ED]['Relation']>]!, entity),
+                        [r]: translateActionAuthFilterMaker(schema, relationAuth[r as NonNullable<ED[keyof ED]['Relation']>]!, userEntityName, entity),
                     });
                 }
                 const entityIdAttr = `${entity}Id`;
@@ -597,16 +602,8 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                             return;
                         }
                         const filter = makePotentialFilter(operation, context, raFilterMakerDict[relation]);
-                        if (filter instanceof Promise) {
-                            return filter.then(
-                                (f) => ({
-                                    [entity]: f,
-                                })
-                            );
-                        }
-                        return filter ? {
-                            [entity]: filter,
-                        } : undefined;
+                        
+                        return filter;
                     },
                     errMsg: '越权操作',
                 });
@@ -636,14 +633,20 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                             );
                             if (filtersAnd.find(ele => ele instanceof Promise)) {
                                 return Promise.all(filtersAnd).then(
-                                    (fa) => ({
-                                        $and: fa,
-                                    } as ED[keyof ED]['Selection']['filter'])
+                                    (fa) => {
+                                        if (fa.length > 0) {
+                                            return {
+                                                $and: fa,
+                                            } as ED[keyof ED]['Selection']['filter'];
+                                        }
+                                    }
                                 );
                             }
-                            return {
-                                $and: filtersAnd
-                            } as ED[keyof ED]['Selection']['filter'];
+                            if (filtersAnd.length > 0) {
+                                return {
+                                    $and: filtersAnd
+                                } as ED[keyof ED]['Selection']['filter'];
+                            }
                         };
 
                         const toBeRemoved = context.select(userEntityName, {
