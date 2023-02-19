@@ -627,9 +627,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                             ).filter(
                                 ele => !!ele
                             ).map(
-                                ele => ({
-                                    [entity]: makePotentialFilter(operation, context, ele),
-                                })
+                                ele => makePotentialFilter(operation, context, ele)
                             );
                             if (filtersAnd.find(ele => ele instanceof Promise)) {
                                 return Promise.all(filtersAnd).then(
