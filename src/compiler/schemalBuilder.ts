@@ -21,8 +21,8 @@ const Schema: Record<string, {
     schemaAttrs: Array<ts.PropertySignature>;
     fulltextIndex?: true;
     indexes?: ts.ArrayLiteralExpression;
-    states: string[];
     sourceFile: ts.SourceFile;
+    enumAttributes: Record<string, string[]>;
     locale: ts.ObjectLiteralExpression;
     // relationHierarchy?: ts.ObjectLiteralExpression;
     // reverseCascadeRelationHierarchy?: ts.ObjectLiteralExpression;
@@ -31,7 +31,6 @@ const Schema: Record<string, {
     static: boolean;
     inModi: boolean;
     hasRelationDef: false | ts.TypeAliasDeclaration;
-    enumStringAttrs: string[],
     additionalImports: ts.ImportDeclaration[],
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
@@ -489,19 +488,26 @@ function checkLocaleExpressionPropertyExists(root: ts.ObjectLiteralExpression, a
     )
 }
 
-function isEnumType(filename: string, node: ts.TypeAliasDeclaration) {
-    if (ts.isUnionTypeNode(node.type) && ts.isLiteralTypeNode(node.type.types[0])) {
-        node.type.types.forEach(
-            ele => checkStringLiteralLegal(filename, 'attribute', node.name.text, ele)
-        )
-        return true;
-    }
-    if (ts.isLiteralTypeNode(node.type)) {
-        checkStringLiteralLegal(filename, 'attribute', node.name.text, node.type);
-        return true;
+function getStringEnumValues(filename: string, program: ts.Program, obj: string, node: ts.TypeReferenceNode) {
+    const checker = program.getTypeChecker();
+    const symbol = checker.getSymbolAtLocation(node.typeName);
+    let declaration = symbol?.getDeclarations()![0]!;
+    if (ts.isImportSpecifier(declaration)) {
+        const typee = checker.getDeclaredTypeOfSymbol(symbol!);
+        declaration = typee.aliasSymbol?.getDeclarations()![0]!;
     }
 
-    return false;
+    if (declaration && ts.isTypeAliasDeclaration(declaration)) {
+        if (ts.isUnionTypeNode(declaration.type) && ts.isLiteralTypeNode(declaration.type.types[0])) {
+            return declaration.type.types.map(
+                ele => checkStringLiteralLegal(filename, obj, (<ts.TypeAliasDeclaration>declaration).name.text, ele)
+            )
+        }
+        if (ts.isLiteralTypeNode(declaration.type)) {
+            const value = checkStringLiteralLegal(filename, obj, declaration.name.text, declaration.type);
+            return [value];
+        }
+    }
 }
 
 function analyzeEntity(filename: string, path: string, program: ts.Program, relativePath?: string) {
@@ -526,9 +532,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     let toModi = false;
     let actionType = 'crud';
     let _static = false;
-    const enumStringAttrs: string[] = [];
-    const states: string[] = [];
-    const localEnumStringTypes: string[] = [];
+    const enumAttributes: Record<string, string[]> = {};
     const additionalImports: ts.ImportDeclaration[] = [];
     let localeDef: ts.ObjectLiteralExpression | undefined = undefined;
     // let relationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
@@ -615,27 +619,10 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                             }
                             else {
                                 schemaAttrs.push(attrNode);
-                                if (localEnumStringTypes.includes(type.typeName.text)) {
-                                    enumStringAttrs.push((<ts.Identifier>name).text);
+                                const enumStringValues = getStringEnumValues(filename, program, '属性', type);
+                                if (enumStringValues) {
+                                    enumAttributes[attrName] = enumStringValues;
                                 }
-                                // 如果是从其它的文件引入的定义类型，在这里也要分析判定成enumStringAttrs
-                                else {
-                                    const checker = program.getTypeChecker();
-                                    const symbol = checker.getSymbolAtLocation(type.typeName);
-                                    const declaration = symbol?.getDeclarations()![0]!;
-                                    if (ts.isImportSpecifier(declaration)) {
-                                        const typee = checker.getDeclaredTypeOfSymbol(symbol!);
-                                        const declaration2 = typee.aliasSymbol?.getDeclarations()![0];
-                                        if (declaration2 && ts.isTypeAliasDeclaration(declaration2)) {
-                                            if (isEnumType(filename, declaration2)) {
-                                                enumStringAttrs.push((<ts.Identifier>name).text);
-                                            }
-                                        }
-                                        
-                                        // declaration = typee.aliasSymbol!.getDeclarations()![0];
-                                    }
-                                }
-
                             }
                         }
                         else if (ts.isArrayTypeNode(type!) && ts.isTypeReferenceNode(type.elementType) && ts.isIdentifier(type.elementType.typeName)) {
@@ -663,17 +650,13 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         }
                         else {
                             schemaAttrs.push(attrNode);
-                            if (ts.isUnionTypeNode(type!)) {
+                            if (ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) && ts.isStringLiteral(type.types[0].literal)) {
+                                assert(ts.isIdentifier(name));
                                 const { types } = type;
-                                if (ts.isLiteralTypeNode(types[0]) && ts.isStringLiteral(types[0].literal)) {
-                                    enumStringAttrs.push((<ts.Identifier>name).text);
-                                    types.forEach(
-                                        (ele) => {
-                                            assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的枚举属性定义「${attrName}」`);
-                                            assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」中定义的属性枚举「${attrName}」的字符串长度应小于${STRING_LITERAL_MAX_LENGTH}`);
-                                        }
-                                    )
-                                }
+                                const enumValues = types.map(
+                                    (ele) => checkStringLiteralLegal(filename, '属性', name.text, ele)
+                                );
+                                enumAttributes[name.text] = enumValues;
                             }
                         }
 
@@ -806,18 +789,21 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 assert(!hasActionDef, `【${filename}】action定义须在Relation之后`);
                 assert(!localeDef, `【${filename}】locale定义须在Relation之后`);
                 // 增加userXXX对象的描述
+                const relationValues = [] as string[];
                 if (ts.isLiteralTypeNode(node.type)) {
                     assert(ts.isStringLiteral(node.type.literal));
                     assert(node.type.literal.text.length < STRING_LITERAL_MAX_LENGTH, `Relation定义的字符串长度不长于${STRING_LITERAL_MAX_LENGTH}（${filename}，${node.type.literal.text}）`);
+                    relationValues.push(node.type.literal.text);
                 }
                 else {
                     assert(ts.isUnionTypeNode(node.type), `Relation的定义只能是string类型（${filename}）`);
-                    node.type.types.forEach(
+                    relationValues.push(...node.type.types.map(
                         (ele) => {
                             assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `Relation的定义只能是string类型（${filename}）`);
                             assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `Relation定义的字符串长度不长于${STRING_LITERAL_MAX_LENGTH}（${filename}，${ele.literal.text}）`);
+                            return ele.literal.text;
                         }
-                    );
+                    ));
                 }
                 const entityLc = firstLetterLowerCase(moduleName);
                 const relationEntityName = `User${moduleName}`;
@@ -854,7 +840,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     [relationEntityName]: {
                         schemaAttrs: relationSchemaAttrs,
                         sourceFile,
-                        enumStringAttrs: ['relation'],
+                        enumAttributes: {
+                            relation: relationValues,
+                        },
                         actionType: 'excludeUpdate',
                         additionalImports: [
                             factory.createImportDeclaration(
@@ -931,20 +919,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
                 pushStatementIntoSchemaAst(moduleName, node, sourceFile!);
-
-                if (isEnumType(filename, node)) {
-                    // 本文件内定义的枚举类型
-                    localEnumStringTypes.push(node.name.text);
-
-                    if (ts.isUnionTypeNode(node.type)) {
-                        node.type.types.forEach(
-                            (ele) => {
-                                assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `「${filename}」不支持混合型的常量定义「${node.name.text}」`);
-                                assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」中定义的常量枚举「${node.name.text}」的字符串长度应小于${STRING_LITERAL_MAX_LENGTH}`);
-                            }
-                        );
-                    }
-                }
             }
         }
 
@@ -952,62 +926,34 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
             const { declarationList: { declarations } } = node;
             declarations.forEach(
                 (declaration) => {
-                    if (ts.isIdentifier(declaration.name) && declaration.name.text.endsWith('ActionDef')) {
-                        if (declaration.type && ts.isTypeReferenceNode(declaration.type) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ActionDef') {
-                            // 是显示的actionDef定义
-                            checkActionDefNameConsistent(filename, declaration);
-                            const { typeArguments } = declaration.type;
-                            assert(typeArguments!.length === 2);
-                            const [actionNode, stateNode] = typeArguments!;
+                    if (declaration.type && ts.isTypeReferenceNode(declaration.type) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ActionDef') {
+                        checkActionDefNameConsistent(filename, declaration);
+                        const { typeArguments } = declaration.type;
+                        assert(typeArguments!.length === 2);
+                        const [actionNode, stateNode] = typeArguments!;
 
-                            const checker = program.getTypeChecker();
-                            let symbol = checker.getSymbolAtLocation((<ts.TypeReferenceNode>actionNode).typeName);
-
-                            let declaration2 = symbol!.getDeclarations()![0];
-                            if (declaration2.getSourceFile() === sourceFile) {
-                                // pushStatementIntoActionAst(moduleName, <ts.TypeAliasDeclaration>declaration2, sourceFile);
-                            }
-
-                            symbol = checker.getSymbolAtLocation((<ts.TypeReferenceNode>stateNode).typeName);
-
-                            declaration2 = symbol!.getDeclarations()![0];
-                            if (declaration2.getSourceFile() === sourceFile) {
-                                // 检查state的定义合法
-                                assert(ts.isTypeAliasDeclaration(declaration2) && ts.isUnionTypeNode(declaration2.type), `「${filename}」State「${(<ts.TypeAliasDeclaration>declaration2).name}」的定义只能是或结点`);
-                                declaration2.type.types.forEach(
-                                    (type) => {
-                                        assert(ts.isLiteralTypeNode(type) && ts.isStringLiteral(type.literal), `「${filename}」State「${(<ts.TypeAliasDeclaration>declaration2).name}」的定义只能是字符串`);
-                                        assert(type.literal.text.length < STRING_LITERAL_MAX_LENGTH, `「${filename}」State「${type.literal.text}」的长度大于「${STRING_LITERAL_MAX_LENGTH}」`);
-                                    }
-                                );
-                                /* pushStatementIntoActionAst(moduleName,
-                                    factory.updateTypeAliasDeclaration(
-                                        declaration2,
-                                        declaration2.decorators,
-                                        [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-                                        declaration2.name,
-                                        declaration2.typeParameters,
-                                        declaration2.type
-                                    ),
-                                    sourceFile); */
-                            }
-                        }
+                        assert(ts.isTypeReferenceNode(actionNode));
+                        assert(ts.isTypeReferenceNode(stateNode));
+                        assert(getStringEnumValues(filename, program, 'action', (<ts.TypeReferenceNode>actionNode)), `文件${filename}中的action${(<ts.Identifier>actionNode.typeName).text}定义不是字符串类型`);
+                        const enumStateValues = getStringEnumValues(filename, program, 'state', stateNode);
+                        assert(enumStateValues, `文件${filename}中的state${(<ts.Identifier>stateNode.typeName).text}定义不是字符串类型`)
 
                         pushStatementIntoActionAst(moduleName, node, sourceFile!);
 
+                        assert(ts.isIdentifier(declaration.name));
                         const adName = declaration.name.text.slice(0, declaration.name.text.length - 9);
                         const attr = adName.concat('State');
                         schemaAttrs.push(
                             factory.createPropertySignature(
                                 undefined,
-                                factory.createIdentifier(firstLetterLowerCase(attr)),
+                                firstLetterLowerCase(attr),
                                 factory.createToken(ts.SyntaxKind.QuestionToken),
                                 factory.createTypeReferenceNode(
-                                    factory.createIdentifier(attr),
+                                    attr,
                                 )
                             )
                         );
-                        states.push(firstLetterLowerCase(attr));
+                        enumAttributes[firstLetterLowerCase(attr)] = enumStateValues;
                     }
                     else if (declaration.type && (ts.isArrayTypeNode(declaration.type!)
                         && ts.isTypeReferenceNode(declaration.type.elementType)
@@ -1152,7 +1098,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
 
                         indexes = declaration.initializer;
                     }
-                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'LocaleDef') {
+                    else if (declaration.type && ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'LocaleDef') {
                         // locale定义
                         const { type, initializer } = declaration;
 
@@ -1161,7 +1107,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         assert(properties.length > 0, `${filename}至少需要有一种locale定义`);
 
 
-                        const allEnumStringAttrs = enumStringAttrs.concat(states);
+                        const allEnumStringAttrs = Object.keys(enumAttributes);
                         const { typeArguments } = type;
                         assert(typeArguments &&
                             ts.isTypeReferenceNode(typeArguments[0])
@@ -1207,7 +1153,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
 
                         localeDef = initializer;
                     }
-                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'Configuration') {
+                    else if (declaration.type && ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'Configuration') {
                         assert(!hasActionDef, `${moduleName}中的Configuration定义在Action之后`);
                         assert(ts.isObjectLiteralExpression(declaration.initializer!));
                         const { properties } = declaration.initializer;
@@ -1260,7 +1206,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
         actionType,
         static: _static,
         hasRelationDef,
-        enumStringAttrs: enumStringAttrs.concat(states),
+        enumAttributes,
         additionalImports,
     };
     if (hasFulltextIndex) {
@@ -5281,7 +5227,7 @@ function outputAction(outputDir: string, printer: ts.Printer) {
 }
 
 function constructAttributes(entity: string): ts.PropertyAssignment[] {
-    const { schemaAttrs, enumStringAttrs } = Schema[entity];
+    const { schemaAttrs, enumAttributes } = Schema[entity];
     const { [entity]: manyToOneSet } = ManyToOne;
     const result: ts.PropertyAssignment[] = [];
 
@@ -5495,10 +5441,10 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                 );
                             }
                             else {
-                                if (enumStringAttrs && enumStringAttrs.includes((<ts.Identifier>name).text)) {
+                                if (enumAttributes && enumAttributes[(<ts.Identifier>name).text]) {
                                     attrAssignments.push(
                                         factory.createPropertyAssignment(
-                                            factory.createIdentifier("type"),
+                                            'type',
                                             factory.createStringLiteral("varchar")
                                         ),
                                         factory.createPropertyAssignment(
@@ -5509,6 +5455,14 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                                     factory.createNumericLiteral(STRING_LITERAL_MAX_LENGTH)
                                                 )],
                                                 true
+                                            )
+                                        ),
+                                        factory.createPropertyAssignment(
+                                            'enumeration',
+                                            factory.createArrayLiteralExpression(
+                                                enumAttributes[(<ts.Identifier>name).text].map(
+                                                    ele => factory.createStringLiteral(ele)
+                                                )                                                
                                             )
                                         )
                                     );

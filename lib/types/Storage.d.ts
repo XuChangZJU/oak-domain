@@ -26,6 +26,7 @@ export interface Attribute {
     notNull?: boolean;
     unique?: boolean;
     sequenceStart?: number;
+    enumeration?: string[];
 }
 export declare type Attributes<SH extends EntityShape> = Omit<{
     [attrName in keyof SH]: Attribute;

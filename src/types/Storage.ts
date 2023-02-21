@@ -33,6 +33,7 @@ export interface Attribute {
     notNull?: boolean;
     unique?: boolean;
     sequenceStart?: number;
+    enumeration?: string[];
 }
 
 export type Attributes<SH extends EntityShape> = Omit<{
