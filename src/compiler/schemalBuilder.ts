@@ -658,6 +658,14 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                                 );
                                 enumAttributes[name.text] = enumValues;
                             }
+                            else if (ts.isLiteralTypeNode(type!) && ts.isStringLiteral(type.literal)) {
+                                // 单个字符串的情形，目前应该没有，没测试过，先写着 by Xc 20230221
+                                assert(ts.isIdentifier(name));
+                                const enumValues = [
+                                    checkStringLiteralLegal(filename, '属性', name.text, type)
+                                ];
+                                enumAttributes[name.text] = enumValues;
+                            }
                         }
 
                         if (attrName === 'entity') {
@@ -5478,19 +5486,18 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                 if (ts.isUnionTypeNode(type!)) {
                     if (ts.isLiteralTypeNode(type.types[0])) {
                         if (ts.isStringLiteral(type.types[0].literal)) {
+                            assert (enumAttributes && enumAttributes[(<ts.Identifier>name).text]);
                             attrAssignments.push(
                                 factory.createPropertyAssignment(
-                                    factory.createIdentifier("type"),
-                                    factory.createStringLiteral("varchar")
+                                    'type',
+                                    factory.createStringLiteral("enum")
                                 ),
                                 factory.createPropertyAssignment(
-                                    factory.createIdentifier("params"),
-                                    factory.createObjectLiteralExpression(
-                                        [factory.createPropertyAssignment(
-                                            factory.createIdentifier("length"),
-                                            factory.createNumericLiteral(STRING_LITERAL_MAX_LENGTH)
-                                        )],
-                                        true
+                                    'enumeration',
+                                    factory.createArrayLiteralExpression(
+                                        enumAttributes[(<ts.Identifier>name).text].map(
+                                            ele => factory.createStringLiteral(ele)
+                                        )                                                
                                     )
                                 )
                             );
