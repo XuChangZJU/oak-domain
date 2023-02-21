@@ -5445,17 +5445,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                     attrAssignments.push(
                                         factory.createPropertyAssignment(
                                             'type',
-                                            factory.createStringLiteral("varchar")
-                                        ),
-                                        factory.createPropertyAssignment(
-                                            factory.createIdentifier("params"),
-                                            factory.createObjectLiteralExpression(
-                                                [factory.createPropertyAssignment(
-                                                    factory.createIdentifier("length"),
-                                                    factory.createNumericLiteral(STRING_LITERAL_MAX_LENGTH)
-                                                )],
-                                                true
-                                            )
+                                            factory.createStringLiteral("enum")
                                         ),
                                         factory.createPropertyAssignment(
                                             'enumeration',
