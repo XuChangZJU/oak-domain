@@ -3,7 +3,7 @@
  */
 'use strict';
 
-import { OakInputIllegalException } from "../types";
+import { EntityDict, OakInputIllegalException } from "../types";
 
 type ValidatorFunction = (text: string, size?:number) => string|boolean;
 type ValidatorMoneyFunction = (text: string, zero?:boolean) => string|boolean;
@@ -106,7 +106,7 @@ export const isVehicleNumber: ValidatorFunction = (str) => {
 }
 
 
-export function checkAttributesNotNull<T extends Record<string, any>>(entity: string, data: T, attributes: Array<keyof T>, allowEmpty?: true) {
+export function checkAttributesNotNull<ED extends EntityDict, T extends keyof EntityDict>(entity: T, data: Partial<ED[T]['CreateSingle']['data']>, attributes: Array<keyof ED[T]['CreateSingle']['data']>, allowEmpty?: true) {
     const attrs = attributes.filter(
         (attr) => {
             if (data[attr] === null || data[attr] === ''|| data[attr] === undefined) {
@@ -119,16 +119,16 @@ export function checkAttributesNotNull<T extends Record<string, any>>(entity: st
     ) as string[];
 
     if (attrs.length > 0) {
-        throw new OakInputIllegalException(entity, attrs, '属性不能为空');
+        throw new OakInputIllegalException(entity as string, attrs, '属性不能为空');
     }
 };
 
-export function checkAttributesScope<T extends Record<string, any>>(entity: string, data: T, attributes: Array<keyof T>) {
+export function checkAttributesScope<ED extends EntityDict, T extends keyof EntityDict>(entity: T, data: Partial<ED[T]['CreateSingle']['data']>, attributes: Array<keyof ED[T]['CreateSingle']['data']>) {
     const attrs = attributes.filter(
         attr => !data.hasOwnProperty(attr)
     ) as string[];    
 
     if (attrs.length > 0) {
-        throw new OakInputIllegalException(entity, attrs, '多余的属性');
+        throw new OakInputIllegalException(entity as string, attrs, '多余的属性');
     }
 }

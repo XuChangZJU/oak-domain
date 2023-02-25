@@ -20,4 +20,5 @@ declare type IsOptional<T, K extends keyof T> = {
 export declare type OptionalKeys<T> = {
     [K in keyof T]: IsOptional<T, K>;
 }[keyof T];
+export declare type SyncOrAsync<T> = T | Promise<T>;
 export {};

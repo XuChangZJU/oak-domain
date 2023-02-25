@@ -230,6 +230,27 @@ export class OakDeadlock<ED extends EntityDict> extends OakUserException<ED> {
     }
 };
 
+export class OakPreConditionUnsetException<ED extends EntityDict> extends OakUserException<ED> {
+    entity?: keyof ED;
+    code?: string;
+
+    constructor(message?: string | undefined, entity?: keyof ED | undefined, code?: string | undefined) {
+        super(message || '前置条件不满足');
+        this.entity = entity,
+        this.code = code;
+    }
+
+    
+    toString(): string {
+        return JSON.stringify({
+            name: this.constructor.name,
+            message: this.message,
+            code: this.code,
+            entity: this.entity,
+        });
+    }
+}
+
 export function makeException<ED extends EntityDict>(data: {
     name: string;
     message?: string;
@@ -300,6 +321,11 @@ export function makeException<ED extends EntityDict>(data: {
         }
         case 'OakImportDataParseException': {
             const e = new OakImportDataParseException(data.message!, data.line, data.header);
+            e.setOpRecords(data.opRecords);
+            return e;
+        }
+        case 'OakPreConditionUnsetException': {
+            const e = new OakPreConditionUnsetException(data.message, data.entity, data.code);
             e.setOpRecords(data.opRecords);
             return e;
         }

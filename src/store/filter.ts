@@ -19,14 +19,6 @@ export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...f
                             filter.$and = ele[k];
                         }
                     }
-                    else if (k === '$or') {
-                        if (filter.$or) {
-                            filter.$or.push(...(ele[k] as any));
-                        }
-                        else {
-                            filter.$or = ele[k];
-                        }
-                    }
                     else if (filter.hasOwnProperty(k)) {
                         if (filter.$and) {
                             filter.$and.push({

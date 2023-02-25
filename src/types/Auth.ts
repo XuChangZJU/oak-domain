@@ -1,4 +1,4 @@
-import { CascadeActionAuth, RelationHierarchy, CascadeRelationAuth, ActionOnRemove } from ".";
+import { CascadeActionAuth, RelationHierarchy, CascadeRelationAuth, ActionOnRemove, SyncOrAsync } from ".";
 import { AsyncContext } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OperateOption, SelectOption } from "../types/Entity";
@@ -15,9 +15,9 @@ export type DataChecker<ED extends EntityDict, T extends keyof ED, Cxt extends A
     type: 'data';
     entity: T;
     action: Omit<ED[T]['Action'], 'remove'> | Array<Omit<ED[T]['Action'], 'remove'>>;
-    checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => any | Promise<any>;
+    checker: (data: ED[T]['Create']['data'] | ED[T]['Update']['data'], context: Cxt) => SyncOrAsync<any>;
     conditionalFilter?: ED[T]['Update']['filter'] | (
-        (operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Selection']['filter']>
+        (operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => SyncOrAsync<ED[T]['Selection']['filter']>
     );
 };
 
@@ -27,7 +27,7 @@ export type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends As
     entity: T;
     action: Omit<ED[T]['Action'], 'create'> | Array<Omit<ED[T]['Action'], 'create'>>;
     filter: ED[T]['Selection']['filter'] | (
-        (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'] | Promise<ED[T]['Selection']['filter']>
+        (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => SyncOrAsync<ED[T]['Selection']['filter']>
     );       // 对行的额外检查条件
     errMsg?: string;
     inconsistentRows?: { // 因为这里的限制不一定在本row上，如果不传这个exception，则默认返回本row上的exception        
@@ -35,7 +35,7 @@ export type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends As
         selection: (filter?: ED[T]['Selection']['filter']) => ED[keyof ED]['Selection'];
     };
     conditionalFilter?: ED[T]['Update']['filter'] | (
-        (operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Update']['filter']>
+        (operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => SyncOrAsync<ED[T]['Update']['filter']>
     );
 };
 
@@ -45,10 +45,10 @@ export type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt exten
     entity: T;
     when?: 'after';
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
-    relationFilter: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => ED[T]['Selection']['filter'] | Promise<ED[T]['Selection']['filter']>;       // 生成一个额外的relation相关的filter，加在原先的filter上
+    relationFilter: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => SyncOrAsync<ED[T]['Selection']['filter']>,         // 生成一个额外的relation相关的filter，加在原先的filter上
     errMsg: string;
     conditionalFilter?: ED[T]['Update']['filter'] | (
-        (operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Selection']['filter']>
+        (operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => SyncOrAsync<ED[T]['Selection']['filter']>
     );
 };
 
@@ -62,8 +62,8 @@ export type LogicalChecker<ED extends EntityDict, T extends keyof ED, Cxt extend
         operation: ED[T]['Operation'] | ED[T]['Selection'],
         context: Cxt,
         option: OperateOption | SelectOption
-    ) => any | Promise<any>;
-    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
+    ) => SyncOrAsync<any>;
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => SyncOrAsync<ED[T]['Update']['filter']>);
 };
 
 export type LogicalRelationChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
@@ -77,7 +77,7 @@ export type LogicalRelationChecker<ED extends EntityDict, T extends keyof ED, Cx
         context: Cxt,
         option: OperateOption | SelectOption
     ) => any | Promise<any>;
-    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter']);
+    conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => SyncOrAsync<ED[T]['Update']['filter']>);
 };
 
 

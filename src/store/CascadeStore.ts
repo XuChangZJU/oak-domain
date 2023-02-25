@@ -728,28 +728,31 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         else {
                             // 这里优化一下，如果filter上有id，直接更新成根据entityId来过滤
                             // 除了性能原因之外，还因为会制造出user: { id: xxx }这样的查询，general中不允许这样查询的出现
-                            if (filter) {
-                                if (filter.id && Object.keys(filter).length === 1) {
-                                    Object.assign(otm, {
-                                        filter: addFilterSegment({
-                                            entity,
-                                            entityId: filter.id,
-                                        }, filterOtm),
+                            // 暂时先封掉user上的相关更新条件，会制造出连接表上的update
+                            if (entity !== 'user') {
+                                if (filter) {
+                                    if (filter.id && Object.keys(filter).length === 1) {
+                                        Object.assign(otm, {
+                                            filter: addFilterSegment({
+                                                entity,
+                                                entityId: filter.id,
+                                            }, filterOtm),
+                                        });
+                                    }
+                                    else {
+                                        Object.assign(otm, {
+                                            filter: addFilterSegment({
+                                                [entity]: filter,
+                                            }, filterOtm),
+                                        });
+                                    }
+                                }
+                                if (action === 'remove' && actionOtm === 'update') {
+                                    Object.assign(dataOtm, {
+                                        entity: null,
+                                        entityId: null,
                                     });
                                 }
-                                else {
-                                    Object.assign(otm, {
-                                        filter: addFilterSegment({
-                                            [entity]: filter,
-                                        }, filterOtm),
-                                    });
-                                }
-                            }
-                            if (action === 'remove' && actionOtm === 'update') {
-                                Object.assign(dataOtm, {
-                                    entity: null,
-                                    entityId: null,
-                                });
                             }
                         }
                     }
@@ -792,20 +795,23 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             // 这里优化一下，如果filter上有id，直接更新成根据entityId来过滤
                             // 除了性能原因之外，还因为会制造出user: { id: xxx }这样的查询，general中不允许这样查询的出现
                             // 绝大多数情况都是id，但也有可能update可能出现上层filter不是根据id的（userEntityGrant的过期触发的wechatQrCode的过期，见general中的userEntityGrant的trigger）
-                            if (filter) {
-                                if (filter.id && Object.keys(filter).length === 1) {
+                            // 暂时先封掉user上的连接，以避免生成连接表更新
+                            if (entity !== 'user') {
+                                if (filter) {
+                                    if (filter.id && Object.keys(filter).length === 1) {
+                                        Object.assign(otm, {
+                                            filter: addFilterSegment({
+                                                [foreignKey]: filter.id,
+                                            }, filterOtm),
+                                        });
+                                }
+                                else {
                                     Object.assign(otm, {
                                         filter: addFilterSegment({
-                                            [foreignKey]: filter.id,
+                                            [foreignKey.slice(0, foreignKey.length - 2)]: filter,
                                         }, filterOtm),
                                     });
-                            }
-                            else {
-                                Object.assign(otm, {
-                                    filter: addFilterSegment({
-                                        [foreignKey.slice(0, foreignKey.length - 2)]: filter,
-                                    }, filterOtm),
-                                });
+                                }
                             }
                         }
                         if (action === 'remove' && actionOtm === 'update') {
