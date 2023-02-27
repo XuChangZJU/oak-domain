@@ -101,7 +101,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
     }
     
     serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {
-        if (result instanceof Stream) {
+        if (result instanceof Stream || result instanceof Buffer) {
             return {
                 body: result,
             };
