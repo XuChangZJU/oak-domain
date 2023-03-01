@@ -1642,7 +1642,8 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                     case 'Int':
                     case 'Uint':
                     case 'Float':
-                    case 'Double': {
+                    case 'Double':
+                    case 'Price': {
                         type2 = factory.createTypeReferenceNode(
                             factory.createIdentifier('Q_NumberValue'),
                         );
@@ -1897,7 +1898,8 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                     case 'File':
                     case 'SingleGeo':
                     case 'Geo':
-                    case 'Object': {
+                    case 'Object':
+                    case 'Price': {
                         properties.push(
                             [name, false]
                         )
@@ -2410,7 +2412,8 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
                     case 'Boolean':
                     case 'Datetime':
                     case 'Image':
-                    case 'File': {
+                    case 'File':
+                    case 'Price': {
                         type2 = factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
                         break;
                     }
@@ -4420,6 +4423,11 @@ const initialStatements = () => [
                     factory.createImportSpecifier(
                         false,
                         undefined,
+                        factory.createIdentifier('Price')
+                    ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
                         factory.createIdentifier('Image')
                     ),
                     factory.createImportSpecifier(
@@ -5396,6 +5404,15 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                     factory.createIdentifier("type"),
                                     factory.createStringLiteral("boolean")
                                 )
+                            );
+                            break;
+                        }
+                        case 'Price': {
+                            attrAssignments.push(
+                                factory.createPropertyAssignment(
+                                    factory.createIdentifier("type"),
+                                    factory.createStringLiteral("money")
+                                ),
                             );
                             break;
                         }

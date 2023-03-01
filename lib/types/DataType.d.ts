@@ -9,6 +9,7 @@ export declare type Image = string;
 export declare type File = string;
 export declare type Datetime = number | Date;
 export declare type Boolean = boolean;
+export declare type Price = number;
 export declare type PrimaryKey = string;
 export declare type ForeignKey<E extends string> = string;
 export declare type Sequence = string;

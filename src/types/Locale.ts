@@ -18,6 +18,7 @@ type LocaleOfValue<V extends Record<string, string>> = {
 
 export type LocaleDef<Sc extends Record<string, any>, Ac extends string, R extends string, V extends Record<string, string>> = {
     [L in Language]?: {
+        name: string;
         attr: LocaleOfSchema<Sc> & {
             [A in keyof V]: string;     // 目前写在V里面的应该只有枚举变量和state
         };

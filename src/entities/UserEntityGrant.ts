@@ -15,6 +15,7 @@ const locale: LocaleDef<
     {}
 > = {
     zh_CN: {
+        name: '用户授权',
         attr: {
             relation: '关系',
             entity: '关联对象',
