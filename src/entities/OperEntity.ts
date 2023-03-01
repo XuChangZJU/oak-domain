@@ -15,6 +15,7 @@ const config: Configuration = {
 
 const locale: LocaleDef<Schema, '', '', {}> = {
     zh_CN: {
+        name: '操作对象连接',
         attr: {
             oper: '操作',
             entity: '关联对象',

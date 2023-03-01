@@ -43,6 +43,7 @@ const locale: LocaleDef<Schema, Action, '', {
     iState: IState,
 }> = {
     zh_CN: {
+        name: '更新',
         attr: {
             targetEntity: '目标对象',
             entity: '关联对象',

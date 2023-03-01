@@ -25,6 +25,7 @@ const locale: LocaleDef<Schema, Action, '', {
     userState: UserState;
 }> = {
     zh_CN: {
+        name: '用户',
         attr: {
             name: '姓名',
             nickname: '昵称',
