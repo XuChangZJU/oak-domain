@@ -16,6 +16,7 @@ export declare const isNickname: ValidatorFunction;
 export declare const isSizedCaptcha: ValidatorFunction;
 export declare const isDigital: ValidatorFunction;
 export declare const isPhone: ValidatorFunction;
+export declare const isTel: ValidatorFunction;
 export declare const isNumber: ValidatorFunction;
 export declare const isMoney: ValidatorMoneyFunction;
 export declare const isVehicleNumber: ValidatorFunction;
