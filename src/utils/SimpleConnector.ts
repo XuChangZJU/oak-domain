@@ -41,17 +41,15 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         const { contentType, body } = makeContentTypeAndBody(params);
         const response = await global.fetch(this.serverUrl, {
             method: 'POST',
-            headers: contentType ? {
-                'oak-cxt': cxtStr,
-                'oak-aspect': name as string,
-            } : Object.assign(
+            headers: Object.assign(
                 {
                     'oak-cxt': cxtStr,
                     'oak-aspect': name as string,
-                }, {
-                contentType: contentType as string
-            }
-            ),
+                },
+                contentType && {
+                    'Content-Type': contentType as string,
+                }
+            ) as RequestInit['headers'],
             body,
         });
         if (response.status > 299) {
