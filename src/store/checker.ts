@@ -335,7 +335,7 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
             const getForeignKeyId = (d: ED[keyof ED]['CreateSingle']['data']) => {
                 if (relation === 2) {
                     if (d.entity === attr && typeof d.entityId === 'string') {
-                        return d.entitId as string;
+                        return d.entityId as string;
                     }
                     throw new OakUserUnpermittedException();
                 }
