@@ -220,11 +220,21 @@ export function translateCheckerInSyncContext<
     }
 }
 
-type FilterMakeFn<ED extends EntityDict & BaseEntityDict> = (operation: ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'], userId: string) => ED[keyof ED]['Selection']['filter'] | {
+type CreateRelationSingleCounter<ED extends EntityDict & BaseEntityDict> = {
     $entity: keyof ED;
     $filter?: ED[keyof ED]['Selection']['filter'];
     $count?: number;
 };
+
+type CreateRelationMultipleCounter<ED extends EntityDict & BaseEntityDict> = {
+    [K in '$$and' | '$$or']?: (CreateRelationSingleCounter<ED> | CreateRelationMultipleCounter<ED>)[];
+}
+
+type CreateRelationCounter<ED extends EntityDict & BaseEntityDict> = CreateRelationSingleCounter<ED> | CreateRelationMultipleCounter<ED>;
+
+
+type FilterMakeFn<ED extends EntityDict & BaseEntityDict> =
+    (operation: ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'], userId: string) => ED[keyof ED]['Selection']['filter'] | CreateRelationCounter<ED>;
 
 function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityDict>(
     schema: StorageSchema<ED>,
@@ -315,12 +325,18 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
 
     const filterMaker = paths.length ? translateFilterMakerIter(entity2, 0) : translateRelationFilter(entity2);
     if (!paths.length) {
+        //  不可能是create
         return (oper, userId) => filterMaker(userId);
     }
     /**
      * 针对第一层做一下特别优化，比如对象A指向对象B（多对一），如果A的cascadePath是 'B'，
      * 当create A时，会带有Bid。此时生成该B对象上的相关表达式查询返回，可以避免必须将此判定在对象创建之后再做
      * 另一使用场景是，在查询A时，如果带有Bid（在对象跳一对多子对象场景下很常见），可以提前判定这个查询对某些用户一定返回空集
+     * 
+     * 20230306:
+     * 在前台的权限判断中，会将list上的filter当成内在的限制对create动作进行判断，此时有一种可能是，filter并不能直接判断出外键，但会限制外键的查询范围。
+     * 例如，在jichuang项目中，就存在park/list上，平台的用户去访问时，其查询条件是{ system: { platformId: 1 }}；而用户的关系落在system.platform.platformProvider上，
+     * 此时如直接通过data上的外键判断就会失败，需要通过对filter上相应的语义解构，进行进一步的判断
      */
     const [attr] = paths;
     const relation = judgeRelation(schema, entity2, attr);
@@ -328,54 +344,145 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
     const filterMaker2 = paths.length > 1
         ? (relation === 2 ? translateFilterMakerIter(attr, 1) : translateFilterMakerIter(relation, 1))
         : (relation === 2 ? translateRelationFilter(attr) : translateRelationFilter(relation));
+
+    const translateCreateFilterMaker = (
+        entity: keyof ED,
+        filter: ED[keyof ED]['Selection']['filter'],
+        userId: string
+    ): CreateRelationCounter<ED> | OakUserUnpermittedException<ED> => {
+        const counters: CreateRelationCounter<ED>[] = [];
+        if (filter) {
+            if (relation === 2) {
+                if (filter.entity === entity && filter.entityId) {
+                    // 这里对entityId的限定的数据只要和userId有一条relation，就不能否定可能会有创建动作（外键在最终create时，data上一定会有判定）
+                    counters.push({
+                        $entity: attr,
+                        $filter: addFilterSegment(filterMaker2(userId), { id: filter.entityId }),
+                    });
+                }
+                if (filter[attr]) {
+                    counters.push({
+                        $entity: attr,
+                        $filter: addFilterSegment(filterMaker2(userId), filter[attr]),
+                    });
+                }
+            }
+            else {
+                assert(typeof relation === 'string');
+                if (filter[`${attr}Id`]) {
+                    const filterMaker3 = paths.length > 1 ? translateFilterMakerIter(relation, 1) : translateRelationFilter(relation);
+                    // 这里对attrId的限定的数据只要和userId有一条relation，就不能否定可能会有创建动作（外键在最终create时，data上一定会有判定）
+                    counters.push({
+                        $entity: relation,
+                        $filter: addFilterSegment(filterMaker3(userId), { id: filter[`${attr}Id`] }),
+                    });
+                }
+                if (filter[attr]) {
+                    counters.push({
+                        $entity: relation,
+                        $filter: addFilterSegment(filterMaker2(userId), filter[attr]),
+                    });
+                }
+            }
+
+            if (filter.$and) {
+                const countersAnd = filter.$and.map(
+                    (ele: ED[keyof ED]['Selection']['filter']) => translateCreateFilterMaker(entity, ele, userId)
+                ) as ReturnType<typeof translateCreateFilterMaker>[];
+                // and 只要有一个满足就行
+                const ca2 = countersAnd.filter(
+                    ele => !(ele instanceof OakUserUnpermittedException)
+                ) as CreateRelationCounter<ED>[];
+                counters.push(...ca2);
+            }
+
+            if (filter.$or) {
+                const countersOr = filter.$and.map(
+                    (ele: ED[keyof ED]['Selection']['filter']) => translateCreateFilterMaker(entity, ele, userId)
+                ) as ReturnType<typeof translateCreateFilterMaker>[];
+                // or也只要有一个满足就行（不能否定）
+                const co2 = countersOr.filter(
+                    ele => !(ele instanceof OakUserUnpermittedException)
+                ) as CreateRelationCounter<ED>[];
+                counters.push(...co2);
+            }
+        }
+
+        if (counters.length === 0) {
+            // 一个counter都找不出来，说明当前路径上不满足
+            return new OakUserUnpermittedException();
+        }
+        else if (counters.length === 1) {
+            return counters[0];
+        }
+        // 是or关系，只要其中有一个满足就可以通过
+        return {
+            $$or: counters,
+        };
+    };
     return (operation, userId) => {
         const { action } = operation as ED[keyof ED]['Operation'];
         if (action === 'create') {
             const { data } = operation as ED[keyof ED]['Create'];
-            const getForeignKeyId = (d: ED[keyof ED]['CreateSingle']['data']) => {
+            if (data) {
+                // 有data的情形根据data判定
+                const getForeignKeyId = (d: ED[keyof ED]['CreateSingle']['data']) => {
+                    if (relation === 2) {
+                        if (d.entity === attr && typeof d.entityId === 'string') {
+                            return d.entityId as string;
+                        }
+                        throw new OakUserUnpermittedException();
+                    }
+                    else {
+                        assert(typeof relation === 'string');
+                        if (typeof d[`${attr}Id`] === 'string') {
+                            return d[`${attr}Id`] as string;
+                        }
+                        throw new OakUserUnpermittedException();
+                    }
+                };
                 if (relation === 2) {
-                    if (d.entity === attr && typeof d.entityId === 'string') {
-                        return d.entityId as string;
+                    if (data instanceof Array) {
+                        const fkIds = uniq(data.map(d => getForeignKeyId(d)));
+                        return {
+                            $entity: attr,
+                            $filter: addFilterSegment(filterMaker2(userId), { id: { $in: fkIds } }),
+                            $count: fkIds.length,
+                        };
                     }
-                    throw new OakUserUnpermittedException();
+                    const fkId = getForeignKeyId(data);
+                    return {
+                        $entity: attr,
+                        $filter: addFilterSegment(filterMaker2(userId), { id: fkId }),
+                    };
                 }
-                else {
-                    assert(typeof relation === 'string');
-                    if (typeof d[`${attr}Id`] === 'string') {
-                        return d[`${attr}Id`] as string;
-                    }
-                    throw new OakUserUnpermittedException();
-                }
-            };
-            if (relation === 2) {
+                assert(typeof relation === 'string');
                 if (data instanceof Array) {
                     const fkIds = uniq(data.map(d => getForeignKeyId(d)));
                     return {
-                        $entity: attr,
+                        $entity: relation,
                         $filter: addFilterSegment(filterMaker2(userId), { id: { $in: fkIds } }),
                         $count: fkIds.length,
                     };
                 }
                 const fkId = getForeignKeyId(data);
                 return {
-                    $entity: attr,
+                    $entity: relation,
                     $filter: addFilterSegment(filterMaker2(userId), { id: fkId }),
                 };
             }
-            assert(typeof relation === 'string');
-            if (data instanceof Array) {
-                const fkIds = uniq(data.map(d => getForeignKeyId(d)));
-                return {
-                    $entity: relation,
-                    $filter: addFilterSegment(filterMaker2(userId), { id: { $in: fkIds } }),
-                    $count: fkIds.length,
-                };
+            else {
+                // todo
+                const { filter } = operation as ED[keyof ED]['Selection'];
+                if (filter) {
+                    const counter = translateCreateFilterMaker(entity2, filter, userId);
+                    if (counter instanceof OakUserUnpermittedException) {
+                        throw counter;
+                    }
+                    return counter;
+                }
+                throw new OakUserUnpermittedException();
             }
-            const fkId = getForeignKeyId(data);
-            return {
-                $entity: relation,
-                $filter: addFilterSegment(filterMaker2(userId), { id: fkId }),
-            };
         }
         const { filter } = operation;
         if (relation === 2 && filter?.entity === attr && filter?.entityId) {
@@ -437,7 +544,94 @@ function translateActionAuthFilterMaker<ED extends EntityDict & BaseEntityDict>(
     return filterMaker;
 }
 
-function makePotentialFilter<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>> (
+function execCreateCounter<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
+    context: Cxt,
+    counter: CreateRelationCounter<ED>,
+): SyncOrAsync<undefined | OakUserUnpermittedException<ED>> {
+    if ((<CreateRelationMultipleCounter<ED>>counter)?.$$and) {
+        // 每个counter都要满足才能过
+        const counters = (<CreateRelationMultipleCounter<ED>>counter)?.$$and!;
+        assert(counters.length > 0);
+        const counterResults = counters.map(
+            ele => execCreateCounter(context, ele)
+        );
+        if (counterResults[0] instanceof Promise) {
+            return Promise.all(counterResults)
+                .then(
+                    (cr2) => {
+                        const unpermitted = cr2.find(
+                            (ele) => ele instanceof OakUserUnpermittedException
+                        );
+                        if (unpermitted) {
+                            return unpermitted;
+                        }
+                        return undefined;
+                    }
+                );
+        }
+        else {
+            const unpermitted = counterResults.find(
+                (ele) => ele instanceof OakUserUnpermittedException
+            );
+            if (unpermitted) {
+                return unpermitted;
+            }
+            else {
+                return undefined;
+            }
+        }
+    }
+    else if ((<CreateRelationMultipleCounter<ED>>counter)?.$$or) {
+        // 只要有一个counter能过就算过
+        const counters = (<CreateRelationMultipleCounter<ED>>counter)?.$$or!;
+        assert(counters.length > 0);
+        const counterResults = counters.map(
+            ele => execCreateCounter(context, ele)
+        );
+        if (counterResults[0] instanceof Promise) {
+            return Promise.all(counterResults)
+                .then(
+                    (cr2) => {
+                        const permittedIdx = cr2.indexOf(undefined);
+                        if (permittedIdx !== -1) {
+                            return undefined;
+                        }
+                        return new OakUserUnpermittedException();
+                    }
+                );
+        }
+        else {
+            const permittedIndex = counterResults.indexOf(undefined);
+            if (permittedIndex !== -1) {
+                return undefined;
+            }
+            else {
+                return new OakUserUnpermittedException();
+            }
+        }
+    }
+    else if ((<CreateRelationSingleCounter<ED>>counter)?.$entity) {
+        const { $entity, $filter, $count = 1 } = counter as CreateRelationSingleCounter<ED>;
+        const count = context.count($entity, {
+            filter: $filter,
+        }, { dontCollect: true });
+        if (count instanceof Promise) {
+            return count.then(
+                (c2) => {
+                    if (c2 >= $count) {
+                        return undefined;
+                    }
+                    return new OakUserUnpermittedException();
+                }
+            );
+        }
+        else {
+            return count >= $count ? undefined : new OakUserUnpermittedException();
+        }
+    }
+}
+
+function makePotentialFilter<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
     operation: ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'],
     context: Cxt,
     filterMaker: FilterMakeFn<ED> | (FilterMakeFn<ED> | FilterMakeFn<ED>[])[]): SyncOrAsync<ED[keyof ED]['Selection']['filter']> {
@@ -466,30 +660,17 @@ function makePotentialFilter<ED extends EntityDict & BaseEntityDict, Cxt extends
     let isAsyncOr = false;
     for (const f of filters) {
         if (f instanceof Array) {
-            let isAsyncAnd = true;
+            let isAsyncAnd = false;
+            assert(f.length > 0);
             const filtersAnd: (SyncOrAsync<ED[keyof ED]['Selection']['filter'] | OakUserUnpermittedException<ED>>)[] = [];
             for (const ff of f) {
-                if (ff?.$entity) {
-                    const { $entity, $filter, $count = 1 } = ff!;
-                    const count = context.count($entity, {
-                        filter: $filter,
-                    }, {});
-                    if (count instanceof Promise) {
+                if ((<CreateRelationMultipleCounter<ED>>ff)?.$$and || (<CreateRelationMultipleCounter<ED>>ff)?.$$or || (<CreateRelationSingleCounter<ED>>ff)?.$entity) {
+                    // 每个counter都要满足才能过
+                    const result = execCreateCounter<ED, Cxt>(context, ff as CreateRelationMultipleCounter<ED>);
+                    if (result instanceof Promise) {
                         isAsyncAnd = true;
-                        filtersAnd.push(
-                            count.then(
-                                (c2) => {
-                                    if (c2 >= $count) {
-                                        return undefined;
-                                    }
-                                    return new OakUserUnpermittedException();
-                                }
-                            )
-                        );
                     }
-                    else {
-                        filtersAnd.push(count >= $count ? undefined : new OakUserUnpermittedException());
-                    }
+                    filtersAnd.push(result);
                 }
                 else if (ff) {
                     filtersAnd.push(ff as ED[keyof ED]['Selection']['filter']);
@@ -520,22 +701,12 @@ function makePotentialFilter<ED extends EntityDict & BaseEntityDict, Cxt extends
             }
         }
         else {
-            if (f?.$entity) {
-                const { $entity, $filter, $count = 1 } = f!;
-                const count = context.count($entity, {
-                    filter: $filter,
-                }, {});
-                if (count instanceof Promise) {
+            if ((<CreateRelationMultipleCounter<ED>>f)?.$$and || (<CreateRelationMultipleCounter<ED>>f)?.$$or || (<CreateRelationSingleCounter<ED>>f)?.$entity) {
+                const counterResults = execCreateCounter<ED, Cxt>(context, f as CreateRelationCounter<ED>);
+                if (counterResults instanceof Promise) {
                     isAsyncOr = true;
-                    filtersOr.push(
-                        count.then(
-                            (c2) => c2 >= $count ? undefined : new OakUserUnpermittedException()
-                        )
-                    );
                 }
-                else {
-                    filtersOr.push(count >= $count ? undefined : new OakUserUnpermittedException());
-                }
+                filtersOr.push(counterResults);
             }
             else if (f) {
                 filtersOr.push(f as ED[keyof ED]['Selection']['filter']);
@@ -602,7 +773,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                             return;
                         }
                         const filter = makePotentialFilter(operation, context, raFilterMakerDict[relation]);
-                        
+
                         return filter;
                     },
                     errMsg: '越权操作',
