@@ -29,4 +29,6 @@ export interface DataTypeParams {
     precision?: number;
     scale?: number;
     signed?: boolean;
+    max?: number;
+    min?: number;
 }
