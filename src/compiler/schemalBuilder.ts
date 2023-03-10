@@ -5340,40 +5340,16 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                             );
                             break;
                         }
-                        case 'Float': {
+                        case 'Double':
+                        case 'Float':
+                        case 'Decimal': {
+                            if (['Double', 'Float'].includes(text)) {
+                                console.warn(`${entity}对象中还有${text}类型定义，现在统一用Decimal进行存储`);
+                            }
                             attrAssignments.push(
                                 factory.createPropertyAssignment(
                                     factory.createIdentifier("type"),
-                                    factory.createStringLiteral("float")
-                                ),
-                                factory.createPropertyAssignment(
-                                    factory.createIdentifier("params"),
-                                    factory.createObjectLiteralExpression(
-                                        [
-                                            factory.createPropertyAssignment(
-                                                factory.createIdentifier("precision"),
-                                                factory.createNumericLiteral(
-                                                    (<ts.NumericLiteral>(<ts.LiteralTypeNode>typeArguments![0]).literal).text
-                                                )
-                                            ),
-                                            factory.createPropertyAssignment(
-                                                factory.createIdentifier("scale"),
-                                                factory.createNumericLiteral(
-                                                    (<ts.NumericLiteral>(<ts.LiteralTypeNode>typeArguments![1]).literal).text
-                                                )
-                                            )
-                                        ],
-                                        true
-                                    )
-                                )
-                            );
-                            break;
-                        }
-                        case 'Double': {
-                            attrAssignments.push(
-                                factory.createPropertyAssignment(
-                                    factory.createIdentifier("type"),
-                                    factory.createStringLiteral("double")
+                                    factory.createStringLiteral("decimal")
                                 ),
                                 factory.createPropertyAssignment(
                                     factory.createIdentifier("params"),
