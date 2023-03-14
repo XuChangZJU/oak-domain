@@ -789,7 +789,7 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                             return makePotentialFilter(operation, context, raFilterMakerDict['@@all']);
                         }
                         if (!raFilterMakerDict[relation]) {
-                            return;
+                            throw new OakUserUnpermittedException();
                         }
                         const filter = makePotentialFilter(operation, context, raFilterMakerDict[relation]);
 
