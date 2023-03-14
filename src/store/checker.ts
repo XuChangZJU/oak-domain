@@ -755,11 +755,26 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
             if (relationAuth) {
                 const raFilterMakerDict = {} as Record<string, FilterMakeFn<ED> | (FilterMakeFn<ED> | FilterMakeFn<ED>[])[]>;
                 const userEntityName = `user${firstLetterUpperCase(entity)}`;
+                const allAuthItem: (CascadeRelationItem | CascadeRelationItem[])[] = [];
                 for (const r in relationAuth) {
+                    const authItem = relationAuth[r as NonNullable<ED[keyof ED]['Relation']>]!;
                     Object.assign(raFilterMakerDict, {
-                        [r]: translateActionAuthFilterMaker(schema, relationAuth[r as NonNullable<ED[keyof ED]['Relation']>]!, userEntityName, entity),
+                        [r]: translateActionAuthFilterMaker(schema, authItem, userEntityName, entity),
                     });
+
+                    if (authItem instanceof Array) {
+                        allAuthItem.push(...authItem);
+                    }
+                    else {
+                        allAuthItem.push(authItem);
+                    }
                 }
+                
+                // 如果不指定relation，则使用所有的authItem的or组合
+                Object.assign(raFilterMakerDict, {
+                    '@@all':  translateActionAuthFilterMaker(schema, allAuthItem, userEntityName, entity),
+                });
+
                 const entityIdAttr = `${entity}Id`;
                 checkers.push({
                     entity: userEntityName as keyof ED,
@@ -769,6 +784,10 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                         const { data } = operation as ED[keyof ED]['Create'];
                         assert(!(data instanceof Array));
                         const { relation, [entityIdAttr]: entityId } = data;
+                        if (!relation) {
+                            // 不指定relation测试是否有创建权限
+                            return makePotentialFilter(operation, context, raFilterMakerDict['@@all']);
+                        }
                         if (!raFilterMakerDict[relation]) {
                             return;
                         }
