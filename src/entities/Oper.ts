@@ -17,6 +17,7 @@ const configuration: Configuration = {
 
 const locale: LocaleDef<Schema, '', '', {}> = {
     zh_CN: {
+        name: '操作',
         attr: {
             action: '动作',
             data: '数据',

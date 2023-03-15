@@ -10,7 +10,7 @@ function makeContentTypeAndBody(data: any) {
     if (process.env.OAK_PLATFORM !== 'wechatMp') {
         if (data instanceof FormData) {
             return {
-                contentType: 'multipart/form-data',
+                // contentType: 'multipart/form-data',
                 body: data,
             };
         }
@@ -41,11 +41,15 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         const { contentType, body } = makeContentTypeAndBody(params);
         const response = await global.fetch(this.serverUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': contentType,
-                'oak-cxt': cxtStr,
-                'oak-aspect': name as string,
-            },
+            headers: Object.assign(
+                {
+                    'oak-cxt': cxtStr,
+                    'oak-aspect': name as string,
+                },
+                contentType && {
+                    'Content-Type': contentType as string,
+                }
+            ) as RequestInit['headers'],
             body,
         });
         if (response.status > 299) {
@@ -61,7 +65,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
                 result,
                 opRecords,
             } = await response.json();
-    
+
             if (exception) {
                 throw this.makeException(exception);
             }
@@ -87,7 +91,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         return SimpleConnector.ROUTER;
     }
 
-    async parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{ name: string; params: any; context: BackCxt; }> {        
+    async parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{ name: string; params: any; context: BackCxt; }> {
         const { 'oak-cxt': oakCxtStr, 'oak-aspect': aspectName } = headers;
         assert(typeof oakCxtStr === 'string' || oakCxtStr === undefined);
         assert(typeof aspectName === 'string');
@@ -99,9 +103,9 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
             context,
         };
     }
-    
+
     serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {
-        if (result instanceof Stream) {
+        if (result instanceof Stream || result instanceof Buffer) {
             return {
                 body: result,
             };
@@ -117,7 +121,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         };
     }
 
-    serializeException(exception: OakException<ED>, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {        
+    serializeException(exception: OakException<ED>, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {
         return {
             body: {
                 exception: exception.toString(),

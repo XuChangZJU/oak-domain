@@ -83,16 +83,26 @@ export const isPhone: ValidatorFunction = (phone) => {
     return /^(\(\d{3,4}\)|\d{3,4}-)?\d{7,8}$/.test(phone);
 };
 
+export const isTel: ValidatorFunction = (text) => {
+    // 1、133xxxx4545 2、0571-630xx239 3、400-123-1400
+    const reg =
+        /^(((\d{3,4}-)?[0-9]{7,8})|(13[0-9]|14[01456879]|15[0-35-9]|16[2567]|17[0-8]|18[0-9]|19[0-35-9])\d{8}|((400)-(\d{3})-(\d{4})(.)(\d{1,4})|(400)-(\d{3})-(\d{4}$)|(400)(\d{3})(\d{4}$)|(400)-(\d{4})-(\d{3}$)))$/.test(
+            text
+        );
+    return reg;
+};
+
 
 export const isNumber: ValidatorFunction = (str) => {
     return /^[0-9]*$/.test(str);
 }
 
 export const isMoney: ValidatorMoneyFunction = (str, zero) => {
-    // zero为true包含零
+    // 金额，最多可以有两位小数 zero为true包含零
     if (zero) {
-        // 金额，最多可以有两位小数
-        return /(^[1-9]([0-9]+)?(\.[0-9]{1,2})?$)|(^(0){1}$)|(^[0-9]\.[0-9]([0-9])?$)/.test(str);
+        return /(^[1-9]([0-9]+)?(\.[0-9]{1,2})?$)|(^(0){1}$)|(^[0-9]\.[0-9]([0-9])?$)/.test(
+            str
+        );
     }
     return /(^[1-9](\d+)?(\.\d{1,2})?$)|(^\d\.\d{1,2}$)/.test(str);
 }

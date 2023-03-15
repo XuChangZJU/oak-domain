@@ -30,7 +30,7 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     setHeaders(headers: IncomingHttpHeaders) {
         this.headers = headers;
     }
-    
+
     getHeader(key: string): string | string[] | undefined {
         if (this.headers) {
             return this.headers[key];
@@ -43,13 +43,13 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
         this.scene = scene;
     }
 
-    private resetEvents() {        
+    private resetEvents() {
         this.events = {
             commit: [],
             rollback: [],
         };
     }
-    
+
     on(event: 'commit' | 'rollback', callback: () => Promise<void>): void {
         this.uuid && this.events[event].push(callback);
     }
@@ -70,24 +70,26 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
         if (this.uuid) {
             await this.rowStore.commit(this.uuid!);
             this.uuid = undefined;
-            for(const e of this.events.commit) {
+            const { commit: commitEvents } = this.events;
+            this.resetEvents();
+            for (const e of commitEvents) {
                 await e();
             }
-            this.resetEvents();
         }
     }
     async rollback(): Promise<void> {
-        if(this.uuid) {
+        if (this.uuid) {
             await this.rowStore.rollback(this.uuid!);
             // console.log('rollback', this.uuid);
             this.uuid = undefined;
-            for(const e of this.events.rollback) {
+            const { rollback: rollbackEvents } = this.events;
+            this.resetEvents();
+            for (const e of rollbackEvents) {
                 await e();
             }
-            this.resetEvents();
         }
     }
-     
+
     operate<T extends keyof ED, OP extends OperateOption>(
         entity: T,
         operation: ED[T]['Operation'],
@@ -95,21 +97,21 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     ) {
         return this.rowStore.operate(entity, operation, this, option);
     }
-    select<T extends keyof ED, OP extends SelectOption> (
+    select<T extends keyof ED, OP extends SelectOption>(
         entity: T,
         selection: ED[T]['Selection'],
         option: OP
     ) {
         return this.rowStore.select(entity, selection, this, option);
     }
-    aggregate<T extends keyof ED, OP extends SelectOption> (
+    aggregate<T extends keyof ED, OP extends SelectOption>(
         entity: T,
         aggregation: ED[T]['Aggregation'],
         option: OP
     ) {
         return this.rowStore.aggregate(entity, aggregation, this, option);
     }
-    count<T extends keyof ED, OP extends SelectOption> (
+    count<T extends keyof ED, OP extends SelectOption>(
         entity: T,
         selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
         option: OP
@@ -120,7 +122,7 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     mergeMultipleResults(toBeMerged: OperationResult<ED>[]) {
         return this.rowStore.mergeMultipleResults(toBeMerged);
     }
-    
+
     getCurrentTxnId() {
         return this.uuid;
     }
@@ -140,7 +142,7 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     abstract isRoot(): boolean;
 
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
-    
+
     abstract toString(): string;
 
     abstract allowUserUpdate(): boolean;
@@ -154,21 +156,21 @@ export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> exten
         option: OP
     ): Promise<OperationResult<ED>>;
 
-    select<T extends keyof ED, OP extends SelectOption> (
+    select<T extends keyof ED, OP extends SelectOption>(
         entity: T,
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP
     ): Promise<Partial<ED[T]['Schema']>[]>;
 
-    aggregate<T extends keyof ED, OP extends SelectOption> (
+    aggregate<T extends keyof ED, OP extends SelectOption>(
         entity: T,
         aggregation: ED[T]['Aggregation'],
         context: Cxt,
         option: OP
     ): Promise<AggregationResult<ED[T]['Schema']>>;
 
-    count<T extends keyof ED, OP extends SelectOption> (
+    count<T extends keyof ED, OP extends SelectOption>(
         entity: T,
         selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
         context: Cxt,

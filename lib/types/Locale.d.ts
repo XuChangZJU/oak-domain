@@ -13,6 +13,7 @@ declare type LocaleOfValue<V extends Record<string, string>> = {
 };
 export declare type LocaleDef<Sc extends Record<string, any>, Ac extends string, R extends string, V extends Record<string, string>> = {
     [L in Language]?: {
+        name: string;
         attr: LocaleOfSchema<Sc> & {
             [A in keyof V]: string;
         };
