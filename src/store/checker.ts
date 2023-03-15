@@ -353,7 +353,7 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
         const counters: CreateRelationCounter<ED>[] = [];
         if (filter) {
             if (relation === 2) {
-                if (filter.entity === entity && filter.entityId) {
+                if (filter.entity === attr && filter.entityId) {
                     // 这里对entityId的限定的数据只要和userId有一条relation，就不能否定可能会有创建动作（外键在最终create时，data上一定会有判定）
                     counters.push({
                         $entity: attr,
