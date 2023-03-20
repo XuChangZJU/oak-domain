@@ -107,3 +107,4 @@ export declare function makeTreeDescendantFilter<ED extends EntityDict, T extend
  */
 export declare function checkFilterContains<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, contained: ED[T]['Selection']['filter'], filter?: ED[T]['Selection']['filter'], dataCompare?: true): boolean | Promise<boolean>;
 export declare function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter'], dataCompare?: true): boolean | Promise<boolean>;
+export declare function getCascadeEntityFilter<ED extends EntityDict, T extends keyof ED>(filter: NonNullable<ED[T]['Selection']['filter']>, attr: keyof NonNullable<ED[T]['Selection']['filter']>): ED[keyof ED]['Selection']['filter'];

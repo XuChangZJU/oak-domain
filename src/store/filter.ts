@@ -948,3 +948,27 @@ export function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt 
     }
     return false;
 }
+
+export function getCascadeEntityFilter<ED extends EntityDict, T extends keyof ED>(
+    filter: NonNullable<ED[T]['Selection']['filter']>,
+    attr: keyof NonNullable<ED[T]['Selection']['filter']>
+): ED[keyof ED]['Selection']['filter'] {
+    const filters: ED[keyof ED]['Selection']['filter'][] = [];
+    if (filter![attr]) {
+        assert(typeof filter![attr] === 'object');
+        filters.push(filter![attr]);
+    }
+    if (filter.$and) {
+        filter.$and.forEach(
+            (ele: NonNullable<ED[T]['Selection']['filter']>) => {
+                const f2 = getCascadeEntityFilter(ele, attr);
+                if (f2) {
+                    filters.push(f2)
+                }
+            }
+        );
+    }
+    if (filters.length > 0) {
+        return combineFilters(filters);
+    }
+}
