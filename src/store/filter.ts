@@ -901,6 +901,7 @@ export function checkFilterContains<ED extends EntityDict, T extends keyof ED, C
         }]);
         const count = context.count(entity, {
             filter: filter2,
+            count: 1,
         }, {
             dontCollect: true,
             blockTrigger: true,

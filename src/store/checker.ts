@@ -95,12 +95,16 @@ export function translateCheckerInAsyncContext<
                 const result = typeof relationFilter === 'function' ? await relationFilter(operation, context, option) : relationFilter;
 
                 if (result) {
-                    if (operation.action === 'create') {
+                    const { filter, action } = operation;
+                    if (action === 'create') {
                         console.warn(`${entity as string}对象的create类型的checker中，存在无法转换为表达式形式的情况，请尽量使用authDef格式定义这类checker`);
+                        return 0;
                     }
-                    else {
-                        operation.filter = combineFilters([operation.filter, result as ED[T]['Selection']['filter']]);
+                    assert(filter);
+                    if (await checkFilterContains<ED, T, Cxt>(entity, context, result, filter, true)) {
+                        return;
                     }
+                    throw new OakUserUnpermittedException(errMsg);
                 }
                 return 0;
             }) as UpdateTriggerInTxn<ED, T, Cxt>['fn'];
@@ -155,18 +159,12 @@ export function translateCheckerInSyncContext<
                 const { filter: operationFilter, action } = operation;
                 const filter2 = typeof filter === 'function' ? (filter as Function)(operation, context, option) : filter;
                 assert(operationFilter);
-                if (['select', 'count', 'stat'].includes(action)) {
-                    operation.filter = addFilterSegment(operationFilter, filter2);
-                    return 0;
+                assert(!(filter2 instanceof Promise));
+                if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter, true)) {
+                    return;
                 }
-                else {
-                    assert(!(filter2 instanceof Promise));
-                    if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter, true)) {
-                        return;
-                    }
-                    const e = new OakRowInconsistencyException(undefined, errMsg);
-                    throw e;
-                }
+                const e = new OakRowInconsistencyException(undefined, errMsg);
+                throw e;
             };
             return {
                 fn,
