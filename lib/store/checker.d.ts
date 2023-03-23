@@ -2,7 +2,13 @@ import { AuthDefDict, Checker, EntityDict, OperateOption, SelectOption, StorageS
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
 import { SyncContext } from './SyncRowStore';
-export declare function translateCheckerInAsyncContext<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>): {
+/**
+ *
+ * @param checker 要翻译的checker
+ * @param silent 如果silent，则row和relation类型的checker只会把限制条件加到查询上，而不报错（除掉create动作）
+ * @returns
+ */
+export declare function translateCheckerInAsyncContext<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>, silent?: boolean): {
     fn: Trigger<ED, T, Cxt>['fn'];
     when: 'before' | 'after';
 };

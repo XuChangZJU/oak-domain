@@ -14,11 +14,17 @@ import { union, uniq, difference } from '../utils/lodash';
 import { judgeRelation } from './relation';
 import { generateNewId } from '../utils/uuid';
 
+/**
+ * 
+ * @param checker 要翻译的checker
+ * @param silent 如果silent，则row和relation类型的checker只会把限制条件加到查询上，而不报错（除掉create动作）
+ * @returns 
+ */
 export function translateCheckerInAsyncContext<
     ED extends EntityDict & BaseEntityDict,
     T extends keyof ED,
     Cxt extends AsyncContext<ED>
->(checker: Checker<ED, T, Cxt>): {
+>(checker: Checker<ED, T, Cxt>, silent?: boolean): {
     fn: Trigger<ED, T, Cxt>['fn'];
     when: 'before' | 'after';
 } {
@@ -42,7 +48,7 @@ export function translateCheckerInAsyncContext<
             const fn = (async ({ operation }, context, option) => {
                 const { filter: operationFilter, action } = operation;
                 const filter2 = typeof filter === 'function' ? await (filter as Function)(operation, context, option) : filter;
-                if (['select', 'count', 'stat'].includes(action)) {
+                if (silent) {
                     operation.filter = addFilterSegment(operationFilter || {}, filter2);
                     return 0;
                 }
@@ -98,6 +104,10 @@ export function translateCheckerInAsyncContext<
                     const { filter, action } = operation;
                     if (action === 'create') {
                         console.warn(`${entity as string}对象的create类型的checker中，存在无法转换为表达式形式的情况，请尽量使用authDef格式定义这类checker`);
+                        return 0;
+                    }
+                    if (silent) {
+                        operation.filter = addFilterSegment(filter || {}, result);
                         return 0;
                     }
                     assert(filter);
