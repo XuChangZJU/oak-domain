@@ -8,7 +8,7 @@ import { SyncContext } from './SyncRowStore';
  * @param silent 如果silent，则row和relation类型的checker只会把限制条件加到查询上，而不报错（除掉create动作）
  * @returns
  */
-export declare function translateCheckerInAsyncContext<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>, silent?: boolean): {
+export declare function translateCheckerInAsyncContext<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>): {
     fn: Trigger<ED, T, Cxt>['fn'];
     when: 'before' | 'after';
 };
