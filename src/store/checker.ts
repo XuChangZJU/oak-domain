@@ -405,7 +405,7 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
             }
 
             if (filter.$or) {
-                const countersOr = filter.$and.map(
+                const countersOr = filter.$or.map(
                     (ele: ED[keyof ED]['Selection']['filter']) => translateCreateFilterMaker(entity, ele, userId)
                 ) as ReturnType<typeof translateCreateFilterMaker>[];
                 // or也只要有一个满足就行（不能否定）
