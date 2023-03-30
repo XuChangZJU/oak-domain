@@ -12,6 +12,10 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
         commit: Array<() => Promise<void>>;
         rollback: Array<() => Promise<void>>;
     };
+    /**
+     * 在返回结果前调用，对数据行进行一些预处理，比如将一些敏感的列隐藏
+     */
+    abstract refineOpRecords(): Promise<void>;
     constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders);
     setHeaders(headers: IncomingHttpHeaders): void;
     getHeader(key: string): string | string[] | undefined;
