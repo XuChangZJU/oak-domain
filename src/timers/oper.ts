@@ -1,7 +1,6 @@
 import { EntityDict } from '../types/Entity';
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from '../store/AsyncRowStore';
-import { assert } from 'console';
 import { vaccumEntities } from './vaccum';
 
 type VaccumOperOption<ED extends EntityDict & BaseEntityDict> = {
