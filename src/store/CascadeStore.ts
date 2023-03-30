@@ -1056,7 +1056,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             data.map(
                                                 async (ele) => ({
                                                     id: await generateNewIdAsync(),
-                                                    targetEntityId: ele.id,
+                                                    entityId: ele.id,
+                                                    entity: entity as string,
                                                 })
                                             )
                                         ),
@@ -1204,7 +1205,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             ids.map(
                                                 async (ele) => ({
                                                     id: await generateNewIdAsync(),
-                                                    targetEntityId: ele,
+                                                    entityId: ele,
+                                                    entity: entity as string,
                                                 })
                                             )
                                         )

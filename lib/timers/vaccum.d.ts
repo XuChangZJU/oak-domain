@@ -13,6 +13,7 @@ declare type VaccumOption<ED extends EntityDict & BaseEntityDict> = {
 };
 /**
  * 删除数据库中的部分数据，减少体积
+ * 一般只删除日志类数据
  * @param option
  */
 export declare function vaccumEntities<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>>(option: VaccumOption<ED>, context: Cxt): Promise<void>;

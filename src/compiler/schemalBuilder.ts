@@ -730,8 +730,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 beforeSchema = false;
 
                 // 对于不是Modi和Oper的对象，全部建立和ModiEntity的反指关系
-                // 也不用再建立了，不可能有这样的查询操作 by Xc 20230330
-                /* if (!['Modi', 'Oper', 'OperEntity', 'ModiEntity'].includes(moduleName) && !toModi) {
+                if (!['Modi', 'Oper', 'OperEntity', 'ModiEntity'].includes(moduleName) && !toModi) {
                     if (ReversePointerRelations['ModiEntity'] && !ReversePointerRelations['ModiEntity'].includes(moduleName)) {
                         ReversePointerRelations['ModiEntity'].push(moduleName);
                     }
@@ -740,11 +739,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                             ['ModiEntity']: [moduleName],
                         });
                     }
-                } */
 
-                // 对于不是Oper的对象，全部建立和OperEntity的反指关系
-                // 不再建立了 by Xc 20230330
-                /* if (!['Oper', 'OperEntity', 'ModiEntity'].includes(moduleName)) {
                     if (ReversePointerRelations['OperEntity'] && !ReversePointerRelations['OperEntity'].includes(moduleName)) {
                         ReversePointerRelations['OperEntity'].push(moduleName);
                     }
@@ -752,8 +747,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         assign(ReversePointerRelations, {
                             ['OperEntity']: [moduleName],
                         });
-                    } 
-                }*/
+                    }
+                }
+
             }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
@@ -5475,7 +5471,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                             factory.createArrayLiteralExpression(
                                                 enumAttributes[(<ts.Identifier>name).text].map(
                                                     ele => factory.createStringLiteral(ele)
-                                                )                                                
+                                                )
                                             )
                                         )
                                     );
@@ -5501,7 +5497,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                 if (ts.isUnionTypeNode(type!)) {
                     if (ts.isLiteralTypeNode(type.types[0])) {
                         if (ts.isStringLiteral(type.types[0].literal)) {
-                            assert (enumAttributes && enumAttributes[(<ts.Identifier>name).text]);
+                            assert(enumAttributes && enumAttributes[(<ts.Identifier>name).text]);
                             attrAssignments.push(
                                 factory.createPropertyAssignment(
                                     'type',
@@ -5512,7 +5508,7 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
                                     factory.createArrayLiteralExpression(
                                         enumAttributes[(<ts.Identifier>name).text].map(
                                             ele => factory.createStringLiteral(ele)
-                                        )                                                
+                                        )
                                     )
                                 )
                             );

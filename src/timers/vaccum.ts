@@ -1,6 +1,5 @@
 import dayJs from 'dayjs';
 import { appendFileSync, existsSync, openSync, rmSync, closeSync, createReadStream, createWriteStream } from 'fs';
-import assert from 'assert';
 import { EntityDict } from '../types/Entity';
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from '../store/AsyncRowStore';
@@ -23,6 +22,7 @@ type VaccumOption<ED extends EntityDict & BaseEntityDict> = {
 
 /**
  * 删除数据库中的部分数据，减少体积
+ * 一般只删除日志类数据
  * @param option 
  */
 export async function vaccumEntities<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>>(option: VaccumOption<ED>, context: Cxt) {
