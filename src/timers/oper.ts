@@ -2,6 +2,7 @@ import { EntityDict } from '../types/Entity';
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from '../store/AsyncRowStore';
 import { vaccumEntities } from './vaccum';
+import { combineFilters } from '../store/filter';
 
 type VaccumOperOption<ED extends EntityDict & BaseEntityDict> = {
     aliveLine: number;
@@ -50,7 +51,11 @@ export async function vaccumOper<ED extends EntityDict & BaseEntityDict, Cxt ext
             entity: 'operEntity',
             aliveLine: aliveLine + 10000,
             filter: {
-                oper: operFilter,
+                oper: combineFilters([operFilter, {
+                    $$createAt$$: {
+                        $lt: aliveLine,
+                    }
+                }]),
             },
         },{
             entity: 'oper',
