@@ -1066,7 +1066,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         action: 'create',
                                         data: {
                                             id: await generateNewIdAsync(),
-                                            targetEntityId: (data as ED[T]['CreateSingle']['data']).id,
+                                            entityId: (data as ED[T]['CreateSingle']['data']).id,
+                                            entity: entity as string,
                                         },
                                     }]
                                 },
