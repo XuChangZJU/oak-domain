@@ -4,7 +4,7 @@ import { AsyncContext } from '../store/AsyncRowStore';
 import { vaccumEntities } from './vaccum';
 import { combineFilters } from '../store/filter';
 
-type VaccumOperOption<ED extends EntityDict & BaseEntityDict> = {
+export type VaccumOperOption<ED extends EntityDict & BaseEntityDict> = {
     aliveLine: number;
     excludeOpers?: {
         [T in keyof ED]?: ED[T]['Action'][];
@@ -57,7 +57,7 @@ export async function vaccumOper<ED extends EntityDict & BaseEntityDict, Cxt ext
                     }
                 }]),
             },
-        },{
+        }, {
             entity: 'oper',
             aliveLine,
             filter: operFilter,
