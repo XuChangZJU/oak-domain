@@ -13,7 +13,7 @@ import { unset, uniq, cloneDeep, pick } from '../utils/lodash';
 import { SyncContext } from "./SyncRowStore";
 import { AsyncContext } from "./AsyncRowStore";
 import { getRelevantIds } from "./filter";
-import { CreateOperation as CreateOperOperation } from '../base-app-domain/Oper/Schema';
+import { CreateSingleOperation as CreateSingleOperOperation } from '../base-app-domain/Oper/Schema';
 import { CreateOperation as CreateModiOperation, UpdateOperation as UpdateModiOperation } from '../base-app-domain/Modi/Schema';
 import { generateNewIdAsync } from "../utils/uuid";
 import { reinforceOperation, reinforceSelection } from "./selection";
@@ -1038,9 +1038,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
                         // 按照框架要求生成Oper和OperEntity这两个内置的对象
                         assert(operId);
-                        const operatorId = await context.getCurrentUserId(true);
+                        const operatorId = context.getCurrentUserId(true);
                         if (operatorId) {
-                            const createOper: CreateOperOperation = {
+                            const createOper: CreateSingleOperOperation = {
                                 id: 'dummy',
                                 action: 'create',
                                 data: {
@@ -1048,6 +1048,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     action,
                                     data,
                                     operatorId,
+                                    targetEntity: entity as string,
                                     operEntity$oper: data instanceof Array ? {
                                         id: 'dummy',
                                         action: 'create',
@@ -1055,8 +1056,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             data.map(
                                                 async (ele) => ({
                                                     id: await generateNewIdAsync(),
-                                                    entity: entity as string,
-                                                    entityId: ele.id,
+                                                    targetEntityId: ele.id,
                                                 })
                                             )
                                         ),
@@ -1065,8 +1065,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         action: 'create',
                                         data: {
                                             id: await generateNewIdAsync(),
-                                            entity: entity as string,
-                                            entityId: (data as ED[T]['CreateSingle']['data']).id,
+                                            targetEntityId: (data as ED[T]['CreateSingle']['data']).id,
                                         },
                                     }]
                                 },
@@ -1190,13 +1189,14 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         if (!option?.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
                             // 按照框架要求生成Oper和OperEntity这两个内置的对象
                             assert(operId);
-                            const createOper: CreateOperOperation = {
+                            const createOper: CreateSingleOperOperation = {
                                 id: 'dummy',
                                 action: 'create',
                                 data: {
                                     id: operId,
                                     action,
                                     data,
+                                    targetEntity: entity as string,
                                     operEntity$oper: {
                                         id: 'dummy',
                                         action: 'create',
@@ -1204,8 +1204,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             ids.map(
                                                 async (ele) => ({
                                                     id: await generateNewIdAsync(),
-                                                    entity: entity as string,
-                                                    entityId: ele,
+                                                    targetEntityId: ele,
                                                 })
                                             )
                                         )

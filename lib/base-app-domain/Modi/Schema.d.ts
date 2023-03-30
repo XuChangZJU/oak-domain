@@ -5,7 +5,6 @@ import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
 import { Action, ParticularAction, IState } from "./Action";
 import * as ModiEntity from "../ModiEntity/Schema";
-import * as OperEntity from "../OperEntity/Schema";
 export declare type OpSchema = EntityShape & {
     targetEntity: String<32>;
     entity: String<32>;
@@ -28,8 +27,6 @@ export declare type Schema = EntityShape & {
     iState?: IState | null;
     modiEntity$modi?: Array<ModiEntity.Schema>;
     modiEntity$modi$$aggr?: AggregationResult<ModiEntity.Schema>;
-    operEntity$entity?: Array<OperEntity.Schema>;
-    operEntity$entity$$aggr?: AggregationResult<OperEntity.Schema>;
 } & {
     [A in ExpressionKey]?: any;
 };
@@ -68,12 +65,6 @@ export declare type Projection = {
     };
     modiEntity$modi$$aggr?: ModiEntity.Aggregation & {
         $entity: "modiEntity";
-    };
-    operEntity$entity?: OperEntity.Selection & {
-        $entity: "operEntity";
-    };
-    operEntity$entity$$aggr?: OperEntity.Aggregation & {
-        $entity: "operEntity";
     };
 } & Partial<ExprOp<OpAttr | string>>;
 declare type ModiIdProjection = OneOf<{
@@ -114,7 +105,6 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity"
     [K: string]: any;
 }) & {
     modiEntity$modi?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "modi" | "modiId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "modi" | "modiId">>>;
-    operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
 };
 export declare type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export declare type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
@@ -122,7 +112,6 @@ export declare type CreateOperation = CreateSingleOperation | CreateMultipleOper
 export declare type UpdateOperationData = FormUpdateData<OpSchema> & {
     [k: string]: any;
     modiEntity$modi?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "modi" | "modiId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "modi" | "modiId">>>;
-    operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
 };
 export declare type UpdateOperation = OakOperation<"update" | ParticularAction | string, UpdateOperationData, Filter, Sorter>;
 export declare type RemoveOperationData = {};

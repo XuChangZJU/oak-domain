@@ -5,8 +5,7 @@ import { Schema as Oper } from './Oper';
 
 export interface Schema extends EntityShape {
     oper: Oper,
-    entity: String<32>;
-    entityId: String<64>;
+    targetEntityId: String<64>;
 };
 
 const config: Configuration = {
@@ -18,8 +17,7 @@ const locale: LocaleDef<Schema, '', '', {}> = {
         name: '操作对象连接',
         attr: {
             oper: '操作',
-            entity: '关联对象',
-            entityId: '关联对象id',
+            targetEntityId: '关联对象id',
         },
     },
 };

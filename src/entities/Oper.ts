@@ -9,6 +9,7 @@ export interface Schema extends EntityShape {
     filter?: Object;
     extra?: Object;
     operator?: User;
+    targetEntity: String<32>;
 };
 
 const configuration: Configuration = {
@@ -24,6 +25,7 @@ const locale: LocaleDef<Schema, '', '', {}> = {
             filter: '选择条件',
             extra: '其它',
             operator: '操作者',
+            targetEntity: '关联对象',
         },
     },
 };

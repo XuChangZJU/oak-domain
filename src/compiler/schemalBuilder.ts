@@ -14,6 +14,7 @@ import {
     NUMERICAL_LITERL_DEFAULT_SCALE,
     INT_LITERL_DEFAULT_WIDTH,
     LIB_OAK_DOMAIN,
+    ENTITY_NAME_MAX_LENGTH,
 } from './env';
 import { firstLetterLowerCase, firstLetterUpperCase } from '../utils/string';
 
@@ -510,6 +511,19 @@ function getStringEnumValues(filename: string, program: ts.Program, obj: string,
     }
 }
 
+function checkNameLegal(filename: string, attrName: string, upperCase?: boolean) {
+    assert(attrName.length <= ENTITY_NAME_MAX_LENGTH, `文件「${filename}」：「${attrName}」的名称定义过长，不能超过「${ENTITY_NAME_MAX_LENGTH}」长度`);
+    if (upperCase) {
+        assert(/[A-Z][a-z|A-Z|0-9]+/i.test(attrName), `文件「${filename}」：「${attrName}」的名称必须以大写字母开始，且只能包含字母和数字`);
+    }
+    else if (upperCase === false) {
+        assert(/[a-z][a-z|A-Z|0-9]+/i.test(attrName), `文件「${filename}」：「${attrName}」的名称必须以小写字母开始，且只能包含字母和数字`);
+    }
+    else {
+        assert(/[a-z|A-Z][a-z|A-Z|0-9]+/i.test(attrName), `文件「${filename}」：「${attrName}」的名称必须以字母开始，且只能包含字母和数字`);
+    }
+}
+
 function analyzeEntity(filename: string, path: string, program: ts.Program, relativePath?: string) {
     const fullPath = `${path}/${filename}`;
     const sourceFile = program.getSourceFile(fullPath);
@@ -521,6 +535,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
         // removeFromRelationShip(moduleName);
         console.warn(`出现了同名的Entity定义「${moduleName}」，将使用${fullPath}取代掉默认对象，请检查新的对象结构及相关常量定义与原有的兼容，否则原有对象的相关逻辑会出现不可知异常`);
     }
+    checkNameLegal(filename, moduleName, true);
+
     const referencedSchemas: string[] = [];
     const schemaAttrs: ts.TypeElement[] = [];
     let hasFulltextIndex: boolean = false;
@@ -587,6 +603,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     (attrNode) => {
                         const { type, name, questionToken } = <ts.PropertySignature>attrNode;
                         const attrName = (<ts.Identifier>name).text;
+                        checkNameLegal(filename, attrName, false);
                         if (ts.isTypeReferenceNode(type!)
                             && ts.isIdentifier(type.typeName)) {
                             if ((referencedSchemas.includes(type.typeName.text) || type.typeName.text === 'Schema')) {
@@ -707,10 +724,27 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         [moduleName]: 1,
                     });
                 }
+                else if (hasEntityAttr || hasEntityIdAttr) {
+                    throw new Error(`文件「${filename}」：属性 定义中只包含${hasEntityAttr ? 'entity' : 'entityId'}，不符合定义规范。entity/entityId必须联合出现，代表不定对象的反向指针`);
+                }
                 beforeSchema = false;
 
+                // 对于不是Modi和Oper的对象，全部建立和ModiEntity的反指关系
+                // 也不用再建立了，不可能有这样的查询操作 by Xc 20230330
+                /* if (!['Modi', 'Oper', 'OperEntity', 'ModiEntity'].includes(moduleName) && !toModi) {
+                    if (ReversePointerRelations['ModiEntity'] && !ReversePointerRelations['ModiEntity'].includes(moduleName)) {
+                        ReversePointerRelations['ModiEntity'].push(moduleName);
+                    }
+                    else {
+                        assign(ReversePointerRelations, {
+                            ['ModiEntity']: [moduleName],
+                        });
+                    }
+                } */
+
                 // 对于不是Oper的对象，全部建立和OperEntity的反指关系
-                if (!['Oper', 'OperEntity', 'ModiEntity'].includes(moduleName)) {
+                // 不再建立了 by Xc 20230330
+                /* if (!['Oper', 'OperEntity', 'ModiEntity'].includes(moduleName)) {
                     if (ReversePointerRelations['OperEntity'] && !ReversePointerRelations['OperEntity'].includes(moduleName)) {
                         ReversePointerRelations['OperEntity'].push(moduleName);
                     }
@@ -718,20 +752,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         assign(ReversePointerRelations, {
                             ['OperEntity']: [moduleName],
                         });
-                    }
-
-                    // 对于不是Modi的对象，全部建立和ModiEntity的反指关系
-                    if (!['Modi'].includes(moduleName) && !toModi) {
-                        if (ReversePointerRelations['ModiEntity'] && !ReversePointerRelations['ModiEntity'].includes(moduleName)) {
-                            ReversePointerRelations['ModiEntity'].push(moduleName);
-                        }
-                        else {
-                            assign(ReversePointerRelations, {
-                                ['ModiEntity']: [moduleName],
-                            });
-                        }
-                    }
-                }
+                    } 
+                }*/
             }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用

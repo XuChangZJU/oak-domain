@@ -7,4 +7,5 @@ export interface Schema extends EntityShape {
     filter?: Object;
     extra?: Object;
     operator?: User;
+    targetEntity: String<32>;
 }
