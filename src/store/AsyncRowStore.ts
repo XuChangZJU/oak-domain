@@ -4,7 +4,7 @@ import assert from "assert";
 import { IncomingHttpHeaders } from "http";
 
 export abstract class AsyncContext<ED extends EntityDict> implements Context {
-    private rowStore: AsyncRowStore<ED, this>;
+    rowStore: AsyncRowStore<ED, this>;
     private uuid?: string;
     opRecords: OpRecord<ED>[];
     private scene?: string;

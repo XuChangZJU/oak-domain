@@ -1,6 +1,6 @@
 import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, TxnOption, Context, AggregationResult } from "../types";
 export declare abstract class SyncContext<ED extends EntityDict> implements Context {
-    private rowStore;
+    rowStore: SyncRowStore<ED, this>;
     private uuid?;
     constructor(rowStore: SyncRowStore<ED, SyncContext<ED>>);
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;

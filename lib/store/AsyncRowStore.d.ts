@@ -2,7 +2,7 @@
 import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult } from "../types";
 import { IncomingHttpHeaders } from "http";
 export declare abstract class AsyncContext<ED extends EntityDict> implements Context {
-    private rowStore;
+    rowStore: AsyncRowStore<ED, this>;
     private uuid?;
     opRecords: OpRecord<ED>[];
     private scene?;

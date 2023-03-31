@@ -2,7 +2,7 @@ import assert from 'assert';
 import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, TxnOption, Context, AggregationResult } from "../types";
 
 export abstract class SyncContext<ED extends EntityDict> implements Context {
-    private rowStore: SyncRowStore<ED, this>;
+    rowStore: SyncRowStore<ED, this>;
     private uuid?: string;
     constructor(rowStore: SyncRowStore<ED, SyncContext<ED>>) {
         this.rowStore = rowStore;
