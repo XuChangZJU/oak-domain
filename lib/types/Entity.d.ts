@@ -37,6 +37,7 @@ export declare type OperateOption = {
     allowExists?: boolean;
     modiParentId?: string;
     modiParentEntity?: string;
+    deletePhysically?: boolean;
     dummy?: 1;
 };
 export declare type FormUpdateData<SH extends GeneralEntityShape> = Partial<{

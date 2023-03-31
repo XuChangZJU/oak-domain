@@ -16,10 +16,10 @@ export declare abstract class Connector<ED extends EntityDict, BackCxt extends A
         params: any;
         context: BackCxt;
     }>;
-    abstract serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): {
+    abstract serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): Promise<{
         body: any;
         headers?: Record<string, any>;
-    };
+    }>;
     abstract serializeException(exception: OakException<ED>, headers: IncomingHttpHeaders, body: any): {
         body: any;
         headers?: Record<string, any>;

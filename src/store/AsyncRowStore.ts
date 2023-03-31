@@ -4,7 +4,7 @@ import assert from "assert";
 import { IncomingHttpHeaders } from "http";
 
 export abstract class AsyncContext<ED extends EntityDict> implements Context {
-    private rowStore: AsyncRowStore<ED, this>;
+    rowStore: AsyncRowStore<ED, this>;
     private uuid?: string;
     opRecords: OpRecord<ED>[];
     private scene?: string;
@@ -14,6 +14,11 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
         commit: Array<() => Promise<void>>;
         rollback: Array<() => Promise<void>>;
     }
+
+    /**
+     * 在返回结果前调用，对数据行进行一些预处理，比如将一些敏感的列隐藏
+     */
+    abstract refineOpRecords(): Promise<void>;
 
     constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders) {
         this.rowStore = store;

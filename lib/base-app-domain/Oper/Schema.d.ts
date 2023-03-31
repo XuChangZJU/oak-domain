@@ -12,6 +12,7 @@ export declare type OpSchema = EntityShape & {
     filter?: Object | null;
     extra?: Object | null;
     operatorId?: ForeignKey<"user"> | null;
+    targetEntity: String<32>;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
@@ -20,6 +21,7 @@ export declare type Schema = EntityShape & {
     filter?: Object | null;
     extra?: Object | null;
     operatorId?: ForeignKey<"user"> | null;
+    targetEntity: String<32>;
     operator?: User.Schema | null;
     operEntity$oper?: Array<OperEntity.Schema>;
     operEntity$oper$$aggr?: AggregationResult<OperEntity.Schema>;
@@ -37,6 +39,7 @@ declare type AttrFilter = {
     extra: Object;
     operatorId: Q_StringValue | SubQuery.UserIdSubQuery;
     operator: User.Filter;
+    targetEntity: Q_StringValue;
 };
 export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
 export declare type Projection = {
@@ -52,6 +55,7 @@ export declare type Projection = {
     extra?: number;
     operatorId?: number;
     operator?: User.Projection;
+    targetEntity?: number;
     operEntity$oper?: OperEntity.Selection & {
         $entity: "operEntity";
     };
@@ -79,6 +83,8 @@ export declare type SortAttr = {
     operatorId: number;
 } | {
     operator: User.SortAttr;
+} | {
+    targetEntity: number;
 } | {
     [k: string]: any;
 } | OneOf<ExprOp<OpAttr | string>>;

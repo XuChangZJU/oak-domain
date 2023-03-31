@@ -24,10 +24,10 @@ export declare class SimpleConnector<ED extends EntityDict, BackCxt extends Asyn
         params: any;
         context: BackCxt;
     }>;
-    serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): {
+    serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): Promise<{
         body: any;
         headers?: Record<string, any> | undefined;
-    };
+    }>;
     serializeException(exception: OakException<ED>, headers: IncomingHttpHeaders, body: any): {
         body: any;
         headers?: Record<string, any> | undefined;

@@ -49,7 +49,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
     registerChecker<T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>): void {
         const { entity, action, type, conditionalFilter } = checker;
         const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
-        const { fn, when } = translateCheckerInAsyncContext(checker, true);
+        const { fn, when } = translateCheckerInAsyncContext(checker);
         const priority = type === 'data' ? DATA_CHECKER_DEFAULT_PRIORITY : CHECKER_DEFAULT_PRIORITY;        // checker的默认优先级最低（前面的trigger可能会赋上一些相应的值）
         const trigger = {
             checkerType: type,

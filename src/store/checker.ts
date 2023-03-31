@@ -24,7 +24,7 @@ export function translateCheckerInAsyncContext<
     ED extends EntityDict & BaseEntityDict,
     T extends keyof ED,
     Cxt extends AsyncContext<ED>
->(checker: Checker<ED, T, Cxt>, silent?: boolean): {
+>(checker: Checker<ED, T, Cxt>): {
     fn: Trigger<ED, T, Cxt>['fn'];
     when: 'before' | 'after';
 } {
@@ -48,7 +48,7 @@ export function translateCheckerInAsyncContext<
             const fn = (async ({ operation }, context, option) => {
                 const { filter: operationFilter, action } = operation;
                 const filter2 = typeof filter === 'function' ? await (filter as Function)(operation, context, option) : filter;
-                if (silent) {
+                if (['select', 'count', 'stat'].includes(action)) {
                     operation.filter = addFilterSegment(operationFilter || {}, filter2);
                     return 0;
                 }
@@ -106,7 +106,7 @@ export function translateCheckerInAsyncContext<
                         console.warn(`${entity as string}对象的create类型的checker中，存在无法转换为表达式形式的情况，请尽量使用authDef格式定义这类checker`);
                         return 0;
                     }
-                    if (silent) {
+                    if (['select', 'count', 'stat'].includes(action)) {
                         operation.filter = addFilterSegment(filter || {}, result);
                         return 0;
                     }
@@ -405,7 +405,7 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
             }
 
             if (filter.$or) {
-                const countersOr = filter.$and.map(
+                const countersOr = filter.$or.map(
                     (ele: ED[keyof ED]['Selection']['filter']) => translateCreateFilterMaker(entity, ele, userId)
                 ) as ReturnType<typeof translateCreateFilterMaker>[];
                 // or也只要有一个满足就行（不能否定）
