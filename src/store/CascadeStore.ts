@@ -1573,11 +1573,11 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             const { id } = row;
                             if (!entityBranch![id!]) {
                                 Object.assign(entityBranch!, {
-                                    [id!]: row,
+                                    [id!]: cloneDeep(row),
                                 });
                             }
                             else {
-                                Object.assign(entityBranch[id], row);
+                                Object.assign(entityBranch[id], cloneDeep(row));
                             }
                         }
                     }
@@ -1599,7 +1599,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 if (row) {
                     const { id } = row as { id: string };
                     Object.assign(entityBranch!, {
-                        [id!]: row,
+                        [id!]: cloneDeep(row),
                     });
                 }
             }
