@@ -376,6 +376,15 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 else {
                     cascadeSelectionFns.push(
                         (result) => {
+                            const entityIds = uniq(result.filter(
+                                ele => ele.entity === attr
+                            ).map(
+                                ele => {
+                                    assert(ele.entityId !== null);
+                                    return ele.entityId;
+                                }
+                            ) as string[]);
+
                             const dealWithSubRows = (subRows: Partial<ED[T]['Schema']>[]) => {
                                 assert(subRows.length <= entityIds.length);
                                 if (subRows.length < entityIds.length && !toModi) {
@@ -412,14 +421,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     }
                                 );
                             };
-                            const entityIds = uniq(result.filter(
-                                ele => ele.entity === attr
-                            ).map(
-                                ele => {
-                                    assert(ele.entityId !== null);
-                                    return ele.entityId;
-                                }
-                            ) as string[]);
 
                             if (entityIds.length > 0) {
                                 const subRows = cascadeSelectFn.call(this, attr as any, {
@@ -438,9 +439,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 else {
                                     dealWithSubRows(subRows as any);
                                 }
-                            }
-                            else {
-
                             }
                         }
                     );
@@ -493,6 +491,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 else {
                     cascadeSelectionFns.push(
                         (result) => {
+                            const ids = uniq(result.filter(
+                                ele => !!(ele[`${attr}Id`])
+                            ).map(
+                                ele => ele[`${attr}Id`]
+                            ) as string[]);
+
                             const dealWithSubRows = (subRows: Partial<ED[keyof ED]['Schema']>[]) => {
                                 assert(subRows.length <= ids.length);
                                 if (subRows.length < ids.length && !toModi) {
@@ -534,11 +538,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     }
                                 );
                             };
-                            const ids = uniq(result.filter(
-                                ele => !!(ele[`${attr}Id`])
-                            ).map(
-                                ele => ele[`${attr}Id`]
-                            ) as string[]);
 
                             if (ids.length > 0) {
                                 const subRows = cascadeSelectFn.call(this, relation, {
@@ -613,17 +612,26 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 ) as string[];
 
                                 const dealWithSubRows = (subRows: Partial<ED[keyof ED]['Schema']>[]) => {
-                                    result.forEach(
-                                        (ele) => {
-                                            const subRowss = subRows.filter(
-                                                ele2 => ele2[foreignKey] === ele.id
-                                            );
-                                            assert(subRowss);
-                                            Object.assign(ele, {
-                                                [attr]: subRowss,
-                                            });
-                                        }
-                                    );
+                                    // 这里如果result只有一行，则把返回结果直接置上，不对比外键值
+                                    // 这样做的原因是有的对象的filter会被改写掉（userId)，只能临时这样处理
+                                    if (result.length == 1) {
+                                        Object.assign(result[0], {
+                                            [attr]: subRows,
+                                        });
+                                    }
+                                    else {
+                                        result.forEach(
+                                            (ele) => {
+                                                const subRowss = subRows.filter(
+                                                    ele2 => ele2[foreignKey] === ele.id
+                                                );
+                                                assert(subRowss);
+                                                Object.assign(ele, {
+                                                    [attr]: subRowss,
+                                                });
+                                            }
+                                        );
+                                    }
                                 };
 
                                 if (ids.length > 0) {
@@ -697,17 +705,26 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     ele => ele.id
                                 ) as string[];
                                 const dealWithSubRows = (subRows: Partial<ED[T]['Schema']>[]) => {
-                                    result.forEach(
-                                        (ele) => {
-                                            const subRowss = subRows.filter(
-                                                ele2 => ele2.entityId === ele.id
-                                            );
-                                            assert(subRowss);
-                                            Object.assign(ele, {
-                                                [attr]: subRowss,
-                                            });
-                                        }
-                                    );
+                                    // 这里如果result只有一行，则把返回结果直接置上，不对比外键值
+                                    // 这样做的原因是有的对象的filter会被改写掉（userId)，只能临时这样处理
+                                    if (result.length === 1) {
+                                        Object.assign(result[0], {
+                                            [attr]: subRows,
+                                        });
+                                    }
+                                    else {
+                                        result.forEach(
+                                            (ele) => {
+                                                const subRowss = subRows.filter(
+                                                    ele2 => ele2.entityId === ele.id
+                                                );
+                                                assert(subRowss);
+                                                Object.assign(ele, {
+                                                    [attr]: subRowss,
+                                                });
+                                            }
+                                        );
+                                    }
                                 };
 
                                 if (ids.length > 0) {
