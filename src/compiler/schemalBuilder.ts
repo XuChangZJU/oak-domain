@@ -5268,7 +5268,15 @@ function constructAttributes(entity: string): ts.PropertyAssignment[] {
     schemaAttrs.forEach(
         (attr) => {
             const attrAssignments: ts.PropertyAssignment[] = [];
-            const { name, type } = attr;
+            const { name, type, questionToken: allowNull } = attr;
+            if (!allowNull) {
+                attrAssignments.push(
+                    factory.createPropertyAssignment(
+                        factory.createIdentifier("notNull"),
+                        factory.createTrue(),
+                    ),
+                );
+            }
             let name2 = name;
 
             if (ts.isTypeReferenceNode(type!)) {

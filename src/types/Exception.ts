@@ -138,8 +138,8 @@ export class OakRowInconsistencyException<ED extends EntityDict> extends OakUser
  */
 export class OakInputIllegalException<ED extends EntityDict> extends OakUserException<ED> {
     private attributes: string[];
-    private entity: string;
-    constructor(entity: string, attributes: string[], message?: string) {
+    private entity: keyof ED;
+    constructor(entity: keyof ED, attributes: string[], message?: string) {
         super(message);
         this.entity = entity;
         this.attributes = attributes;
@@ -168,6 +168,13 @@ export class OakInputIllegalException<ED extends EntityDict> extends OakUserExce
         });
     }
 };
+
+// 属性为空
+export class OakAttrNotNullException<ED extends EntityDict> extends OakInputIllegalException<ED> {
+    constructor(entity: keyof ED, attributes: string[], message?: string) {
+        super(entity, attributes, message || '属性不允许为空');
+    }
+}
 
 /**
  * 用户权限不够时抛的异常
