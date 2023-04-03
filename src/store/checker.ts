@@ -1184,52 +1184,62 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
             type: 'data',
             action: 'create' as ED[keyof ED]['Action'],
             checker: (data) => {
-                const illegalNullAttrs = difference(notNullAttrs, Object.keys(data));
-                if (illegalNullAttrs.length > 0) {
-                    throw new OakAttrNotNullException(entity, illegalNullAttrs);
-                }
-                for (const attr in data) {
-                    if (attributes[attr]) {
-                        const { type, params, default: defaultValue, enumeration } = attributes[attr];
-                        switch (type) {
-                            case 'char':
-                            case 'varchar': {
-                                if (typeof (data as ED[keyof ED]['CreateSingle']['data'])[attr] !== 'string') {
-                                    throw new OakInputIllegalException(entity, [attr], 'not a string');
+                const checkData = (data2: ED[keyof ED]['CreateSingle']['data']) => {
+                    const illegalNullAttrs = difference(notNullAttrs, Object.keys(data2));
+                    if (illegalNullAttrs.length > 0) {
+                        throw new OakAttrNotNullException(entity, illegalNullAttrs);
+                    }
+                    for (const attr in data2) {
+                        if (attributes[attr as string]) {
+                            const { type, params, default: defaultValue, enumeration } = attributes[attr as string];
+                            switch (type) {
+                                case 'char':
+                                case 'varchar': {
+                                    if (typeof (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] !== 'string') {
+                                        throw new OakInputIllegalException(entity, [attr], 'not a string');
+                                    }
+                                    const { length } = params!;
+                                    if (length && (data2 as ED[keyof ED]['CreateSingle']['data'])[attr]!.length > length) {
+                                        throw new OakInputIllegalException(entity, [attr], 'too long');
+                                    }
+                                    break;
                                 }
-                                const { length } = params!;
-                                if (length && (data as ED[keyof ED]['CreateSingle']['data'])[attr]!.length > length) {
-                                    throw new OakInputIllegalException(entity, [attr], 'too long');
+                                case 'int':
+                                case 'smallint':
+                                case 'tinyint':
+                                case 'bigint':
+                                case 'decimal':
+                                case 'money': {
+                                    if (typeof (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] !== 'number') {
+                                        throw new OakInputIllegalException(entity, [attr], 'not a number');
+                                    }
+                                    const { min, max } = params!;
+                                    if (typeof min === 'number' && (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] < min) {
+                                        throw new OakInputIllegalException(entity, [attr], 'too small');
+                                    }
+                                    if (typeof max === 'number' && (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] > max) {
+                                        throw new OakInputIllegalException(entity, [attr], 'too big');
+                                    }
+                                    break;
                                 }
-                                break;
-                            }
-                            case 'int':
-                            case 'smallint':
-                            case 'tinyint':
-                            case 'bigint':
-                            case 'decimal':
-                            case 'money': {
-                                if (typeof (data as ED[keyof ED]['CreateSingle']['data'])[attr] !== 'number') {
-                                    throw new OakInputIllegalException(entity, [attr], 'not a number');
+                                case 'enum': {
+                                    assert(enumeration);
+                                    if (!enumeration.includes((data2 as ED[keyof ED]['CreateSingle']['data'])[attr])) {
+                                        throw new OakInputIllegalException(entity, [attr], 'not in enumberation');
+                                    }
+                                    break;
                                 }
-                                const { min, max } = params!;
-                                if (typeof min === 'number' && (data as ED[keyof ED]['CreateSingle']['data'])[attr] < min) {
-                                    throw new OakInputIllegalException(entity, [attr], 'too small');
-                                }
-                                if (typeof max === 'number' && (data as ED[keyof ED]['CreateSingle']['data'])[attr] > max) {
-                                    throw new OakInputIllegalException(entity, [attr], 'too big');
-                                }
-                                break;
-                            }
-                            case 'enum': {
-                                assert(enumeration);
-                                if (!enumeration.includes((data as ED[keyof ED]['CreateSingle']['data'])[attr])) {
-                                    throw new OakInputIllegalException(entity, [attr], 'not in enumberation');
-                                }
-                                break;
                             }
                         }
                     }
+                };
+                if (data instanceof Array) {
+                    data.forEach(
+                        ele => checkData(ele)
+                    );
+                }
+                else {
+                    checkData(data as ED[keyof ED]['CreateSingle']['data']);
                 }
             }
         })
