@@ -241,7 +241,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                         }
                     }
                     const number = (trigger as CreateTrigger<ED, T, Cxt>).fn({ operation: operation as ED[T]['Create'] }, context, option as OperateOption);
-                    if (number > 0) {
+                    if (number as number > 0) {
                         this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
                     }
                 }
@@ -371,7 +371,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                         operation: operation as ED[T]['Selection'],
                         result: result!,
                     }, context, option as SelectOption);
-                    if (number > 0) {
+                    if (number as number > 0) {
                         this.logger.info(`触发器「${trigger.name}」成功触发了「${number}」行数据更改`);
                     }
                 }
