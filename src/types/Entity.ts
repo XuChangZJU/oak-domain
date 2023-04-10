@@ -81,7 +81,7 @@ export interface EntityShape {
     $$deleteAt$$?: number | Date | null;
 }
 
-interface GeneralEntityShape extends EntityShape {
+export interface GeneralEntityShape extends EntityShape {
     [K: string]: any;
 }
 
