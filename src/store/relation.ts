@@ -59,6 +59,7 @@ export function judgeRelation<ED extends {
     else if (attributes.hasOwnProperty('entity')
         && attributes.hasOwnProperty('entityId')
         && schema.hasOwnProperty(attr)) {
+        assert(attributes.entity.ref!.includes(attr), '不应当出现的case');
         // 反向指针的外键
         return 2;
     }

@@ -1187,7 +1187,34 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                 const checkData = (data2: ED[keyof ED]['CreateSingle']['data']) => {
                     const illegalNullAttrs = difference(notNullAttrs, Object.keys(data2));
                     if (illegalNullAttrs.length > 0) {
-                        throw new OakAttrNotNullException(entity, illegalNullAttrs);
+                        // 要处理多对一的cascade create
+                        for (const attr of illegalNullAttrs) {
+                            if (attr === 'entityId') {
+                                if (illegalNullAttrs.includes('entity')) {
+                                    continue;
+                                }
+                            }
+                            else if (attr === 'entity' && attributes[attr].type === 'ref') {
+                                let hasCascadeCreate = false;
+                                for (const ref of attributes[attr].ref as string[]) {
+                                    if (data2[ref] && data2[ref].action === 'create') {
+                                        hasCascadeCreate = true;
+                                        break;
+                                    }
+                                }
+                                if (hasCascadeCreate) {
+                                    continue;
+                                }
+                            }
+                            else if (attributes[attr].type === 'ref') {
+                                const ref = attributes[attr].ref as string;
+                                if (data2[ref] && data2[ref].action === 'create') {
+                                    continue;
+                                }
+                            }
+                            // 到这里说明确实是有not null的属性没有赋值
+                            throw new OakAttrNotNullException(entity, illegalNullAttrs);
+                        }
                     }
                     for (const attr in data2) {
                         if (attributes[attr as string]) {
