@@ -13,6 +13,7 @@ import { firstLetterUpperCase } from '../utils/string';
 import { union, uniq, difference } from '../utils/lodash';
 import { judgeRelation } from './relation';
 import { generateNewId } from '../utils/uuid';
+import { excludeUpdateActions } from '../actions/action';
 
 /**
  * 
@@ -1170,14 +1171,83 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
     return checkers;
 }
 
+function checkAttributeLegal<ED extends EntityDict & BaseEntityDict>(
+    schema: StorageSchema<ED>,
+    entity: keyof ED,
+    data: ED[keyof ED]['Update']['data'] | ED[keyof ED]['CreateSingle']['data']) {
+    const { attributes } = schema[entity];
+    for (const attr in data) {
+        if (attributes[attr as string]) {
+            const { type, params, default: defaultValue, enumeration, notNull } = attributes[attr as string];
+            if (data[attr] === null || data[attr] === undefined) {
+                if (notNull && defaultValue === undefined) {
+                    throw new OakAttrNotNullException(entity, [attr]);
+                }
+                if (defaultValue !== undefined) {
+                    Object.assign(data, {
+                        [attr]: defaultValue,
+                    });
+                }
+                continue;
+            }
+            switch (type) {
+                case 'char':
+                case 'varchar': {
+                    if (typeof (data as ED[keyof ED]['CreateSingle']['data'])[attr] !== 'string') {
+                        throw new OakInputIllegalException(entity, [attr], 'not a string');
+                    }
+                    const { length } = params!;
+                    if (length && (data as ED[keyof ED]['CreateSingle']['data'])[attr]!.length > length) {
+                        throw new OakInputIllegalException(entity, [attr], 'too long');
+                    }
+                    break;
+                }
+                case 'int':
+                case 'smallint':
+                case 'tinyint':
+                case 'bigint':
+                case 'decimal':
+                case 'money': {
+                    if (typeof (data as ED[keyof ED]['CreateSingle']['data'])[attr] !== 'number') {
+                        throw new OakInputIllegalException(entity, [attr], 'not a number');
+                    }
+                    const { min, max } = params || {};
+                    if (typeof min === 'number' && (data as ED[keyof ED]['CreateSingle']['data'])[attr] < min) {
+                        throw new OakInputIllegalException(entity, [attr], 'too small');
+                    }
+                    if (typeof max === 'number' && (data as ED[keyof ED]['CreateSingle']['data'])[attr] > max) {
+                        throw new OakInputIllegalException(entity, [attr], 'too big');
+                    }
+                    break;
+                }
+                case 'enum': {
+                    assert(enumeration);
+                    if (!enumeration.includes((data as ED[keyof ED]['CreateSingle']['data'])[attr])) {
+                        throw new OakInputIllegalException(entity, [attr], 'not in enumberation');
+                    }
+                    break;
+                }
+            }
+        }
+        else {
+            // 这里似乎还有一种update中带cascade remove的case，等遇到再说（貌似cascadeUpdate没有处理完整这种情况） by Xc
+            if (typeof data[attr] === 'object' && data[attr].action === 'remove') {
+                console.warn('cascade remove可能是未处理的边界，请注意');
+            }
+        }
+    }
+}
+
 export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
     const checkers: Checker<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
-        const { attributes } = schema[entity];
+        const { attributes, actions } = schema[entity];
         const notNullAttrs = Object.keys(attributes).filter(
             ele => attributes[ele].notNull
         );
+
+        const updateActions = difference(actions, excludeUpdateActions);
 
         checkers.push({
             entity,
@@ -1216,49 +1286,7 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                             throw new OakAttrNotNullException(entity, illegalNullAttrs);
                         }
                     }
-                    for (const attr in data2) {
-                        if (attributes[attr as string]) {
-                            const { type, params, default: defaultValue, enumeration } = attributes[attr as string];
-                            switch (type) {
-                                case 'char':
-                                case 'varchar': {
-                                    if (typeof (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] !== 'string') {
-                                        throw new OakInputIllegalException(entity, [attr], 'not a string');
-                                    }
-                                    const { length } = params!;
-                                    if (length && (data2 as ED[keyof ED]['CreateSingle']['data'])[attr]!.length > length) {
-                                        throw new OakInputIllegalException(entity, [attr], 'too long');
-                                    }
-                                    break;
-                                }
-                                case 'int':
-                                case 'smallint':
-                                case 'tinyint':
-                                case 'bigint':
-                                case 'decimal':
-                                case 'money': {
-                                    if (typeof (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] !== 'number') {
-                                        throw new OakInputIllegalException(entity, [attr], 'not a number');
-                                    }
-                                    const { min, max } = params || {};
-                                    if (typeof min === 'number' && (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] < min) {
-                                        throw new OakInputIllegalException(entity, [attr], 'too small');
-                                    }
-                                    if (typeof max === 'number' && (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] > max) {
-                                        throw new OakInputIllegalException(entity, [attr], 'too big');
-                                    }
-                                    break;
-                                }
-                                case 'enum': {
-                                    assert(enumeration);
-                                    if (!enumeration.includes((data2 as ED[keyof ED]['CreateSingle']['data'])[attr])) {
-                                        throw new OakInputIllegalException(entity, [attr], 'not in enumberation');
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    checkAttributeLegal(schema, entity, data2);
                 };
                 if (data instanceof Array) {
                     data.forEach(
@@ -1268,6 +1296,13 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                 else {
                     checkData(data as ED[keyof ED]['CreateSingle']['data']);
                 }
+            }
+        }, {
+            entity,
+            type: 'data',
+            action: updateActions as ED[keyof ED]['Action'][],
+            checker: (data) => {
+                checkAttributeLegal(schema, entity, data);
             }
         })
     }
