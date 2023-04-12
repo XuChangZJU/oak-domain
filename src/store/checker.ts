@@ -1213,7 +1213,7 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                                     if (typeof (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] !== 'number') {
                                         throw new OakInputIllegalException(entity, [attr], 'not a number');
                                     }
-                                    const { min, max } = params!;
+                                    const { min, max } = params || {};
                                     if (typeof min === 'number' && (data2 as ED[keyof ED]['CreateSingle']['data'])[attr] < min) {
                                         throw new OakInputIllegalException(entity, [attr], 'too small');
                                     }
