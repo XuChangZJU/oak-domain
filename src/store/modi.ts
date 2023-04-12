@@ -149,8 +149,8 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
     const triggers: Trigger<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
-        const { inModi } = schema[entity];
-        if (inModi) {
+        const { toModi } = schema[entity];
+        if (toModi) {
             // 当关联modi的对象被删除时，对应的modi也删除。这里似乎只需要删除掉活跃对象？因为oper不能删除，所以oper和modi是必须要支持对deleted对象的容错？
             // 这里没有想清楚，by Xc 20230209
             triggers.push({
