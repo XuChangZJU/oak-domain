@@ -336,6 +336,15 @@ export function makeException<ED extends EntityDict>(data: {
             e.setOpRecords(data.opRecords);
             return e;
         }
+        case 'OakAttrNotNullException': {
+            const e = new OakAttrNotNullException(
+                data.entity,
+                data.attributes,
+                data.message
+            );
+            e.setOpRecords(data.opRecords);
+            return e;
+        }
         default:
             return;
     }
