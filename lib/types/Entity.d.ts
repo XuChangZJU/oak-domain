@@ -65,7 +65,7 @@ export interface EntityShape {
     $$updateAt$$: number | Date;
     $$deleteAt$$?: number | Date | null;
 }
-interface GeneralEntityShape extends EntityShape {
+export interface GeneralEntityShape extends EntityShape {
     [K: string]: any;
 }
 export declare type MakeAction<A extends string> = A;

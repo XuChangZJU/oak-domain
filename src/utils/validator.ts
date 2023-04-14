@@ -3,7 +3,7 @@
  */
 'use strict';
 
-import { EntityDict, OakInputIllegalException } from "../types";
+import { EntityDict, OakAttrNotNullException, OakInputIllegalException } from "../types";
 
 type ValidatorFunction = (text: string, size?:number) => string|boolean;
 type ValidatorMoneyFunction = (text: string, zero?:boolean) => string|boolean;
@@ -129,7 +129,7 @@ export function checkAttributesNotNull<ED extends EntityDict, T extends keyof En
     ) as string[];
 
     if (attrs.length > 0) {
-        throw new OakInputIllegalException(entity as string, attrs, '属性不能为空');
+        throw new OakAttrNotNullException(entity as string, attrs, '属性不能为空');
     }
 };
 

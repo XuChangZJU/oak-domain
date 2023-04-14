@@ -55,11 +55,14 @@ export declare class OakRowInconsistencyException<ED extends EntityDict> extends
 export declare class OakInputIllegalException<ED extends EntityDict> extends OakUserException<ED> {
     private attributes;
     private entity;
-    constructor(entity: string, attributes: string[], message?: string);
-    getEntity(): string;
+    constructor(entity: keyof ED, attributes: string[], message?: string);
+    getEntity(): keyof ED;
     getAttributes(): string[];
     addAttributesPrefix(prefix: string): void;
     toString(): string;
+}
+export declare class OakAttrNotNullException<ED extends EntityDict> extends OakInputIllegalException<ED> {
+    constructor(entity: keyof ED, attributes: string[], message?: string);
 }
 /**
  * 用户权限不够时抛的异常

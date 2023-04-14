@@ -4,7 +4,6 @@ import { EntityDict } from '../types/Entity';
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from '../store/AsyncRowStore';
 import { combineFilters } from '../store/filter';
-import { createGzip } from 'node:zlib';
 import { pipeline } from 'stream';
 import { generateNewIdAsync } from '../utils/uuid';
 
@@ -38,7 +37,7 @@ export async function vaccumEntities<ED extends EntityDict & BaseEntityDict, Cxt
         if (filter) {
             filter2 = combineFilters([filter2, filter]);
         }
-        if (backupDir) {
+        if (backupDir && process.env.OAK_PLATFORM === 'server') {
             // 使用mysqldump将待删除的数据备份出来
             const { zip: zip } = option;
             const now = dayJs();
@@ -105,6 +104,7 @@ export async function vaccumEntities<ED extends EntityDict & BaseEntityDict, Cxt
                 rmSync(backFile);
             }
             else if (zip) {
+                const { createGzip } = require('zlib');
                 const gzip = createGzip();
                 const source = createReadStream(backFile);
                 const destination = createWriteStream(`${backFile}.zip`);
