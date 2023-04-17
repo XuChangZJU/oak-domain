@@ -5,21 +5,29 @@ import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape } from "../../types/Entity";
 import { AppendOnlyAction } from "../../actions/action";
 import * as Modi from "../Modi/Schema";
+import * as ActionAuth from "../ActionAuth/Schema";
+import * as Relation from "../Relation/Schema";
+import * as RelationAuth from "../RelationAuth/Schema";
 import * as User from "../User/Schema";
 import * as UserEntityGrant from "../UserEntityGrant/Schema";
+import * as UserRelation from "../UserRelation/Schema";
 export declare type OpSchema = EntityShape & {
     modiId: ForeignKey<"modi">;
-    entity: "user" | "userEntityGrant" | string;
+    entity: "actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
     entityId: String<64>;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
     modiId: ForeignKey<"modi">;
-    entity: "user" | "userEntityGrant" | string;
+    entity: "actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
     entityId: String<64>;
     modi: Modi.Schema;
+    actionAuth?: ActionAuth.Schema;
+    relation?: Relation.Schema;
+    relationAuth?: RelationAuth.Schema;
     user?: User.Schema;
     userEntityGrant?: UserEntityGrant.Schema;
+    userRelation?: UserRelation.Schema;
 } & {
     [A in ExpressionKey]?: any;
 };
@@ -32,10 +40,14 @@ declare type AttrFilter<E> = {
     modi: Modi.Filter;
     entity: E;
     entityId: Q_StringValue;
+    actionAuth: ActionAuth.Filter;
+    relation: Relation.Filter;
+    relationAuth: RelationAuth.Filter;
     user: User.Filter;
     userEntityGrant: UserEntityGrant.Filter;
+    userRelation: UserRelation.Filter;
 };
-export declare type Filter<E = Q_EnumValue<"user" | "userEntityGrant" | string>> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr | string>>;
+export declare type Filter<E = Q_EnumValue<"actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string>> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr | string>>;
 export declare type Projection = {
     "#id"?: NodeId;
     [k: string]: any;
@@ -47,8 +59,12 @@ export declare type Projection = {
     modi?: Modi.Projection;
     entity?: number;
     entityId?: number;
+    actionAuth?: ActionAuth.Projection;
+    relation?: Relation.Projection;
+    relationAuth?: RelationAuth.Projection;
     user?: User.Projection;
     userEntityGrant?: UserEntityGrant.Projection;
+    userRelation?: UserRelation.Projection;
 } & Partial<ExprOp<OpAttr | string>>;
 declare type ModiEntityIdProjection = OneOf<{
     id: number;
@@ -56,10 +72,22 @@ declare type ModiEntityIdProjection = OneOf<{
 declare type ModiIdProjection = OneOf<{
     modiId: number;
 }>;
+declare type ActionAuthIdProjection = OneOf<{
+    entityId: number;
+}>;
+declare type RelationIdProjection = OneOf<{
+    entityId: number;
+}>;
+declare type RelationAuthIdProjection = OneOf<{
+    entityId: number;
+}>;
 declare type UserIdProjection = OneOf<{
     entityId: number;
 }>;
 declare type UserEntityGrantIdProjection = OneOf<{
+    entityId: number;
+}>;
+declare type UserRelationIdProjection = OneOf<{
     entityId: number;
 }>;
 export declare type SortAttr = {
@@ -79,9 +107,17 @@ export declare type SortAttr = {
 } | {
     entityId: number;
 } | {
+    actionAuth: ActionAuth.SortAttr;
+} | {
+    relation: Relation.SortAttr;
+} | {
+    relationAuth: RelationAuth.SortAttr;
+} | {
     user: User.SortAttr;
 } | {
     userEntityGrant: UserEntityGrant.SortAttr;
+} | {
+    userRelation: UserRelation.SortAttr;
 } | {
     [k: string]: any;
 } | OneOf<ExprOp<OpAttr | string>>;
@@ -104,6 +140,39 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity"
 })) & ({
     entity?: never;
     entityId?: never;
+    actionAuth: ActionAuth.CreateSingleOperation;
+} | {
+    entity: "actionAuth";
+    entityId: String<64>;
+    actionAuth: ActionAuth.UpdateOperation;
+} | {
+    entity: "actionAuth";
+    entityId: String<64>;
+} | {
+    entity?: never;
+    entityId?: never;
+    relation: Relation.CreateSingleOperation;
+} | {
+    entity: "relation";
+    entityId: String<64>;
+    relation: Relation.UpdateOperation;
+} | {
+    entity: "relation";
+    entityId: String<64>;
+} | {
+    entity?: never;
+    entityId?: never;
+    relationAuth: RelationAuth.CreateSingleOperation;
+} | {
+    entity: "relationAuth";
+    entityId: String<64>;
+    relationAuth: RelationAuth.UpdateOperation;
+} | {
+    entity: "relationAuth";
+    entityId: String<64>;
+} | {
+    entity?: never;
+    entityId?: never;
     user: User.CreateSingleOperation;
 } | {
     entity: "user";
@@ -122,6 +191,17 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity"
     userEntityGrant: UserEntityGrant.UpdateOperation;
 } | {
     entity: "userEntityGrant";
+    entityId: String<64>;
+} | {
+    entity?: never;
+    entityId?: never;
+    userRelation: UserRelation.CreateSingleOperation;
+} | {
+    entity: "userRelation";
+    entityId: String<64>;
+    userRelation: UserRelation.UpdateOperation;
+} | {
+    entity: "userRelation";
     entityId: String<64>;
 } | {
     entity?: string;
@@ -144,6 +224,18 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity"
     modi?: never;
     modiId?: String<64> | null;
 })) & ({
+    actionAuth?: ActionAuth.CreateSingleOperation | ActionAuth.UpdateOperation | ActionAuth.RemoveOperation;
+    entityId?: never;
+    entity?: never;
+} | {
+    relation?: Relation.CreateSingleOperation | Relation.UpdateOperation | Relation.RemoveOperation;
+    entityId?: never;
+    entity?: never;
+} | {
+    relationAuth?: RelationAuth.CreateSingleOperation | RelationAuth.UpdateOperation | RelationAuth.RemoveOperation;
+    entityId?: never;
+    entity?: never;
+} | {
     user?: User.CreateSingleOperation | User.UpdateOperation | User.RemoveOperation;
     entityId?: never;
     entity?: never;
@@ -152,7 +244,11 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity"
     entityId?: never;
     entity?: never;
 } | {
-    entity?: ("user" | "userEntityGrant" | string) | null;
+    userRelation?: UserRelation.CreateSingleOperation | UserRelation.UpdateOperation | UserRelation.RemoveOperation;
+    entityId?: never;
+    entity?: never;
+} | {
+    entity?: ("actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string) | null;
     entityId?: String<64> | null;
 }) & {
     [k: string]: any;
@@ -161,17 +257,29 @@ export declare type UpdateOperation = OakOperation<"update" | string, UpdateOper
 export declare type RemoveOperationData = {} & (({
     modi?: Modi.UpdateOperation | Modi.RemoveOperation;
 })) & ({
+    actionAuth?: ActionAuth.UpdateOperation | ActionAuth.RemoveOperation;
+} | {
+    relation?: Relation.UpdateOperation | Relation.RemoveOperation;
+} | {
+    relationAuth?: RelationAuth.UpdateOperation | RelationAuth.RemoveOperation;
+} | {
     user?: User.UpdateOperation | User.RemoveOperation;
 } | {
     userEntityGrant?: UserEntityGrant.UpdateOperation | UserEntityGrant.RemoveOperation;
+} | {
+    userRelation?: UserRelation.UpdateOperation | UserRelation.RemoveOperation;
 } | {
     [k: string]: any;
 });
 export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter, Sorter>;
 export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation;
 export declare type ModiIdSubQuery = Selection<ModiIdProjection>;
+export declare type ActionAuthIdSubQuery = Selection<ActionAuthIdProjection>;
+export declare type RelationIdSubQuery = Selection<RelationIdProjection>;
+export declare type RelationAuthIdSubQuery = Selection<RelationAuthIdProjection>;
 export declare type UserIdSubQuery = Selection<UserIdProjection>;
 export declare type UserEntityGrantIdSubQuery = Selection<UserEntityGrantIdProjection>;
+export declare type UserRelationIdSubQuery = Selection<UserRelationIdProjection>;
 export declare type ModiEntityIdSubQuery = Selection<ModiEntityIdProjection>;
 export declare type EntityDef = {
     Schema: Schema;

@@ -65,7 +65,7 @@
     /* Advanced Options */
     "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */
   },
-  "include": ["src/**/*" ],
+  "include": ["src/**/*", "scripts/ActionAuth.ts222" ],
   "exclude": [
     "node_modules",
     "**/*.spec.ts",

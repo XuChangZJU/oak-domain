@@ -115,7 +115,8 @@ export function translateCheckerInAsyncContext<
                     if (await checkFilterContains<ED, T, Cxt>(entity, context, result, filter, true)) {
                         return;
                     }
-                    throw new OakUserUnpermittedException(errMsg);
+                    const errMsg2 = typeof errMsg === 'function' ? errMsg(operation, context, option) : errMsg;
+                    throw new OakUserUnpermittedException(errMsg2);
                 }
                 return 0;
             }) as UpdateTriggerInTxn<ED, T, Cxt>['fn'];
@@ -201,7 +202,8 @@ export function translateCheckerInSyncContext<
                     if (checkFilterContains<ED, T, Cxt>(entity, context, result as ED[T]['Selection']['filter'], filter, true)) {
                         return;
                     }
-                    throw new OakUserUnpermittedException(errMsg);
+                    const errMsg2 = typeof errMsg === 'function' ? errMsg(operation, context, option) : errMsg;
+                    throw new OakUserUnpermittedException(errMsg2);
                 }
             };
             return {
@@ -804,7 +806,10 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
 
                         return filter;
                     },
-                    errMsg: '越权操作',
+                    errMsg: (operation, context) => {
+                        console.error(`创建${entity as string}时越权，userId是${context.getCurrentUserId()}，数据是${JSON.stringify(operation.data)}`);
+                        return `创建${entity as string}时越权`;
+                    },
                 });
 
                 checkers.push({
@@ -863,7 +868,10 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                         }
                         return makeFilterFromRows(toBeRemoved); */
                     },
-                    errMsg: '越权操作',
+                    errMsg: (operation, context) => {
+                        console.error(`移除${entity as string}时越权，userId是${context.getCurrentUserId()}，移除条件是${JSON.stringify(operation.filter)}`);
+                        return `移除${entity as string}时越权`;
+                    },
                 });
                 // 转让权限现在用update动作，只允许update userId给其它人
                 // todo 等实现的时候再写
@@ -881,7 +889,12 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                             const filter = makePotentialFilter(operation, context, filterMaker);
                             return filter;
                         },
-                        errMsg: '定义的actionAuth中检查出来越权操作',
+                        errMsg: (operation, context) => {
+                            const { action, data, filter } = operation as ED[keyof ED]['Create'];
+                            console.error(`对${entity as string}进行${action}时越权，userId是${context.getCurrentUserId()}
+                                数据是${JSON.stringify(data)}，条件是${JSON.stringify(filter)}`);
+                            return `对${entity as string}进行${action}时越权`;
+                        },
                     });
                 }
             }
