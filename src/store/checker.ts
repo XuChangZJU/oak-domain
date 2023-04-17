@@ -623,13 +623,19 @@ function execCreateCounter<ED extends EntityDict & BaseEntityDict, Cxt extends A
     }
     else if ((<CreateRelationSingleCounter<ED>>counter)?.$entity) {
         const { $entity, $filter, $count = 1 } = counter as CreateRelationSingleCounter<ED>;
-        const count = context.count($entity, {
+        // count不走reinforceSelection，先用select
+        const result = context.select($entity, {
+            data: {
+                id: 1,
+            },
             filter: $filter,
+            indexFrom: 0,
+            count: $count,
         }, { dontCollect: true });
-        if (count instanceof Promise) {
-            return count.then(
-                (c2) => {
-                    if (c2 >= $count) {
+        if (result instanceof Promise) {
+            return result.then(
+                (r2) => {
+                    if (r2.length >= $count) {
                         return undefined;
                     }
                     return new OakUserUnpermittedException();
@@ -637,7 +643,7 @@ function execCreateCounter<ED extends EntityDict & BaseEntityDict, Cxt extends A
             );
         }
         else {
-            return count >= $count ? undefined : new OakUserUnpermittedException();
+            return result.length >= $count ? undefined : new OakUserUnpermittedException();
         }
     }
 }
