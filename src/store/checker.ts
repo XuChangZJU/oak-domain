@@ -1283,7 +1283,7 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                                     continue;
                                 }
                             }
-                            else if (attr === 'entity' && attributes[attr].type === 'ref') {
+                            else if (attr === 'entity' && attributes[attr].ref) {
                                 let hasCascadeCreate = false;
                                 for (const ref of attributes[attr].ref as string[]) {
                                     if (data2[ref] && data2[ref].action === 'create') {
