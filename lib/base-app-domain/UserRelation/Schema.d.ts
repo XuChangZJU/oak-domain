@@ -11,11 +11,15 @@ import * as OperEntity from "../OperEntity/Schema";
 export declare type OpSchema = EntityShape & {
     userId: ForeignKey<"user">;
     relationId: ForeignKey<"relation">;
+    entity: String<32>;
+    entityId: String<64>;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
     userId: ForeignKey<"user">;
     relationId: ForeignKey<"relation">;
+    entity: String<32>;
+    entityId: String<64>;
     user: User.Schema;
     relation: Relation.Schema;
     modiEntity$entity?: Array<ModiEntity.Schema>;
@@ -34,6 +38,8 @@ declare type AttrFilter = {
     user: User.Filter;
     relationId: Q_StringValue | SubQuery.RelationIdSubQuery;
     relation: Relation.Filter;
+    entity: Q_StringValue;
+    entityId: Q_StringValue;
 };
 export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
 export declare type Projection = {
@@ -47,6 +53,8 @@ export declare type Projection = {
     user?: User.Projection;
     relationId?: number;
     relation?: Relation.Projection;
+    entity?: number;
+    entityId?: number;
     modiEntity$entity?: ModiEntity.Selection & {
         $entity: "modiEntity";
     };
@@ -86,6 +94,10 @@ export declare type SortAttr = {
 } | {
     relation: Relation.SortAttr;
 } | {
+    entity: number;
+} | {
+    entityId: number;
+} | {
     [k: string]: any;
 } | OneOf<ExprOp<OpAttr | string>>;
 export declare type SortNode = {
@@ -96,7 +108,7 @@ export declare type Sorter = SortNode[];
 export declare type SelectOperation<P extends Object = Projection> = OakSelection<"select", P, Filter, Sorter>;
 export declare type Selection<P extends Object = Projection> = Omit<SelectOperation<P>, "action">;
 export declare type Aggregation = DeduceAggregation<Projection, Filter, Sorter>;
-export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "userId" | "relationId">> & (({
+export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "entityId" | "userId" | "relationId">> & (({
     userId?: never;
     user: User.CreateSingleOperation;
 } | {
@@ -112,7 +124,11 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "userId"
     relation?: Relation.UpdateOperation;
 } | {
     relationId: String<64>;
-})) & {
+})) & ({
+    entity?: string;
+    entityId?: string;
+    [K: string]: any;
+}) & {
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
     operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
 };

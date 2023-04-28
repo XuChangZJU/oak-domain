@@ -56,9 +56,9 @@ export declare type Projection = {
     entity?: number;
     entityId?: number;
     action?: number;
-    data?: number;
-    filter?: number;
-    extra?: number;
+    data?: number | Object;
+    filter?: number | Object;
+    extra?: number | Object;
     iState?: number;
     modiEntity$modi?: ModiEntity.Selection & {
         $entity: "modiEntity";

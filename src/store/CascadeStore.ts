@@ -574,7 +574,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     (row) => {
                                         const aggrResult = aggregateFn.call(this, entity2, {
                                             data: subProjection,
-                                            filter: combineFilters([{
+                                            filter: combineFilters<ED, T>([{
                                                 [foreignKey]: row.id,
                                             }, subFilter]),
                                             sorter: subSorter,
@@ -637,7 +637,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 if (ids.length > 0) {
                                     const subRows = cascadeSelectFn.call(this, entity2, {
                                         data: subProjection,
-                                        filter: combineFilters([{
+                                        filter: combineFilters<ED, T>([{
                                             [foreignKey]: {
                                                 $in: ids,
                                             }
@@ -667,7 +667,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     (row) => {
                                         const aggrResult = aggregateFn.call(this, entity2, {
                                             data: subProjection,
-                                            filter: combineFilters([{
+                                            filter: combineFilters<ED, T>([{
                                                 entity,
                                                 entityId: row.id,
                                             }, subFilter]),
@@ -730,7 +730,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 if (ids.length > 0) {
                                     const subRows = cascadeSelectFn.call(this, entity2, {
                                         data: subProjection,
-                                        filter: combineFilters([{
+                                        filter: combineFilters<ED, T>([{
                                             entity,
                                             entityId: {
                                                 $in: ids,

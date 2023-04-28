@@ -183,10 +183,71 @@ export function generateNewId() {
         do {
             random[iter] = Math.ceil(Math.random() * 1000) % 128;
         } while (++iter < 16);
-     
+
         if (ID_OPTION?.shuffle || process.env.NODE_ENV === 'development') {
             return v4({ random });
         }
         return sequentialUuid({ random });
     }
+}
+
+function stringToArrayBuffer(str: string) {
+    var bytes = new Array();
+    var len, c;
+    len = str.length;
+    for (var i = 0; i < len; i++) {
+        c = str.charCodeAt(i);
+        if (c >= 0x010000 && c <= 0x10FFFF) {
+            bytes.push(((c >> 18) & 0x07) | 0xF0);
+            bytes.push(((c >> 12) & 0x3F) | 0x80);
+            bytes.push(((c >> 6) & 0x3F) | 0x80);
+            bytes.push((c & 0x3F) | 0x80);
+        } else if (c >= 0x000800 && c <= 0x00FFFF) {
+            bytes.push(((c >> 12) & 0x0F) | 0xE0);
+            bytes.push(((c >> 6) & 0x3F) | 0x80);
+            bytes.push((c & 0x3F) | 0x80);
+        } else if (c >= 0x000080 && c <= 0x0007FF) {
+            bytes.push(((c >> 6) & 0x1F) | 0xC0);
+            bytes.push((c & 0x3F) | 0x80);
+        } else {
+            bytes.push(c & 0xFF);
+        }
+    }
+    var array = new Int8Array(bytes.length);
+    for (var i = 0; i <= bytes.length; i++) {
+        array[i] = bytes[i];
+    }
+    return array;
+}
+/**
+ * 在一些特殊场景下根据数据生成指定的uuid，长度不能超过36byte
+ * @param: input: 输入的数据数组，应保证唯一性
+ */
+export function formUuid(...input: string[]) {
+    let uuid = input.join('-');
+    if (uuid.length <= 36) {
+        return uuid;
+    }
+    const buffer = stringToArrayBuffer(uuid);
+    const b = new Array(16);
+
+    let i = 0;
+    do {
+        b[i++] = 0;
+    } while(i < 16);
+
+    i = 0;
+    while(i < buffer.length) {
+        b[i % 16] += buffer[i];        
+        i ++;
+    }
+
+    i = 0;
+    do {
+        b[i] = b[i] % 256;
+        i ++;
+    } while (i < 16);
+
+    
+    return unsafeStringify(b);
 }

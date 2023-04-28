@@ -2,7 +2,7 @@ import PathLib from 'path';
 import assert from 'assert';
 import { writeFileSync, readdirSync, mkdirSync, fstat } from 'fs';
 import { emptydirSync } from 'fs-extra';
-import { assign, cloneDeep, difference, identity, intersection, keys, pull, uniq, uniqBy } from 'lodash';
+import { assign, cloneDeep, difference, identity, intersection, keys, pull, uniq, uniqBy, flatten } from 'lodash';
 import * as ts from 'typescript';
 const { factory } = ts;
 import {
@@ -336,6 +336,7 @@ const RESERVED_ACTION_NAMES = ['GenericAction', 'ParticularAction', 'ExcludeRemo
 import { genericActions, relationActions } from '../actions/action';
 import { unIndexedTypes } from '../types/DataType';
 import { initinctiveAttributes } from '../types/Entity';
+import { formUuid } from '../utils/uuid';
 
 const OriginActionDict = {
     'crud': 'GenericAction',
@@ -814,7 +815,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
             else if (node.name.text === 'Relation') {
                 assert(!hasActionDef, `【${filename}】action定义须在Relation之后`);
                 assert(!localeDef, `【${filename}】locale定义须在Relation之后`);
-                // 增加userXXX对象的描述
                 const relationValues = [] as string[];
                 if (ts.isLiteralTypeNode(node.type)) {
                     assert(ts.isStringLiteral(node.type.literal));
@@ -831,7 +831,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         }
                     ));
                 }
-                const entityLc = firstLetterLowerCase(moduleName);
+
+                // 增加userXXX对象的描述(todo 这里后面要删掉，现在是为了编译通过)
+                /* const entityLc = firstLetterLowerCase(moduleName);
                 const relationEntityName = `User${moduleName}`;
                 const relationSchemaAttrs: ts.TypeElement[] = [
                     factory.createPropertySignature(
@@ -890,7 +892,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     },
                 });
                 addRelationship(relationEntityName, 'User', 'user', true);
-                addRelationship(relationEntityName, moduleName, entityLc, true);
+                addRelationship(relationEntityName, moduleName, entityLc, true); */
 
                 // 对UserEntityGrant对象，建立相应的反指关系
                 if (ReversePointerRelations['UserEntityGrant']) {
@@ -901,6 +903,30 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 else {
                     assign(ReversePointerRelations, {
                         ['UserEntityGrant']: [moduleName],
+                    });
+                }
+
+                // 对Relation对象建立相应的反指关系
+                if (ReversePointerRelations['Relation']) {
+                    if (!ReversePointerRelations['Relation'].includes(moduleName)) {
+                        ReversePointerRelations['Relation'].push(moduleName);
+                    }
+                }
+                else {
+                    assign(ReversePointerRelations, {
+                        ['Relation']: [moduleName],
+                    });
+                }
+
+                // 对UserRelation对象建立相应的反指关系
+                if (ReversePointerRelations['UserRelation']) {
+                    if (!ReversePointerRelations['UserRelation'].includes(moduleName)) {
+                        ReversePointerRelations['UserRelation'].push(moduleName);
+                    }
+                }
+                else {
+                    assign(ReversePointerRelations, {
+                        ['UserRelation']: [moduleName],
                     });
                 }
 
@@ -1584,7 +1610,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
  * @param entity 
  */
 function constructFilter(statements: Array<ts.Statement>, entity: string) {
-    const { schemaAttrs, fulltextIndex } = Schema[entity];
+    const { schemaAttrs, fulltextIndex, enumAttributes } = Schema[entity];
     const members: Array<ts.TypeElement> = [
         // id: Q_StringValue
         factory.createPropertySignature(
@@ -1720,11 +1746,23 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                                 createForeignRef(entity, text2, 'Filter')
                             );
                         }
-                        else {
+                        else if (enumAttributes && enumAttributes[attrName] || ts.isUnionTypeNode(type!)) {
                             // 这里应该都是引用某个UnionType类型的定义了，如何判断？
                             // const words = getStringTextFromUnionStringLiterals();
                             type2 = factory.createTypeReferenceNode(
                                 factory.createIdentifier('Q_EnumValue'),
+                                [
+                                    factory.createTypeReferenceNode(
+                                        factory.createIdentifier(text),
+                                        undefined
+                                    )
+                                ]
+                            );
+                        }
+                        else {
+                            // 非枚举类型的非结构化属性，用JSONFilter来形式化
+                            type2 = factory.createTypeReferenceNode(
+                                factory.createIdentifier('JsonFilter'),
                                 [
                                     factory.createTypeReferenceNode(
                                         factory.createIdentifier(text),
@@ -1882,7 +1920,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
  * @param entity 
  */
 function constructProjection(statements: Array<ts.Statement>, entity: string) {
-    const { schemaAttrs } = Schema[entity];
+    const { schemaAttrs, enumAttributes } = Schema[entity];
     const properties: Array<[string | ts.PropertyName, boolean, ts.TypeNode?/* , ts.TypeNode? */]> = [
         ['id', false],
         ['$$createAt$$', false],
@@ -1908,6 +1946,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                     case 'String':
                     case 'Text':
                     case 'Int':
+                    case 'Uint':
                     case 'Float':
                     case 'Double':
                     case 'Boolean':
@@ -1916,11 +1955,22 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                     case 'File':
                     case 'SingleGeo':
                     case 'Geo':
-                    case 'Object':
                     case 'Price': {
                         properties.push(
                             [name, false]
                         )
+                        break;
+                    }
+                    case 'Object': {
+                        properties.push(
+                            [name, false, factory.createUnionTypeNode([
+                                factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier("Object"),
+                                    undefined
+                                )
+                            ])]
+                        );
                         break;
                     }
                     default: {
@@ -1948,14 +1998,20 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                             }
                         }
                         else {
-                            // todo 此处是对State的专门处理
-                            if (text.endsWith('State')) {
+                           if (!enumAttributes || !enumAttributes[attrName]) {
+                                // 引用的非enum类型shape
                                 properties.push(
-                                    [name, false, undefined]
+                                    [name, false, factory.createUnionTypeNode([
+                                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+                                        factory.createTypeReferenceNode(
+                                            factory.createIdentifier("JsonProjection"),
+                                            [type]
+                                        )
+                                    ])]
                                 );
                             }
                             else {
-                                // 引用的shape
+                                // 引用的enum类型shape
                                 properties.push(
                                     [name, false, undefined]
                                 );
@@ -1971,9 +2027,23 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
         else {
             // 增加了本身object的shape定义
             // assert(ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) || ts.isLiteralTypeNode(type!));
-            properties.push(
-                [name, false, undefined]
-            )
+            if (enumAttributes && enumAttributes[attrName] || ts.isUnionTypeNode(type!)) {
+                properties.push(
+                    [name, false, undefined]
+                );
+            }
+            else {
+                // 如果是非枚举类型的其它对象的union定义，加上JsonProjection
+                properties.push(
+                    [name, false, factory.createUnionTypeNode([
+                        factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
+                        factory.createTypeReferenceNode(
+                            factory.createIdentifier("JsonProjection"),
+                            [type!]
+                        )
+                    ])]
+                );
+            }
         }
     }
 
@@ -3157,10 +3227,16 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
     if (ReversePointerEntities[entity]) {
         if (ReversePointerRelations[entity]) {
             const { schemaAttrs } = Schema[entity];
-            const { questionToken } = schemaAttrs.find(
+            const { questionToken: entityQuestionToken } = schemaAttrs.find(
                 ele => {
                     const { name } = ele;
                     return (<ts.Identifier>name).text === 'entity'
+                }
+            )!;
+            const { questionToken: entityIdQuestionToken } = schemaAttrs.find(
+                ele => {
+                    const { name } = ele;
+                    return (<ts.Identifier>name).text === 'entityId'
                 }
             )!;
             for (const one of ReversePointerRelations[entity]) {
@@ -3221,14 +3297,14 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier('entity'),
-                            questionToken,
+                            entityQuestionToken,
                             factory.createLiteralTypeNode(factory.createStringLiteral(`${firstLetterLowerCase(one)}`)
                             )
                         ),
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier('entityId'),
-                            questionToken,
+                            entityIdQuestionToken,
                             factory.createTypeReferenceNode(
                                 factory.createIdentifier("String"),
                                 [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
@@ -4467,6 +4543,11 @@ const initialStatements = () => [
                         false,
                         undefined,
                         factory.createIdentifier('SingleGeo')
+                    ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier('JsonProjection')
                     )
                 ]
             )
@@ -4536,6 +4617,11 @@ const initialStatements = () => [
                         false,
                         undefined,
                         factory.createIdentifier('ExpressionKey')
+                    ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier('JsonFilter')
                     ),
                 ]
             )
@@ -4654,9 +4740,9 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
     for (const one in Schema) {
         const identifier = `${one}IdSubQuery`;
         const fromEntites = OneToMany[one] ? uniq(OneToMany[one]
-            .filter(
+            /* .filter(
                 ([e, f]) => f !== 'entity'
-            ).map(
+            ) */.map(
                 ([e]) => e
             )) : [];
         fromEntites.push(one);
@@ -4962,7 +5048,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         }
 
         // Relation定义加入
-        if (typeof Schema[entity].hasRelationDef === 'object' && ts.isTypeAliasDeclaration(Schema[entity].hasRelationDef as ts.Node)) {
+        /* if (typeof Schema[entity].hasRelationDef === 'object' && ts.isTypeAliasDeclaration(Schema[entity].hasRelationDef as ts.Node)) {
             const node = Schema[entity].hasRelationDef as ts.TypeAliasDeclaration;
             statements.push(
                 factory.updateTypeAliasDeclaration(
@@ -4974,7 +5060,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     node.type
                 )
             );
-        }
+        } */
 
         constructSchema(statements, entity);
         constructFilter(statements, entity);
@@ -5122,7 +5208,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 )
             );
         }
-        if (typeof Schema[entity].hasRelationDef === 'object' && ts.isTypeAliasDeclaration(Schema[entity].hasRelationDef as ts.Node)) {
+        /* if (typeof Schema[entity].hasRelationDef === 'object' && ts.isTypeAliasDeclaration(Schema[entity].hasRelationDef as ts.Node)) {
             EntityDefAttrs.push(
                 factory.createPropertySignature(
                     undefined,
@@ -5134,7 +5220,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     )
                 )
             );
-        }
+        } */
         statements.push(
             factory.createTypeAliasDeclaration(
                 undefined,
@@ -6122,10 +6208,12 @@ function addReverseRelationship() {
     }
 }
 
+
 function outputIndexTs(outputDir: string) {
     const indexTs = `export * from './EntityDict';
     export * from './Storage';
     export * from './ActionDefDict';
+    export * from './Relation';
     `;
     const filename = PathLib.join(outputDir, 'index.ts');
     writeFileSync(filename, indexTs, { flag: 'w' });
@@ -6189,6 +6277,243 @@ function analyzeInModi() {
     }
 }
 
+
+let IGNORED_RELATION_PATH_SET: Record<string, string[]> = {}
+
+export function registerIgnoredRelationPathSet(set: Record<string, string[]>) {
+    IGNORED_RELATION_PATH_SET = set;
+}
+/**
+ * 输出所有和User相关的对象的后继
+ */
+function outputRelation(outputDir: string, printer: ts.Printer) {
+    const ExcludedEntities = ['Oper', 'User', 'OperEntity', 'Modi', 'ModiEntity', 'UserEntityGrant'];
+    const actionPath: [string, string, string, boolean][] = [];
+    const relationPath: [string, string, string, boolean][] = [];
+    const outputRecursively = (root: string, entity: string, path: string, paths: string[], isRelation: boolean) => {
+        if (ExcludedEntities.includes(entity)) {
+            return;
+        }
+        if (paths.length > 32) {
+            throw new Error('对象之间的关系深度过长，请优化设计加以避免');
+        }
+        actionPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
+        if (Schema[entity].hasRelationDef) {
+            relationPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
+        }
+        const { [entity]: parent } = OneToMany;
+        if (parent) {
+            parent.forEach(
+                ([child, foreignKey]) => {
+                    if (child !== entity && !paths.includes(firstLetterLowerCase(child)) && !IGNORED_RELATION_PATH_SET[firstLetterLowerCase(child)]?.includes(foreignKey)) {
+                        // 如果有递归直接忽略，递归对象在设计时不要进入这个链条
+                        const fk = foreignKey === 'entity' ? firstLetterLowerCase(entity) : foreignKey;
+                        const path2 = path ? `${fk}.${path}` : fk;
+                        outputRecursively(root, child, path2, paths.concat([firstLetterLowerCase(entity)]), isRelation);
+                    }
+                }
+            );
+        }
+    };
+    // 所有属性中有指向user的对象
+    const { User } = OneToMany;
+    User.forEach(
+        ([entity3, foreignKey]) => {
+            const fk = foreignKey === 'entity' ? 'user' : foreignKey;
+            outputRecursively(firstLetterLowerCase(entity3), entity3, fk, [fk], false);
+        }
+    );
+    // 所有带relation的对象
+    const hasRelationEntities = Object.keys(Schema).filter(
+        (entity) => Schema[entity].hasRelationDef
+    );
+    hasRelationEntities.forEach(
+        (entity3) => {
+            outputRecursively(firstLetterLowerCase(entity3), entity3, '', [], true);
+        }
+    )
+
+    const entityRelations: [string, string[]][] = [];
+    for (const entity in Schema) {
+        const { hasRelationDef } = Schema[entity];
+        if (hasRelationDef) {
+            const { type } = hasRelationDef;
+            if (ts.isUnionTypeNode(type)) {
+                const { types } = type;
+                const relations = types.map(
+                    ele => {
+                        assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
+                        return ele.literal.text;
+                    }
+                );
+                entityRelations.push([firstLetterLowerCase(entity), relations]);
+            }
+            else {
+                assert(ts.isLiteralTypeNode(type));
+                assert(ts.isStringLiteral(type.literal));
+                const relations = [type.literal.text];
+                entityRelations.push([firstLetterLowerCase(entity), relations]);
+            }
+        }
+    }
+
+    const stmts: ts.Statement[] = [
+        factory.createImportDeclaration(
+            undefined,
+            undefined,
+            factory.createImportClause(
+                false,
+                undefined,
+                factory.createNamedImports([factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("AuthCascadePath")
+                )])
+            ),
+            factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(1)}Entity`),
+            undefined
+        ),
+        factory.createImportDeclaration(
+            undefined,
+            undefined,
+            factory.createImportClause(
+                false,
+                undefined,
+                factory.createNamedImports([factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("EntityDict")
+                )])
+            ),
+            factory.createStringLiteral("./EntityDict"),
+            undefined
+        ),
+        factory.createImportDeclaration(
+            undefined,
+            undefined,
+            factory.createImportClause(
+                false,
+                undefined,
+                factory.createNamedImports([factory.createImportSpecifier(
+                    false,
+                    factory.createIdentifier("CreateOperationData"),
+                    factory.createIdentifier("Relation")
+                )])
+            ),
+            factory.createStringLiteral("./Relation/Schema"),
+            undefined
+        ),
+        factory.createVariableStatement(
+            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+            factory.createVariableDeclarationList(
+                [factory.createVariableDeclaration(
+                    factory.createIdentifier("ActionCascadePathGraph"),
+                    undefined,
+                    factory.createArrayTypeNode(factory.createTypeReferenceNode(
+                        factory.createIdentifier("AuthCascadePath"),
+                        [factory.createTypeReferenceNode(
+                            factory.createIdentifier("EntityDict"),
+                            undefined
+                        )]
+                    )),
+                    factory.createArrayLiteralExpression(
+                        actionPath.map(
+                            ([entity, path, root, isRelation]) => factory.createArrayLiteralExpression(
+                                [
+                                    factory.createStringLiteral(entity),
+                                    factory.createStringLiteral(path),
+                                    factory.createStringLiteral(root),
+                                    isRelation ? factory.createTrue() : factory.createFalse()
+                                ],
+                                false
+                            )
+                        ),
+                        true
+                    )
+                )],
+                ts.NodeFlags.Const
+            )
+        ),
+        factory.createVariableStatement(
+            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+            factory.createVariableDeclarationList(
+                [factory.createVariableDeclaration(
+                    factory.createIdentifier("RelationCascadePathGraph"),
+                    undefined,
+                    factory.createArrayTypeNode(factory.createTypeReferenceNode(
+                        factory.createIdentifier("AuthCascadePath"),
+                        [factory.createTypeReferenceNode(
+                            factory.createIdentifier("EntityDict"),
+                            undefined
+                        )]
+                    )),
+                    factory.createArrayLiteralExpression(
+                        relationPath.map(
+                            ([entity, path, root, isRelation]) => factory.createArrayLiteralExpression(
+                                [
+                                    factory.createStringLiteral(entity),
+                                    factory.createStringLiteral(path),
+                                    factory.createStringLiteral(root),
+                                    isRelation ? factory.createTrue() : factory.createFalse()
+                                ],
+                                false
+                            )
+                        ),
+                        true
+                    )
+                )],
+                ts.NodeFlags.Const
+            )
+        ),
+        factory.createVariableStatement(
+            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+            factory.createVariableDeclarationList(
+                [factory.createVariableDeclaration(
+                    factory.createIdentifier("relations"),
+                    undefined,
+                    factory.createArrayTypeNode(factory.createTypeReferenceNode(
+                        factory.createIdentifier("Relation"),
+                        undefined
+                    )),
+                    factory.createArrayLiteralExpression(
+                        flatten(entityRelations.map(
+                            ([entity, relations]) => relations.map(
+                                (relation) => factory.createObjectLiteralExpression(
+                                    [
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("id"),
+                                            factory.createStringLiteral(formUuid(entity, relation))
+                                        ),
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("entity"),
+                                            factory.createStringLiteral(entity)
+                                        ),
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("name"),
+                                            factory.createStringLiteral(relation)
+                                        )
+                                    ],
+                                    true
+                                )
+                            )
+                        )),
+                        true
+                    )
+                )],
+                ts.NodeFlags.Const
+            )
+        )
+    ];
+
+
+    const result = printer.printList(
+        ts.ListFormat.SourceFileStatements,
+        factory.createNodeArray(stmts),
+        ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS));
+    const filename = PathLib.join(outputDir, 'Relation.ts');
+    writeFileSync(filename, result, { flag: 'w' });
+}
+
 export function analyzeEntities(inputDir: string, relativePath?: string) {
     const files = readdirSync(inputDir);
     const fullFilenames = files.map(
@@ -6216,6 +6541,7 @@ export function analyzeEntities(inputDir: string, relativePath?: string) {
 
 export function buildSchema(outputDir: string): void {
     addReverseRelationship();
+    // setRelationEntities();
     const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
     resetOutputDir(outputDir);
     outputSchema(outputDir, printer);
@@ -6224,6 +6550,7 @@ export function buildSchema(outputDir: string): void {
     outputAction(outputDir, printer);
     outputEntityDict(outputDir, printer);
     outputStorage(outputDir, printer);
+    outputRelation(outputDir, printer);
     outputIndexTs(outputDir);
 
     if (!process.env.COMPLING_AS_LIB) {

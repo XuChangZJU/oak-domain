@@ -1,4 +1,5 @@
-import { EntityDef } from "../types/Entity";
+import { EntityDict } from "../base-app-domain";
+import { EntityDict as BaseEntityDict } from "../types/Entity";
 import { StorageSchema } from "../types/Storage";
 /**
  * 判断对象和属性之间的关系
@@ -8,6 +9,4 @@ import { StorageSchema } from "../types/Storage";
  * @param row
  * @returns
  */
-export declare function judgeRelation<ED extends {
-    [E: string]: EntityDef;
-}>(schema: StorageSchema<ED>, entity: keyof ED, attr: string): string | 1 | 2 | string[] | 0;
+export declare function judgeRelation<ED extends EntityDict & BaseEntityDict>(schema: StorageSchema<ED>, entity: keyof ED, attr: string): string | 1 | 2 | string[] | 0;

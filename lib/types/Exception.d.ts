@@ -23,6 +23,12 @@ export declare class OakImportDataParseException<ED extends EntityDict> extends 
     header?: string;
     constructor(message: string, line: number, header?: string);
 }
+export declare class OakNoRelationDefException<ED extends EntityDict, T extends keyof ED> extends OakDataException<ED> {
+    entity: T;
+    action: ED[T]['Action'];
+    constructor(entity: T, action: ED[T]['Action'], msg?: string);
+    toString(): string;
+}
 export declare class OakOperExistedException<ED extends EntityDict> extends OakDataException<ED> {
 }
 export declare class OakRowUnexistedException<ED extends EntityDict> extends OakDataException<ED> {

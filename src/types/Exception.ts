@@ -82,6 +82,25 @@ export class OakImportDataParseException<ED extends EntityDict> extends OakExcep
     }
 }
 
+export class OakNoRelationDefException<ED extends EntityDict, T extends keyof ED> extends OakDataException<ED> {
+    entity: T;
+    action: ED[T]['Action'];
+    constructor(entity: T, action: ED[T]['Action'], msg?: string) {
+        super(msg || `对象${entity as string}的操作${action}找不到有效的relation定义`);
+        this.entity = entity;
+        this.action = action;
+    }
+    
+    toString(): string {
+        return JSON.stringify({
+            name: this.constructor.name,
+            message: this.message,
+            entity: this.entity,
+            action: this.action,
+        });
+    }
+}
+
 export class OakOperExistedException<ED extends EntityDict> extends OakDataException<ED> {
     // 进行操作时发现同样id的Oper对象已经存在
 }
@@ -318,6 +337,11 @@ export function makeException<ED extends EntityDict>(data: {
         }
         case 'OakDataException': {
             const e = new OakDataException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
+        }
+        case 'OakNoRelationDefException': {
+            const e = new OakNoRelationDefException(data.entity, data.action, data.message);
             e.setOpRecords(data.opRecords);
             return e;
         }

@@ -8,15 +8,23 @@ import { Schema as Relation } from './Relation';
 export interface Schema extends EntityShape {
     user: User;
     relation: Relation;
+    entity: String<32>;
+    entityId: String<64>;
 };
 
 
 const indexes: Index<Schema>[] = [
     {
-        name: 'index_user_relation',
+        name: 'index_user_entity_entityId_relation',
         attributes: [
             {
                 name: 'user',
+            },
+            {
+                name: 'entity',
+            },
+            {
+                name: 'entityId',
             },
             {
                 name: 'relation',
@@ -39,6 +47,8 @@ const locale: LocaleDef<
         attr: {
             user: '关系',
             relation: '目标关系',
+            entity: '目标对象',
+            entityId: '目标对象ID',
         },
     },
 };

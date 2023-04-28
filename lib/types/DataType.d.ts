@@ -19,3 +19,6 @@ export { Geo, SingleGeo } from './Geo';
 export declare type DataTypes = number | string | Datetime | Day | Time | Geo | Object | SingleGeo;
 export declare const types: string[];
 export declare const unIndexedTypes: string[];
+export declare type JsonProjection<O extends object> = {
+    [k in keyof O]?: NonNullable<O[k]> extends object ? JsonProjection<NonNullable<O[k]>> | number : number;
+};

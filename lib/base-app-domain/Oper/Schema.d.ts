@@ -50,9 +50,9 @@ export declare type Projection = {
     $$updateAt$$?: number;
     $$seq$$?: number;
     action?: number;
-    data?: number;
-    filter?: number;
-    extra?: number;
+    data?: number | Object;
+    filter?: number | Object;
+    extra?: number | Object;
     operatorId?: number;
     operator?: User.Projection;
     targetEntity?: number;

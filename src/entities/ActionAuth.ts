@@ -16,8 +16,11 @@ export interface Schema extends EntityShape {
 
 const indexes: Index<Schema>[] = [
     {
-        name: 'index_relation_path',
+        name: 'index_entity_relation_path',
         attributes: [
+            {
+                name: 'destEntity',
+            },
             {
                 name: 'relation',
             },

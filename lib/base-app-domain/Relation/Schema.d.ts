@@ -11,16 +11,16 @@ import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 export declare type OpSchema = EntityShape & {
     entity: String<32>;
-    entityId: String<64>;
-    name: String<32>;
-    display: String<32>;
+    entityId?: String<64> | null;
+    name?: String<32> | null;
+    display?: String<32> | null;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
     entity: String<32>;
-    entityId: String<64>;
-    name: String<32>;
-    display: String<32>;
+    entityId?: String<64> | null;
+    name?: String<32> | null;
+    display?: String<32> | null;
     actionAuth$relation?: Array<ActionAuth.Schema>;
     actionAuth$relation$$aggr?: AggregationResult<ActionAuth.Schema>;
     relationAuth$relation?: Array<RelationAuth.Schema>;

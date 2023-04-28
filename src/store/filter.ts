@@ -1,11 +1,12 @@
 import assert from 'assert';
-import { EXPRESSION_PREFIX, OakRowInconsistencyException, StorageSchema } from '../types';
-import { EntityDict } from "../types/Entity";
+import { EntityDict as BaseEntityDict, EXPRESSION_PREFIX, OakRowInconsistencyException, StorageSchema } from '../types';
+import { EntityDict } from "../base-app-domain";
 import { difference, intersection, union } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
 import { judgeRelation } from './relation';
 import { SyncContext } from './SyncRowStore';
-export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
+
+export function addFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
     const filter: ED[T]['Selection']['filter'] = {};
     filters.forEach(
         ele => {
@@ -44,7 +45,7 @@ export function addFilterSegment<ED extends EntityDict, T extends keyof ED>(...f
     return filter;
 }
 
-export function unionFilterSegment<ED extends EntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
+export function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
     let allOnlyOneOr = true;
     for (const f of filters) {
         if (Object.keys(f!).length > 1 || !f!.$or) {
@@ -67,7 +68,7 @@ export function unionFilterSegment<ED extends EntityDict, T extends keyof ED>(..
     } as ED[T]['Selection']['filter'];
 }
 
-export function combineFilters<ED extends EntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>, union?: true) {
+export function combineFilters<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>, union?: true) {
     if (union) {
         return unionFilterSegment(...filters);
     }
@@ -489,7 +490,7 @@ export function judgeValueRelation(value1: any, value2: any, contained: boolean)
     }
 }
 
-function judgeFilter2ValueRelation<ED extends EntityDict, T extends keyof ED>(
+function judgeFilter2ValueRelation<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     attr: keyof ED[T]['Schema'],
@@ -548,7 +549,7 @@ function judgeFilter2ValueRelation<ED extends EntityDict, T extends keyof ED>(
         }
         else {
             if (attr === attr2) {
-                const rel = judgeRelation(schema, entity, attr2);
+                const rel = judgeRelation<ED>(schema, entity, attr2);
                 if (rel === 1) {
                     return judgeValueRelation(filter[attr2], conditionalFilterAttrValue, contained);
                 }
@@ -575,7 +576,7 @@ function judgeFilter2ValueRelation<ED extends EntityDict, T extends keyof ED>(
  * @param conditionalFilter
  * @param contained: true代表filter包容conditionalFilter, false代表filter与conditionalFilter相斥
  */
-function judgeFilterRelation<ED extends EntityDict, T extends keyof ED>(
+function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     filter: ED[T]['Selection']['filter'],
@@ -669,7 +670,7 @@ function judgeFilterRelation<ED extends EntityDict, T extends keyof ED>(
  * @param conditionalFilter 
  * @returns 
  */
-export function contains<ED extends EntityDict, T extends keyof ED>(
+export function contains<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     filter: ED[T]['Selection']['filter'],
@@ -692,7 +693,7 @@ export function contains<ED extends EntityDict, T extends keyof ED>(
  * @param filter 
  * @param conditionalFilter 
  */
-export function repel<ED extends EntityDict, T extends keyof ED>(
+export function repel<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     filter1: ED[T]['Selection']['filter'],
@@ -707,7 +708,7 @@ export function repel<ED extends EntityDict, T extends keyof ED>(
  * @param filter 
  * @returns 
  */
-export function getRelevantIds<ED extends EntityDict, T extends keyof ED>(filter: ED[T]['Selection']['filter']): string[] {
+export function getRelevantIds<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(filter: ED[T]['Selection']['filter']): string[] {
     let ids: string[] | undefined;
     let idsAnd: string[] | undefined;
     let idsOr: string[] | undefined;
@@ -773,7 +774,7 @@ export function getRelevantIds<ED extends EntityDict, T extends keyof ED>(filter
  * @param filter1 
  * @param filter2 
  */
-export function same<ED extends EntityDict, T extends keyof ED>(
+export function same<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     filter1: ED[T]['Selection']['filter'],
@@ -793,7 +794,7 @@ export function same<ED extends EntityDict, T extends keyof ED>(
  * @param filter 查询当前行的条件
  * @param level 
  */
-export function makeTreeAncestorFilter<ED extends EntityDict, T extends keyof ED>(
+export function makeTreeAncestorFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     parentKey: string,
     filter: ED[T]['Selection']['filter'],
@@ -839,7 +840,7 @@ export function makeTreeAncestorFilter<ED extends EntityDict, T extends keyof ED
  * @param filter 查询当前行的条件
  * @param level 
  */
-export function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof ED>(
+export function makeTreeDescendantFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     parentKey: string,
     filter: ED[T]['Selection']['filter'],
@@ -880,7 +881,7 @@ export function makeTreeDescendantFilter<ED extends EntityDict, T extends keyof 
  * @param dataCompare 
  * @returns 
  */
-export function checkFilterContains<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
+export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
     entity: T,
     context: Cxt,
     contained: ED[T]['Selection']['filter'],
@@ -916,7 +917,7 @@ export function checkFilterContains<ED extends EntityDict, T extends keyof ED, C
     return false;
 }
 
-export function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
+export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
     entity: T,
     context: Cxt,
     filter1: ED[T]['Selection']['filter'],
@@ -950,7 +951,7 @@ export function checkFilterRepel<ED extends EntityDict, T extends keyof ED, Cxt 
     return false;
 }
 
-export function getCascadeEntityFilter<ED extends EntityDict, T extends keyof ED>(
+export function getCascadeEntityFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     filter: NonNullable<ED[T]['Selection']['filter']>,
     attr: keyof NonNullable<ED[T]['Selection']['filter']>
 ): ED[keyof ED]['Selection']['filter'] {

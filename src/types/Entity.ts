@@ -257,3 +257,5 @@ export type Configuration = {
     actionType?: ActionType;
     static?: boolean;    // 标识是维表（变动较小，相对独立）
 };
+
+export type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, keyof ED, boolean];

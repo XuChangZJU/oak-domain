@@ -5,15 +5,15 @@ import { Index } from '../types/Storage';
 
 export interface Schema extends EntityShape {
     entity: String<32>;
-    entityId: String<64>;        // 可以为空
-    name: String<32>;
-    display: String<32>;
+    entityId?: String<64>;        // 可以为空
+    name?: String<32>;
+    display?: String<32>;
 };
 
 
 const indexes: Index<Schema>[] = [
     {
-        name: 'index_entity_entityId_name',
+        name: 'index_targetEntity_entityId_name',
         attributes: [
             {
                 name: 'entity',

@@ -1,4 +1,6 @@
 import * as ActionAuth from "./ActionAuth/Schema";
+import * as DirectActionAuth from "./DirectActionAuth/Schema";
+import * as FreeActionAuth from "./FreeActionAuth/Schema";
 import * as Modi from "./Modi/Schema";
 import * as ModiEntity from "./ModiEntity/Schema";
 import * as Oper from "./Oper/Schema";
@@ -9,8 +11,30 @@ import * as User from "./User/Schema";
 import * as UserEntityGrant from "./UserEntityGrant/Schema";
 import * as UserRelation from "./UserRelation/Schema";
 export declare type ActionAuthIdSubQuery = {
-    [K in "$in" | "$nin"]?: (ActionAuth.ActionAuthIdSubQuery & {
+    [K in "$in" | "$nin"]?: (ModiEntity.ActionAuthIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.ActionAuthIdSubQuery & {
+        entity: "operEntity";
+    }) | (ActionAuth.ActionAuthIdSubQuery & {
         entity: "actionAuth";
+    }) | any;
+};
+export declare type DirectActionAuthIdSubQuery = {
+    [K in "$in" | "$nin"]?: (ModiEntity.DirectActionAuthIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.DirectActionAuthIdSubQuery & {
+        entity: "operEntity";
+    }) | (DirectActionAuth.DirectActionAuthIdSubQuery & {
+        entity: "directActionAuth";
+    }) | any;
+};
+export declare type FreeActionAuthIdSubQuery = {
+    [K in "$in" | "$nin"]?: (ModiEntity.FreeActionAuthIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.FreeActionAuthIdSubQuery & {
+        entity: "operEntity";
+    }) | (FreeActionAuth.FreeActionAuthIdSubQuery & {
+        entity: "freeActionAuth";
     }) | any;
 };
 export declare type ModiIdSubQuery = {
@@ -44,12 +68,20 @@ export declare type RelationIdSubQuery = {
         entity: "relationAuth";
     }) | (UserRelation.RelationIdSubQuery & {
         entity: "userRelation";
+    }) | (ModiEntity.RelationIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.RelationIdSubQuery & {
+        entity: "operEntity";
     }) | (Relation.RelationIdSubQuery & {
         entity: "relation";
     }) | any;
 };
 export declare type RelationAuthIdSubQuery = {
-    [K in "$in" | "$nin"]?: (RelationAuth.RelationAuthIdSubQuery & {
+    [K in "$in" | "$nin"]?: (ModiEntity.RelationAuthIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.RelationAuthIdSubQuery & {
+        entity: "operEntity";
+    }) | (RelationAuth.RelationAuthIdSubQuery & {
         entity: "relationAuth";
     }) | any;
 };
@@ -60,17 +92,29 @@ export declare type UserIdSubQuery = {
         entity: "user";
     }) | (UserRelation.UserIdSubQuery & {
         entity: "userRelation";
+    }) | (ModiEntity.UserIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.UserIdSubQuery & {
+        entity: "operEntity";
     }) | (User.UserIdSubQuery & {
         entity: "user";
     }) | any;
 };
 export declare type UserEntityGrantIdSubQuery = {
-    [K in "$in" | "$nin"]?: (UserEntityGrant.UserEntityGrantIdSubQuery & {
+    [K in "$in" | "$nin"]?: (ModiEntity.UserEntityGrantIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.UserEntityGrantIdSubQuery & {
+        entity: "operEntity";
+    }) | (UserEntityGrant.UserEntityGrantIdSubQuery & {
         entity: "userEntityGrant";
     }) | any;
 };
 export declare type UserRelationIdSubQuery = {
-    [K in "$in" | "$nin"]?: (UserRelation.UserRelationIdSubQuery & {
+    [K in "$in" | "$nin"]?: (ModiEntity.UserRelationIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.UserRelationIdSubQuery & {
+        entity: "operEntity";
+    }) | (UserRelation.UserRelationIdSubQuery & {
         entity: "userRelation";
     }) | any;
 };

@@ -1,4 +1,6 @@
 import { EntityDef as ActionAuth } from "./ActionAuth/Schema";
+import { EntityDef as DirectActionAuth } from "./DirectActionAuth/Schema";
+import { EntityDef as FreeActionAuth } from "./FreeActionAuth/Schema";
 import { EntityDef as Modi } from "./Modi/Schema";
 import { EntityDef as ModiEntity } from "./ModiEntity/Schema";
 import { EntityDef as Oper } from "./Oper/Schema";
@@ -10,6 +12,8 @@ import { EntityDef as UserEntityGrant } from "./UserEntityGrant/Schema";
 import { EntityDef as UserRelation } from "./UserRelation/Schema";
 export declare type EntityDict = {
     actionAuth: ActionAuth;
+    directActionAuth: DirectActionAuth;
+    freeActionAuth: FreeActionAuth;
     modi: Modi;
     modiEntity: ModiEntity;
     oper: Oper;

@@ -181,4 +181,5 @@ export declare type Configuration = {
     actionType?: ActionType;
     static?: boolean;
 };
+export declare type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, keyof ED, boolean];
 export {};
