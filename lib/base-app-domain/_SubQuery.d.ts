@@ -1,5 +1,6 @@
 import * as ActionAuth from "./ActionAuth/Schema";
 import * as DirectActionAuth from "./DirectActionAuth/Schema";
+import * as DirectRelationAuth from "./DirectRelationAuth/Schema";
 import * as FreeActionAuth from "./FreeActionAuth/Schema";
 import * as Modi from "./Modi/Schema";
 import * as ModiEntity from "./ModiEntity/Schema";
@@ -26,6 +27,15 @@ export declare type DirectActionAuthIdSubQuery = {
         entity: "operEntity";
     }) | (DirectActionAuth.DirectActionAuthIdSubQuery & {
         entity: "directActionAuth";
+    }) | any;
+};
+export declare type DirectRelationAuthIdSubQuery = {
+    [K in "$in" | "$nin"]?: (ModiEntity.DirectRelationAuthIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.DirectRelationAuthIdSubQuery & {
+        entity: "operEntity";
+    }) | (DirectRelationAuth.DirectRelationAuthIdSubQuery & {
+        entity: "directRelationAuth";
     }) | any;
 };
 export declare type FreeActionAuthIdSubQuery = {
@@ -64,6 +74,8 @@ export declare type OperEntityIdSubQuery = {
 export declare type RelationIdSubQuery = {
     [K in "$in" | "$nin"]?: (ActionAuth.RelationIdSubQuery & {
         entity: "actionAuth";
+    }) | (DirectRelationAuth.RelationIdSubQuery & {
+        entity: "directRelationAuth";
     }) | (RelationAuth.RelationIdSubQuery & {
         entity: "relationAuth";
     }) | (UserRelation.RelationIdSubQuery & {

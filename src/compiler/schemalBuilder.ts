@@ -6012,29 +6012,13 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
             )
         );
 
-        if (Schema[entity].hasRelationDef || entity === 'User') {
-            propertyAssignments.push(
-                factory.createPropertyAssignment(
-                    factory.createIdentifier("actions"),
-                    factory.createCallExpression(
-                        factory.createPropertyAccessExpression(
-                            factory.createIdentifier("actions"),
-                            factory.createIdentifier("concat")
-                        ),
-                        undefined,
-                        [factory.createIdentifier("relationActions")]
-                    )
-                )
-            );
-        }
-        else {
-            propertyAssignments.push(
-                factory.createShorthandPropertyAssignment(
-                    factory.createIdentifier("actions"),
-                    undefined
-                )
-            );
-        }
+       
+        propertyAssignments.push(
+            factory.createShorthandPropertyAssignment(
+                factory.createIdentifier("actions"),
+                undefined
+            )
+        );
 
         if (indexExpressions.length > 0) {
             propertyAssignments.push(
