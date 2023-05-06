@@ -402,8 +402,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     private makeDirectionActionAuthMap(directActionAuths: ED['directActionAuth']['OpSchema'][]) {
         const directActionAuthMap: Record<string, string[]> = {};
         for (const auth of directActionAuths) {
-            const { deActions, destEntity, rootEntity, path } = auth;
-            const k = `$${destEntity}-${path}-${rootEntity}`;
+            const { deActions, destEntity, sourceEntity, path } = auth;
+            const k = `$${destEntity}-${path}-${sourceEntity}`;
             directActionAuthMap[k] = deActions;
         }
         return directActionAuthMap;
@@ -427,14 +427,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     }
 
     private upsertDirectActionAuth(directActionAuth: ED['directActionAuth']['OpSchema']) {
-        const { deActions, destEntity, rootEntity, path } = directActionAuth;
-        const k = `$${destEntity}-${path}-${rootEntity}`;
+        const { deActions, destEntity, sourceEntity, path } = directActionAuth;
+        const k = `$${destEntity}-${path}-${sourceEntity}`;
         this.directActionAuthMap[k] = deActions;
     }
     
     private removeDirectActionAuth(directActionAuth: ED['directActionAuth']['OpSchema']) {
-        const { deActions, destEntity, rootEntity, path } = directActionAuth;
-        const k = `$${destEntity}-${path}-${rootEntity}`;
+        const { deActions, destEntity, sourceEntity, path } = directActionAuth;
+        const k = `$${destEntity}-${path}-${sourceEntity}`;
         delete this.directActionAuthMap[k];
     }
 
@@ -670,7 +670,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 fn: async({ operation }, context) => {
                     const { data, filter } = operation;
                     assert(typeof filter!.id === 'string');     //  freeAuthDict不应当有其它更新的情况
-                    assert(!data.destEntity && !data.rootEntity && !data.path);
+                    assert(!data.destEntity && !data.sourceEntity && !data.path);
                     if (data.deActions) {
                         const daas = await context.select('directActionAuth', {
                             data: {
@@ -678,7 +678,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                 deActions: 1,
                                 destEntity: 1,
                                 path: 1,
-                                rootEntity: 1,
+                                sourceEntity: 1,
                             },
                             filter,
                         }, { dontCollect: true });
@@ -703,7 +703,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             deActions: 1,
                             destEntity: 1,
                             path: 1,
-                            rootEntity: 1,
+                            sourceEntity: 1,
                         },
                         filter,
                     }, { dontCollect: true, includedDeleted: true });

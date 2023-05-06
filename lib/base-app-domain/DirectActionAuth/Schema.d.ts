@@ -8,14 +8,14 @@ import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 declare type Actions = string[];
 export declare type OpSchema = EntityShape & {
-    rootEntity: String<32>;
+    sourceEntity: String<32>;
     path: String<256>;
     destEntity: String<32>;
     deActions: Actions;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
-    rootEntity: String<32>;
+    sourceEntity: String<32>;
     path: String<256>;
     destEntity: String<32>;
     deActions: Actions;
@@ -31,7 +31,7 @@ declare type AttrFilter = {
     $$createAt$$: Q_DateValue;
     $$seq$$: Q_StringValue;
     $$updateAt$$: Q_DateValue;
-    rootEntity: Q_StringValue;
+    sourceEntity: Q_StringValue;
     path: Q_StringValue;
     destEntity: Q_StringValue;
     deActions: JsonFilter<Actions>;
@@ -44,7 +44,7 @@ export declare type Projection = {
     $$createAt$$?: number;
     $$updateAt$$?: number;
     $$seq$$?: number;
-    rootEntity?: number;
+    sourceEntity?: number;
     path?: number;
     destEntity?: number;
     deActions?: number | JsonProjection<Actions>;
@@ -73,7 +73,7 @@ export declare type SortAttr = {
 } | {
     $$updateAt$$: number;
 } | {
-    rootEntity: number;
+    sourceEntity: number;
 } | {
     path: number;
 } | {

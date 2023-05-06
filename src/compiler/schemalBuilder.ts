@@ -349,7 +349,7 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
     const actionTexts = genericActions.map(
         ele => ele
     );
-    if (hasRelationDef) {
+    if (moduleName === 'User') {
         actionTexts.push(...relationActions);
     }
     if (ts.isUnionTypeNode(node)) {
@@ -786,7 +786,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         undefined
                     )
                 ] as ts.TypeNode[];
-                if (hasRelationDef || moduleName === 'User') {
+                if (moduleName === 'User') {
                     actionDefNodes.push(
                         factory.createTypeReferenceNode(
                             'RelationAction',

@@ -6,7 +6,7 @@ import { Index } from '../types/Storage';
 type Actions = string[];
 
 export interface Schema extends EntityShape {
-    rootEntity: String<32>;
+    sourceEntity: String<32>;
     path: String<256>;
     destEntity: String<32>;
     deActions: Actions;
@@ -21,7 +21,7 @@ const indexes: Index<Schema>[] = [
                 name: 'destEntity',
             },
             {
-                name: 'rootEntity',
+                name: 'sourceEntity',
             },
             {
                 name: 'path',
@@ -42,7 +42,7 @@ const locale: LocaleDef<
     zh_CN: {
         name: '直接对象访问授权',
         attr: {
-            rootEntity: '根对象',
+            sourceEntity: '源对象',
             path: '路径',
             destEntity: '目标对象',
             deActions: '目标对象动作',
