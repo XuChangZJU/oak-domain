@@ -257,3 +257,6 @@ export type Configuration = {
     actionType?: ActionType;
     static?: boolean;    // 标识是维表（变动较小，相对独立）
 };
+
+// 一对多的键值的扩展
+export type OtmKey<K extends string> = K | `${K}$${number}`;
