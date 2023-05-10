@@ -182,4 +182,7 @@ export declare type Configuration = {
     static?: boolean;
 };
 export declare type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, keyof ED, boolean];
+export declare type AuthDeduceRelationMap<ED extends EntityDict> = {
+    [T in keyof ED]?: keyof ED[T]['OpSchema'];
+};
 export {};

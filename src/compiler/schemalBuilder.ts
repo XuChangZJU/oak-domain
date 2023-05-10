@@ -1998,7 +1998,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                             }
                         }
                         else {
-                           if (!enumAttributes || !enumAttributes[attrName]) {
+                            if (!enumAttributes || !enumAttributes[attrName]) {
                                 // 引用的非enum类型shape
                                 properties.push(
                                     [name, false, factory.createUnionTypeNode([
@@ -4743,8 +4743,8 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
             /* .filter(
                 ([e, f]) => f !== 'entity'
             ) */.map(
-                ([e]) => e
-            )) : [];
+            ([e]) => e
+        )) : [];
         fromEntites.push(one);
 
         const inUnionTypeNode: ts.TypeNode[] = fromEntites.map(
@@ -6012,7 +6012,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
             )
         );
 
-       
+
         propertyAssignments.push(
             factory.createShorthandPropertyAssignment(
                 factory.createIdentifier("actions"),
@@ -6262,34 +6262,72 @@ function analyzeInModi() {
 }
 
 
-let IGNORED_RELATION_PATH_SET: Record<string, string[]> = {}
+let IGNORED_FOREIGN_KEY_MAP: Record<string, string[]> = {};
+let IGNORED_RELATION_PATH_MAP: Record<string, string[]> = {};
+let DEDUCED_RELATION_MAP: Record<string, string> = {};
 
-export function registerIgnoredRelationPathSet(set: Record<string, string[]>) {
-    IGNORED_RELATION_PATH_SET = set;
+export function registerIgnoredForeignKeyMap(map: Record<string, string[]>) {
+    IGNORED_FOREIGN_KEY_MAP = map;
 }
+
+export function registerIgnoredRelationPathMap(map: Record<string, string[]>) {
+    for (const k in map) {
+        IGNORED_RELATION_PATH_MAP[firstLetterUpperCase(k)] = map[k];
+    }
+}
+
+export function registerDeducedRelationMap(map: Record<string, string>) {
+    for (const k in map) {
+        const entity = firstLetterUpperCase(k);
+        assert(Schema.hasOwnProperty(entity), `config/relation.ts中配置的DeducedRelationMap包含不合法的对象名称「${k}」`);
+        // 定义的deduce的属性一定是多对一的外键，此时ReversePointerEntities还未处理
+        if (ReversePointerEntities[entity] && map[k] === 'entity') {
+
+        }
+        else {        
+            const mto = ManyToOne[entity].find(
+                ele => ele[1] === map[k]
+            );
+            assert(mto, `config/relation.ts中配置的DeducedRelationMap所定义的「${k}」的deduce属性「${map[k]}」不是一个有效的外键指针`);
+        }
+
+        DEDUCED_RELATION_MAP[entity] = map[k];
+    }
+}
+
 /**
  * 输出所有和User相关的对象的后继
  */
 function outputRelation(outputDir: string, printer: ts.Printer) {
-    const ExcludedEntities = ['Oper', 'User', 'OperEntity', 'Modi', 'ModiEntity', 'UserEntityGrant'];
+    const ExcludedEntities = ['Oper', 'User', 'OperEntity', 'Modi', 'ModiEntity', 'UserRelation'];
     const actionPath: [string, string, string, boolean][] = [];
     const relationPath: [string, string, string, boolean][] = [];
     const outputRecursively = (root: string, entity: string, path: string, paths: string[], isRelation: boolean) => {
         if (ExcludedEntities.includes(entity)) {
             return;
         }
-        if (paths.length > 32) {
+
+        if (IGNORED_RELATION_PATH_MAP[entity]?.find(
+            (ele) => path.includes(ele)
+        )) {
+            return;
+        }
+
+        if (paths.length > 12) {
             throw new Error('对象之间的关系深度过长，请优化设计加以避免');
         }
-        actionPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
+        if (!DEDUCED_RELATION_MAP[entity]) {
+            actionPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
+        }
         if (Schema[entity].hasRelationDef) {
+            // assert(!DEDUCED_RELATION_MAP[entity], `${entity}对象定义了deducedRelationMap，但它有relation`);
             relationPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
         }
         const { [entity]: parent } = OneToMany;
         if (parent) {
             parent.forEach(
                 ([child, foreignKey]) => {
-                    if (child !== entity && !paths.includes(firstLetterLowerCase(child)) && !IGNORED_RELATION_PATH_SET[firstLetterLowerCase(child)]?.includes(foreignKey)) {
+                    if (child !== entity && !paths.includes(firstLetterLowerCase(child)) && !IGNORED_FOREIGN_KEY_MAP[firstLetterLowerCase(child)]?.includes(foreignKey)) {
                         // 如果有递归直接忽略，递归对象在设计时不要进入这个链条
                         const fk = foreignKey === 'entity' ? firstLetterLowerCase(entity) : foreignKey;
                         const path2 = path ? `${fk}.${path}` : fk;
@@ -6348,11 +6386,18 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
             factory.createImportClause(
                 false,
                 undefined,
-                factory.createNamedImports([factory.createImportSpecifier(
-                    false,
-                    undefined,
-                    factory.createIdentifier("AuthCascadePath")
-                )])
+                factory.createNamedImports([
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier("AuthCascadePath")
+                    ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier("AuthDeduceRelationMap")
+                    )
+                ])
             ),
             factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(1)}Entity`),
             undefined
@@ -6489,6 +6534,40 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
         )
     ];
 
+    if (Object.keys(DEDUCED_RELATION_MAP).length > 0) {
+        stmts.push(
+            factory.createVariableStatement(
+                [
+                    factory.createToken(ts.SyntaxKind.ExportKeyword)
+                ],
+                factory.createVariableDeclarationList(
+                    [
+                        factory.createVariableDeclaration(
+                            factory.createIdentifier("DeducedRelationMap"),
+                            undefined,
+                            factory.createTypeReferenceNode(
+                                factory.createIdentifier("AuthDeduceRelationMap"),
+                                [factory.createTypeReferenceNode(
+                                    factory.createIdentifier("EntityDict"),
+                                    undefined
+                                )]
+                            ),
+                            factory.createObjectLiteralExpression(
+                                Object.keys(DEDUCED_RELATION_MAP).map(
+                                    ele => factory.createPropertyAssignment(
+                                        factory.createIdentifier(firstLetterLowerCase(ele)),
+                                        factory.createStringLiteral(DEDUCED_RELATION_MAP[ele])
+                                    )
+                                ),
+                                true
+                            )
+                        )
+                    ],
+                    ts.NodeFlags.Const
+                )
+            )
+        );
+    }
 
     const result = printer.printList(
         ts.ListFormat.SourceFileStatements,

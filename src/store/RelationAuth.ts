@@ -1,7 +1,7 @@
 import assert from "assert";
 import { EntityDict } from "../base-app-domain";
-import { CreateTrigger, OakNoRelationDefException, OakUnloggedInException, OakUserUnpermittedException, RemoveTrigger, StorageSchema, Trigger, UpdateTrigger } from "../types";
-import { AuthCascadePath, EntityDict as BaseEntityDict } from "../types/Entity";
+import { CreateTrigger, OakDataException, OakNoRelationDefException, OakUnloggedInException, OakUserUnpermittedException, RemoveTrigger, StorageSchema, Trigger, UpdateTrigger } from "../types";
+import { AuthCascadePath, EntityDict as BaseEntityDict, AuthDeduceRelationMap } from "../types/Entity";
 import { AsyncContext } from "./AsyncRowStore";
 import { checkFilterContains } from "./filter";
 import { judgeRelation } from "./relation";
@@ -10,6 +10,7 @@ import { SyncContext } from "./SyncRowStore";
 export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     private actionCascadePathGraph: AuthCascadePath<ED>[];
     private relationCascadePathGraph: AuthCascadePath<ED>[];
+    private authDeduceRelationMap: AuthDeduceRelationMap<ED>;
     private schema: StorageSchema<ED>;
     private relationalFilterMaker: {
         [T in keyof ED]?: (action: ED[T]['Action'] | 'select', userId: string, directActionAuthMap: Record<string, string[]>) => ED[T]['Selection']['filter'];
@@ -134,6 +135,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         };
 
         for (const entity in pathGroup) {
+            /* if (pathGroup[entity]!.length > 6) {
+                throw new Error(`${entity as string}上的actionPath数量大于6，请优化}`);
+            } */
             const filterMakers = pathGroup[entity]!.map(
                 (ele) => {
                     const [e, p, r, ir] = ele;      // entity, path, root, isRelation
@@ -180,7 +184,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 directActionAuth: Record<string, string[]>,
                 data?: ED[T]['CreateSingle']['data'],
                 filter?: ED[T]['Selection']['filter']
-            ) => <Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt) => boolean | Promise<boolean>)[] = pathGroup[entity]!.map(
+            ) => (<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt) => boolean | Promise<boolean>) | false)[] = pathGroup[entity]!.map(
                 (ele) => {
                     const [e, p, r, ir] = ele;      // entity, path, root, isRelation
                     const daKey = `${e as string}-${p}-${r as string}`;
@@ -197,57 +201,56 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         ) => {
                             if (data) {
                                 const { id } = data;
-                                return async (context: AsyncContext<ED> | SyncContext<ED>) => {
-                                    const actionAuths = context.select('actionAuth', {
-                                        data: {
-                                            id: 1,
-                                            relationId: 1,
-                                            destEntity: 1,
-                                            relation: {
-                                                id: 1,
-                                                name: 1,
-                                            },
-                                        },
-                                        filter: {
-                                            path: '',
-                                            deActions: {
-                                                $contains: 'create',
-                                            },
-                                            relation: {
-                                                entity: e as string,
-                                            },
-                                        },
-                                    }, {});
-
-                                    const assignPossibleRelation = (aas: ED['actionAuth']['Schema'][]) => {
-                                        if (aas.length > 0) {
-                                            assert(aas.length === 1, `在${e as string}上的自身关系上定义了超过一种create的权限，「${aas.map(ele => ele.relation!.name).join(',')}」`);
-                                            const { relationId } = aas[0];
-                                            Object.assign(data, {
-                                                userRelation$entity: {
-                                                    action: 'create',
-                                                    data: {
-                                                        entity: e as string,
-                                                        entityId: id,
-                                                        relationId,
-                                                        userId,
+                                return (context: AsyncContext<ED> | SyncContext<ED>) => {
+                                    // 只对后台需要创建，前台直接返回
+                                    if (context instanceof AsyncContext) {
+                                        const assignPossibleRelation = (aas: ED['actionAuth']['Schema'][]) => {
+                                            if (aas.length > 0) {
+                                                assert(aas.length === 1, `在${e as string}上的自身关系上定义了超过一种create的权限，「${aas.map(ele => ele.relation!.name).join(',')}」`);
+                                                const { relationId } = aas[0];
+                                                Object.assign(data, {
+                                                    userRelation$entity: {
+                                                        action: 'create',
+                                                        data: {
+                                                            entity: e as string,
+                                                            entityId: id,
+                                                            relationId,
+                                                            userId,
+                                                        }
                                                     }
-                                                }
-                                            });
-                                            return true;
-                                        }
-                                        return false;
-                                    };
-
-                                    if (actionAuths instanceof Promise) {
-                                        return actionAuths.then(
-                                            (aas) => assignPossibleRelation(aas as ED['actionAuth']['Schema'][])
+                                                });
+                                                return true;
+                                            }
+                                            return false;
+                                        };
+                                        return context.select('actionAuth', {
+                                            data: {
+                                                id: 1,
+                                                relationId: 1,
+                                                destEntity: 1,
+                                                relation: {
+                                                    id: 1,
+                                                    name: 1,
+                                                },
+                                            },
+                                            filter: {
+                                                path: '',
+                                                deActions: {
+                                                    $contains: 'create',
+                                                },
+                                                relation: {
+                                                    entity: e as string,
+                                                },
+                                            },
+                                        }, {}).then(
+                                            (actionAuths) => assignPossibleRelation(actionAuths as ED['actionAuth']['Schema'][])
+                                        ).then(
+                                            () => true
                                         );
                                     }
-                                    return assignPossibleRelation(actionAuths as ED['actionAuth']['Schema'][]);
+                                    return true;
                                 };
                             }
-
                             return () => true;
                         };
                     }
@@ -261,18 +264,23 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             filter?: ED[T]['Selection']['filter']
                         ) => {
                             if (data) {
-                                if (rel === 2) {
-                                    Object.assign(data, {
-                                        entity: 'user',
-                                        entityId: userId,
-                                    });
-                                }
-                                else {
-                                    assert(typeof rel === 'string');
-                                    Object.assign(data, {
-                                        [`${paths[0]}Id`]: userId,
-                                    })
-                                }
+                                return (context) => {
+                                    if (context instanceof AsyncContext) {
+                                        if (rel === 2) {
+                                            Object.assign(data, {
+                                                entity: 'user',
+                                                entityId: userId,
+                                            });
+                                        }
+                                        else {
+                                            assert(typeof rel === 'string');
+                                            Object.assign(data, {
+                                                [`${paths[0]}Id`]: userId,
+                                            });
+                                        }
+                                    }
+                                    return true;
+                                };
                             }
                             return () => true;
                         };
@@ -342,11 +350,11 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         filter?: ED[T]['Selection']['filter']
                     ) => {
                         if (!filter && !data) {
-                            return () => false;
+                            return false;
                         }
                         const result = translateFilterToSelect(e, (filter || data)!, 0, userId, directActionAuthMap);
                         if (!result) {
-                            return () => false;
+                            return false;
                         }
                         return (context) => {
                             const { entity, filter, relationalFilter } = result;
@@ -364,7 +372,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             ) => {
                 const callbacks = createCheckers.map(
                     ele => ele(userId, directActionAuthMap, data, filter)
-                );
+                ).filter(
+                    ele => typeof ele === 'function'
+                ) as (<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt) => boolean | Promise<boolean>)[];
+
+                if (callbacks.length > 6) {
+                    throw new OakDataException(`在create「${entity}」时relation相关的权限检查过多，请优化actionAuth的路径`);
+                }
+
                 return (context) => {
                     const result = callbacks.map(
                         ele => ele(context)
@@ -390,12 +405,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         }
     }
 
-    constructor(actionCascadePathGraph: AuthCascadePath<ED>[], relationCascadePathGraph: AuthCascadePath<ED>[], schema: StorageSchema<ED>) {
+    constructor(schema: StorageSchema<ED>, actionCascadePathGraph: AuthCascadePath<ED>[], relationCascadePathGraph: AuthCascadePath<ED>[], authDeduceRelationMap: AuthDeduceRelationMap<ED>) {
         this.actionCascadePathGraph = actionCascadePathGraph;
         this.relationCascadePathGraph = relationCascadePathGraph;
         this.schema = schema;
         this.relationalFilterMaker = {};
         this.relationalCreateChecker = {};
+        this.authDeduceRelationMap = authDeduceRelationMap;
         this.constructFilterMaker();
     }
 
@@ -431,7 +447,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         const k = `$${destEntity}-${path}-${sourceEntity}`;
         this.directActionAuthMap[k] = deActions;
     }
-    
+
     private removeDirectActionAuth(directActionAuth: ED['directActionAuth']['OpSchema']) {
         const { deActions, destEntity, sourceEntity, path } = directActionAuth;
         const k = `$${destEntity}-${path}-${sourceEntity}`;
@@ -514,32 +530,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         throw new OakUnloggedInException();
     }
 
-    // 后台检查filter是否满足relation约束
-    async checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt) {
-        if (context.isRoot()) {
-            return;
-        }
+    private async checkActionAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt) {
         const action = (operation as ED[T]['Operation']).action || 'select';
-
-        // 后台用缓存的faa来判定，减少对数据库的查询（freeActionAuth表很少更新）
-        if (!this.freeActionAuthMap || this.freeActionAuthMap[entity as string]?.includes(action)) {
-            return;
-        }
-
-        const userId = context.getCurrentUserId();
-        if (!userId) {
-            throw new OakNoRelationDefException<ED, T>(entity, action);
-        }
-
-        // 后台用缓存的daa来判定，减少对数据库的查询（freeActionAuth表很少更新）
+        const userId = context.getCurrentUserId()!;
         if (action === 'create' && this.relationalCreateChecker[entity]) {
             const { data, filter } = operation as ED[T]['Create'];
-            if (filter) {
-                // 如果create传了filter, 前台保证create一定满足此约束，优先判断
-                const callback = this.relationalCreateChecker[entity]!(userId, this.directActionAuthMap, undefined, filter);
-                await callback(context);
-            }
-            else if (data instanceof Array) {
+            // 后台不用判断filter吧
+            if (data instanceof Array) {
                 await Promise.all(
                     data.map(
                         (ele) => {
@@ -565,6 +562,55 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             throw new OakUserUnpermittedException(`当前用户不允许在${entity as string}上执行${action}操作`);
         }
         throw new OakUnloggedInException();
+    }
+
+    /**
+     * 在entity上执行Operation，等同于在其path路径的父对象上执行相关的action操作，进行relation判定
+     * @param entity 
+     * @param operation 
+     * @param context 
+     */
+    private async checkCascadeActionAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        operation: ED[T]['Operation'] | ED[T]['Selection'],
+        path: string,
+        action: string,
+        context: Cxt
+    ) {
+        const { data: childData, filter: childFilter } = operation;
+        const childAction = (operation as ED[T]['Operation']).action || 'select';
+        assert(path);
+        const paths = path.split('.');
+
+    }
+
+    // 后台检查filter是否满足relation约束
+    async checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt) {
+        if (context.isRoot()) {
+            return;
+        }
+        const action = (operation as ED[T]['Operation']).action || 'select';
+
+        // 后台用缓存的faa来判定，减少对数据库的查询（freeActionAuth表很少更新）
+        if (!this.freeActionAuthMap || this.freeActionAuthMap[entity as string]?.includes(action)) {
+            return;
+        }
+
+        const userId = context.getCurrentUserId();
+        if (!userId) {
+            throw new OakNoRelationDefException<ED, T>(entity, action);
+        }
+
+        // 对compile中放过的几个特殊meta对象的处理
+       /*  switch (entity as string) {
+            case 'modi': {
+                if (action === 'select') {
+                    return this.checkActionAsync()
+                }
+            }
+        } */
+
+        await this.checkActionAsync(entity, operation, context);
     }
 
     /**
@@ -597,7 +643,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 action: 'update',
                 when: 'commit',
                 name: 'freeActionAuth更新时，刷新relationAuth中的缓存数据',
-                fn: async({ operation }, context) => {
+                fn: async ({ operation }, context) => {
                     const { data, filter } = operation;
                     assert(typeof filter!.id === 'string');     //  freeAuthDict不应当有其它更新的情况
                     assert(!data.destEntity);
@@ -623,7 +669,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 action: 'remove',
                 when: 'commit',
                 name: 'freeActionAuth删除时，刷新relationAuth中的缓存数据',
-                fn: async({ operation }, context) => {
+                fn: async ({ operation }, context) => {
                     const { data, filter } = operation;
                     assert(typeof filter!.id === 'string');     //  freeActionAuth不应当有其它更新的情况
                     const faas = await context.select('freeActionAuth', {
@@ -667,7 +713,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 action: 'update',
                 when: 'commit',
                 name: 'directActionAuth更新时，刷新relationAuth中的缓存数据',
-                fn: async({ operation }, context) => {
+                fn: async ({ operation }, context) => {
                     const { data, filter } = operation;
                     assert(typeof filter!.id === 'string');     //  freeAuthDict不应当有其它更新的情况
                     assert(!data.destEntity && !data.sourceEntity && !data.path);
@@ -694,7 +740,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 action: 'remove',
                 when: 'commit',
                 name: 'directActionAuth删除时，刷新relationAuth中的缓存数据',
-                fn: async({ operation }, context) => {
+                fn: async ({ operation }, context) => {
                     const { data, filter } = operation;
                     assert(typeof filter!.id === 'string');     //  directActionAuth不应当有其它更新的情况
                     const daas = await context.select('directActionAuth', {

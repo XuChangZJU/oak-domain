@@ -259,3 +259,6 @@ export type Configuration = {
 };
 
 export type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, keyof ED, boolean];
+export type AuthDeduceRelationMap<ED extends EntityDict> = {
+    [T in keyof ED]?: keyof ED[T]['OpSchema'];
+};
