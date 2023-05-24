@@ -6,9 +6,6 @@ import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOper
 import { AppendOnlyAction } from "../../actions/action";
 import * as Modi from "../Modi/Schema";
 import * as ActionAuth from "../ActionAuth/Schema";
-import * as DirectActionAuth from "../DirectActionAuth/Schema";
-import * as DirectRelationAuth from "../DirectRelationAuth/Schema";
-import * as FreeActionAuth from "../FreeActionAuth/Schema";
 import * as Relation from "../Relation/Schema";
 import * as RelationAuth from "../RelationAuth/Schema";
 import * as User from "../User/Schema";
@@ -16,19 +13,16 @@ import * as UserEntityGrant from "../UserEntityGrant/Schema";
 import * as UserRelation from "../UserRelation/Schema";
 export declare type OpSchema = EntityShape & {
     modiId: ForeignKey<"modi">;
-    entity: "actionAuth" | "directActionAuth" | "directRelationAuth" | "freeActionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
+    entity: "actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
     entityId: String<64>;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
     modiId: ForeignKey<"modi">;
-    entity: "actionAuth" | "directActionAuth" | "directRelationAuth" | "freeActionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
+    entity: "actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
     entityId: String<64>;
     modi: Modi.Schema;
     actionAuth?: ActionAuth.Schema;
-    directActionAuth?: DirectActionAuth.Schema;
-    directRelationAuth?: DirectRelationAuth.Schema;
-    freeActionAuth?: FreeActionAuth.Schema;
     relation?: Relation.Schema;
     relationAuth?: RelationAuth.Schema;
     user?: User.Schema;
@@ -47,16 +41,13 @@ declare type AttrFilter<E> = {
     entity: E;
     entityId: Q_StringValue;
     actionAuth: ActionAuth.Filter;
-    directActionAuth: DirectActionAuth.Filter;
-    directRelationAuth: DirectRelationAuth.Filter;
-    freeActionAuth: FreeActionAuth.Filter;
     relation: Relation.Filter;
     relationAuth: RelationAuth.Filter;
     user: User.Filter;
     userEntityGrant: UserEntityGrant.Filter;
     userRelation: UserRelation.Filter;
 };
-export declare type Filter<E = Q_EnumValue<"actionAuth" | "directActionAuth" | "directRelationAuth" | "freeActionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string>> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr | string>>;
+export declare type Filter<E = Q_EnumValue<"actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string>> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr | string>>;
 export declare type Projection = {
     "#id"?: NodeId;
     [k: string]: any;
@@ -69,9 +60,6 @@ export declare type Projection = {
     entity?: number;
     entityId?: number;
     actionAuth?: ActionAuth.Projection;
-    directActionAuth?: DirectActionAuth.Projection;
-    directRelationAuth?: DirectRelationAuth.Projection;
-    freeActionAuth?: FreeActionAuth.Projection;
     relation?: Relation.Projection;
     relationAuth?: RelationAuth.Projection;
     user?: User.Projection;
@@ -85,15 +73,6 @@ declare type ModiIdProjection = OneOf<{
     modiId: number;
 }>;
 declare type ActionAuthIdProjection = OneOf<{
-    entityId: number;
-}>;
-declare type DirectActionAuthIdProjection = OneOf<{
-    entityId: number;
-}>;
-declare type DirectRelationAuthIdProjection = OneOf<{
-    entityId: number;
-}>;
-declare type FreeActionAuthIdProjection = OneOf<{
     entityId: number;
 }>;
 declare type RelationIdProjection = OneOf<{
@@ -129,12 +108,6 @@ export declare type SortAttr = {
     entityId: number;
 } | {
     actionAuth: ActionAuth.SortAttr;
-} | {
-    directActionAuth: DirectActionAuth.SortAttr;
-} | {
-    directRelationAuth: DirectRelationAuth.SortAttr;
-} | {
-    freeActionAuth: FreeActionAuth.SortAttr;
 } | {
     relation: Relation.SortAttr;
 } | {
@@ -174,39 +147,6 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity"
     actionAuth: ActionAuth.UpdateOperation;
 } | {
     entity: "actionAuth";
-    entityId: String<64>;
-} | {
-    entity?: never;
-    entityId?: never;
-    directActionAuth: DirectActionAuth.CreateSingleOperation;
-} | {
-    entity: "directActionAuth";
-    entityId: String<64>;
-    directActionAuth: DirectActionAuth.UpdateOperation;
-} | {
-    entity: "directActionAuth";
-    entityId: String<64>;
-} | {
-    entity?: never;
-    entityId?: never;
-    directRelationAuth: DirectRelationAuth.CreateSingleOperation;
-} | {
-    entity: "directRelationAuth";
-    entityId: String<64>;
-    directRelationAuth: DirectRelationAuth.UpdateOperation;
-} | {
-    entity: "directRelationAuth";
-    entityId: String<64>;
-} | {
-    entity?: never;
-    entityId?: never;
-    freeActionAuth: FreeActionAuth.CreateSingleOperation;
-} | {
-    entity: "freeActionAuth";
-    entityId: String<64>;
-    freeActionAuth: FreeActionAuth.UpdateOperation;
-} | {
-    entity: "freeActionAuth";
     entityId: String<64>;
 } | {
     entity?: never;
@@ -288,18 +228,6 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity"
     entityId?: never;
     entity?: never;
 } | {
-    directActionAuth?: DirectActionAuth.CreateSingleOperation | DirectActionAuth.UpdateOperation | DirectActionAuth.RemoveOperation;
-    entityId?: never;
-    entity?: never;
-} | {
-    directRelationAuth?: DirectRelationAuth.CreateSingleOperation | DirectRelationAuth.UpdateOperation | DirectRelationAuth.RemoveOperation;
-    entityId?: never;
-    entity?: never;
-} | {
-    freeActionAuth?: FreeActionAuth.CreateSingleOperation | FreeActionAuth.UpdateOperation | FreeActionAuth.RemoveOperation;
-    entityId?: never;
-    entity?: never;
-} | {
     relation?: Relation.CreateSingleOperation | Relation.UpdateOperation | Relation.RemoveOperation;
     entityId?: never;
     entity?: never;
@@ -320,7 +248,7 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity"
     entityId?: never;
     entity?: never;
 } | {
-    entity?: ("actionAuth" | "directActionAuth" | "directRelationAuth" | "freeActionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string) | null;
+    entity?: ("actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string) | null;
     entityId?: String<64> | null;
 }) & {
     [k: string]: any;
@@ -330,12 +258,6 @@ export declare type RemoveOperationData = {} & (({
     modi?: Modi.UpdateOperation | Modi.RemoveOperation;
 })) & ({
     actionAuth?: ActionAuth.UpdateOperation | ActionAuth.RemoveOperation;
-} | {
-    directActionAuth?: DirectActionAuth.UpdateOperation | DirectActionAuth.RemoveOperation;
-} | {
-    directRelationAuth?: DirectRelationAuth.UpdateOperation | DirectRelationAuth.RemoveOperation;
-} | {
-    freeActionAuth?: FreeActionAuth.UpdateOperation | FreeActionAuth.RemoveOperation;
 } | {
     relation?: Relation.UpdateOperation | Relation.RemoveOperation;
 } | {
@@ -353,9 +275,6 @@ export declare type RemoveOperation = OakOperation<"remove", RemoveOperationData
 export declare type Operation = CreateOperation | UpdateOperation | RemoveOperation;
 export declare type ModiIdSubQuery = Selection<ModiIdProjection>;
 export declare type ActionAuthIdSubQuery = Selection<ActionAuthIdProjection>;
-export declare type DirectActionAuthIdSubQuery = Selection<DirectActionAuthIdProjection>;
-export declare type DirectRelationAuthIdSubQuery = Selection<DirectRelationAuthIdProjection>;
-export declare type FreeActionAuthIdSubQuery = Selection<FreeActionAuthIdProjection>;
 export declare type RelationIdSubQuery = Selection<RelationIdProjection>;
 export declare type RelationAuthIdSubQuery = Selection<RelationAuthIdProjection>;
 export declare type UserIdSubQuery = Selection<UserIdProjection>;

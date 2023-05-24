@@ -262,3 +262,4 @@ export type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, keyof ED
 export type AuthDeduceRelationMap<ED extends EntityDict> = {
     [T in keyof ED]?: keyof ED[T]['OpSchema'];
 };
+export type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];

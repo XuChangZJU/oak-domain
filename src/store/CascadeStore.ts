@@ -864,6 +864,18 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
                         assert(typeof filterMto.id === 'string');
                     }
+                    else if (filter!.entity === attr && filter!.entityId) {
+                        Object.assign(operationMto, {
+                            filter: addFilterSegment({
+                                id: filter!.entityId,
+                            }, filterMto),
+                        });
+                    }
+                    else if (filter![attr]) {
+                        Object.assign(operationMto, {
+                            filter: addFilterSegment(filter![attr], filterMto),
+                        });
+                    }
                     else {
                         // A中data的entityId作为B中filter的主键
                         Object.assign(operationMto, {
@@ -919,6 +931,18 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     if (filterMto?.id) {
                         // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
                         assert(typeof filterMto.id === 'string');
+                    }
+                    else if (filter![`${attr}Id`]) {
+                        Object.assign(operationMto, {
+                            filter: addFilterSegment(filterMto || {}, {
+                                id: filter![`${attr}Id`],
+                            }),
+                        });
+                    }
+                    else if (filter![attr]) {
+                        Object.assign(operationMto, {
+                            filter: addFilterSegment(filterMto || {}, filter![attr]),
+                        });
                     }
                     else {
                         // A中data的entityId作为B中filter的主键
@@ -1188,7 +1212,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             iState: 'active',
                         },
                     };
+                    const closeRootMode = context.openRootMode();
                     await this.cascadeUpdateAsync('modi', modiCreate, context, option);
+                    closeRootMode();
                     return 1;
                 }
                 else {
@@ -1334,10 +1360,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     }]
                                 },
                             };
+                            const closeRootMode = context.openRootMode();
                             await this.cascadeUpdateAsync('oper', createOper, context, {
                                 dontCollect: true,
                                 dontCreateOper: true,
                             });
+                            closeRootMode();
                         }
                     }
                     return result!;
@@ -1445,7 +1473,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             };
                         }
                     }
+                    const closeRootMode = context.openRootMode();
                     await this.cascadeUpdateAsync('modi', modiUpsert!, context, option);
+                    closeRootMode();
                     return 1;
                 }
                 else {
@@ -1476,10 +1506,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     },
                                 },
                             }
+                            const closeRootMode = context.openRootMode();
                             await this.cascadeUpdateAsync('oper', createOper, context, {
                                 dontCollect: true,
                                 dontCreateOper: true,
                             });
+                            closeRootMode();
                         }
                     };
                     if (action === 'remove') {

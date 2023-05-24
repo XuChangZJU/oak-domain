@@ -6265,9 +6265,14 @@ function analyzeInModi() {
 let IGNORED_FOREIGN_KEY_MAP: Record<string, string[]> = {};
 let IGNORED_RELATION_PATH_MAP: Record<string, string[]> = {};
 let DEDUCED_RELATION_MAP: Record<string, string> = {};
+let SELECT_FREE_ENTITIES: string[] = [];
 
 export function registerIgnoredForeignKeyMap(map: Record<string, string[]>) {
     IGNORED_FOREIGN_KEY_MAP = map;
+}
+
+export function registerSelectFreeEntities(entities: string[]) {
+    SELECT_FREE_ENTITIES = entities;
 }
 
 export function registerIgnoredRelationPathMap(map: Record<string, string[]>) {
@@ -6284,7 +6289,7 @@ export function registerDeducedRelationMap(map: Record<string, string>) {
         if (ReversePointerEntities[entity] && map[k] === 'entity') {
 
         }
-        else {        
+        else {
             const mto = ManyToOne[entity].find(
                 ele => ele[1] === map[k]
             );
@@ -6342,7 +6347,9 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
     User.forEach(
         ([entity3, foreignKey]) => {
             const fk = foreignKey === 'entity' ? 'user' : foreignKey;
-            outputRecursively(firstLetterLowerCase(entity3), entity3, fk, [fk], false);
+            if (!IGNORED_FOREIGN_KEY_MAP[firstLetterLowerCase(entity3)]?.includes(foreignKey)) {
+                outputRecursively(firstLetterLowerCase(entity3), entity3, fk, [fk], false);
+            }
         }
     );
     // 所有带relation的对象
@@ -6396,6 +6403,11 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
                         false,
                         undefined,
                         factory.createIdentifier("AuthDeduceRelationMap")
+                    ),
+                    factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        factory.createIdentifier("SelectFreeEntities")
                     )
                 ])
             ),
@@ -6534,40 +6546,68 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
         )
     ];
 
-    if (Object.keys(DEDUCED_RELATION_MAP).length > 0) {
-        stmts.push(
-            factory.createVariableStatement(
+    stmts.push(
+        factory.createVariableStatement(
+            [
+                factory.createToken(ts.SyntaxKind.ExportKeyword)
+            ],
+            factory.createVariableDeclarationList(
                 [
-                    factory.createToken(ts.SyntaxKind.ExportKeyword)
-                ],
-                factory.createVariableDeclarationList(
-                    [
-                        factory.createVariableDeclaration(
-                            factory.createIdentifier("DeducedRelationMap"),
-                            undefined,
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("AuthDeduceRelationMap"),
-                                [factory.createTypeReferenceNode(
-                                    factory.createIdentifier("EntityDict"),
-                                    undefined
-                                )]
+                    factory.createVariableDeclaration(
+                        factory.createIdentifier("deducedRelationMap"),
+                        undefined,
+                        factory.createTypeReferenceNode(
+                            factory.createIdentifier("AuthDeduceRelationMap"),
+                            [factory.createTypeReferenceNode(
+                                factory.createIdentifier("EntityDict"),
+                                undefined
+                            )]
+                        ),
+                        factory.createObjectLiteralExpression(
+                            Object.keys(DEDUCED_RELATION_MAP).map(
+                                ele => factory.createPropertyAssignment(
+                                    factory.createIdentifier(firstLetterLowerCase(ele)),
+                                    factory.createStringLiteral(DEDUCED_RELATION_MAP[ele])
+                                )
                             ),
-                            factory.createObjectLiteralExpression(
-                                Object.keys(DEDUCED_RELATION_MAP).map(
-                                    ele => factory.createPropertyAssignment(
-                                        factory.createIdentifier(firstLetterLowerCase(ele)),
-                                        factory.createStringLiteral(DEDUCED_RELATION_MAP[ele])
-                                    )
-                                ),
-                                true
-                            )
+                            true
                         )
-                    ],
-                    ts.NodeFlags.Const
-                )
+                    )
+                ],
+                ts.NodeFlags.Const
             )
-        );
-    }
+        )
+    );
+
+    stmts.push(
+        factory.createVariableStatement(
+            [
+                factory.createToken(ts.SyntaxKind.ExportKeyword)
+            ],
+            factory.createVariableDeclarationList(
+                [factory.createVariableDeclaration(
+                    factory.createIdentifier("selectFreeEntities"),
+                    undefined,
+                    factory.createTypeReferenceNode(
+                        factory.createIdentifier("SelectFreeEntities"),
+                        [factory.createTypeReferenceNode(
+                            factory.createIdentifier("EntityDict"),
+                            undefined
+                        )]
+                    ),
+                    factory.createArrayLiteralExpression(
+                        SELECT_FREE_ENTITIES.map(
+                            ele => factory.createStringLiteral(ele)
+                        ),
+                        false
+                    )
+                )],
+                ts.NodeFlags.Const
+            )
+        )
+    );
+
+
 
     const result = printer.printList(
         ts.ListFormat.SourceFileStatements,

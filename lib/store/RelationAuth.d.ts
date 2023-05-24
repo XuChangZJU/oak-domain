@@ -1,5 +1,5 @@
 import { EntityDict } from "../base-app-domain";
-import { StorageSchema, Trigger } from "../types";
+import { StorageSchema } from "../types";
 import { AuthCascadePath, EntityDict as BaseEntityDict, AuthDeduceRelationMap } from "../types/Entity";
 import { AsyncContext } from "./AsyncRowStore";
 import { SyncContext } from "./SyncRowStore";
@@ -8,31 +8,45 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
     private relationCascadePathGraph;
     private authDeduceRelationMap;
     private schema;
-    private relationalFilterMaker;
-    private relationalCreateChecker;
-    private directActionAuthMap;
-    private freeActionAuthMap;
-    private constructFilterMaker;
-    constructor(schema: StorageSchema<ED>, actionCascadePathGraph: AuthCascadePath<ED>[], relationCascadePathGraph: AuthCascadePath<ED>[], authDeduceRelationMap: AuthDeduceRelationMap<ED>);
-    private makeDirectionActionAuthMap;
-    setDirectionActionAuths(directActionAuths: ED['directActionAuth']['OpSchema'][]): void;
-    setFreeActionAuths(freeActionAuths: ED['freeActionAuth']['OpSchema'][]): void;
-    private upsertFreeActionAuth;
-    private upsertDirectActionAuth;
-    private removeDirectActionAuth;
-    checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt): void;
-    private checkActionAsync;
     /**
-     * 在entity上执行Operation，等同于在其path路径的父对象上执行相关的action操作，进行relation判定
+     * 根据当前操作条件，查找到满足actions（overlap关系）的relationId和relativePath
+     */
+    private relationalChecker;
+    private selectFreeEntities;
+    private constructRelationalChecker;
+    constructor(schema: StorageSchema<ED>, actionCascadePathGraph: AuthCascadePath<ED>[], relationCascadePathGraph: AuthCascadePath<ED>[], authDeduceRelationMap: AuthDeduceRelationMap<ED>, selectFreeEntities: (keyof ED)[]);
+    /**
+     * 对Operation而言，找到最顶层对象的对应权限所在的relation，再查找actionAuth中其它子对象有无相对路径授权
+     * 如一个cascade更新目标是(entity: a, action: 'update')：{
+     *      b: {
+     *          action: 'update',
+     *          data: {
+     *              c: {
+     *                  action: 'update',
+     *              },
+     *          },
+     *      },
+     *      d$entity: [{
+     *          action: 'create',
+     *          data: {},
+     *      }]
+     * }
+     * 则应检查的顶层对象是c，而b:update, a:update以及d:create都应该在c所对应权限的派生路径上
      * @param entity
      * @param operation
-     * @param context
      */
-    private checkCascadeActionAsync;
-    checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt): Promise<void>;
+    private destructCascadeOperation;
+    checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt): void;
+    private getDeducedCheckOperation;
     /**
-     * 后台需要注册数据变化的监听器，以保证缓存的维度数据准确
-     * 在集群上要支持跨结点的监听器(todo)
+     * 查询当前用户在对应entity上可以操作的relationIds
+     * @param entity
+     * @param entityId
+     * @param context
+     * @returns
      */
-    getAuthDataTriggers<Cxt extends AsyncContext<ED>>(): Trigger<ED, keyof ED, Cxt>[];
+    private getGrantedRelationIds;
+    private checkSpecialEntity;
+    private checkActions;
+    checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt): Promise<void>;
 }

@@ -5,7 +5,6 @@ import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
 import * as ActionAuth from "../ActionAuth/Schema";
-import * as DirectRelationAuth from "../DirectRelationAuth/Schema";
 import * as RelationAuth from "../RelationAuth/Schema";
 import * as UserRelation from "../UserRelation/Schema";
 import * as ModiEntity from "../ModiEntity/Schema";
@@ -24,8 +23,6 @@ export declare type Schema = EntityShape & {
     display?: String<32> | null;
     actionAuth$relation?: Array<ActionAuth.Schema>;
     actionAuth$relation$$aggr?: AggregationResult<ActionAuth.Schema>;
-    directRelationAuth$destRelation?: Array<DirectRelationAuth.Schema>;
-    directRelationAuth$destRelation$$aggr?: AggregationResult<DirectRelationAuth.Schema>;
     relationAuth$sourceRelation?: Array<RelationAuth.Schema>;
     relationAuth$sourceRelation$$aggr?: AggregationResult<RelationAuth.Schema>;
     relationAuth$destRelation?: Array<RelationAuth.Schema>;
@@ -66,12 +63,6 @@ export declare type Projection = {
     };
     actionAuth$relation$$aggr?: ActionAuth.Aggregation & {
         $entity: "actionAuth";
-    };
-    directRelationAuth$destRelation?: DirectRelationAuth.Selection & {
-        $entity: "directRelationAuth";
-    };
-    directRelationAuth$destRelation$$aggr?: DirectRelationAuth.Aggregation & {
-        $entity: "directRelationAuth";
     };
     relationAuth$sourceRelation?: RelationAuth.Selection & {
         $entity: "relationAuth";
@@ -140,7 +131,6 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity"
     [K: string]: any;
 }) & {
     actionAuth$relation?: OakOperation<ActionAuth.UpdateOperation["action"], Omit<ActionAuth.UpdateOperationData, "relation" | "relationId">, ActionAuth.Filter> | OakOperation<"create", Omit<ActionAuth.CreateOperationData, "relation" | "relationId">[]> | Array<OakOperation<"create", Omit<ActionAuth.CreateOperationData, "relation" | "relationId">> | OakOperation<ActionAuth.UpdateOperation["action"], Omit<ActionAuth.UpdateOperationData, "relation" | "relationId">, ActionAuth.Filter>>;
-    directRelationAuth$destRelation?: OakOperation<DirectRelationAuth.UpdateOperation["action"], Omit<DirectRelationAuth.UpdateOperationData, "destRelation" | "destRelationId">, DirectRelationAuth.Filter> | OakOperation<"create", Omit<DirectRelationAuth.CreateOperationData, "destRelation" | "destRelationId">[]> | Array<OakOperation<"create", Omit<DirectRelationAuth.CreateOperationData, "destRelation" | "destRelationId">> | OakOperation<DirectRelationAuth.UpdateOperation["action"], Omit<DirectRelationAuth.UpdateOperationData, "destRelation" | "destRelationId">, DirectRelationAuth.Filter>>;
     relationAuth$sourceRelation?: OakOperation<RelationAuth.UpdateOperation["action"], Omit<RelationAuth.UpdateOperationData, "sourceRelation" | "sourceRelationId">, RelationAuth.Filter> | OakOperation<"create", Omit<RelationAuth.CreateOperationData, "sourceRelation" | "sourceRelationId">[]> | Array<OakOperation<"create", Omit<RelationAuth.CreateOperationData, "sourceRelation" | "sourceRelationId">> | OakOperation<RelationAuth.UpdateOperation["action"], Omit<RelationAuth.UpdateOperationData, "sourceRelation" | "sourceRelationId">, RelationAuth.Filter>>;
     relationAuth$destRelation?: OakOperation<RelationAuth.UpdateOperation["action"], Omit<RelationAuth.UpdateOperationData, "destRelation" | "destRelationId">, RelationAuth.Filter> | OakOperation<"create", Omit<RelationAuth.CreateOperationData, "destRelation" | "destRelationId">[]> | Array<OakOperation<"create", Omit<RelationAuth.CreateOperationData, "destRelation" | "destRelationId">> | OakOperation<RelationAuth.UpdateOperation["action"], Omit<RelationAuth.UpdateOperationData, "destRelation" | "destRelationId">, RelationAuth.Filter>>;
     userRelation$relation?: OakOperation<UserRelation.UpdateOperation["action"], Omit<UserRelation.UpdateOperationData, "relation" | "relationId">, UserRelation.Filter> | OakOperation<"create", Omit<UserRelation.CreateOperationData, "relation" | "relationId">[]> | Array<OakOperation<"create", Omit<UserRelation.CreateOperationData, "relation" | "relationId">> | OakOperation<UserRelation.UpdateOperation["action"], Omit<UserRelation.UpdateOperationData, "relation" | "relationId">, UserRelation.Filter>>;
@@ -153,7 +143,6 @@ export declare type CreateOperation = CreateSingleOperation | CreateMultipleOper
 export declare type UpdateOperationData = FormUpdateData<OpSchema> & {
     [k: string]: any;
     actionAuth$relation?: ActionAuth.UpdateOperation | ActionAuth.RemoveOperation | OakOperation<"create", Omit<ActionAuth.CreateOperationData, "relation" | "relationId">[]> | Array<OakOperation<"create", Omit<ActionAuth.CreateOperationData, "relation" | "relationId">> | ActionAuth.UpdateOperation | ActionAuth.RemoveOperation>;
-    directRelationAuth$destRelation?: DirectRelationAuth.UpdateOperation | DirectRelationAuth.RemoveOperation | OakOperation<"create", Omit<DirectRelationAuth.CreateOperationData, "destRelation" | "destRelationId">[]> | Array<OakOperation<"create", Omit<DirectRelationAuth.CreateOperationData, "destRelation" | "destRelationId">> | DirectRelationAuth.UpdateOperation | DirectRelationAuth.RemoveOperation>;
     relationAuth$sourceRelation?: RelationAuth.UpdateOperation | RelationAuth.RemoveOperation | OakOperation<"create", Omit<RelationAuth.CreateOperationData, "sourceRelation" | "sourceRelationId">[]> | Array<OakOperation<"create", Omit<RelationAuth.CreateOperationData, "sourceRelation" | "sourceRelationId">> | RelationAuth.UpdateOperation | RelationAuth.RemoveOperation>;
     relationAuth$destRelation?: RelationAuth.UpdateOperation | RelationAuth.RemoveOperation | OakOperation<"create", Omit<RelationAuth.CreateOperationData, "destRelation" | "destRelationId">[]> | Array<OakOperation<"create", Omit<RelationAuth.CreateOperationData, "destRelation" | "destRelationId">> | RelationAuth.UpdateOperation | RelationAuth.RemoveOperation>;
     userRelation$relation?: UserRelation.UpdateOperation | UserRelation.RemoveOperation | OakOperation<"create", Omit<UserRelation.CreateOperationData, "relation" | "relationId">[]> | Array<OakOperation<"create", Omit<UserRelation.CreateOperationData, "relation" | "relationId">> | UserRelation.UpdateOperation | UserRelation.RemoveOperation>;

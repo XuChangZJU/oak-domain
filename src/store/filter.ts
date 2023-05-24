@@ -7,10 +7,13 @@ import { judgeRelation } from './relation';
 import { SyncContext } from './SyncRowStore';
 
 export function addFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
-    const filter: ED[T]['Selection']['filter'] = {};
+    let filter: ED[T]['Selection']['filter'] | undefined;
     filters.forEach(
         ele => {
             if (ele) {
+                if (!filter) {
+                    filter = {};
+                }
                 for (const k in ele) {
                     if (k === '$and') {
                         if (filter.$and) {

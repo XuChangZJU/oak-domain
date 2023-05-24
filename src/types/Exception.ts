@@ -84,11 +84,11 @@ export class OakImportDataParseException<ED extends EntityDict> extends OakExcep
 
 export class OakNoRelationDefException<ED extends EntityDict, T extends keyof ED> extends OakDataException<ED> {
     entity: T;
-    action: ED[T]['Action'];
-    constructor(entity: T, action: ED[T]['Action'], msg?: string) {
-        super(msg || `对象${entity as string}的操作${action}找不到有效的relation定义`);
+    actions: ED[T]['Action'][];
+    constructor(entity: T, actions: ED[T]['Action'][], msg?: string) {
+        super(msg || `对象${entity as string}的操作${actions.join(',')}找不到有效的relation定义`);
         this.entity = entity;
-        this.action = action;
+        this.actions = actions;
     }
     
     toString(): string {
@@ -96,7 +96,7 @@ export class OakNoRelationDefException<ED extends EntityDict, T extends keyof ED
             name: this.constructor.name,
             message: this.message,
             entity: this.entity,
-            action: this.action,
+            action: this.actions,
         });
     }
 }

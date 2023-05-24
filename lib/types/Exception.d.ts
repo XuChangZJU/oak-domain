@@ -25,8 +25,8 @@ export declare class OakImportDataParseException<ED extends EntityDict> extends 
 }
 export declare class OakNoRelationDefException<ED extends EntityDict, T extends keyof ED> extends OakDataException<ED> {
     entity: T;
-    action: ED[T]['Action'];
-    constructor(entity: T, action: ED[T]['Action'], msg?: string);
+    actions: ED[T]['Action'][];
+    constructor(entity: T, actions: ED[T]['Action'][], msg?: string);
     toString(): string;
 }
 export declare class OakOperExistedException<ED extends EntityDict> extends OakDataException<ED> {

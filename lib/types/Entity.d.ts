@@ -185,4 +185,5 @@ export declare type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, 
 export declare type AuthDeduceRelationMap<ED extends EntityDict> = {
     [T in keyof ED]?: keyof ED[T]['OpSchema'];
 };
+export declare type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];
 export {};

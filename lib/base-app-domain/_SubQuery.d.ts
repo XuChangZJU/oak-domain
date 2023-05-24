@@ -1,7 +1,4 @@
 import * as ActionAuth from "./ActionAuth/Schema";
-import * as DirectActionAuth from "./DirectActionAuth/Schema";
-import * as DirectRelationAuth from "./DirectRelationAuth/Schema";
-import * as FreeActionAuth from "./FreeActionAuth/Schema";
 import * as Modi from "./Modi/Schema";
 import * as ModiEntity from "./ModiEntity/Schema";
 import * as Oper from "./Oper/Schema";
@@ -18,33 +15,6 @@ export declare type ActionAuthIdSubQuery = {
         entity: "operEntity";
     }) | (ActionAuth.ActionAuthIdSubQuery & {
         entity: "actionAuth";
-    }) | any;
-};
-export declare type DirectActionAuthIdSubQuery = {
-    [K in "$in" | "$nin"]?: (ModiEntity.DirectActionAuthIdSubQuery & {
-        entity: "modiEntity";
-    }) | (OperEntity.DirectActionAuthIdSubQuery & {
-        entity: "operEntity";
-    }) | (DirectActionAuth.DirectActionAuthIdSubQuery & {
-        entity: "directActionAuth";
-    }) | any;
-};
-export declare type DirectRelationAuthIdSubQuery = {
-    [K in "$in" | "$nin"]?: (ModiEntity.DirectRelationAuthIdSubQuery & {
-        entity: "modiEntity";
-    }) | (OperEntity.DirectRelationAuthIdSubQuery & {
-        entity: "operEntity";
-    }) | (DirectRelationAuth.DirectRelationAuthIdSubQuery & {
-        entity: "directRelationAuth";
-    }) | any;
-};
-export declare type FreeActionAuthIdSubQuery = {
-    [K in "$in" | "$nin"]?: (ModiEntity.FreeActionAuthIdSubQuery & {
-        entity: "modiEntity";
-    }) | (OperEntity.FreeActionAuthIdSubQuery & {
-        entity: "operEntity";
-    }) | (FreeActionAuth.FreeActionAuthIdSubQuery & {
-        entity: "freeActionAuth";
     }) | any;
 };
 export declare type ModiIdSubQuery = {
@@ -74,8 +44,6 @@ export declare type OperEntityIdSubQuery = {
 export declare type RelationIdSubQuery = {
     [K in "$in" | "$nin"]?: (ActionAuth.RelationIdSubQuery & {
         entity: "actionAuth";
-    }) | (DirectRelationAuth.RelationIdSubQuery & {
-        entity: "directRelationAuth";
     }) | (RelationAuth.RelationIdSubQuery & {
         entity: "relationAuth";
     }) | (UserRelation.RelationIdSubQuery & {

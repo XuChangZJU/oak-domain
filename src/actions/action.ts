@@ -9,7 +9,7 @@ export type RelationAction = 'grant' | 'revoke';
 export const readOnlyActions = ['count', 'stat', 'download', 'select', 'aggregate'];
 export const appendOnlyActions = readOnlyActions.concat('create');
 export const excludeUpdateActions = appendOnlyActions.concat('remove');
-export const exludeRemoveActions = appendOnlyActions.concat('update');
+export const excludeRemoveActions = appendOnlyActions.concat('update');
 export const genericActions = excludeUpdateActions.concat('update');
 export const relationActions = ['grant', 'revoke'];
 
