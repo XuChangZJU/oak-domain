@@ -46,6 +46,8 @@ export declare type RelationIdSubQuery = {
         entity: "actionAuth";
     }) | (RelationAuth.RelationIdSubQuery & {
         entity: "relationAuth";
+    }) | (UserEntityGrant.RelationIdSubQuery & {
+        entity: "userEntityGrant";
     }) | (UserRelation.RelationIdSubQuery & {
         entity: "userRelation";
     }) | (ModiEntity.RelationIdSubQuery & {
