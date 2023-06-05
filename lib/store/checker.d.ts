@@ -1,4 +1,4 @@
-import { AuthDefDict, Checker, EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, CascadeRemoveDefDict } from "../types";
+import { AuthDefDict, Checker, EntityDict, OperateOption, SelectOption, StorageSchema, Trigger } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
 import { SyncContext } from './SyncRowStore';
@@ -29,5 +29,5 @@ export declare function createAuthCheckers<ED extends EntityDict & BaseEntityDic
  * @returns
  * 如果有的对象允许删除，需要使用trigger来处理其相关联的外键对象，这些trigger写作before，则会在checker之前执行，仍然可以删除成功
  */
-export declare function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>, cascadeRemoveDict: CascadeRemoveDefDict<ED>): Checker<ED, keyof ED, Cxt>[];
+export declare function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>): Checker<ED, keyof ED, Cxt>[];
 export declare function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>): Checker<ED, keyof ED, Cxt>[];

@@ -976,36 +976,213 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
 
         if (ts.isVariableStatement(node)) {
             const { declarationList: { declarations } } = node;
+            const dealWithActionDef = (declaration: ts.VariableDeclaration) => {
+                checkActionDefNameConsistent(filename, declaration);
+                const { typeArguments } = declaration.type as ts.TypeReferenceNode;
+                assert(typeArguments!.length === 2);
+                const [actionNode, stateNode] = typeArguments!;
+
+                assert(ts.isTypeReferenceNode(actionNode));
+                assert(ts.isTypeReferenceNode(stateNode));
+                assert(getStringEnumValues(filename, program, 'action', (<ts.TypeReferenceNode>actionNode)), `文件${filename}中的action${(<ts.Identifier>actionNode.typeName).text}定义不是字符串类型`);
+                const enumStateValues = getStringEnumValues(filename, program, 'state', stateNode);
+                assert(enumStateValues, `文件${filename}中的state${(<ts.Identifier>stateNode.typeName).text}定义不是字符串类型`)
+
+                pushStatementIntoActionAst(moduleName, node, sourceFile!);
+
+                assert(ts.isIdentifier(declaration.name));
+                const adName = declaration.name.text.slice(0, declaration.name.text.length - 9);
+                const attr = adName.concat('State');
+                schemaAttrs.push(
+                    factory.createPropertySignature(
+                        undefined,
+                        firstLetterLowerCase(attr),
+                        factory.createToken(ts.SyntaxKind.QuestionToken),
+                        factory.createTypeReferenceNode(
+                            attr,
+                        )
+                    )
+                );
+                enumAttributes[firstLetterLowerCase(attr)] = enumStateValues;
+            };
+            const dealWithIndexes = (declaration: ts.ArrayLiteralExpression) => {
+                const indexNameDict: Record<string, true> = {};
+                // 检查索引的属性是否合法
+                const { elements } = declaration;
+                elements.forEach(
+                    (ele) => {
+                        let isFulltextIndex = false;
+                        assert(ts.isObjectLiteralExpression(ele));
+                        const { properties } = ele;
+                        const attrProperty = properties.find(
+                            (ele2) => {
+                                assert(ts.isPropertyAssignment(ele2));
+                                return ele2.name.getText() === 'attributes';
+                            }
+                        ) as ts.PropertyAssignment;
+                        assert(ts.isArrayLiteralExpression(attrProperty.initializer));
+
+                        const nameProperty = properties.find(
+                            (ele2) => {
+                                assert(ts.isPropertyAssignment(ele2));
+                                return ele2.name.getText() === 'name';
+                            }
+                        ) as ts.PropertyAssignment;
+                        assert(ts.isStringLiteral(nameProperty.initializer));
+                        const nameText = nameProperty.initializer.text;
+                        if (indexNameDict[nameText]) {
+                            throw new Error(`「${filename}」索引定义重名「${nameText}」`);
+                        }
+                        assign(indexNameDict, {
+                            [nameText]: true,
+                        });
+
+                        const configProperty = properties.find(
+                            (ele2) => {
+                                assert(ts.isPropertyAssignment(ele2));
+                                return ele2.name.getText() === 'config';
+                            }
+                        ) as ts.PropertyAssignment;
+                        if (configProperty) {
+                            assert(ts.isObjectLiteralExpression(configProperty.initializer));
+                            const { properties: properties2 } = configProperty.initializer;
+                            const typeProperty = properties2.find(
+                                (ele2) => {
+                                    assert(ts.isPropertyAssignment(ele2));
+                                    return ele2.name.getText() === 'type';
+                                }
+                            ) as ts.PropertyAssignment;
+
+                            if (typeProperty && (<ts.Identifier>typeProperty.initializer!).text === 'fulltext') {
+                                // 定义了全文索引
+                                if (hasFulltextIndex) {
+                                    throw new Error(`「${filename}」只能定义一个全文索引`);
+                                }
+                                hasFulltextIndex = true;
+                                isFulltextIndex = true;
+                            }
+                        }
+
+                        const { elements } = attrProperty.initializer;
+
+                        // 每个属性都应该在schema中有值，且对象类型是可索引值
+                        elements.forEach(
+                            (ele2) => {
+                                assert(ts.isObjectLiteralExpression(ele2));
+                                const { properties: properties2 } = ele2;
+
+                                const nameProperty = properties2.find(
+                                    (ele3) => {
+                                        assert(ts.isPropertyAssignment(ele3));
+                                        return ele3.name.getText() === 'name';
+                                    }
+                                ) as ts.PropertyAssignment;
+
+                                const indexAttrName = (<ts.Identifier>nameProperty.initializer!).text;
+                                if (!initinctiveAttributes.includes(indexAttrName)) {
+                                    const schemaNode = schemaAttrs.find(
+                                        (ele3) => {
+                                            assert(ts.isPropertySignature(ele3));
+                                            return (<ts.Identifier>ele3.name).text === indexAttrName;
+                                        }
+                                    ) as ts.PropertySignature;
+                                    if (!schemaNode) {
+                                        throw new Error(`「${filename}」中索引「${nameText}」的属性「${indexAttrName}」定义非法`);
+                                    }
+
+                                    const { type, name } = schemaNode;
+                                    const entity = moduleName;
+                                    const { [entity]: manyToOneSet } = ManyToOne;
+                                    if (ts.isTypeReferenceNode(type!)) {
+                                        const { typeName } = type;
+                                        if (ts.isIdentifier(typeName)) {
+                                            const { text } = typeName;
+                                            const text2 = text === 'Schema' ? entity : text;
+                                            const manyToOneItem = manyToOneSet && manyToOneSet.find(
+                                                ([refEntity, attrName]) => refEntity === text2 && attrName === (<ts.Identifier>name).text
+                                            );
+                                            if (!manyToOneItem) {
+                                                // 如果不是外键，则不能是Text, File 
+                                                if (isFulltextIndex) {
+                                                    assert(['Text', 'String'].includes(text2), `「${filename}」中全文索引「${nameText}」定义的属性「${indexAttrName}」类型非法，只能是Text/String`);
+                                                }
+                                                else {
+                                                    assert(!unIndexedTypes.includes(text2), `「${filename}」中索引「${nameText}」的属性「${indexAttrName}」的类型为「${text2}」，不可索引`);
+                                                }
+                                            }
+                                            else {
+                                                assert(!isFulltextIndex, `「${filename}」中全文索引「${nameText}」的属性「${indexAttrName}」类型非法，只能为Text/String`);
+                                                // 在这里把外键加上Id，这样storageSchema才能正常通过
+                                                // 这里的写法不太好，未来TS版本高了可能会有问题。by Xc 20230131
+                                                Object.assign(nameProperty, {
+                                                    initializer: factory.createStringLiteral(`${indexAttrName}Id`),
+                                                });
+                                            }
+                                        }
+                                        else {
+                                            assert(false);          // 这是什么case，不确定
+                                        }
+                                    }
+                                    else {
+                                        assert(!isFulltextIndex, `「${filename}」中全文索引「${nameText}」的属性「${indexAttrName}」类型只能为Text/String`);
+                                        assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${entity}中索引「${nameText}」的属性${(<ts.Identifier>name).text}有定义非法`);
+                                    }
+                                }
+                            }
+                        );
+                    }
+                );
+
+                indexes = declaration;
+            };
+            const dealWithLocales = (declaration: ts.ObjectLiteralExpression) => {
+                if (hasActionDef) {
+                    // 检查每种locale定义中都应该有'action'域
+                    checkLocaleExpressionPropertyExists(declaration, 'action', true, filename);
+                }
+                else {
+                    checkLocaleExpressionPropertyExists(declaration, 'action', false, filename);
+                }
+
+                if (hasRelationDef) {
+                    // 检查每种locale定义中都应该有'r'域
+                    checkLocaleExpressionPropertyExists(declaration, 'r', true, filename);
+                }
+                else {
+                    checkLocaleExpressionPropertyExists(declaration, 'r', false, filename);
+                }
+
+                const allEnumStringAttrs = Object.keys(enumAttributes);
+                if (allEnumStringAttrs.length > 0) {
+                    // 检查每种locale定义中都应该有'v'域
+                    checkLocaleExpressionPropertyExists(declaration, 'v', true, filename);
+                }
+                else {
+                    // 检查每种locale定义中都应该有'v'域
+                    checkLocaleExpressionPropertyExists(declaration, 'v', false, filename);
+                }
+                localeDef = declaration;
+            };
+            const dealWithConfiguration = (declaration: ts.ObjectLiteralExpression) => {
+                assert(!hasActionDef, `${moduleName}中的Configuration定义在Action之后`);
+                const { properties } = declaration;
+                const atProperty = properties.find(
+                    ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'actionType'
+                );
+                const staticProperty = properties.find(
+                    ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'static'
+                );
+                if (atProperty) {
+                    actionType = (<ts.StringLiteral>(<ts.PropertyAssignment>atProperty).initializer).text;
+                }
+                if (staticProperty) {
+                    _static = true;     // static如果有值只能为true
+                }
+            };
             declarations.forEach(
                 (declaration) => {
-                    if (declaration.type && ts.isTypeReferenceNode(declaration.type) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ActionDef') {
-                        checkActionDefNameConsistent(filename, declaration);
-                        const { typeArguments } = declaration.type;
-                        assert(typeArguments!.length === 2);
-                        const [actionNode, stateNode] = typeArguments!;
-
-                        assert(ts.isTypeReferenceNode(actionNode));
-                        assert(ts.isTypeReferenceNode(stateNode));
-                        assert(getStringEnumValues(filename, program, 'action', (<ts.TypeReferenceNode>actionNode)), `文件${filename}中的action${(<ts.Identifier>actionNode.typeName).text}定义不是字符串类型`);
-                        const enumStateValues = getStringEnumValues(filename, program, 'state', stateNode);
-                        assert(enumStateValues, `文件${filename}中的state${(<ts.Identifier>stateNode.typeName).text}定义不是字符串类型`)
-
-                        pushStatementIntoActionAst(moduleName, node, sourceFile!);
-
-                        assert(ts.isIdentifier(declaration.name));
-                        const adName = declaration.name.text.slice(0, declaration.name.text.length - 9);
-                        const attr = adName.concat('State');
-                        schemaAttrs.push(
-                            factory.createPropertySignature(
-                                undefined,
-                                firstLetterLowerCase(attr),
-                                factory.createToken(ts.SyntaxKind.QuestionToken),
-                                factory.createTypeReferenceNode(
-                                    attr,
-                                )
-                            )
-                        );
-                        enumAttributes[firstLetterLowerCase(attr)] = enumStateValues;
+                    if (declaration.type && ts.isTypeReferenceNode(declaration.type) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ActionDef') {                        
+                        dealWithActionDef(declaration);
                     }
                     else if (declaration.type && (ts.isArrayTypeNode(declaration.type!)
                         && ts.isTypeReferenceNode(declaration.type.elementType)
@@ -1018,224 +1195,85 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         && ts.isIdentifier(declaration.type.typeArguments![0].typeName)
                         && declaration.type.typeArguments![0].typeName.text === 'Index')) {
                         // 对索引Index的定义
-                        const indexNameDict: Record<string, true> = {};
-                        assert(ts.isArrayLiteralExpression(declaration.initializer!), `「${filename}」Index「${declaration.name.getText()}」的定义必须符合规范`);
-
-                        // todo 这里应该先做一个类型检查的，但不知道怎么写  by Xc
-                        // 检查索引的属性是否合法
-                        const { elements } = declaration.initializer;
-                        elements.forEach(
-                            (ele) => {
-                                let isFulltextIndex = false;
-                                assert(ts.isObjectLiteralExpression(ele));
-                                const { properties } = ele;
-                                const attrProperty = properties.find(
-                                    (ele2) => {
-                                        assert(ts.isPropertyAssignment(ele2));
-                                        return ele2.name.getText() === 'attributes';
-                                    }
-                                ) as ts.PropertyAssignment;
-                                assert(ts.isArrayLiteralExpression(attrProperty.initializer));
-
-                                const nameProperty = properties.find(
-                                    (ele2) => {
-                                        assert(ts.isPropertyAssignment(ele2));
-                                        return ele2.name.getText() === 'name';
-                                    }
-                                ) as ts.PropertyAssignment;
-                                assert(ts.isStringLiteral(nameProperty.initializer));
-                                const nameText = nameProperty.initializer.text;
-                                if (indexNameDict[nameText]) {
-                                    throw new Error(`「${filename}」索引定义重名「${nameText}」`);
-                                }
-                                assign(indexNameDict, {
-                                    [nameText]: true,
-                                });
-
-                                const configProperty = properties.find(
-                                    (ele2) => {
-                                        assert(ts.isPropertyAssignment(ele2));
-                                        return ele2.name.getText() === 'config';
-                                    }
-                                ) as ts.PropertyAssignment;
-                                if (configProperty) {
-                                    assert(ts.isObjectLiteralExpression(configProperty.initializer));
-                                    const { properties: properties2 } = configProperty.initializer;
-                                    const typeProperty = properties2.find(
-                                        (ele2) => {
-                                            assert(ts.isPropertyAssignment(ele2));
-                                            return ele2.name.getText() === 'type';
-                                        }
-                                    ) as ts.PropertyAssignment;
-
-                                    if (typeProperty && (<ts.Identifier>typeProperty.initializer!).text === 'fulltext') {
-                                        // 定义了全文索引
-                                        if (hasFulltextIndex) {
-                                            throw new Error(`「${filename}」只能定义一个全文索引`);
-                                        }
-                                        hasFulltextIndex = true;
-                                        isFulltextIndex = true;
-                                    }
-                                }
-
-                                const { elements } = attrProperty.initializer;
-
-                                // 每个属性都应该在schema中有值，且对象类型是可索引值
-                                elements.forEach(
-                                    (ele2) => {
-                                        assert(ts.isObjectLiteralExpression(ele2));
-                                        const { properties: properties2 } = ele2;
-
-                                        const nameProperty = properties2.find(
-                                            (ele3) => {
-                                                assert(ts.isPropertyAssignment(ele3));
-                                                return ele3.name.getText() === 'name';
-                                            }
-                                        ) as ts.PropertyAssignment;
-
-                                        const indexAttrName = (<ts.Identifier>nameProperty.initializer!).text;
-                                        if (!initinctiveAttributes.includes(indexAttrName)) {
-                                            const schemaNode = schemaAttrs.find(
-                                                (ele3) => {
-                                                    assert(ts.isPropertySignature(ele3));
-                                                    return (<ts.Identifier>ele3.name).text === indexAttrName;
-                                                }
-                                            ) as ts.PropertySignature;
-                                            if (!schemaNode) {
-                                                throw new Error(`「${filename}」中索引「${nameText}」的属性「${indexAttrName}」定义非法`);
-                                            }
-
-                                            const { type, name } = schemaNode;
-                                            const entity = moduleName;
-                                            const { [entity]: manyToOneSet } = ManyToOne;
-                                            if (ts.isTypeReferenceNode(type!)) {
-                                                const { typeName } = type;
-                                                if (ts.isIdentifier(typeName)) {
-                                                    const { text } = typeName;
-                                                    const text2 = text === 'Schema' ? entity : text;
-                                                    const manyToOneItem = manyToOneSet && manyToOneSet.find(
-                                                        ([refEntity, attrName]) => refEntity === text2 && attrName === (<ts.Identifier>name).text
-                                                    );
-                                                    if (!manyToOneItem) {
-                                                        // 如果不是外键，则不能是Text, File 
-                                                        if (isFulltextIndex) {
-                                                            assert(['Text', 'String'].includes(text2), `「${filename}」中全文索引「${nameText}」定义的属性「${indexAttrName}」类型非法，只能是Text/String`);
-                                                        }
-                                                        else {
-                                                            assert(!unIndexedTypes.includes(text2), `「${filename}」中索引「${nameText}」的属性「${indexAttrName}」的类型为「${text2}」，不可索引`);
-                                                        }
-                                                    }
-                                                    else {
-                                                        assert(!isFulltextIndex, `「${filename}」中全文索引「${nameText}」的属性「${indexAttrName}」类型非法，只能为Text/String`);
-                                                        // 在这里把外键加上Id，这样storageSchema才能正常通过
-                                                        // 这里的写法不太好，未来TS版本高了可能会有问题。by Xc 20230131
-                                                        Object.assign(nameProperty, {
-                                                            initializer: factory.createStringLiteral(`${indexAttrName}Id`),
-                                                        });
-                                                    }
-                                                }
-                                                else {
-                                                    assert(false);          // 这是什么case，不确定
-                                                }
-                                            }
-                                            else {
-                                                assert(!isFulltextIndex, `「${filename}」中全文索引「${nameText}」的属性「${indexAttrName}」类型只能为Text/String`);
-                                                assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${entity}中索引「${nameText}」的属性${(<ts.Identifier>name).text}有定义非法`);
-                                            }
-                                        }
-                                    }
-                                );
-                            }
-                        );
-
-                        indexes = declaration.initializer;
+                        console.log(`「${filename}」直接定义indexes的写法已经过时，请定义在entityDesc中`);
+                        assert(ts.isArrayLiteralExpression(declaration.initializer!));
+                        dealWithIndexes(declaration.initializer);
                     }
                     else if (declaration.type && ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'LocaleDef') {
                         // locale定义
-                        const { type, initializer } = declaration;
+                        console.log(`「${filename}」直接定义locales的写法已经过时，请定义在entityDesc中`);
 
+                        const { type, initializer } = declaration;        
                         assert(ts.isObjectLiteralExpression(initializer!));
                         const { properties } = initializer;
                         assert(properties.length > 0, `${filename}至少需要有一种locale定义`);
-
-
+        
                         const allEnumStringAttrs = Object.keys(enumAttributes);
-                        const { typeArguments } = type;
+                        const { typeArguments } = type as ts.TypeReferenceNode;
                         assert(typeArguments &&
                             ts.isTypeReferenceNode(typeArguments[0])
                             && ts.isIdentifier(typeArguments[0].typeName) && typeArguments[0].typeName.text === 'Schema', `${filename}中缺少locale定义，或者locale类型定义的第一个参数不是Schema`);
-
+        
                         if (hasActionDef) {
                             assert(ts.isTypeReferenceNode(typeArguments[1])
                                 && ts.isIdentifier(typeArguments[1].typeName) && typeArguments[1].typeName.text === 'Action', `${filename}中locale类型定义的第二个参数不是Action`);
-                            // 检查每种locale定义中都应该有'action'域
-                            checkLocaleExpressionPropertyExists(initializer, 'action', true, filename);
                         }
                         else {
                             assert(ts.isLiteralTypeNode(typeArguments[1])
                                 && ts.isStringLiteral(typeArguments[1].literal), `${filename}中locale类型定义的第二个参数不是字符串`);
-                            checkLocaleExpressionPropertyExists(initializer, 'action', false, filename);
                         }
-
+        
                         if (hasRelationDef) {
                             assert(ts.isTypeReferenceNode(typeArguments[2])
                                 && ts.isIdentifier(typeArguments[2].typeName)
                                 && typeArguments[2].typeName.text === 'Relation', `${filename}中的locale类型定义的第三个参数不是Relation`);
-                            // 检查每种locale定义中都应该有'r'域
-                            checkLocaleExpressionPropertyExists(initializer, 'r', true, filename);
                         }
                         else {
                             assert(ts.isLiteralTypeNode(typeArguments[2])
                                 && ts.isStringLiteral(typeArguments[2].literal), `${filename}中locale类型定义的第三个参数不是空字符串`);
-                            checkLocaleExpressionPropertyExists(initializer, 'r', false, filename);
                         }
-
+        
                         if (allEnumStringAttrs.length > 0) {
                             assert(ts.isTypeLiteralNode(typeArguments[3]), `${filename}中的locale类型定义的第四个参数不是{}`);
                             checkLocaleEnumAttrs(typeArguments[3], allEnumStringAttrs, filename);
-                            // 检查每种locale定义中都应该有'v'域
-                            checkLocaleExpressionPropertyExists(initializer, 'v', true, filename);
                         }
                         else {
                             assert(ts.isTypeLiteralNode(typeArguments[3]), `${filename}中的locale类型定义的第四个参数不是{}`);
-                            assert(typeArguments[3].members.length == 0, `${filename}中locale类型定义的第四个参数不应存在相应的v定义`)
-                            // 检查每种locale定义中都应该有'v'域
-                            checkLocaleExpressionPropertyExists(initializer, 'v', false, filename);
+                            assert(typeArguments[3].members.length == 0, `${filename}中locale类型定义的第四个参数不应存在相应的v定义`);
                         }
-
-                        localeDef = initializer;
+                        dealWithLocales(initializer);
                     }
                     else if (declaration.type && ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'Configuration') {
-                        assert(!hasActionDef, `${moduleName}中的Configuration定义在Action之后`);
+                        console.log(`「${filename}」直接定义configuration的写法已经过时，请定义在entityDesc中`);
+                        assert(ts.isObjectLiteralExpression(declaration.initializer!));
+                        dealWithConfiguration(declaration.initializer);
+                    }
+                    else if (declaration.type && ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'EntityDesc') {
                         assert(ts.isObjectLiteralExpression(declaration.initializer!));
                         const { properties } = declaration.initializer;
-                        const atProperty = properties.find(
-                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'actionType'
+
+                        const localesProperty = properties.find(
+                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'locales'
                         );
-                        const staticProperty = properties.find(
-                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'static'
+                        assert(ts.isPropertyAssignment(localesProperty!));
+                        dealWithLocales(localesProperty.initializer as ts.ObjectLiteralExpression);
+
+                        const indexesProperty = properties.find(
+                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'indexes'
                         );
-                        if (atProperty) {
-                            actionType = (<ts.StringLiteral>(<ts.PropertyAssignment>atProperty).initializer).text;
+                        if (indexesProperty) {
+                            assert(ts.isPropertyAssignment(indexesProperty));
+                            dealWithIndexes(indexesProperty.initializer as ts.ArrayLiteralExpression);
                         }
-                        if (staticProperty) {
-                            _static = true;     // static如果有值只能为true
+
+                        const configurationProperty = properties.find(
+                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'configuration'
+                        );
+                        if (configurationProperty) {
+                            assert(ts.isPropertyAssignment(configurationProperty));
+                            dealWithConfiguration(configurationProperty.initializer as ts.ObjectLiteralExpression);
                         }
                     }
-                    /* else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'RelationHierarchy') {
-                        // RelationHierary
-                        assert(hasRelationDef, `${moduleName}中的Relation定义在RelationHierarchy之后`);
-                        const { initializer } = declaration;
-                        assert(ts.isObjectLiteralExpression(initializer!), `${moduleName}中的RelationHierarchy的定义必须是初始化为ObjectLiteralExpress`);
-                        relationHierarchy = initializer;
-                    }
-                    else if (ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'ReverseCascadeRelationHierarchy') {
-                        // ReverseCascadeRelationHierarchy
-                        assert(hasRelationDef, `${moduleName}中的Relation定义在ReverseCascadeRelationHierarchy之后`);
-                        const { initializer } = declaration;
-                        assert(ts.isObjectLiteralExpression(initializer!), `${moduleName}中的RelationHierarchy的定义必须是初始化为ObjectLiteralExpress`);
-                        reverseCascadeRelationHierarchy = initializer;
-                    } */
                     else {
                         throw new Error(`${moduleName}：不能理解的定义内容${(declaration.name as ts.Identifier).text}`);
                     }
