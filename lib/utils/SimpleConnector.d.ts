@@ -5,6 +5,7 @@ import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException } from "../types";
 export declare class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
     static ROUTER: string;
+    static BRIDGE_ROUTER: string;
     private serverUrl;
     private makeException;
     private contextBuilder;
@@ -31,5 +32,16 @@ export declare class SimpleConnector<ED extends EntityDict, BackCxt extends Asyn
     serializeException(exception: OakException<ED>, headers: IncomingHttpHeaders, body: any): {
         body: any;
         headers?: Record<string, any> | undefined;
+    };
+    getBridgeRouter(): string;
+    /**
+     * 通过桥接访问外部资源
+     * @param url
+     * @param headers
+     */
+    makeBridgeUrl(url: string, headers?: Record<string, string>): string;
+    parseBridgeRequestQuery(urlParams: string): {
+        url: string;
+        headers?: Record<string, string> | undefined;
     };
 }

@@ -1,6 +1,7 @@
 import assert from 'assert';
 import { IncomingHttpHeaders } from "http";
 import { Stream } from 'stream';
+import URL from 'url';
 import { AsyncContext, AsyncRowStore } from '../store/AsyncRowStore';
 import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException, OakExternalException, OpRecord } from "../types";
@@ -24,6 +25,7 @@ function makeContentTypeAndBody(data: any) {
 
 export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
     static ROUTER = '/aspect';
+    static BRIDGE_ROUTER = '/bridge';
     private serverUrl: string;
     private makeException: (exceptionData: any) => OakException<ED>;
     private contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>;
@@ -128,6 +130,41 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
             body: {
                 exception: exception.toString(),
             },
+        };
+    }
+
+    getBridgeRouter(): string {
+        return SimpleConnector.BRIDGE_ROUTER;
+    }
+    
+    /**
+     * 通过桥接访问外部资源
+     * @param url 
+     * @param headers 
+     */
+    makeBridgeUrl(url: string, headers?: Record<string, string>) {
+        if (process.env.NODE_ENV === 'development' && process.env.PROD !== 'true') {
+            console.warn('在development下无法通过bridge访问资源，将直接访问，可能失败', url);
+            return url;
+        }
+
+        const search = new URL.URLSearchParams({
+            url,
+        });
+        if (headers) {
+            search.append('headers', JSON.stringify(headers));
+        }
+
+        return `${this.getBridgeRouter()}?${search.toString()}`;
+    }
+
+    parseBridgeRequestQuery(urlParams: string): { url: string; headers?: Record<string, string> | undefined; } {
+        const search = new URL.URLSearchParams(urlParams);
+        const url = search.get('url') as string;
+        const headers = search.get('headers');
+        return {
+            url,
+            headers: headers && JSON.parse(headers),
         };
     }
 }
