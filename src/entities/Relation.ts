@@ -1,7 +1,6 @@
 import { String } from '../types/DataType';
-import { LocaleDef } from '../types/Locale';
 import { EntityShape } from '../types/Entity';
-import { Index } from '../types/Storage';
+import { EntityDesc } from '../types/EntityDesc';
 
 export interface Schema extends EntityShape {
     entity: String<32>;
@@ -10,40 +9,35 @@ export interface Schema extends EntityShape {
     display?: String<32>;
 };
 
-
-const indexes: Index<Schema>[] = [
-    {
-        name: 'index_targetEntity_entityId_name',
-        attributes: [
-            {
-                name: 'entity',
+const entityDesc: EntityDesc<Schema> = {
+    locales: {
+        zh_CN: {
+            name: '用户授权',
+            attr: {
+                name: '关系',
+                entity: '目标对象',
+                entityId: '目标对象id',
+                display: '显示值',
             },
-            {
-                name: 'entityId',
-            },
-            {
-                name: 'name',
-            }
-        ],
-        config: {
-            unique: true,
         },
     },
-];
-
-const locale: LocaleDef<
-    Schema,
-    '',
-    '',
-    {}
-> = {
-    zh_CN: {
-        name: '用户授权',
-        attr: {
-            name: '关系',
-            entity: '目标对象',
-            entityId: '目标对象id',
-            display: '显示值',
+    indexes: [
+        {
+            name: 'index_targetEntity_entityId_name',
+            attributes: [
+                {
+                    name: 'entity',
+                },
+                {
+                    name: 'entityId',
+                },
+                {
+                    name: 'name',
+                }
+            ],
+            config: {
+                unique: true,
+            },
         },
-    },
+    ]
 };
