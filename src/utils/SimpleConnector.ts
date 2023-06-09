@@ -143,19 +143,20 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
      * @param headers 
      */
     makeBridgeUrl(url: string, headers?: Record<string, string>) {
-        if (process.env.NODE_ENV === 'development' && process.env.PROD !== 'true') {
-            console.warn('在development下无法通过bridge访问资源，将直接访问，可能失败', url);
-            return url;
-        }
+        // if (process.env.PROD !== 'true') {
+        //     console.warn('在development下无法通过bridge访问资源，将直接访问，可能失败', url);
+        //     return url;
+        // }
+        const encodeUrl = encodeURIComponent(url);
+        // const urlParse = URL.parse(url, true);
+        // const { search } = urlParse as {
+        //     search: string;
+        // };
+        // if (headers) {
+        //     search.append('headers', JSON.stringify(headers));
+        // }
 
-        const search = new URL.URLSearchParams({
-            url,
-        });
-        if (headers) {
-            search.append('headers', JSON.stringify(headers));
-        }
-
-        return `${this.getBridgeRouter()}?${search.toString()}`;
+        return `${this.getBridgeRouter()}?url=${encodeUrl}`;
     }
 
     parseBridgeRequestQuery(urlParams: string): { url: string; headers?: Record<string, string> | undefined; } {
