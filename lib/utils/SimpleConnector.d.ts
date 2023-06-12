@@ -4,9 +4,10 @@ import { AsyncContext, AsyncRowStore } from '../store/AsyncRowStore';
 import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException } from "../types";
 export declare class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
-    static ROUTER: string;
+    static ASPECT_ROUTER: string;
     static BRIDGE_ROUTER: string;
-    private serverUrl;
+    private serverAspectUrl;
+    private serverBridgeUrl;
     private makeException;
     private contextBuilder;
     constructor(serverUrl: string, makeException: (exceptionData: any) => OakException<ED>, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>);
@@ -35,7 +36,7 @@ export declare class SimpleConnector<ED extends EntityDict, BackCxt extends Asyn
     };
     getBridgeRouter(): string;
     /**
-     * 通过桥接访问外部资源
+     * 通过本地服务器桥接访问外部资源的url
      * @param url
      * @param headers
      */
