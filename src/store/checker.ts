@@ -115,7 +115,8 @@ export function translateCheckerInAsyncContext<
                     if (await checkFilterContains<ED, T, Cxt>(entity, context, result, filter, true)) {
                         return;
                     }
-                    throw new OakUserUnpermittedException(errMsg);
+                    const errMsg2 = typeof errMsg === 'function' ? errMsg(operation, context, option) : errMsg;
+                    throw new OakUserUnpermittedException(errMsg2);
                 }
                 return 0;
             }) as UpdateTriggerInTxn<ED, T, Cxt>['fn'];
@@ -201,7 +202,8 @@ export function translateCheckerInSyncContext<
                     if (checkFilterContains<ED, T, Cxt>(entity, context, result as ED[T]['Selection']['filter'], filter, true)) {
                         return;
                     }
-                    throw new OakUserUnpermittedException(errMsg);
+                    const errMsg2 = typeof errMsg === 'function' ? errMsg(operation, context, option) : errMsg;
+                    throw new OakUserUnpermittedException(errMsg2);
                 }
             };
             return {
@@ -243,7 +245,7 @@ type CreateRelationCounter<ED extends EntityDict & BaseEntityDict> = CreateRelat
 
 
 type FilterMakeFn<ED extends EntityDict & BaseEntityDict> =
-    (operation: ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'], userId: string) => ED[keyof ED]['Selection']['filter'] | CreateRelationCounter<ED>;
+    (operation: ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'], userId: string) => ED[keyof ED]['Selection']['filter'] | CreateRelationCounter<ED> | OakUserUnpermittedException<ED>;
 
 function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityDict>(
     schema: StorageSchema<ED>,
@@ -440,19 +442,20 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                         if (d.entity === attr && typeof d.entityId === 'string') {
                             return d.entityId as string;
                         }
-                        throw new OakUserUnpermittedException();
                     }
                     else {
                         assert(typeof relation === 'string');
                         if (typeof d[`${attr}Id`] === 'string') {
                             return d[`${attr}Id`] as string;
                         }
-                        throw new OakUserUnpermittedException();
                     }
                 };
                 if (relation === 2) {
                     if (data instanceof Array) {
-                        const fkIds = uniq(data.map(d => getForeignKeyId(d)));
+                        const fkIds = uniq(data.map(d => getForeignKeyId(d)).filter(ele => !!ele));
+                        if (fkIds.length === 0) {
+                            return new OakUserUnpermittedException();
+                        }
                         return {
                             $entity: attr,
                             $filter: addFilterSegment(filterMaker2(userId), { id: { $in: fkIds } }),
@@ -460,6 +463,9 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                         };
                     }
                     const fkId = getForeignKeyId(data);
+                    if (!fkId) {
+                        return new OakUserUnpermittedException();
+                    }
                     return {
                         $entity: attr,
                         $filter: addFilterSegment(filterMaker2(userId), { id: fkId }),
@@ -467,7 +473,10 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                 }
                 assert(typeof relation === 'string');
                 if (data instanceof Array) {
-                    const fkIds = uniq(data.map(d => getForeignKeyId(d)));
+                    const fkIds = uniq(data.map(d => getForeignKeyId(d)).filter(ele => !!ele));
+                    if (fkIds.length === 0) {
+                        return new OakUserUnpermittedException();
+                    }
                     return {
                         $entity: relation,
                         $filter: addFilterSegment(filterMaker2(userId), { id: { $in: fkIds } }),
@@ -475,6 +484,9 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                     };
                 }
                 const fkId = getForeignKeyId(data);
+                if (!fkId) {
+                    return new OakUserUnpermittedException();
+                }
                 return {
                     $entity: relation,
                     $filter: addFilterSegment(filterMaker2(userId), { id: fkId }),
@@ -485,9 +497,9 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                 const { filter } = operation as ED[keyof ED]['Selection'];
                 if (filter) {
                     const counter = translateCreateFilterMaker(entity2, filter, userId);
-                    if (counter instanceof OakUserUnpermittedException) {
-                        throw counter;
-                    }
+                    // if (counter instanceof OakUserUnpermittedException) {
+                    //     throw counter;
+                    // }
                     return counter;
                 }
                 throw new OakUserUnpermittedException();
@@ -621,13 +633,19 @@ function execCreateCounter<ED extends EntityDict & BaseEntityDict, Cxt extends A
     }
     else if ((<CreateRelationSingleCounter<ED>>counter)?.$entity) {
         const { $entity, $filter, $count = 1 } = counter as CreateRelationSingleCounter<ED>;
-        const count = context.count($entity, {
+        // count不走reinforceSelection，先用select
+        const result = context.select($entity, {
+            data: {
+                id: 1,
+            },
             filter: $filter,
+            indexFrom: 0,
+            count: $count,
         }, { dontCollect: true });
-        if (count instanceof Promise) {
-            return count.then(
-                (c2) => {
-                    if (c2 >= $count) {
+        if (result instanceof Promise) {
+            return result.then(
+                (r2) => {
+                    if (r2.length >= $count) {
                         return undefined;
                     }
                     return new OakUserUnpermittedException();
@@ -635,7 +653,7 @@ function execCreateCounter<ED extends EntityDict & BaseEntityDict, Cxt extends A
             );
         }
         else {
-            return count >= $count ? undefined : new OakUserUnpermittedException();
+            return result.length >= $count ? undefined : new OakUserUnpermittedException();
         }
     }
 }
@@ -804,7 +822,10 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
 
                         return filter;
                     },
-                    errMsg: '越权操作',
+                    errMsg: (operation, context) => {
+                        console.error(`创建${entity as string}时越权，userId是${context.getCurrentUserId()}，数据是${JSON.stringify(operation.data)}`);
+                        return `创建${entity as string}时越权`;
+                    },
                 });
 
                 checkers.push({
@@ -863,7 +884,10 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                         }
                         return makeFilterFromRows(toBeRemoved); */
                     },
-                    errMsg: '越权操作',
+                    errMsg: (operation, context) => {
+                        console.error(`移除${entity as string}时越权，userId是${context.getCurrentUserId()}，移除条件是${JSON.stringify(operation.filter)}`);
+                        return `移除${entity as string}时越权`;
+                    },
                 });
                 // 转让权限现在用update动作，只允许update userId给其它人
                 // todo 等实现的时候再写
@@ -881,7 +905,12 @@ export function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt e
                             const filter = makePotentialFilter(operation, context, filterMaker);
                             return filter;
                         },
-                        errMsg: '定义的actionAuth中检查出来越权操作',
+                        errMsg: (operation, context) => {
+                            const { action, data, filter } = operation as ED[keyof ED]['Create'];
+                            console.error(`对${entity as string}进行${action}时越权，userId是${context.getCurrentUserId()}
+                                数据是${JSON.stringify(data)}，条件是${JSON.stringify(filter)}`);
+                            return `对${entity as string}进行${action}时越权`;
+                        },
                     });
                 }
             }
@@ -1264,7 +1293,7 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                                     continue;
                                 }
                             }
-                            else if (attr === 'entity' && attributes[attr].type === 'ref') {
+                            else if (attr === 'entity' && attributes[attr].ref) {
                                 let hasCascadeCreate = false;
                                 for (const ref of attributes[attr].ref as string[]) {
                                     if (data2[ref] && data2[ref].action === 'create') {

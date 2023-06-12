@@ -35,7 +35,7 @@ export declare type RelationChecker<ED extends EntityDict, T extends keyof ED, C
     when?: 'after';
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
     relationFilter: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => SyncOrAsync<ED[T]['Selection']['filter']>;
-    errMsg: string;
+    errMsg: string | ((operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option?: OperateOption | SelectOption) => string);
     conditionalFilter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => SyncOrAsync<ED[T]['Selection']['filter']>);
 };
 export declare type LogicalChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {

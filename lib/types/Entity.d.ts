@@ -181,4 +181,5 @@ export declare type Configuration = {
     actionType?: ActionType;
     static?: boolean;
 };
+export declare type OtmKey<K extends string> = K | `${K}$${number}`;
 export {};

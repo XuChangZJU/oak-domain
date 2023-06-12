@@ -46,7 +46,7 @@ export type RelationChecker<ED extends EntityDict, T extends keyof ED, Cxt exten
     when?: 'after';
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
     relationFilter: (operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option: OperateOption | SelectOption) => SyncOrAsync<ED[T]['Selection']['filter']>,         // 生成一个额外的relation相关的filter，加在原先的filter上
-    errMsg: string;
+    errMsg: string | ((operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt, option?: OperateOption | SelectOption) => string);
     conditionalFilter?: ED[T]['Update']['filter'] | (
         (operation: ED[T]['Operation'], context: Cxt, option: OperateOption) => SyncOrAsync<ED[T]['Selection']['filter']>
     );

@@ -1,6 +1,7 @@
 import assert from 'assert';
 import { IncomingHttpHeaders } from "http";
 import { Stream } from 'stream';
+import URL from 'url';
 import { AsyncContext, AsyncRowStore } from '../store/AsyncRowStore';
 import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException, OakExternalException, OpRecord } from "../types";
@@ -23,14 +24,17 @@ function makeContentTypeAndBody(data: any) {
 }
 
 export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
-    static ROUTER = '/aspect';
-    private serverUrl: string;
+    static ASPECT_ROUTER = '/aspect';
+    static BRIDGE_ROUTER = '/bridge';
+    private serverAspectUrl: string;
+    private serverBridgeUrl: string;
     private makeException: (exceptionData: any) => OakException<ED>;
     private contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>;
 
     constructor(serverUrl: string, makeException: (exceptionData: any) => OakException<ED>, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>) {
         super();
-        this.serverUrl = `${serverUrl}${SimpleConnector.ROUTER}`;
+        this.serverAspectUrl = `${serverUrl}${SimpleConnector.ASPECT_ROUTER}`;
+        this.serverBridgeUrl = `${serverUrl}${SimpleConnector.BRIDGE_ROUTER}`;
         this.makeException = makeException;
         this.contextBuilder = contextBuilder;
     }
@@ -39,7 +43,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         const cxtStr = context.toString();
 
         const { contentType, body } = makeContentTypeAndBody(params);
-        const response = await global.fetch(this.serverUrl, {
+        const response = await global.fetch(this.serverAspectUrl, {
             method: 'POST',
             headers: Object.assign(
                 {
@@ -88,7 +92,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
     }
 
     getRouter(): string {
-        return SimpleConnector.ROUTER;
+        return SimpleConnector.ASPECT_ROUTER;
     }
 
     async parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{ name: string; params: any; context: BackCxt; }> {
@@ -111,7 +115,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
             };
         }
 
-        await context.refineOpRecords();        
+        await context.refineOpRecords();
         return {
             body: {
                 result,
@@ -128,6 +132,41 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
             body: {
                 exception: exception.toString(),
             },
+        };
+    }
+
+    getBridgeRouter(): string {
+        return SimpleConnector.BRIDGE_ROUTER;
+    }
+
+    /**
+     * 通过本地服务器桥接访问外部资源的url
+     * @param url 
+     * @param headers 
+     */
+    makeBridgeUrl(url: string, headers?: Record<string, string>) {
+        // if (process.env.PROD !== 'true') {
+        //     console.warn('在development下无法通过bridge访问资源，将直接访问，可能失败', url);
+        //     return url;
+        // }
+        const encodeUrl = encodeURIComponent(url);
+        // const urlParse = URL.parse(url, true);
+        // const { search } = urlParse as {
+        //     search: string;
+        // };
+        // if (headers) {
+        //     search.append('headers', JSON.stringify(headers));
+        // }
+
+        return `${this.serverBridgeUrl}?url=${encodeUrl}`;
+    }
+    parseBridgeRequestQuery(urlParams: string): { url: string; headers?: Record<string, string> | undefined; } {
+        const search = new URL.URLSearchParams(urlParams);
+        const url = search.get('url') as string;
+        const headers = search.get('headers');
+        return {
+            url,
+            headers: headers && JSON.parse(headers),
         };
     }
 }
