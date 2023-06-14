@@ -567,8 +567,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 if (foreignKey) {
                     // 基于属性的一对多
                     if (isAggr) {
-                        // 是聚合运算
-                        cascadeSelectionFns.push(
+                        // 是聚合运算，只有后台才需要执行
+                        (context instanceof AsyncContext) && cascadeSelectionFns.push(
                             (result) => {
                                 const aggrResults = result.map(
                                     (row) => {
@@ -660,8 +660,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 else {
                     // 基于entity的多对一
                     if (isAggr) {
-                        // 是聚合运算
-                        cascadeSelectionFns.push(
+                        // 是聚合运算，只有后台才需要执行
+                        (context instanceof AsyncContext) && cascadeSelectionFns.push(
                             (result) => {
                                 const aggrResults = result.map(
                                     (row) => {

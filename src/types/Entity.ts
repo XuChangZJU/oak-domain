@@ -263,3 +263,5 @@ export type AuthDeduceRelationMap<ED extends EntityDict> = {
     [T in keyof ED]?: keyof ED[T]['OpSchema'];
 };
 export type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];
+// 一对多的键值的扩展
+export type OtmKey<K extends string> = K | `${K}$${number}`;

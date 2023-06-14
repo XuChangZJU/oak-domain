@@ -245,7 +245,7 @@ type CreateRelationCounter<ED extends EntityDict & BaseEntityDict> = CreateRelat
 
 
 type FilterMakeFn<ED extends EntityDict & BaseEntityDict> =
-    (operation: ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'], userId: string) => ED[keyof ED]['Selection']['filter'] | CreateRelationCounter<ED>;
+    (operation: ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'], userId: string) => ED[keyof ED]['Selection']['filter'] | CreateRelationCounter<ED> | OakUserUnpermittedException<ED>;
 
 function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityDict>(
     schema: StorageSchema<ED>,
@@ -442,19 +442,20 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                         if (d.entity === attr && typeof d.entityId === 'string') {
                             return d.entityId as string;
                         }
-                        throw new OakUserUnpermittedException();
                     }
                     else {
                         assert(typeof relation === 'string');
                         if (typeof d[`${attr}Id`] === 'string') {
                             return d[`${attr}Id`] as string;
                         }
-                        throw new OakUserUnpermittedException();
                     }
                 };
                 if (relation === 2) {
                     if (data instanceof Array) {
-                        const fkIds = uniq(data.map(d => getForeignKeyId(d)));
+                        const fkIds = uniq(data.map(d => getForeignKeyId(d)).filter(ele => !!ele));
+                        if (fkIds.length === 0) {
+                            return new OakUserUnpermittedException();
+                        }
                         return {
                             $entity: attr,
                             $filter: addFilterSegment(filterMaker2(userId), { id: { $in: fkIds } }),
@@ -462,6 +463,9 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                         };
                     }
                     const fkId = getForeignKeyId(data);
+                    if (!fkId) {
+                        return new OakUserUnpermittedException();
+                    }
                     return {
                         $entity: attr,
                         $filter: addFilterSegment(filterMaker2(userId), { id: fkId }),
@@ -469,7 +473,10 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                 }
                 assert(typeof relation === 'string');
                 if (data instanceof Array) {
-                    const fkIds = uniq(data.map(d => getForeignKeyId(d)));
+                    const fkIds = uniq(data.map(d => getForeignKeyId(d)).filter(ele => !!ele));
+                    if (fkIds.length === 0) {
+                        return new OakUserUnpermittedException();
+                    }
                     return {
                         $entity: relation,
                         $filter: addFilterSegment(filterMaker2(userId), { id: { $in: fkIds } }),
@@ -477,6 +484,9 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                     };
                 }
                 const fkId = getForeignKeyId(data);
+                if (!fkId) {
+                    return new OakUserUnpermittedException();
+                }
                 return {
                     $entity: relation,
                     $filter: addFilterSegment(filterMaker2(userId), { id: fkId }),
@@ -487,9 +497,9 @@ function translateCascadeRelationFilterMaker<ED extends EntityDict & BaseEntityD
                 const { filter } = operation as ED[keyof ED]['Selection'];
                 if (filter) {
                     const counter = translateCreateFilterMaker(entity2, filter, userId);
-                    if (counter instanceof OakUserUnpermittedException) {
-                        throw counter;
-                    }
+                    // if (counter instanceof OakUserUnpermittedException) {
+                    //     throw counter;
+                    // }
                     return counter;
                 }
                 throw new OakUserUnpermittedException();
@@ -1163,7 +1173,7 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                                     continue;
                                 }
                             }
-                            else if (attr === 'entity' && attributes[attr].type === 'ref') {
+                            else if (attr === 'entity' && attributes[attr].ref) {
                                 let hasCascadeCreate = false;
                                 for (const ref of attributes[attr].ref as string[]) {
                                     if (data2[ref] && data2[ref].action === 'create') {
