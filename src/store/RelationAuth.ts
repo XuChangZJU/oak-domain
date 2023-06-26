@@ -599,6 +599,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             for (const attr in data) {
                 const rel = judgeRelation(this.schema, entity, attr);
                 if (rel === 2) {
+                    assert(!this.authDeduceRelationMap[attr], 'deduceRelation的entity只应当出现在一对多的路径上');
                     assert(!changeRoot, 'cascadeUpdate不应产生两条父级路径');
                     assert(!relativeRootPath, 'cascadeUpdate不应产生两条父级路径');
                     changeRoot = true;
@@ -661,6 +662,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     root = destructFn(attr, operationMto, '', parentFilter2);
                 }
                 else if (typeof rel === 'string') {
+                    assert(!this.authDeduceRelationMap[attr], 'deduceRelation的entity只应当出现在一对多的路径上');
                     assert(!changeRoot, 'cascadeUpdate不应产生两条父级路径');
                     assert(!relativeRootPath, 'cascadeUpdate不应产生两条父级路径');
                     changeRoot = true;
@@ -720,61 +722,64 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     });
                     root = destructFn(rel, operationMto, '', parentFilter2);
                 }
-                else if (rel instanceof Array) {
+                else if (rel instanceof Array) {                    
                     const [entityOtm, foreignKey] = rel;
-                    const otmOperations = data[attr];
-                    if (entityOtm === 'userRelation' && entity !== 'user') {
-                        assert(!relativeRootPath, 'userRelation只能创建在最顶层');
-                        const dealWithUserRelation = (userRelation: ED['userRelation']['CreateSingle']) => {
-                            const { action, data } = userRelation;
-                            assert(action === 'create', 'cascade更新中只允许创建userRelation');
-                            const attrs = Object.keys(data);
-                            assert(difference(attrs, Object.keys(this.schema.userRelation.attributes).concat('id')).length === 0);
-                            userRelations.push(data as ED['userRelation']['OpSchema']);
-                        };
-                        if (otmOperations instanceof Array) {
-                            otmOperations.forEach(
-                                (otmOperation) => dealWithUserRelation(otmOperation)
-                            );
+                    // 如果是一对多的deduceRelation，可以忽略，其父对象能过就行
+                    if (!this.authDeduceRelationMap[entityOtm]) {
+                        const otmOperations = data[attr];
+                        if (entityOtm === 'userRelation' && entity !== 'user') {
+                            assert(!relativeRootPath, 'userRelation只能创建在最顶层');
+                            const dealWithUserRelation = (userRelation: ED['userRelation']['CreateSingle']) => {
+                                const { action, data } = userRelation;
+                                assert(action === 'create', 'cascade更新中只允许创建userRelation');
+                                const attrs = Object.keys(data);
+                                assert(difference(attrs, Object.keys(this.schema.userRelation.attributes).concat('id')).length === 0);
+                                userRelations.push(data as ED['userRelation']['OpSchema']);
+                            };
+                            if (otmOperations instanceof Array) {
+                                otmOperations.forEach(
+                                    (otmOperation) => dealWithUserRelation(otmOperation)
+                                );
+                            }
+                            else {
+                                dealWithUserRelation(otmOperations);
+                            }
                         }
                         else {
-                            dealWithUserRelation(otmOperations);
-                        }
-                    }
-                    else {
-                        const subPath = foreignKey ? foreignKey.slice(0, foreignKey.length - 2) : entity as string;
-                        const relativeRootPath2 = relativeRootPath ? `${subPath}.${relativeRootPath}` : subPath;
-                        const dealWithOneToMany = (otm: ED[keyof ED]['Update'] | ED[keyof ED]['Create']) => {
-                            // 一对多之后不允许再有多对一的关系（cascadeUpdate更新必须是一棵树，不允许森林）
-                            destructFn(entityOtm, otm, relativeRootPath2,);
-                        };
-                        if (otmOperations instanceof Array) {
-                            const actionDict: Record<string, 1> = {};
-                            otmOperations.forEach(
-                                (otmOperation) => {
-                                    const { action } = otmOperation;
-                                    if (!actionDict[action]) {
-                                        actionDict[action] = 1;
+                            const subPath = foreignKey ? foreignKey.slice(0, foreignKey.length - 2) : entity as string;
+                            const relativeRootPath2 = relativeRootPath ? `${subPath}.${relativeRootPath}` : subPath;
+                            const dealWithOneToMany = (otm: ED[keyof ED]['Update'] | ED[keyof ED]['Create']) => {
+                                // 一对多之后不允许再有多对一的关系（cascadeUpdate更新必须是一棵树，不允许森林）
+                                destructFn(entityOtm, otm, relativeRootPath2,);
+                            };
+                            if (otmOperations instanceof Array) {
+                                const actionDict: Record<string, 1> = {};
+                                otmOperations.forEach(
+                                    (otmOperation) => {
+                                        const { action } = otmOperation;
+                                        if (!actionDict[action]) {
+                                            actionDict[action] = 1;
+                                        }
+                                        dealWithOneToMany(otmOperation);
                                     }
-                                    dealWithOneToMany(otmOperation);
-                                }
-                            );
-                            Object.keys(actionDict).forEach(
-                                action => children.push({
+                                );
+                                Object.keys(actionDict).forEach(
+                                    action => children.push({
+                                        entity: entityOtm,
+                                        action,
+                                        relativePath: relativeRootPath2,
+                                    })
+                                );
+                            }
+                            else {
+                                const { action: actionOtm } = otmOperations;
+                                dealWithOneToMany(otmOperations);
+                                children.push({
                                     entity: entityOtm,
-                                    action,
+                                    action: actionOtm,
                                     relativePath: relativeRootPath2,
-                                })
-                            );
-                        }
-                        else {
-                            const { action: actionOtm } = otmOperations;
-                            dealWithOneToMany(otmOperations);
-                            children.push({
-                                entity: entityOtm,
-                                action: actionOtm,
-                                relativePath: relativeRootPath2,
-                            });
+                                });
+                            }
                         }
                     }
                 }
