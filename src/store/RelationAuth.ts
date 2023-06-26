@@ -98,7 +98,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 }
                 else if (rel === 1 && anchors.length === 0) {
                     // 只寻找highest的，有更深的就忽略掉浅的
-                    if (attr === 'entity' && pathGroup[filter.attr]) {
+                    if (attr === 'entity' && pathGroup[filter.entity]) {
                         const nextPath = path ? `${path}.${filter.entity as string}` : filter.entity;
                         if (filter.entityId) {
                             anchorsOnMe.push({
