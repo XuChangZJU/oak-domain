@@ -1,12 +1,12 @@
 import { EntityDict } from '../types/Entity';
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from '../store/AsyncRowStore';
-declare type VaccumOptionEntity<ED extends EntityDict & BaseEntityDict, T extends keyof ED> = {
+type VaccumOptionEntity<ED extends EntityDict & BaseEntityDict, T extends keyof ED> = {
     entity: T;
     filter?: ED[T]['Selection']['filter'];
     aliveLine: number;
 };
-declare type VaccumOption<ED extends EntityDict & BaseEntityDict> = {
+type VaccumOption<ED extends EntityDict & BaseEntityDict> = {
     entities: Array<VaccumOptionEntity<ED, keyof ED>>;
     backupDir?: string;
     zip?: boolean;

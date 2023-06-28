@@ -1,4 +1,4 @@
-declare type Mode = 'S' | 'X';
+type Mode = 'S' | 'X';
 /**
  * 模拟一个读写锁，用于同步。
  * 注意，千万不要发生自己等自己

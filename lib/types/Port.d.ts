@@ -1,15 +1,15 @@
 import { AsyncContext } from "../store/AsyncRowStore";
 import { EntityDict } from "./Entity";
-export declare type Exportation<ED extends EntityDict, T extends keyof ED> = {
+export type Exportation<ED extends EntityDict, T extends keyof ED, K extends string> = {
     name: string;
     id: string;
     entity: T;
     projection: ED[T]['Selection']['data'];
     headers?: string[];
     makeHeaders?: (dataList: Partial<ED[T]['Schema']>[]) => string[];
-    fn: (data: ED[T]['Schema'], context: AsyncContext<ED>, properties?: Record<string, any>) => Promise<Partial<Record<string, string | number | boolean | null>>>;
+    fn: (data: ED[T]['Schema'], context?: AsyncContext<ED>, properties?: Record<string, any>) => Promise<Partial<Record<string, string | number | boolean | null>>> | Partial<Record<string, string | number | boolean | null>>;
 };
-export declare type Importation<ED extends EntityDict, T extends keyof ED, K extends string> = {
+export type Importation<ED extends EntityDict, T extends keyof ED, K extends string> = {
     name: string;
     id: string;
     entity: T;
