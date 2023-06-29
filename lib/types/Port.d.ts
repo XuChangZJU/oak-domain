@@ -5,7 +5,7 @@ export type Exportation<ED extends EntityDict, T extends keyof ED, K extends str
     id: string;
     entity: T;
     projection: ED[T]['Selection']['data'];
-    headers?: string[];
+    headers?: K[];
     makeHeaders?: (dataList: Partial<ED[T]['Schema']>[]) => string[];
     fn: (data: ED[T]['Schema'], context?: AsyncContext<ED>, properties?: Record<string, any>) => Promise<Partial<Record<string, string | number | boolean | null>>> | Partial<Record<string, string | number | boolean | null>>;
 };
