@@ -245,23 +245,24 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     path: AuthCascadePath<ED>;
                                     filter: ED[keyof ED]['Selection']['filter'];
                                 } => {
-                                    if (idx === restPaths.length - 1) {
-                                        if (path[3]) {
-                                            return {
-                                                relativePath,
-                                                path,
-                                                filter: {
-                                                    entity: entity2,
-                                                    entityId: filter2!.id,
-                                                },
-                                            };
-                                        }
+                                    // 这里如果不是relation关系，则最后一项是指向user的外键名，否则最后一项就是最后一层的对象，有区别
+                                    if (idx === restPaths.length - 1 && !path[3]) {
                                         return {
                                             relativePath,
                                             path,
                                             filter: {
                                                 [`${restPaths[idx]}Id`]: userId,
                                                 ...filter2!,
+                                            },
+                                        };
+                                    }
+                                    else if (idx === restPaths.length && path[3]) {
+                                        return {
+                                            relativePath,
+                                            path,
+                                            filter: {
+                                                entity: entity2,
+                                                entityId: filter2!.id,
                                             },
                                         };
                                     }
