@@ -53,22 +53,26 @@ function makeIntrinsicWatchers<ED extends EntityDict>(schema: StorageSchema<ED>)
 
 function checkUniqueBetweenRows(rows: Record<string, any>[], uniqAttrs: string[]) {
     // 先检查这些行本身之间有无unique冲突
-    const uniqRows = uniqBy(rows, (d) => {
+    const dict: Record<string, 1> = {};
+    for (const row of rows) {
         let s = '';
         for (const a of uniqAttrs) {
-            if (d[a as string] === null || d[a as string] === undefined) {
-                s + d.id;
+            if (row[a] === null || row[a] === undefined) {
+                s + row.id;
             }
             else {
-                s + `-${d[a as string]}`;
+                s + `-${row[a]}`;
             }
         }
-        return s;
-    });
-    if (uniqRows.length < rows.length) {
-        throw new OakUniqueViolationException([{
-            attrs: uniqAttrs,
-        }]);
+        if (dict[s]) {
+            throw new OakUniqueViolationException([{
+                id: row.id,
+                attrs: uniqAttrs,
+            }]);
+        }
+        else {
+            dict[s] = 1;
+        }
     }
 }
 
@@ -245,13 +249,13 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                                         $not: operationFilter,
                                     }]),
                                 }, { dontCollect: true });
-                                const checkCount = checkCountLessThan(count, uniqAttrs);
+                                const checkCount = checkCountLessThan(count, uniqAttrs, 0, operationFilter?.id);
 
                                 // 更新的行只能有一行
                                 const rowCount = context.count(entity, {
                                     filter: operationFilter,
                                 }, { dontCollect: true });
-                                const checkRowCount = checkCountLessThan(rowCount, uniqAttrs, 1);
+                                const checkRowCount = checkCountLessThan(rowCount, uniqAttrs, 1, operationFilter?.id);
 
                                 // 如果更新的行数为零似乎也可以，但这应该不可能出现吧，by Xc 20230131
                                 if (checkRowCount instanceof Promise) {

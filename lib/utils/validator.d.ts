@@ -1,6 +1,6 @@
 import { EntityDict } from "../types";
-type ValidatorFunction = (text: string, size?: number) => string | boolean;
-type ValidatorMoneyFunction = (text: string, zero?: boolean) => string | boolean;
+declare type ValidatorFunction = (text: string, size?: number) => string | boolean;
+declare type ValidatorMoneyFunction = (text: string, zero?: boolean) => string | boolean;
 export declare const isMobile: ValidatorFunction;
 export declare const isPassword: ValidatorFunction;
 export declare const isCaptcha: ValidatorFunction;
