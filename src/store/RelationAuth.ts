@@ -176,7 +176,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         (path) => {
                             // 被entity的外键连接所排队的路径，这个非常重要，否则像extraFile这样的对象会有过多的查询路径
                             for (const k in excludePaths) {
-                                if (path[1].startsWith(k) && !excludePaths[k].find(ele => path[1].startsWith(ele))) {
+                                if (path[1].startsWith(k) && !excludePaths[k].find(ele => path[1].startsWith(`${ele}.`))) {
                                     return false;
                                 }
                             }
@@ -186,7 +186,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         (path) => {
                             // 这里anchor的relativePath按长度倒排，所以找到的第一个匹配关系应该就是最准确的
                             const relatedAnchor = anchors.find(
-                                (anchor) => path[1].startsWith(anchor.relativePath)
+                                (anchor) => path[1].startsWith(`${anchor.relativePath}.`)
                             );
                             if (relatedAnchor) {
                                 const { entity, relativePath, filter } = relatedAnchor;
