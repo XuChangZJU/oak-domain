@@ -186,7 +186,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         (path) => {
                             // 这里anchor的relativePath按长度倒排，所以找到的第一个匹配关系应该就是最准确的
                             const relatedAnchor = anchors.find(
-                                (anchor) => path[1].startsWith(`${anchor.relativePath}.`) || path[1] === anchor.relativePath
+                                (anchor) => path[1].startsWith(`${anchor.relativePath}.`) 
+                                    || path[1] === anchor.relativePath
+                                    || !anchor.relativePath     // relativePath如果是'', 所有的路径都成立
                             );
                             if (relatedAnchor) {
                                 const { entity, relativePath, filter } = relatedAnchor;
