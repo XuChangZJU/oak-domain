@@ -74,11 +74,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             const anchors = [] as Anchor[];
             const anchorsOnMe = [] as Anchor[];
             for (const attr in filter) {
-                // todo $or会发生什么？by Xc
                 if (attr === '$and') {
                     filter[attr].forEach(
                         (ele: ED[keyof ED]['Selection']['filter']) => anchors.push(...findHighestAnchors(entity, ele!, path, excludePaths))
                     );
+                    continue;
+                }
+                else if (attr.startsWith('$') || attr.startsWith('#')) {
+                    // todo $or会发生什么？by Xc
                     continue;
                 }
                 const rel = judgeRelation(this.schema, entity, attr);
