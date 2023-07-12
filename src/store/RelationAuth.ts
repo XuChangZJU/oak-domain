@@ -206,7 +206,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                                     }
                                                 );
                                                 return {
-                                                    relativePath: '',
+                                                    relativePath: path[1],
                                                     relationIds,
                                                     path,
                                                 };
@@ -215,7 +215,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                         else {
                                             if (filter!.id === userId) {
                                                 return {
-                                                    relativePath: '',
+                                                    relativePath: path[1],
                                                     path,
                                                 };
                                             }
@@ -223,7 +223,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     }
                                     if (path[3]) {
                                         return {
-                                            relativePath,
+                                            relativePath: path[1],
                                             path,
                                             filter: {
                                                 entity,
@@ -234,7 +234,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     if (userId === filter!.id) {
                                         // 说明userId满足条件，直接返回relativePath
                                         return {
-                                            relativePath: '',
+                                            relativePath: path[1],
                                             path,
                                         };
                                     }
@@ -250,7 +250,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     // 这里如果不是relation关系，则最后一项是指向user的外键名，否则最后一项就是最后一层的对象，有区别
                                     if (idx === restPaths.length - 1 && !path[3]) {
                                         return {
-                                            relativePath,
+                                            relativePath: path[1],
                                             path,
                                             filter: {
                                                 [`${restPaths[idx]}Id`]: userId,
@@ -260,7 +260,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     }
                                     else if (idx === restPaths.length && path[3]) {
                                         return {
-                                            relativePath,
+                                            relativePath: path[1],
                                             path,
                                             filter: {
                                                 entity: entity2,
@@ -306,7 +306,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     ).filter(
                         ele => !!ele
                     ) as {
-                        relativePath: string;                       // （当前目标对象）与在anchor定位出来的对象的相对路径
+                        relativePath: string;                       // （当前目标对象）与将用于测试的cascadePath的destEntity的相对路径
                         path: AuthCascadePath<ED>;                  //  对象的AuthCascadePath
                         filter?: ED[keyof ED]['Selection']['filter'];       //  如果有relation，是对userRelation的查询条件，没有relation则是对path所标定的源对象的查询条件，两者都没有则说明查询条件上已经标定了源对象的userId了
                         relationIds?: string[];                     // 如果有值表示userRelation是本动作所创建出来的，relationIds是相对应的relationIds
