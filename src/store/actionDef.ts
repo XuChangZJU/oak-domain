@@ -110,7 +110,7 @@ function checkUnique<ED extends EntityDict, Cxt extends SyncContext<ED> | AsyncC
         // 说明有null值，不需要检查约束
         return;
     }
-    const filter2 = extraFilter ? addFilterSegment([filter, extraFilter]) : filter;
+    const filter2 = extraFilter ? addFilterSegment(filter, extraFilter) : filter;
     const count = context.count(entity, { filter: filter2 }, { dontCollect: true });
     return checkCountLessThan(count, uniqAttrs, 0, row.id)
 }
