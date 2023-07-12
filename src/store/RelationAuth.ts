@@ -70,7 +70,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             relativePath: string;
         };
 
-        const findHighestAnchors = (entity: keyof ED, filter: NonNullable<ED[keyof ED]['Selection']['filter']>, path: string, excludePaths: Record<string, string[]>): Anchor[] => {
+        const findHighestAnchors = (entity: keyof ED, filter: NonNullable<ED[keyof ED]['Selection']['filter']>, path: string, excludePaths: string[]): Anchor[] => {
             const anchors = [] as Anchor[];
             const anchorsOnMe = [] as Anchor[];
             for (const attr in filter) {
@@ -85,12 +85,18 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 if (rel === 2) {
                     const path2 = path ? `${path}.${attr}` : attr;
                     anchors.push(...findHighestAnchors(attr, filter[attr], path2, excludePaths));
-                    if (!excludePaths[path]) {
-                        excludePaths[path] = [path2];
-                    }
-                    else if (!excludePaths[path].includes(path2)) {
-                        excludePaths[path].push(path2);
-                    }
+
+                    const { attributes } = this.schema[entity];
+                    const { ref } = attributes.entity;
+                    assert(ref instanceof Array);
+                    ref.forEach(
+                        (refEntity) => {
+                            if (refEntity !== attr) {
+                                const refEntityPath = path ? `${path}.${refEntity}` : refEntity;
+                                excludePaths.push(refEntityPath);
+                            }
+                        }
+                    );
                 }
                 else if (typeof rel === 'string') {
                     const path2 = path ? `${path}.${attr}` : attr;
@@ -109,12 +115,17 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                 relativePath: nextPath,
                             });
                         }
-                        if (!excludePaths[path]) {
-                            excludePaths[path] = [nextPath];
-                        }
-                        else if (!excludePaths[path].includes(nextPath)) {
-                            excludePaths[path].push(nextPath);
-                        }
+                        const { attributes } = this.schema[entity];
+                        const { ref } = attributes.entity;
+                        assert(ref instanceof Array);
+                        ref.forEach(
+                            (refEntity) => {
+                                if (refEntity !== filter.entity) {
+                                    const refEntityPath = path ? `${path}.${refEntity}` : refEntity;
+                                    excludePaths.push(refEntityPath);
+                                }
+                            }
+                        );
                     }
                     else if (this.schema[entity].attributes[attr as any]?.type === 'ref') {
                         const { ref } = this.schema[entity].attributes[attr as any];
@@ -162,7 +173,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 ) => {
                     const filter2 = filter || data as ED[keyof ED]['Selection']['filter'];
                     assert(filter2);
-                    const excludePaths: Record<string, string[]> = {};
+                    const excludePaths: string[] = [];
                     const anchors = findHighestAnchors(entity, filter2 as NonNullable<ED[keyof ED]['Selection']['filter']>, '', excludePaths);
                     if (anchors.length === 0) {
                         throw new OakException('本次查询找不到锚定权限的入口，请确认查询条件合法');
@@ -175,8 +186,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     const filters = authCascadePaths.filter(
                         (path) => {
                             // 被entity的外键连接所排队的路径，这个非常重要，否则像extraFile这样的对象会有过多的查询路径
-                            for (const k in excludePaths) {
-                                if (path[1].startsWith(k) && !excludePaths[k].find(ele => path[1].startsWith(`${ele}.`) || path[1] === ele)) {
+                            for (const excludePath of excludePaths) {
+                                if (path[1].startsWith(excludePath)) {
                                     return false;
                                 }
                             }
@@ -186,7 +197,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         (path) => {
                             // 这里anchor的relativePath按长度倒排，所以找到的第一个匹配关系应该就是最准确的
                             const relatedAnchor = anchors.find(
-                                (anchor) => path[1].startsWith(`${anchor.relativePath}.`) 
+                                (anchor) => path[1].startsWith(`${anchor.relativePath}.`)
                                     || path[1] === anchor.relativePath
                                     || !anchor.relativePath     // relativePath如果是'', 所有的路径都成立
                             );
@@ -725,7 +736,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     });
                     root = destructFn(rel, operationMto, '', parentFilter2);
                 }
-                else if (rel instanceof Array) {                    
+                else if (rel instanceof Array) {
                     const [entityOtm, foreignKey] = rel;
                     // 如果是一对多的deduceRelation，可以忽略，其父对象能过就行
                     if (!this.authDeduceRelationMap[entityOtm]) {
@@ -1070,7 +1081,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         const { data } = operation as ED['user']['Update'];
                         if (data.hasOwnProperty('userRelation$user')) {
                             const { userRelation$user } = data;
-                            const checkUrOperation = ( urOperation: ED['userRelation']['Operation']) => this.checkSpecialEntity('userRelation', urOperation, context);
+                            const checkUrOperation = (urOperation: ED['userRelation']['Operation']) => this.checkSpecialEntity('userRelation', urOperation, context);
                             if (userRelation$user instanceof Array) {
                                 const result = userRelation$user.map(ur => checkUrOperation(ur));
                                 if (result[0] instanceof Promise) {
