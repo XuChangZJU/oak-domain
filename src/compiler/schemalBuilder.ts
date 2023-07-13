@@ -6371,21 +6371,18 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
             parent.forEach(
                 ([child, foreignKey]) => {
                     const child2 = firstLetterLowerCase(child);
-                    if (child === entity && Schema[entity].hasRelationDef) {
+                    if (child === entity) {
                         // 如果有层级关系对象，最多找3层。同时这里只找本身存在relation关系的对象，因为如果对象上没有relation，则其上的公共路径应当可以维护住层级关系
-                        // 例如在jichuang项目中，house上没有relation，通过其park外键所维护的路径不需要遍历其父亲。而parkCluster因为有relation，所以必须构造所有的可能路径
-                        const firstRepeated = paths.indexOf(child2);
-                        if (firstRepeated > 0) {
-                            const paths2 = paths.slice(firstRepeated);
-                            if (paths2.length >= 3) {
-                                return;
-                            }
-                            if (paths2.find(ele => ele !== child2)) {
-                                return;
-                            }
+                        // 例如在jichuang项目中，house上没有relation，通过其park外键所维护的路径不需要遍历其父亲。而parkCluster因为有relation，所以必须构造以之为根的所有的可能路径
+                        // 如果不是以之为根的，同样可以根据其上的公共路径去查找，parkCluster.system和parkCluster.parent.system必然是一样的
+                        if (!Schema[entity].hasRelationDef) {
+                            return;
+                        }
+                        if (paths.find(ele => ele !== child2) || paths.length > 2) {
+                            return;
                         }
                     }
-                    else if (paths.indexOf(child2) > 0) {
+                    else if (paths.indexOf(child2) >= 0) {
                         // 除了层级之外的递归直接忽略
                         return;
                     }

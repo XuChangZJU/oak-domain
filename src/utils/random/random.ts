@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 
 export async function getRandomValues(length: number): Promise<Uint8Array> {
     if (length > 65536) {
