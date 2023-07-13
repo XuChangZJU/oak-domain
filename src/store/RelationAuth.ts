@@ -37,7 +37,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             data?: ED[T]['Operation']['data'],
             filter?: ED[T]['Selection']['filter'],
             userRelations?: Array<ED['userRelation']['OpSchema']>,
-        ) => <Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, oneIsEnough?: boolean) => CheckRelationResult[] | Promise<CheckRelationResult[]>
+        ) => (<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, oneIsEnough?: boolean) => CheckRelationResult[] | Promise<CheckRelationResult[]>) | string;
     };
     private selectFreeEntities: (keyof ED)[];
 
@@ -179,7 +179,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     const excludePaths: string[] = [];
                     const anchors = findHighestAnchors(entity, filter2 as NonNullable<ED[keyof ED]['Selection']['filter']>, '', excludePaths);
                     if (anchors.length === 0) {
-                        throw new OakException('本次查询找不到锚定权限的入口，请确认查询条件合法');
+                        return '本次查询找不到锚定权限的入口，请确认查询条件合法';
                     }
                     anchors.sort(
                         (a1, a2) => a2.relativePath.length - a1.relativePath.length
@@ -833,7 +833,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         entity: keyof ED;
         operation: ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'];
         actions?: ED[keyof ED]['Action'][];
-    } {
+    } | undefined {
         // 如果是deduce的对象，将之转化为所deduce的对象上的权限检查            
         const deduceAttr = this.authDeduceRelationMap[entity]!;
         assert(deduceAttr === 'entity', `当前只支持entity作为deduce外键，entity是「${entity as string}」`);
@@ -845,8 +845,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 // 有filter优先判断filter
                 deduceEntity = filter.entity;
                 deduceEntityId = filter.entityId;
-                assert(deduceEntity, `${entity as string}对象上的${action}行为，filter中必须带上${deduceAttr as string}的外键条件`);
-                assert(deduceEntityId, `${entity as string}对象上的${action}行为，filter中必须带上${deduceAttr as string}Id的外键条件`);
+                // assert(deduceEntity, `${entity as string}对象上的${action}行为，filter中必须带上${deduceAttr as string}的外键条件`);
+                // assert(deduceEntityId, `${entity as string}对象上的${action}行为，filter中必须带上${deduceAttr as string}Id的外键条件`);
             }
             else if (data instanceof Array) {
                 for (const d of data) {
@@ -866,45 +866,12 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             else {
                 deduceEntity = (data as ED[T]['CreateSingle']['data']).entity;
                 deduceEntityId = (data as ED[T]['CreateSingle']['data']).entityId;
-                assert(deduceEntity);
-                assert(deduceEntityId);
+                // assert(deduceEntity);
+                // assert(deduceEntityId);
             }
 
-            const excludeActions = readOnlyActions.concat(['create', 'remove']);
-            const updateActions = this.schema[deduceEntity].actions.filter(
-                (a) => !excludeActions.includes(a)
-            );
-
-            return {
-                entity: deduceEntity,
-                operation: {
-                    action: 'update',
-                    data: {},
-                    filter: {
-                        id: deduceEntityId,
-                    },
-                },
-                actions: updateActions,
-            };
-        }
-        else {
-            // 目前应该都有这两个属性，包括select
-            const { entity: deduceEntity, entityId: deduceEntityId } = filter!;
-            assert(deduceEntity, `${entity as string}对象上的${action}行为，必须带上${deduceAttr as string}的外键条件`);
-            assert(deduceEntityId, `${entity as string}对象上的${action}行为，必须带上${deduceAttr as string}Id的外键条件`);
-            if (action === 'select') {
-                return {
-                    entity: deduceEntity,
-                    operation: {
-                        action: 'select',
-                        data: { id: 1 },
-                        filter: { id: deduceEntityId },
-                    }
-                };
-            }
-            else {
-                // 目前对于非select和create的action，只要有其父对象的update/remove属性即可以
-                const excludeActions = readOnlyActions.concat(['create']);
+            if (deduceEntity && deduceEntityId) {
+                const excludeActions = readOnlyActions.concat(['create', 'remove']);
                 const updateActions = this.schema[deduceEntity].actions.filter(
                     (a) => !excludeActions.includes(a)
                 );
@@ -920,6 +887,43 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     },
                     actions: updateActions,
                 };
+            }
+        }
+        else {
+            // 目前应该都有这两个属性，包括select
+            const { entity: deduceEntity, entityId: deduceEntityId } = filter!;
+            // assert(deduceEntity, `${entity as string}对象上的${action}行为，必须带上${deduceAttr as string}的外键条件`);
+            // assert(deduceEntityId, `${entity as string}对象上的${action}行为，必须带上${deduceAttr as string}Id的外键条件`);
+            if (deduceEntity && deduceEntityId) {
+                if (action === 'select') {
+                    return {
+                        entity: deduceEntity,
+                        operation: {
+                            action: 'select',
+                            data: { id: 1 },
+                            filter: { id: deduceEntityId },
+                        }
+                    };
+                }
+                else {
+                    // 目前对于非select和create的action，只要有其父对象的update/remove属性即可以
+                    const excludeActions = readOnlyActions.concat(['create']);
+                    const updateActions = this.schema[deduceEntity].actions.filter(
+                        (a) => !excludeActions.includes(a)
+                    );
+
+                    return {
+                        entity: deduceEntity,
+                        operation: {
+                            action: 'update',
+                            data: {},
+                            filter: {
+                                id: deduceEntityId,
+                            },
+                        },
+                        actions: updateActions,
+                    };
+                }
             }
         }
     }
@@ -983,17 +987,17 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'],
         context: Cxt,
-    ): any | Promise<any> {
+    ): string | Promise<string> {
         const action = (operation as ED[T]['Operation']).action || 'select';
         switch (action) {
             case 'select': {
                 if (['relation', 'actionAuth', 'relationAuth', 'user', 'userEntityGrant'].includes(entity as string)) {
-                    return;
+                    return '';
                 }
                 if (entity === 'userRelation') {
                     const { filter } = operation as ED[T]['Selection'];
                     if (filter?.userId === context.getCurrentUserId()) {
-                        return;
+                        return '';
                     }
                     else {
                         // 查询某一对象的relation，意味着该用户有权利管辖该对象上至少某一种relation的操作权限
@@ -1021,7 +1025,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                 },
                             },
                         }, operation.filter);
-                        return;
+                        return '';
                     }
                 }
                 break;
@@ -1040,13 +1044,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                 return destRelations.then(
                                     (r2) => {
                                         if (!r2.find(ele => ele.id === relationId)) {
-                                            throw new OakUserUnpermittedException(`当前用户没有为id为「${entityId}」的「${entity}」对象创建「${relationId}」人员关系的权限`);
+                                            return `当前用户没有为id为「${entityId}」的「${entity}」对象创建「${relationId}」人员关系的权限`;
                                         }
+                                        return '';
                                     }
                                 );
                             }
                             if (!destRelations.find(ele => ele.id === relationId)) {
-                                throw new OakUserUnpermittedException(`当前用户没有为id为「${entityId}」的「${entity}」对象创建「${relationId}」人员关系的权限`);
+                                return `当前用户没有为id为「${entityId}」的「${entity}」对象创建「${relationId}」人员关系的权限`;
                             }
                         }
                         else {
@@ -1077,7 +1082,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                 },
                             }, filter);
                         }
-                        return;
+                        return '';
                     }
                     case 'user': {
                         // 对用户的操作由应用自己去管理权限，这里只检查grant/revoke
@@ -1088,13 +1093,15 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             if (userRelation$user instanceof Array) {
                                 const result = userRelation$user.map(ur => checkUrOperation(ur));
                                 if (result[0] instanceof Promise) {
-                                    return Promise.all(result);
+                                    return Promise.all(result).then(
+                                        (r2) => r2.join('')
+                                    );
                                 }
-                                return;
+                                return result.join('');
                             }
                             return checkUrOperation(userRelation$user!);
                         }
-                        return;
+                        return '';
                     }
                     default: {
                         break;
@@ -1106,18 +1113,33 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         assert(false, `${entity as string}的${action}权限还未详化处理`);
     }
 
-    private checkActions<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
+    private tryCheckDeducedAuth<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'],
         context: Cxt,
         actions?: ED[T]['Action'][],
-    ): any | Promise<any> {
+    ): string | Promise<string> {
+        if (this.authDeduceRelationMap[entity]) {
+            const deducedResult = this.getDeducedCheckOperation(entity, operation);
+            if (deducedResult) {
+                const { entity: deduceEntity, operation: deduceOperation, actions: deduceActions } = deducedResult;
+                assert(!this.authDeduceRelationMap[deduceEntity], '目前不应出现连续的deduceRelationAuth');
+                return this.tryCheckSelfAuth(deduceEntity, deduceOperation, context, deduceActions);
+            }
+            return `${entity as string}上虽然有deduce权限但不存在相应的查询路径`;
+        }
+        return `${entity as string}上不存在有效的deduce权限`;
+    }
+
+    private tryCheckSelfAuth<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
+        entity: T,
+        operation: ED[T]['Operation'] | ED[T]['Selection'],
+        context: Cxt,
+        actions?: ED[T]['Action'][],
+    ): string | Promise<string> {
         const action = (operation as ED[T]['Operation']).action || 'select';
         const userId = context.getCurrentUserId()!;
-        if (this.authDeduceRelationMap[entity]) {
-            const { entity: deduceEntity, operation: deduceOperation, actions } = this.getDeducedCheckOperation(entity, operation);
-            return this.checkActions(deduceEntity, deduceOperation, context, actions);
-        }
+
         if (action === 'select') {
             // select的权限检查发生在每次cascadeSelect时，如果有多对一的join，被join的实体不需要检查
             if (['user', 'relation', 'oper', 'operEntity', 'modi', 'modiEntity', 'userRelation', 'actionAuth',
@@ -1128,24 +1150,28 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 throw new OakUserUnpermittedException(`处理${entity as string}上不存在有效的actionPath`);
             }
             const checker = this.relationalChecker[entity]!(userId, actions || ['select'], undefined, operation.filter!);
+            if (typeof checker === 'string') {
+                return checker;
+            }
             const result = checker(context, true);
             if (result instanceof Promise) {
                 return result.then(
                     (r2) => {
                         if (r2.length === 0) {
-                            throw new OakUserUnpermittedException(`对「${entity as string}」进行「${action}」操作时找不到对应的授权`);
+                            return `对「${entity as string}」进行「${action}」操作时找不到对应的授权`;
                         }
+                        return '';
                     }
                 )
             }
             if (result.length === 0) {
-                throw new OakUserUnpermittedException(`对「${entity as string}」进行「${action}」操作时找不到对应的授权`);
+                return `对「${entity as string}」进行「${action}」操作时找不到对应的授权`;
             }
         }
         else {
             // operate的权限检查只发生一次，需要在这次检查中将所有cascade的对象的权限检查完成
             // 算法是先将整个update的根结点对象找到，并找到为其赋权的relation，再用此relation去查找所有子对象上的actionAuth
-            const result = [] as Array<Promise<any>>;
+            const result = [] as Array<Promise<string>>;
             const { root, children, userRelations } = this.destructCascadeOperation(entity, operation as ED[T]['Operation']);
 
             const { entity: e, data: d, filter: f, action: a } = root;
@@ -1174,8 +1200,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                 const relationIds = aas2.map(ele => ele.relationId);
                                 const diff = difference(createIds, relationIds);
                                 if (diff.length > 0) {
-                                    throw new OakUserUnpermittedException(`您无权创建「${e as string}」对象上id为「${diff.join(',')}」的用户权限`);
+                                    return `您无权创建「${e as string}」对象上id为「${diff.join(',')}」的用户权限`;
                                 }
+                                return '';
                             }
                         )
                     );
@@ -1184,7 +1211,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     const relationIds = aas.map(ele => ele.relationId!);
                     const diff = difference(createIds, relationIds);
                     if (diff.length > 0) {
-                        throw new OakUserUnpermittedException(`您无权创建「${e as string}」对象上id为「${diff.join(',')}」的用户权限`);
+                        return `您无权创建「${e as string}」对象上id为「${diff.join(',')}」的用户权限`;
                     }
                 }
             }
@@ -1205,6 +1232,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     throw new OakUserUnpermittedException(`${root.entity as string}上不存在有效的actionPath`);
                 }
                 const checker = this.relationalChecker[root.entity]!(userId, actions || [root.action], root.data, root.filter, userRelations);
+                if (typeof checker === 'string') {
+                    return checker;
+                }
                 const r = checker(context, children.length === 0);
                 const checkChildrenAuth = (relativePath: string, relationId?: string) => {
                     const filters = children.map(
@@ -1245,8 +1275,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                 }
                             );
                             if (missedChild) {
-                                return new OakUserUnpermittedException(`对「${missedChild.entity as string}」进行「${missedChild.action}」操作时找不到对应的授权`)
+                                return `对「${missedChild.entity as string}」进行「${missedChild.action}」操作时找不到对应的授权`;
                             }
+                            return '';
                         };
                         if (r2 instanceof Promise) {
                             return r2.then(
@@ -1257,7 +1288,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     }
                     else {
                         // 取消directActionAuth，发现root对象能过，则子对象全部自动通过
-                        return;
+                        return '';
                     }
                 };
                 if (r instanceof Promise) {
@@ -1268,13 +1299,15 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             ))).then(
                                 (r3) => {
                                     if (r3.length === 0) {
-                                        throw new OakUserUnpermittedException(`对「${entity as string}」进行「${action}」操作时找不到对应的授权`);
+                                        return `对「${entity as string}」进行「${action}」操作时找不到对应的授权`;
                                     }
-                                    if (r3.indexOf(undefined) >= 0) {
+                                    if (r3.indexOf('') >= 0) {
                                         // 有一个过就证明能过
-                                        return;
+                                        return '';
                                     }
-                                    throw r3[0];
+                                    return r3.find(
+                                        ele => !!ele
+                                    )!;
                                 }
                             )
                     );
@@ -1284,18 +1317,82 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         ({ relativePath, relationId }) => checkChildrenAuth(relativePath, relationId)
                     );
 
-                    if (r3.length > 0 && r3.includes(undefined)) {
+                    if (r3.length > 0 && r3.includes('')) {
                         // 有一个过就证明能过
+                        return '';
                     }
-                    else {
-                        throw r3[0] || new OakUserUnpermittedException(`对「${entity as string}」进行「${action}」操作时找不到对应的授权`);
-                    }
+                    return r3.find(
+                        ele => !!ele
+                    ) || `对「${entity as string}」进行「${action}」操作时找不到对应的授权`;
                 }
             }
             if (result.length > 0) {
-                return Promise.all(result);
+                return Promise.all(result).then(
+                    (r2) => {
+                        const r3 = r2.find(
+                            ele => !!ele
+                        );
+                        if (r3) {
+                            return r3;
+                        }
+                        return '';
+                    }
+                );
             }
         }
+        return '';
+    }
+
+    private checkActions<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
+        entity: T,
+        operation: ED[T]['Operation'] | ED[T]['Selection'],
+        context: Cxt,
+        actions?: ED[T]['Action'][],
+    ): void | Promise<void> {
+        // 现在checkDeducedAuth和checkSelfAuth是一个或的关系，两者能过一个就算过（message对象就两种可能都有）
+        const result = this.tryCheckDeducedAuth(entity, operation, context, actions);
+        if (result instanceof Promise) {
+            return result.then(
+                (rt) => {
+                    if (!rt) {
+                        return;
+                    }
+                    const result2 = this.tryCheckSelfAuth(entity, operation, context, actions);
+                    if (result2 instanceof Promise) {
+                        return result2.then(
+                            (rt2) => {
+                                if (!rt2) {
+                                    return;
+                                }
+                                throw new OakUserUnpermittedException(rt2);
+                            }
+                        );
+                    }
+                    if (!result2) {
+                        return;
+                    }
+                    throw new OakUserUnpermittedException(result2);
+                }
+            );
+        }
+        if (!result) {
+            return;
+        }
+        const result2 = this.tryCheckSelfAuth(entity, operation, context, actions);
+        if (result2 instanceof Promise) {
+            return result2.then(
+                (rt2) => {
+                    if (!rt2) {
+                        return;
+                    }
+                    throw new OakUserUnpermittedException(rt2);
+                }
+            );
+        }
+        if (!result2) {
+            return;
+        }
+        throw new OakUserUnpermittedException(result2);
     }
 
 

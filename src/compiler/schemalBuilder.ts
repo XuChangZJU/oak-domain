@@ -6359,9 +6359,9 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
         if (paths.length > 12) {
             throw new Error('对象之间的关系深度过长，请优化设计加以避免');
         }
-        if (!DEDUCED_RELATION_MAP[entity]) {
-            actionPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
-        }
+        
+        actionPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
+
         if (Schema[entity].hasRelationDef) {
             // assert(!DEDUCED_RELATION_MAP[entity], `${entity}对象定义了deducedRelationMap，但它有relation`);
             relationPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
@@ -6370,12 +6370,37 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
         if (parent) {
             parent.forEach(
                 ([child, foreignKey]) => {
-                    if (child !== entity && !paths.includes(firstLetterLowerCase(child)) && !IGNORED_FOREIGN_KEY_MAP[firstLetterLowerCase(child)]?.includes(foreignKey)) {
-                        // 如果有递归直接忽略，递归对象在设计时不要进入这个链条
-                        const fk = foreignKey === 'entity' ? firstLetterLowerCase(entity) : foreignKey;
-                        const path2 = path ? `${fk}.${path}` : fk;
-                        outputRecursively(root, child, path2, paths.concat([firstLetterLowerCase(entity)]), isRelation);
+                    const child2 = firstLetterLowerCase(child);
+                    if (child === entity && Schema[entity].hasRelationDef) {
+                        // 如果有层级关系对象，最多找3层。同时这里只找本身存在relation关系的对象，因为如果对象上没有relation，则其上的公共路径应当可以维护住层级关系
+                        // 例如在jichuang项目中，house上没有relation，通过其park外键所维护的路径不需要遍历其父亲。而parkCluster因为有relation，所以必须构造所有的可能路径
+                        const firstRepeated = paths.indexOf(child2);
+                        if (firstRepeated > 0) {
+                            const paths2 = paths.slice(firstRepeated);
+                            if (paths2.length >= 3) {
+                                return;
+                            }
+                            if (paths2.find(ele => ele !== child2)) {
+                                return;
+                            }
+                        }
                     }
+                    else if (paths.indexOf(child2) > 0) {
+                        // 除了层级之外的递归直接忽略
+                        return;
+                    }
+                    if (IGNORED_FOREIGN_KEY_MAP[child2]?.includes(foreignKey)) {
+                        // 忽略的路径放弃
+                        return;
+                    }
+                    if (DEDUCED_RELATION_MAP[child] === foreignKey) {
+                        // 如果子对象本身由父对象推定，也放弃
+                        return;
+                    }
+                                        
+                    const fk = foreignKey === 'entity' ? firstLetterLowerCase(entity) : foreignKey;
+                    const path2 = path ? `${fk}.${path}` : fk;
+                    outputRecursively(root, child, path2, paths.concat([firstLetterLowerCase(entity)]), isRelation);
                 }
             );
         }
