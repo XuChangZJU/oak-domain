@@ -893,22 +893,39 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         }
         else {
             // 目前应该都有这两个属性，包括select
-            const { entity: deduceEntity, entityId: deduceEntityId } = filter!;
+            let { entity: deduceEntity, entityId: deduceEntityId } = filter!;
             // assert(deduceEntity, `${entity as string}对象上的${action}行为，必须带上${deduceAttr as string}的外键条件`);
             // assert(deduceEntityId, `${entity as string}对象上的${action}行为，必须带上${deduceAttr as string}Id的外键条件`);
+            let deduceFilter: ED[keyof ED]['Selection']['filter'] = {};
             if (deduceEntity && deduceEntityId) {
+                deduceFilter = { id: deduceEntityId };
+            }
+            else {
+                // 也可能是用cascade方式进行查找，这里有时候filter上会带有两个不同的entity目标，尚未处理（todo!）
+                const { ref } = this.schema[entity].attributes.entity;
+                assert (ref instanceof Array);
+                for (const refEntity of ref) {
+                    if (filter![refEntity]) {
+                        deduceEntity = refEntity;
+                        deduceFilter = filter![refEntity];
+                        break;
+                    }
+                }
+            }
+            
+            if (deduceEntity && deduceFilter) {
                 if (action === 'select') {
                     return {
                         entity: deduceEntity,
                         operation: {
                             action: 'select',
                             data: { id: 1 },
-                            filter: { id: deduceEntityId },
+                            filter: deduceFilter,
                         }
                     };
                 }
                 else {
-                    // 目前对于非select和create的action，只要有其父对象的update/remove属性即可以
+                    // 目前对于非select和create的action，只要有其父对象的某一update/remove属性即可以（这样设计可能不严谨）
                     const excludeActions = readOnlyActions.concat(['create']);
                     const updateActions = this.schema[deduceEntity].actions.filter(
                         (a) => !excludeActions.includes(a)
@@ -919,9 +936,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         operation: {
                             action: 'update',
                             data: {},
-                            filter: {
-                                id: deduceEntityId,
-                            },
+                            filter: deduceFilter,
                         },
                         actions: updateActions,
                     };
