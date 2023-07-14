@@ -523,7 +523,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         this.schema = schema;
         this.selectFreeEntities = selectFreeEntities;
         this.relationalChecker = {};
-        this.authDeduceRelationMap = authDeduceRelationMap;
+        this.authDeduceRelationMap = Object.assign({}, authDeduceRelationMap, {
+            modi: 'entity',
+        });
         this.constructRelationalChecker();
     }
 
@@ -991,7 +993,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         const action = (operation as ED[T]['Operation']).action || 'select';
         switch (action) {
             case 'select': {
-                if (['relation', 'actionAuth', 'relationAuth', 'user', 'userEntityGrant'].includes(entity as string)) {
+                if (['relation', 'actionAuth', 'relationAuth', 'user', 'userEntityGrant', 'oper', 'operEntity'].includes(entity as string)) {
                     return '';
                 }
                 if (entity === 'userRelation') {

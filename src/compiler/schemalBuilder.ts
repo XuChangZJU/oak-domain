@@ -6304,6 +6304,8 @@ let IGNORED_FOREIGN_KEY_MAP: Record<string, string[]> = {};
 let IGNORED_RELATION_PATH_MAP: Record<string, string[]> = {};
 let DEDUCED_RELATION_MAP: Record<string, string> = {};
 let SELECT_FREE_ENTITIES: string[] = [];
+let FIXED_DESTINATION_PATH_MAP: Record<string, string[]> = {};
+let FIXED_FOR_ALL_DESTINATION_PATH_ENTITIES: string[] = [];
 
 export function registerIgnoredForeignKeyMap(map: Record<string, string[]>) {
     IGNORED_FOREIGN_KEY_MAP = map;
@@ -6316,6 +6318,24 @@ export function registerSelectFreeEntities(entities: string[]) {
 export function registerIgnoredRelationPathMap(map: Record<string, string[]>) {
     for (const k in map) {
         IGNORED_RELATION_PATH_MAP[firstLetterUpperCase(k)] = map[k];
+    }
+}
+
+/**
+ * 很多路径虽然最后指向同一对象，但不能封掉，封了会导致查询的时候找不到对应的路径path
+ * @param map 
+ */
+export function registerFixedDestinationPathMap(map: Record<string, string[]>) {
+    for (const k in map) {
+        if (k === '.') {
+            FIXED_FOR_ALL_DESTINATION_PATH_ENTITIES.push(...map[k]);
+        }
+        else if (FIXED_DESTINATION_PATH_MAP[k]) {
+            FIXED_DESTINATION_PATH_MAP[k].push(...map[k]);
+        }
+        else {
+            FIXED_DESTINATION_PATH_MAP[k] = map[k];
+        }
     }
 }
 
@@ -6342,8 +6362,8 @@ export function registerDeducedRelationMap(map: Record<string, string>) {
  * 输出所有和User相关的对象的后继
  */
 function outputRelation(outputDir: string, printer: ts.Printer) {
-    const ExcludedEntities = ['Oper', 'User', 'OperEntity', 'Modi', 'ModiEntity', 'UserRelation'];
-    const actionPath: [string, string, string, boolean][] = [];
+    const ExcludedEntities = ['Oper', 'User', 'OperEntity', 'Modi', 'ModiEntity', 'UserRelation', 'Relation', 'RelationAuth', 'ActionAuth'];
+    const actionPath: [string, string, string, boolean, string[]][] = [];
     const relationPath: [string, string, string, boolean][] = [];
     const outputRecursively = (root: string, entity: string, path: string, paths: string[], isRelation: boolean) => {
         if (ExcludedEntities.includes(entity)) {
@@ -6360,7 +6380,7 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
             throw new Error('对象之间的关系深度过长，请优化设计加以避免');
         }
         
-        actionPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
+        actionPath.push([firstLetterLowerCase(entity), path, root, isRelation, paths]);
 
         if (Schema[entity].hasRelationDef) {
             // assert(!DEDUCED_RELATION_MAP[entity], `${entity}对象定义了deducedRelationMap，但它有relation`);
@@ -6420,7 +6440,32 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
         (entity3) => {
             outputRecursively(firstLetterLowerCase(entity3), entity3, '', [], true);
         }
-    )
+    );
+
+    actionPath.sort(
+        (ele1, ele2) => {
+            // 先按sourceEntity来排序
+            if (ele1[0] > ele2[0]) {
+                return 1;
+            }
+            else if (ele1[0] < ele2[0]) {
+                return -1;
+            }
+            else {
+                // 再按destEntity
+                if (ele1[2] > ele2[2]) {
+                    return 1;
+                }
+                else if (ele1[2] < ele2[2]) {
+                    return -1;
+                }
+                else {
+                    // 最后按paths的长度倒排
+                    return ele1[4].length - ele2[4].length;
+                }
+            }
+        }
+    );
 
     const entityRelations: [string, string[]][] = [];
     for (const entity in Schema) {
