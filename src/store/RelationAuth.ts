@@ -107,16 +107,27 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 }
                 else if (rel === 1 && anchors.length === 0) {
                     // 只寻找highest的，有更深的就忽略掉浅的
-                    if (attr === 'entity' && pathGroup[filter.entity]) {
+                    if (attr === 'entity' && (pathGroup[filter.entity] || filter.entity === 'user')) {
                         const nextPath = path ? `${path}.${filter.entity as string}` : filter.entity;
                         if (filter.entityId) {
-                            anchorsOnMe.push({
-                                entity: filter.entity,
-                                filter: {
-                                    id: filter.entityId,
-                                },
-                                relativePath: nextPath,
-                            });
+                            if (filter.entity === 'user') {
+                                anchors.push({
+                                    entity: filter.entity,
+                                    filter: {
+                                        id: filter.entityId,
+                                    },
+                                    relativePath: nextPath,
+                                });
+                            }
+                            else {
+                                anchorsOnMe.push({
+                                    entity: filter.entity,
+                                    filter: {
+                                        id: filter.entityId,
+                                    },
+                                    relativePath: nextPath,
+                                });
+                            }
                         }
                         const { attributes } = this.schema[entity];
                         const { ref } = attributes.entity;
@@ -133,8 +144,17 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     else if (this.schema[entity].attributes[attr as any]?.type === 'ref') {
                         const { ref } = this.schema[entity].attributes[attr as any];
                         assert(typeof ref === 'string');
-                        if (pathGroup[ref] || ref === 'user') {
+                        if (pathGroup[ref]) {
                             anchorsOnMe.push({
+                                entity: ref,
+                                filter: {
+                                    id: filter[attr],
+                                },
+                                relativePath: path ? `${path}.${attr.slice(0, attr.length - 2)}` : attr.slice(0, attr.length - 2)
+                            });
+                        }
+                        else if (ref === 'user') {
+                            anchors.push({
                                 entity: ref,
                                 filter: {
                                     id: filter[attr],
@@ -190,7 +210,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         (path) => {
                             // 被entity的外键连接所排队的路径，这个非常重要，否则像extraFile这样的对象会有过多的查询路径
                             for (const excludePath of excludePaths) {
-                                if (path[1].startsWith(excludePath)) {
+                                if (path[1].startsWith(`${excludePath}.`) || path[1] === excludePath) {
                                     return false;
                                 }
                             }
