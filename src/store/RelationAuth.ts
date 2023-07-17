@@ -104,8 +104,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     const path2 = path ? `${path}.${attr}` : attr;
                     anchors.push(...findHighestAnchors(rel, filter[attr], path2, excludePaths));
                 }
-                else if (rel === 1 && anchors.length === 0) {
-                    // 只寻找highest的，有更深的就忽略掉浅的
+                else if (rel === 1) {
                     if (attr === 'entity' && (pathGroup[filter.entity] || filter.entity === 'user')) {
                         const nextPath = path ? `${path}.${filter.entity as string}` : filter.entity;
                         if (filter.entityId) {
