@@ -72,7 +72,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
         const findHighestAnchors = (entity: keyof ED, filter: NonNullable<ED[keyof ED]['Selection']['filter']>, path: string, excludePaths: string[]): Anchor[] => {
             const anchors = [] as Anchor[];
-            const anchorsOnMe = [] as Anchor[];
             for (const attr in filter) {
                 if (attr === '$and') {
                     filter[attr].forEach(
@@ -110,24 +109,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     if (attr === 'entity' && (pathGroup[filter.entity] || filter.entity === 'user')) {
                         const nextPath = path ? `${path}.${filter.entity as string}` : filter.entity;
                         if (filter.entityId) {
-                            if (filter.entity === 'user') {
-                                anchors.push({
-                                    entity: filter.entity,
-                                    filter: {
-                                        id: filter.entityId,
-                                    },
-                                    relativePath: nextPath,
-                                });
-                            }
-                            else {
-                                anchorsOnMe.push({
-                                    entity: filter.entity,
-                                    filter: {
-                                        id: filter.entityId,
-                                    },
-                                    relativePath: nextPath,
-                                });
-                            }
+                            anchors.push({
+                                entity: filter.entity,
+                                filter: {
+                                    id: filter.entityId,
+                                },
+                                relativePath: nextPath,
+                            });
                         }
                         const { attributes } = this.schema[entity];
                         const { ref } = attributes.entity;
@@ -144,16 +132,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     else if (this.schema[entity].attributes[attr as any]?.type === 'ref') {
                         const { ref } = this.schema[entity].attributes[attr as any];
                         assert(typeof ref === 'string');
-                        if (pathGroup[ref]) {
-                            anchorsOnMe.push({
-                                entity: ref,
-                                filter: {
-                                    id: filter[attr],
-                                },
-                                relativePath: path ? `${path}.${attr.slice(0, attr.length - 2)}` : attr.slice(0, attr.length - 2)
-                            });
-                        }
-                        else if (ref === 'user') {
+                        if (pathGroup[ref] || ref === 'user') {
                             anchors.push({
                                 entity: ref,
                                 filter: {
@@ -167,9 +146,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             }
             if (anchors.length > 0) {
                 return anchors;
-            }
-            if (anchorsOnMe.length > 0) {
-                return anchorsOnMe;
             }
             if (filter.id) {
                 // 直接以id作为查询目标
