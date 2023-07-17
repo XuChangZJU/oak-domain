@@ -1115,6 +1115,59 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         }
                         return '';
                     }
+                    case 'userEntityGrant': {
+                        // 对userEntityGrant进行操作，权限上等价于对此权限进行授权操作
+                        const { filter, data, action } = operation as ED[T]['Operation'];
+                        assert(!(data instanceof Array));
+                        assert(['create', 'remove'].includes(action));
+                        if (action === 'create') {
+                            assert(!(data instanceof Array));
+                            const { entity, entityId, relationId } = data as ED['userEntityGrant']['CreateSingle']['data'];
+                            const destRelations = this.getGrantedRelationIds(entity!, entityId!, context);
+                            if (destRelations instanceof Promise) {
+                                return destRelations.then(
+                                    (r2) => {
+                                        if (!r2.find(ele => ele.id === relationId)) {
+                                            return `当前用户没有为id为「${entityId}」的「${entity}」对象创建「${relationId}」上授权的权限`;
+                                        }
+                                        return '';
+                                    }
+                                );
+                            }
+                            if (!destRelations.find(ele => ele.id === relationId)) {
+                                return `当前用户没有为id为「${entityId}」的「${entity}」对象创建「${relationId}」人员关系的权限`;
+                            }
+                        }
+                        else {
+                            // remove加上限制条件
+                            const userId = context.getCurrentUserId();
+                            assert(filter);
+                            operation.filter = addFilterSegment({
+                                relationId: {
+                                    $in: {
+                                        entity: 'relationAuth',
+                                        data: {
+                                            destRelationId: 1,
+                                        },
+                                        filter: {
+                                            sourceRelationId: {
+                                                $in: {
+                                                    entity: 'userRelation',
+                                                    data: {
+                                                        relationId: 1,
+                                                    },
+                                                    filter: {
+                                                        userId,
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            }, filter);
+                        }
+                        return '';
+                    }
                     default: {
                         break;
                     }
