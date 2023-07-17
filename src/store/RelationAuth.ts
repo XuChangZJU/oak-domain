@@ -170,7 +170,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     userRelations?: Array<ED['userRelation']['OpSchema']>,
                 ) => {
                     const filter2 = filter || data as ED[keyof ED]['Selection']['filter'];
-                    assert(filter2);
+                    if (!filter2) {
+                        // 到这里如果没有限定条件，可以直接报错。要放在这里的原因是对root的判断太深，设计上可能有点问题 by Xc 20230717
+                        return '没有限定查询条件，无法进行合法的权限判定';
+                    }
                     const excludePaths: string[] = [];
                     const anchors = findHighestAnchors(entity, filter2 as NonNullable<ED[keyof ED]['Selection']['filter']>, '', excludePaths);
                     if (anchors.length === 0) {
