@@ -1,8 +1,8 @@
-export declare type Point = [number, number];
-export declare type Path = Array<Point>;
-export declare type Polygon = Array<Path>;
-export declare type Circle = [Point, number];
-export declare type SingleGeo = {
+export type Point = [number, number];
+export type Path = Array<Point>;
+export type Polygon = Array<Path>;
+export type Circle = [Point, number];
+export type SingleGeo = {
     type: 'point';
     coordinate: Point;
 } | {
@@ -15,4 +15,4 @@ export declare type SingleGeo = {
     type: 'circle';
     coordinate: Circle;
 };
-export declare type Geo = SingleGeo | SingleGeo[];
+export type Geo = SingleGeo | SingleGeo[];

@@ -114,7 +114,7 @@ function checkUnique<ED extends EntityDict, Cxt extends SyncContext<ED> | AsyncC
         // 说明有null值，不需要检查约束
         return;
     }
-    const filter2 = extraFilter ? addFilterSegment([filter, extraFilter]) : filter;
+    const filter2 = extraFilter ? addFilterSegment(filter, extraFilter) : filter;
     const count = context.count(entity, { filter: filter2 }, { dontCollect: true });
     return checkCountLessThan(count, uniqAttrs, 0, row.id)
 }
@@ -203,7 +203,7 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                         priority: 20,       // 优先级要放在最高，所有前置的checker/trigger将数据完整之后再在这里检测
                         checker: (operation, context) => {
                             const { data } = operation;
-                            
+
                             if (data instanceof Array) {
                                 checkUniqueBetweenRows(data, uniqAttrs);
                                 const checkResult = data.map(
@@ -262,7 +262,7 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                                     return Promise.all([checkCount, checkRowCount]).then(
                                         () => undefined
                                     );
-                                }                                
+                                }
                             }
                             // 否则需要结合本行现有的属性来进行检查
                             const projection = { id: 1 };
@@ -287,7 +287,7 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                                     return Promise.all(checkResults).then(
                                         () => undefined
                                     );
-                                }                                
+                                }
                             };
 
                             const currentRows = context.select(entity, {

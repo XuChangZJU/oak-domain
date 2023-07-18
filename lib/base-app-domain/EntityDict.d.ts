@@ -8,7 +8,7 @@ import { EntityDef as RelationAuth } from "./RelationAuth/Schema";
 import { EntityDef as User } from "./User/Schema";
 import { EntityDef as UserEntityGrant } from "./UserEntityGrant/Schema";
 import { EntityDef as UserRelation } from "./UserRelation/Schema";
-export declare type EntityDict = {
+export type EntityDict = {
     actionAuth: ActionAuth;
     modi: Modi;
     modiEntity: ModiEntity;
