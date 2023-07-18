@@ -243,7 +243,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                             },
                                         };
                                     }
-                                    if (userId === filter!.id) {
+                                    else if (userId === filter!.id) {
                                         // 说明userId满足条件，直接返回relativePath
                                         return {
                                             relativePath: path[1],
@@ -261,6 +261,19 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                 } => {
                                     // 这里如果不是relation关系，则最后一项是指向user的外键名，否则最后一项就是最后一层的对象，有区别
                                     if (idx === restPaths.length - 1 && !path[3]) {
+                                        const rel = judgeRelation(this.schema, entity2, restPaths[idx]);
+                                        if (rel === 2) {
+                                            return {
+                                                relativePath: path[1],
+                                                path,
+                                                filter: {
+                                                    entity: 'user',
+                                                    entityId: userId,
+                                                    ...filter2!,
+                                                },
+                                            };
+                                        }
+                                        assert (typeof rel === 'string');
                                         return {
                                             relativePath: path[1],
                                             path,
@@ -939,6 +952,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         actions: updateActions,
                     };
                 }
+            }
+            else if (process.env.NODE_ENV === 'development') {
+                console.warn(`对可deduce权限的对象${entity as string}的动作${action}找不到可推导的外键关系，请检查是否应该带上该外键再处理`);
             }
         }
     }
