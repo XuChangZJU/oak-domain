@@ -1,7 +1,7 @@
 import { ActionType } from '.';
 import { EntityDict, EntityShape, InstinctiveAttributes } from './Entity';
 import { DataType, DataTypeParams } from './schema/DataTypes';
-export type Ref = 'ref';
+export declare type Ref = 'ref';
 export interface Column<SH extends EntityShape> {
     name: keyof SH | `${string}State`;
     size?: number;
@@ -28,12 +28,12 @@ export interface Attribute {
     sequenceStart?: number;
     enumeration?: string[];
 }
-export type Attributes<SH extends EntityShape> = Omit<{
+export declare type Attributes<SH extends EntityShape> = Omit<{
     [attrName in keyof SH]: Attribute;
 }, InstinctiveAttributes>;
 export interface EntityConfig {
 }
-export type UniqConstraint<SH extends EntityShape> = {
+export declare type UniqConstraint<SH extends EntityShape> = {
     attributes: Array<keyof SH>;
     type?: string;
 };
@@ -52,6 +52,6 @@ export interface StorageDesc<SH extends EntityShape> {
     relation?: string[];
     view?: true;
 }
-export type StorageSchema<ED extends EntityDict> = {
+export declare type StorageSchema<ED extends EntityDict> = {
     [K in keyof ED]: StorageDesc<ED[K]['OpSchema']>;
 };
