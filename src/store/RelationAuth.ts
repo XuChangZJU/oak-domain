@@ -1247,41 +1247,78 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 assert(e !== 'user');
                 assert(!(d instanceof Array));
                 const createIds = userRelations.map(ele => ele.relationId!);
-                // 这里处理的是创建对象时顺带创建相关权限，要检查该权限是不是有create动作授权
-                const aas = context.select('actionAuth', {
-                    data: {
-                        id: 1,
-                        relationId: 1,
-                    },
-                    filter: {
-                        destEntity: e as string,
-                        deActions: {
-                            $contains: 'create',
+                /**
+                 * 当某一个对象更新授予权限时，有两种情况：
+                 * 1）当前用户有授予此权限的权限
+                 * 2）当前权限可以在创建的时候自动被创建(根据actionAuth的path = ''同时有create权限来判定)
+                 */
+                const promises = [
+                    context.select('relationAuth', {
+                        data: {
+                            id: 1,
+                            destRelationId: 1,
                         },
-                        path: '',
-                    },
-                }, { dontCollect: true });
-                if (aas instanceof Promise) {
-                    result.push(
-                        aas.then(
-                            (aas2) => {
-                                const relationIds = aas2.map(ele => ele.relationId);
-                                const diff = difference(createIds, relationIds);
-                                if (diff.length > 0) {
-                                    return `您无权创建「${e as string}」对象上id为「${diff.join(',')}」的用户权限`;
+                        filter: {
+                            destRelationId: {
+                                $in: createIds,
+                            },
+                            sourceRelationId: {
+                                $in: {
+                                    entity: 'userRelation',
+                                    data: {
+                                       relationId: 1, 
+                                    },
+                                    filter: {
+                                        userId,
+                                    }
                                 }
-                                return '';
+                            }
+                        }
+                    }, { dontCollect: true}),
+                    action === 'create' && context.select('actionAuth', {
+                        data: {
+                            id: 1,
+                            relationId: 1,
+                        },
+                        filter: {
+                            destEntity: e as string,
+                            deActions: {
+                                $contains: 'create',
+                            },
+                            path: '',
+                        },
+                    }, { dontCollect: true })
+                ] as [
+                    Partial<ED['relationAuth']['Schema']>[] | Promise<Partial<ED['relationAuth']['Schema']>[]>,
+                    Partial<ED['actionAuth']['Schema']>[] | Promise<Partial<ED['actionAuth']['Schema']>[]>
+                ];
+
+                const checkRelationLegal = (selectResult: [Partial<ED['relationAuth']['Schema']>[], Partial<ED['actionAuth']['Schema']>[] | undefined]) => {
+                    if (selectResult[0].length > 0 && difference(createIds, selectResult[0].map(ele => ele.destRelationId)).length === 0) {
+                        return true;
+                    }
+                    if (selectResult[1] && difference(createIds, selectResult[1].map(ele => ele.relationId)).length === 0) {
+                        return true;
+                    }
+                };
+
+                if (promises[0] instanceof Promise) {
+                    result.push(
+                        Promise.all(promises).then(
+                            (r2) => {
+                                if (checkRelationLegal(r2)) {
+                                    return '';
+                                }
+                                return `您没有创建${createIds.join(',')}之一关系的权限`;
                             }
                         )
                     );
                 }
                 else {
-                    const relationIds = aas.map(ele => ele.relationId!);
-                    const diff = difference(createIds, relationIds);
-                    if (diff.length > 0) {
-                        return `您无权创建「${e as string}」对象上id为「${diff.join(',')}」的用户权限`;
+                    if (!checkRelationLegal(promises as [Partial<ED['relationAuth']['Schema']>[], Partial<ED['actionAuth']['Schema']>[]])) {
+                        return `您没有创建${createIds.join(',')}关系之一的权限`;
                     }
-                }
+                }                
             }
             if (['user', 'relation', 'oper', 'operEntity', 'modi', 'modiEntity', 'userRelation', 'actionAuth',
                 'freeActionAuth', 'relationAuth', 'userEntityGrant', 'relation'].includes(e as string)) {
