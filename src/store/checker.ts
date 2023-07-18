@@ -3,7 +3,7 @@ import { addFilterSegment, checkFilterContains, combineFilters } from "../store/
 import { OakAttrNotNullException, OakInputIllegalException, OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
 import {
     AuthDefDict, CascadeRelationItem, Checker, CreateTriggerInTxn,
-    EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn, RelationHierarchy, SelectOpResult, REMOVE_CASCADE_PRIORITY, RefOrExpression, SyncOrAsync, CascadeRemoveDefDict
+    EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn, RelationHierarchy, SelectOpResult, SyncOrAsync, CascadeRemoveDefDict, CHECKER_MAX_PRIORITY
 } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
@@ -980,6 +980,7 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
             entity: entity as keyof ED,
             action: 'remove',
             type: 'logical',
+            priority: CHECKER_MAX_PRIORITY,
             checker: (operation, context, option) => {
                 const promises: Promise<void>[] = [];
                 if (OneToManyMatrix[entity]) {

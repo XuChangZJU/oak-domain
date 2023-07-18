@@ -813,7 +813,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     }
 
     // 前台检查filter是否满足relation约束
-    checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt) {
+    checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: Omit< ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt) {
         if (context.isRoot()) {
             return;
         }
@@ -828,10 +828,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
     private getDeducedCheckOperation<T extends keyof ED, Cxt extends AsyncContext<ED>>(
         entity: T,
-        operation: ED[T]['Operation'] | ED[T]['Selection']
+        operation: Omit< ED[T]['Operation'] | ED[T]['Selection'], 'id'>,
     ): {
         entity: keyof ED;
-        operation: ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'];
+        operation: Omit<ED[keyof ED]['Operation'] | ED[keyof ED]['Selection'], 'id'>;
         actions?: ED[keyof ED]['Action'][];
     } | undefined {
         // 如果是deduce的对象，将之转化为所deduce的对象上的权限检查            
@@ -883,8 +883,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         data: {},
                         filter: {
                             id: deduceEntityId,
-                        },
-                    },
+                        } as ED[keyof ED]['Selection']['filter'],
+                    } as Omit<ED[keyof ED]['Operation'], 'id'>,
                     actions: updateActions,
                 };
             }
@@ -919,7 +919,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             action: 'select',
                             data: { id: 1 },
                             filter: deduceFilter,
-                        }
+                        } as Omit<ED[keyof ED]['Selection'], 'id'>
                     };
                 }
                 else {
@@ -935,7 +935,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             action: 'update',
                             data: {},
                             filter: deduceFilter,
-                        },
+                        } as Omit<ED[keyof ED]['Operation'], 'id'>,
                         actions: updateActions,
                     };
                 }
@@ -1000,8 +1000,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
     private checkSpecialEntity<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
         entity: T,
-        operation: ED[T]['Operation'] | ED[T]['Selection'],
-        context: Cxt,
+        operation: Omit< ED[T]['Operation'] | ED[T]['Selection'], 'id'>,
+        context: Cxt
     ): string | Promise<string> {
         const action = (operation as ED[T]['Operation']).action || 'select';
         switch (action) {
@@ -1183,7 +1183,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
     private tryCheckDeducedAuth<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
         entity: T,
-        operation: ED[T]['Operation'] | ED[T]['Selection'],
+        operation: Omit< ED[T]['Operation'] | ED[T]['Selection'], 'id'>,
         context: Cxt,
         actions?: ED[T]['Action'][],
     ): string | Promise<string> {
@@ -1201,7 +1201,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
     private tryCheckSelfAuth<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
         entity: T,
-        operation: ED[T]['Operation'] | ED[T]['Selection'],
+        operation: Omit< ED[T]['Operation'] | ED[T]['Selection'], 'id'>,
         context: Cxt,
         actions?: ED[T]['Action'][],
     ): string | Promise<string> {
@@ -1327,7 +1327,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     action: a,
                     data: d,
                     filter: f,
-                }, context);
+                } as Omit<ED[keyof ED]['Operation'], 'id'>, context);
                 if (r instanceof Promise) {
                     result.push(r);
                 }
@@ -1450,7 +1450,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
     private checkActions<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
         entity: T,
-        operation: ED[T]['Operation'] | ED[T]['Selection'],
+        operation: Omit< ED[T]['Operation'] | ED[T]['Selection'], 'id'>,
         context: Cxt,
         actions?: ED[T]['Action'][],
     ): void | Promise<void> {
@@ -1502,7 +1502,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
 
     // 后台检查filter是否满足relation约束
-    async checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt) {
+    async checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: Omit< ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt) {
         if (context.isRoot()) {
             return;
         }

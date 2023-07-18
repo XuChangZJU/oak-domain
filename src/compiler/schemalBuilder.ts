@@ -3034,18 +3034,12 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                 )
             ],
             factory.createTypeReferenceNode(
-                factory.createIdentifier("Omit"),
+                factory.createIdentifier("SelectOperation"),
                 [
                     factory.createTypeReferenceNode(
-                        factory.createIdentifier("SelectOperation"),
-                        [
-                            factory.createTypeReferenceNode(
-                                factory.createIdentifier("P"),
-                                undefined
-                            )
-                        ]
-                    ),
-                    factory.createLiteralTypeNode(factory.createStringLiteral("action"))
+                        factory.createIdentifier("P"),
+                        undefined
+                    )
                 ]
             )
         ),

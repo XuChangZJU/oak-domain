@@ -1,10 +1,13 @@
-import { ActionDictOfEntityDict, BBWatcher, Checker, EntityDict, StorageSchema, Trigger, RowChecker, OakDataException, OakUniqueViolationException } from "../types";
+import { ActionDictOfEntityDict, BBWatcher, Checker, EntityDict, StorageSchema, Trigger, RowChecker, OakDataException, OakUniqueViolationException, UpdateTrigger, CHECKER_MAX_PRIORITY } from "../types";
 import { SyncContext } from "./SyncRowStore";
 import { AsyncContext } from "./AsyncRowStore";
 import { uniqBy, pick, intersection } from '../utils/lodash';
 import { addFilterSegment } from "./filter";
+import { createDynamicCheckers } from '../checkers';
+import { createDynamicTriggers } from '../triggers';
+import { EntityDict as BaseEntityDict } from '../base-app-domain/EntityDict';
 
-export function getFullProjection<ED extends EntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>) {
+export function getFullProjection<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>) {
     const { attributes } = schema[entity];
     const projection: ED[T]['Selection']['data'] = {
         id: 1,
@@ -21,7 +24,7 @@ export function getFullProjection<ED extends EntityDict, T extends keyof ED>(ent
     return projection;
 }
 
-function makeIntrinsicWatchers<ED extends EntityDict>(schema: StorageSchema<ED>) {
+function makeIntrinsicWatchers<ED extends EntityDict & BaseEntityDict>(schema: StorageSchema<ED>) {
     const watchers: BBWatcher<ED, keyof ED>[] = [];
     for (const entity in schema) {
         const { attributes } = schema[entity];
@@ -93,7 +96,7 @@ function checkCountLessThan(count: number | Promise<number>, uniqAttrs: string[]
     }
 }
 
-function checkUnique<ED extends EntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
+function checkUnique<ED extends EntityDict& BaseEntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
     entity: keyof ED,
     row: Record<string, any>,
     context: Cxt,
@@ -115,9 +118,9 @@ function checkUnique<ED extends EntityDict, Cxt extends SyncContext<ED> | AsyncC
     return checkCountLessThan(count, uniqAttrs, 0, row.id)
 }
 
-export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(schema: StorageSchema<ED>, actionDefDict: ActionDictOfEntityDict<ED>) {
-    const checkers: Array<Checker<ED, keyof ED, Cxt>> = [];
-    const triggers: Array<Trigger<ED, keyof ED, Cxt>> = [];
+export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>>(schema: StorageSchema<ED>, actionDefDict: ActionDictOfEntityDict<ED>) {
+    const checkers: Array<Checker<ED, keyof ED, Cxt | FrontCxt>> = createDynamicCheckers<ED, Cxt | FrontCxt>(schema);
+    const triggers: Array<Trigger<ED, keyof ED, Cxt | FrontCxt>> = createDynamicTriggers<ED, Cxt | FrontCxt>(schema);
 
     // action状态转换矩阵相应的checker
     for (const entity in actionDefDict) {
@@ -140,11 +143,12 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                     filter: conditionalFilter,
                     errMsg: '',
                 } as RowChecker<ED, keyof ED, Cxt>);
+
+                // 这里用data类型的checker改数据了不太好，先这样
                 checkers.push({
                     action: action as any,
                     type: 'data',
                     entity,
-                    priority: 10,       // 优先级要高
                     checker: (data) => {
                         Object.assign(data, {
                             [attr]: stm[action][1],
@@ -196,14 +200,14 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                         entity,
                         action: 'create',
                         type: 'logical',
-                        priority: 20,       // 优先级要放在最高，所有前置的checker/trigger将数据完整之后再在这里检测
+                        priority: CHECKER_MAX_PRIORITY,       // 优先级要放在最低，所有前置的checker/trigger将数据完整之后再在这里检测
                         checker: (operation, context) => {
                             const { data } = operation;
                             
                             if (data instanceof Array) {
                                 checkUniqueBetweenRows(data, uniqAttrs);
                                 const checkResult = data.map(
-                                    ele => checkUnique<ED, Cxt>(entity, ele, context, uniqAttrs)
+                                    ele => checkUnique<ED, Cxt | FrontCxt>(entity, ele, context, uniqAttrs)
                                 );
                                 if (checkResult[0] instanceof Promise) {
                                     return Promise.all(checkResult).then(
@@ -212,14 +216,14 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                                 }
                             }
                             else {
-                                return checkUnique<ED, Cxt>(entity, data, context, uniqAttrs);
+                                return checkUnique<ED, Cxt | FrontCxt>(entity, data, context, uniqAttrs);
                             }
                         }
                     }, {
                         entity,
                         action: 'update',       // 只检查update，其它状态转换的action应该不会涉及unique约束的属性
                         type: 'logical',
-                        priority: 20,       // 优先级要放在最高，所有前置的checker/trigger将数据完整之后再在这里检测
+                        priority: CHECKER_MAX_PRIORITY,       // 优先级要放在最低，所有前置的checker/trigger将数据完整之后再在这里检测
                         checker: (operation, context) => {
                             const { data, filter: operationFilter } = operation as ED[keyof ED]['Update'];
                             const attrs = Object.keys(data);
@@ -275,7 +279,7 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                                 // 先检查这些行本身之间是否冲突
                                 checkUniqueBetweenRows(rows22, uniqAttrs);
                                 const checkResults = rows22.map(
-                                    (row) => checkUnique<ED, Cxt>(entity, row, context, uniqAttrs, {
+                                    (row) => checkUnique<ED, Cxt | FrontCxt>(entity, row, context, uniqAttrs, {
                                         $not: operationFilter
                                     })
                                 );

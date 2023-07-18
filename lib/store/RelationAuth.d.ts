@@ -36,7 +36,7 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      * @param operation
      */
     private destructCascadeOperation;
-    checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt): void;
+    checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): void;
     private getDeducedCheckOperation;
     /**
      * 查询当前用户在对应entity上可以操作的relationIds
@@ -50,5 +50,5 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
     private tryCheckDeducedAuth;
     private tryCheckSelfAuth;
     private checkActions;
-    checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'], context: Cxt): Promise<void>;
+    checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): Promise<void>;
 }

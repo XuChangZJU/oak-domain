@@ -1,6 +1,6 @@
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { OpSchema as Modi } from '../base-app-domain/Modi/Schema';
-import { Operation, StorageSchema, RowChecker, EntityDict, OperateOption, Trigger, RemoveTrigger, REMOVE_CASCADE_PRIORITY } from '../types';
+import { Operation, StorageSchema, RowChecker, EntityDict, OperateOption, Trigger, RemoveTrigger, TRIGGER_DEFAULT_PRIORITY } from '../types';
 import { appendOnlyActions } from '../actions/action';
 import { difference } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
@@ -145,7 +145,7 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
 }
 
 
-export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>>(schema: StorageSchema<ED>) {
+export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
     const triggers: Trigger<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
@@ -157,8 +157,8 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
                 name: `当删除${entity}对象时，删除相关联的modi的modiEntity`,
                 action: 'remove',
                 entity,
-                when: 'after',
-                priority: REMOVE_CASCADE_PRIORITY,
+                when: 'before',
+                priority: TRIGGER_DEFAULT_PRIORITY,
                 fn: async ({ operation }, context, option) => {
                     const { filter } = operation;
                     await context.operate('modiEntity', {

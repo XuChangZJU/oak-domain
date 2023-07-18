@@ -54,7 +54,7 @@ export declare type Operation<A extends string, D extends Projection, F extends 
 } & FilterPart<A, F>;
 export declare type Selection<A extends ReadOnlyAction, D extends Projection, F extends Filter | undefined = undefined, S extends Sorter | undefined = undefined> = {
     id?: string;
-    action: A;
+    action?: A;
     data: D;
     sorter?: S;
 } & FilterPart<A, F>;
@@ -74,7 +74,7 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<Selection<'select', Projection, Filter, Sorter>, 'action'>;
+    Selection: Selection<'select', Projection, Filter, Sorter>;
     Aggregation: DeduceAggregation<Projection, Filter, Sorter>;
     Operation: CUDOperation;
     Create: CreateOperation;

@@ -68,7 +68,7 @@ export type Selection<A extends ReadOnlyAction,
     F extends Filter | undefined = undefined,
     S extends Sorter | undefined = undefined> = {
         id?: string;     // selection的id可传可不传，如果传意味着该select会记录在oper中
-        action: A;
+        action?: A;
         data: D;
         sorter?: S;
     } & FilterPart<A, F>;
@@ -93,7 +93,7 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<Selection<'select', Projection, Filter, Sorter>, 'action'>;
+    Selection: Selection<'select', Projection, Filter, Sorter>;
     Aggregation: DeduceAggregation<Projection, Filter, Sorter>;
     Operation: CUDOperation;
     Create: CreateOperation;

@@ -7,12 +7,11 @@ import { EntityShape } from "../types/Entity";
 /**
  * 优先级越小，越早执行。定义在1～99之间
  */
-export declare const TRIGGER_DEFAULT_PRIORITY = 50;
 export declare const TRIGGER_MIN_PRIORITY = 1;
-export declare const TRIGGER_MAX_PRIORITY = 99;
-export declare const DATA_CHECKER_DEFAULT_PRIORITY = 60;
-export declare const CHECKER_DEFAULT_PRIORITY = 99;
-export declare const REMOVE_CASCADE_PRIORITY = 70;
+export declare const TRIGGER_DEFAULT_PRIORITY = 25;
+export declare const TRIGGER_MAX_PRIORITY = 50;
+export declare const CHECKER_MAX_PRIORITY = 99;
+export declare const CHECKER_PRIORITY_MAP: Record<CheckerType, number>;
 interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
     checkerType?: CheckerType;
     entity: T;
