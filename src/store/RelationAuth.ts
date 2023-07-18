@@ -1245,7 +1245,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             const { entity: e, data: d, filter: f, action: a } = root;
             if (userRelations.length > 0) {
                 assert(e !== 'user');
-                assert(a === 'create' && !(d instanceof Array));
+                assert(!(d instanceof Array));
                 const createIds = userRelations.map(ele => ele.relationId!);
                 // 这里处理的是创建对象时顺带创建相关权限，要检查该权限是不是有create动作授权
                 const aas = context.select('actionAuth', {
