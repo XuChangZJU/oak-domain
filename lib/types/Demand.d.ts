@@ -80,4 +80,8 @@ export declare type JsonFilter<O extends any> = O extends Array<infer P> ? (Json
 } : O extends number ? Q_NumberValue : O extends string ? Q_StringValue : O extends boolean ? Q_BooleanValue : O extends Record<string, any> ? {
     [A in keyof O]?: JsonFilter<O[A]>;
 } : never;
+export declare type SubQueryPredicateMetadata = {
+    '#sqp'?: 'in' | 'not in' | 'all' | 'not all';
+};
+export declare const SUB_QUERY_PREDICATE_KEYWORD = "#sqp";
 export {};

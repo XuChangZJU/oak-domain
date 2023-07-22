@@ -117,5 +117,9 @@ export type JsonFilter<O extends any> = O extends Array<infer P> ? (JsonFilter<P
     [A in keyof O]?: JsonFilter<O[A]>;
 } : never;
 
+export type SubQueryPredicateMetadata = {
+    '#sqp'?: 'in' | 'not in' | 'all' | 'not all';
+};
 
+export const SUB_QUERY_PREDICATE_KEYWORD = '#sqp';
 

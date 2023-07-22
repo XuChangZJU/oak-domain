@@ -94,4 +94,8 @@ export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDic
     private addToResultSelections;
     private addSingleRowToResultSelections;
     protected cascadeSelectAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Promise<Partial<ED[T]['Schema']>[]>;
+    protected selectAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Promise<Partial<ED[T]['Schema']>[]>;
+    protected selectSync<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Partial<ED[T]['Schema']>[];
+    protected operateSync<T extends keyof ED, Cxt extends SyncContext<ED>, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): OperationResult<ED>;
+    protected operateAsync<T extends keyof ED, Cxt extends AsyncContext<ED>, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): Promise<OperationResult<ED>>;
 }

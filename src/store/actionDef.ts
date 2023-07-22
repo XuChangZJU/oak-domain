@@ -120,7 +120,7 @@ function checkUnique<ED extends EntityDict& BaseEntityDict, Cxt extends SyncCont
 
 export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>>(schema: StorageSchema<ED>, actionDefDict: ActionDictOfEntityDict<ED>) {
     const checkers: Array<Checker<ED, keyof ED, Cxt | FrontCxt>> = createDynamicCheckers<ED, Cxt | FrontCxt>(schema);
-    const triggers: Array<Trigger<ED, keyof ED, Cxt | FrontCxt>> = createDynamicTriggers<ED, Cxt | FrontCxt>(schema);
+    const triggers: Array<Trigger<ED, keyof ED, Cxt>> = createDynamicTriggers<ED, Cxt>(schema);
 
     // action状态转换矩阵相应的checker
     for (const entity in actionDefDict) {

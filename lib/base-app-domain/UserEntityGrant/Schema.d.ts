@@ -1,7 +1,6 @@
 import { String, ForeignKey } from "../../types/DataType";
-import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
+import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
 import * as Relation from "../Relation/Schema";
@@ -26,14 +25,16 @@ export declare type Schema = EntityShape & {
     [A in ExpressionKey]?: any;
 };
 declare type AttrFilter = {
-    id: Q_StringValue | SubQuery.UserEntityGrantIdSubQuery;
+    id: Q_StringValue;
     $$createAt$$: Q_DateValue;
     $$seq$$: Q_StringValue;
     $$updateAt$$: Q_DateValue;
     entity: Q_StringValue;
     entityId: Q_StringValue;
-    relationId: Q_StringValue | SubQuery.RelationIdSubQuery;
+    relationId: Q_StringValue;
     relation: Relation.Filter;
+    modiEntity$entity: ModiEntity.Filter & SubQueryPredicateMetadata;
+    operEntity$entity: OperEntity.Filter & SubQueryPredicateMetadata;
 };
 export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
 export declare type Projection = {

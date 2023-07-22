@@ -42,7 +42,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
             );
         };
-    
+
         let relevantIds: string[] = [];
         if (filter) {
             const toBeAssignNode: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
@@ -71,11 +71,11 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     else if (attr === '$text') {
                         // 全文检索首先要有fulltext索引，其次要把fulltext的相关属性加到projection里
                         const { indexes } = this.getSchema()[entity2];
-    
+
                         const fulltextIndex = indexes!.find(
                             ele => ele.config && ele.config.type === 'fulltext'
                         );
-    
+
                         const { attributes } = fulltextIndex!;
                         necessaryAttrs.push(...(attributes.map(ele => ele.name as string)));
                     }
@@ -137,15 +137,15 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     checkNode(projectionNode, necessaryAttrs);
                 }
             };
-    
+
             checkFilterNode(entity, filter, data);
             relevantIds = getRelevantIds(filter);
         }
-    
+
         // sorter感觉现在取不取影响不大，前端的list直接获取返回的ids了，先不管之
         if (sorter) {
         }
-    
+
         const toBeAssignNode2: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
         const projectionNodeDict: Record<string, ED[keyof ED]['Selection']['data']> = {};
         const checkProjectionNode = (entity2: keyof ED, projectionNode: ED[keyof ED]['Selection']['data']) => {
@@ -210,7 +210,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
                 checkNode(projectionNode, necessaryAttrs);
             }
-    
+
             // 如果对象中指向一对多的Modi，此时加上指向Modi的projection
             if (this.getSchema()[entity2].toModi) {
                 Object.assign(projectionNode, {
@@ -234,7 +234,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             }
         };
         checkProjectionNode(entity, data);
-    
+
         if (!sorter && relevantIds.length === 0) {
             // 如果没有sorter，就给予一个按createAt逆序的sorter
             Object.assign(selection, {
@@ -251,7 +251,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 $$createAt$$: 1,
             });
         }
-    
+
         this.selectionRewriters.forEach(
             ele => ele(this.getSchema(), entity, selection)
         );
@@ -267,7 +267,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         this.operationRewriters.push(rewriter);
     }
 
-    public registerSelectionRewriter(rewriter:  SelectionRewriter<ED>) {
+    public registerSelectionRewriter(rewriter: SelectionRewriter<ED>) {
         this.selectionRewriters.push(rewriter);
     }
 
@@ -1640,7 +1640,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): OperationResult<ED> {
-        this.reinforceOperation(entity, operation);
+
         const { action, data, filter, id } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => any> = [];
@@ -1908,7 +1908,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]> {
-        this.reinforceSelection(entity, selection);
         const { data, filter, indexFrom, count, sorter } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
@@ -1961,5 +1960,41 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         }
 
         return rows;
+    }
+
+    protected async selectAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        selection: ED[T]['Selection'],
+        context: Cxt,
+        option: OP): Promise<Partial<ED[T]['Schema']>[]> {
+        this.reinforceSelection(entity, selection);
+        return this.cascadeSelectAsync(entity, selection, context, option);
+    }
+
+    protected selectSync<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
+        entity: T,
+        selection: ED[T]['Selection'],
+        context: Cxt,
+        option: OP): Partial<ED[T]['Schema']>[] {
+        return this.cascadeSelect(entity, selection, context, option);
+    }
+
+    protected operateSync<T extends keyof ED, Cxt extends SyncContext<ED>, OP extends OperateOption>(
+        entity: T,
+        operation: ED[T]['Operation'],
+        context: Cxt,
+        option: OP): OperationResult<ED> {
+
+        //this.reinforceOperation(entity, operation);       // 感觉前台可以无视?
+        return this.cascadeUpdate(entity, operation, context, option);
+    }
+
+    protected operateAsync<T extends keyof ED, Cxt extends AsyncContext<ED>, OP extends OperateOption>(
+        entity: T,
+        operation: ED[T]['Operation'],
+        context: Cxt,
+        option: OP): Promise<OperationResult<ED>> {
+        this.reinforceOperation(entity, operation);
+        return this.operateAsync(entity, operation, context, option);
     }
 }

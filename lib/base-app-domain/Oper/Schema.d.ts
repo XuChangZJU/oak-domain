@@ -1,7 +1,6 @@
 import { String, ForeignKey } from "../../types/DataType";
-import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
+import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
 import { AppendOnlyAction } from "../../actions/action";
 import * as User from "../User/Schema";
@@ -29,7 +28,7 @@ export declare type Schema = EntityShape & {
     [A in ExpressionKey]?: any;
 };
 declare type AttrFilter = {
-    id: Q_StringValue | SubQuery.OperIdSubQuery;
+    id: Q_StringValue;
     $$createAt$$: Q_DateValue;
     $$seq$$: Q_StringValue;
     $$updateAt$$: Q_DateValue;
@@ -37,9 +36,10 @@ declare type AttrFilter = {
     data: Object;
     filter: Object;
     extra: Object;
-    operatorId: Q_StringValue | SubQuery.UserIdSubQuery;
+    operatorId: Q_StringValue;
     operator: User.Filter;
     targetEntity: Q_StringValue;
+    operEntity$oper: OperEntity.Filter & SubQueryPredicateMetadata;
 };
 export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
 export declare type Projection = {

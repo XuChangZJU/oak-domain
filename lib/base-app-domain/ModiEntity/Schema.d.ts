@@ -1,7 +1,6 @@
 import { String, ForeignKey } from "../../types/DataType";
 import { Q_DateValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape } from "../../types/Entity";
 import { AppendOnlyAction } from "../../actions/action";
 import * as Modi from "../Modi/Schema";
@@ -31,14 +30,14 @@ export declare type Schema = EntityShape & {
 } & {
     [A in ExpressionKey]?: any;
 };
-declare type AttrFilter<E> = {
-    id: Q_StringValue | SubQuery.ModiEntityIdSubQuery;
+declare type AttrFilter = {
+    id: Q_StringValue;
     $$createAt$$: Q_DateValue;
     $$seq$$: Q_StringValue;
     $$updateAt$$: Q_DateValue;
-    modiId: Q_StringValue | SubQuery.ModiIdSubQuery;
+    modiId: Q_StringValue;
     modi: Modi.Filter;
-    entity: E;
+    entity: Q_EnumValue<"actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string>;
     entityId: Q_StringValue;
     actionAuth: ActionAuth.Filter;
     relation: Relation.Filter;
@@ -47,7 +46,7 @@ declare type AttrFilter<E> = {
     userEntityGrant: UserEntityGrant.Filter;
     userRelation: UserRelation.Filter;
 };
-export declare type Filter<E = Q_EnumValue<"actionAuth" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string>> = MakeFilter<AttrFilter<E> & ExprOp<OpAttr | string>>;
+export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
 export declare type Projection = {
     "#id"?: NodeId;
     [k: string]: any;

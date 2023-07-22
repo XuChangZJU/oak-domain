@@ -92,7 +92,26 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
                     assert(modiParentEntity);
                     assert(modiParentId);
                     return {
-                        id: {
+                        modiEntity$entity: {
+                            '#sqp': 'not in',
+                            entity,
+                            modi: {
+                                iState: 'active',
+                                $or: [
+                                    {
+                                        entity: {
+                                            $ne: modiParentEntity,
+                                        },
+                                    },
+                                    {
+                                        entityId: {
+                                            $ne: modiParentId,
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                        /* id: {
                             $nin: {
                                 entity: 'modiEntity',
                                 data: {
@@ -117,11 +136,18 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
                                     },
                                 },
                             },
-                        }
+                        } */
                     }
                 }
                 return {
-                    id: {
+                    modiEntity$entity: {
+                        '#sqp': 'not in',
+                        entity,
+                        modi: {
+                            iState: 'active',
+                        }
+                    },
+                    /* id: {
                         $nin: {
                             entity: 'modiEntity',
                             data: {
@@ -134,7 +160,7 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
                                 }
                             },
                         },
-                    }
+                    } */
                 };
             },
             errMsg: '您请求的更新对象上还有正在申请的更新，请等该更新结束后再试',

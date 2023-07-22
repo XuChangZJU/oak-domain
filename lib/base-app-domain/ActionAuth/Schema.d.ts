@@ -1,7 +1,6 @@
 import { String, ForeignKey, JsonProjection } from "../../types/DataType";
-import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, JsonFilter } from "../../types/Demand";
+import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, JsonFilter, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import * as SubQuery from "../_SubQuery";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
 import * as Relation from "../Relation/Schema";
@@ -9,18 +8,18 @@ import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 declare type Actions = string[];
 export declare type OpSchema = EntityShape & {
-    relationId: ForeignKey<"relation">;
+    relationId?: ForeignKey<"relation"> | null;
     path: String<256>;
     destEntity: String<32>;
     deActions: Actions;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
-    relationId: ForeignKey<"relation">;
+    relationId?: ForeignKey<"relation"> | null;
     path: String<256>;
     destEntity: String<32>;
     deActions: Actions;
-    relation: Relation.Schema;
+    relation?: Relation.Schema | null;
     modiEntity$entity?: Array<ModiEntity.Schema>;
     modiEntity$entity$$aggr?: AggregationResult<ModiEntity.Schema>;
     operEntity$entity?: Array<OperEntity.Schema>;
@@ -29,15 +28,17 @@ export declare type Schema = EntityShape & {
     [A in ExpressionKey]?: any;
 };
 declare type AttrFilter = {
-    id: Q_StringValue | SubQuery.ActionAuthIdSubQuery;
+    id: Q_StringValue;
     $$createAt$$: Q_DateValue;
     $$seq$$: Q_StringValue;
     $$updateAt$$: Q_DateValue;
-    relationId: Q_StringValue | SubQuery.RelationIdSubQuery;
+    relationId: Q_StringValue;
     relation: Relation.Filter;
     path: Q_StringValue;
     destEntity: Q_StringValue;
     deActions: JsonFilter<Actions>;
+    modiEntity$entity: ModiEntity.Filter & SubQueryPredicateMetadata;
+    operEntity$entity: OperEntity.Filter & SubQueryPredicateMetadata;
 };
 export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
 export declare type Projection = {
@@ -102,12 +103,12 @@ export declare type Selection<P extends Object = Projection> = SelectOperation<P
 export declare type Aggregation = DeduceAggregation<Projection, Filter, Sorter>;
 export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "relationId">> & (({
     relationId?: never;
-    relation: Relation.CreateSingleOperation;
+    relation?: Relation.CreateSingleOperation;
 } | {
     relationId: String<64>;
     relation?: Relation.UpdateOperation;
 } | {
-    relationId: String<64>;
+    relationId?: String<64>;
 })) & {
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
     operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
