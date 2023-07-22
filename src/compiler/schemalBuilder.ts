@@ -8,7 +8,7 @@ const { factory } = ts;
 import {
     ACTION_CONSTANT_IN_OAK_DOMAIN,
     TYPE_PATH_IN_OAK_DOMAIN,
-    RESERVED_ENTITIES,
+    RESERVED_ENTITY_NAMES,
     STRING_LITERAL_MAX_LENGTH,
     NUMERICAL_LITERL_DEFAULT_PRECISION,
     NUMERICAL_LITERL_DEFAULT_SCALE,
@@ -362,7 +362,7 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
         ).filter(
             ele => !!ele
         );
-        assert(intersection(actionNames, RESERVED_ENTITIES).length === 0,
+        assert(intersection(actionNames, RESERVED_ACTION_NAMES).length === 0,
             `${filename}中的Action命名不能是「${RESERVED_ACTION_NAMES.join(',')}」之一`);
 
         node.types.forEach(
@@ -6852,7 +6852,7 @@ export function analyzeEntities(inputDir: string, relativePath?: string) {
     const fullFilenames = files.map(
         ele => {
             const entity = ele.slice(0, ele.indexOf('.'))
-            if (RESERVED_ENTITIES.includes(entity) || RESERVED_ENTITIES.find(
+            if (RESERVED_ENTITY_NAMES.includes(entity) || RESERVED_ENTITY_NAMES.find(
                 ele2 => entity.startsWith(ele2)
             )) {
                 throw new Error(`${ele}是系统保留字，请勿使用其当对象名或对象名前缀`);

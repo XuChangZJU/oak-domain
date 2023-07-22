@@ -8,6 +8,7 @@ import { judgeRelation } from "./relation";
 import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
 import { difference, intersection, set } from '../utils/lodash';
+import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
 
 
 type OperationTree<ED extends EntityDict & BaseEntityDict> = {
@@ -36,7 +37,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     private relationCascadePathGraph: AuthCascadePath<ED>[];
     private authDeduceRelationMap: AuthDeduceRelationMap<ED>;
     private schema: StorageSchema<ED>;
-    static SPECIAL_ENTITIES = ['user', 'relation', 'oper', 'operEntity', 'modi', 'modiEntity', 'userRelation', 'actionAuth', 'relationAuth', 'relation'];
+    static SPECIAL_ENTITIES = SYSTEM_RESERVE_ENTITIES;
     /**
      * 根据当前操作条件，查找到满足actions（overlap关系）的relationId和relativePath
      */

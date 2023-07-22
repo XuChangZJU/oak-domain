@@ -16,6 +16,7 @@ import { getRelevantIds } from "./filter";
 import { CreateSingleOperation as CreateSingleOperOperation } from '../base-app-domain/Oper/Schema';
 import { CreateOperation as CreateModiOperation, UpdateOperation as UpdateModiOperation } from '../base-app-domain/Modi/Schema';
 import { generateNewIdAsync } from "../utils/uuid";
+import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
 
 /**这个用来处理级联的select和update，对不同能力的 */
 export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> extends RowStore<ED> {
@@ -25,10 +26,50 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     protected abstract supportManyToOneJoin(): boolean;
     protected abstract supportMultipleCreate(): boolean;
 
-    private selectionRewriters: SelectionRewriter<any>[] = [];
-    private operationRewriters: OperationRewriter<any>[] = [];
+    private selectionRewriters: SelectionRewriter<ED, AsyncContext<ED>>[] = [];
+    private operationRewriters: OperationRewriter<ED, AsyncContext<ED>>[] = [];
 
-    private reinforceSelection(entity: keyof ED, selection: ED[keyof ED]['Selection']) {
+    private async reinforceSelection<Cxt extends AsyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {        
+        const noRelationDestEntities: string[] = [];
+        this.reinforceSelectionInner(entity, selection, context, noRelationDestEntities);
+
+        const rewriterPromises: Promise<any>[] = this.selectionRewriters.map(
+            ele => ele(this.getSchema(), entity, selection, context)
+        );
+        
+        // 这个设计每次都要取actionAuth的数据，感觉不是很优雅。by Xc 20230722
+        if (noRelationDestEntities.length > 0 && !option.dontCollect) {
+            rewriterPromises.push(
+                context.select('actionAuth', {
+                    data: {
+                        id: 1,
+                        deActions: 1,
+                        destEntity: 1,
+                        path: 1,
+                        relationId: 1,
+                    },
+                    filter: {
+                        relationId: {
+                            $exists: false,
+                        },
+                        destEntity: {
+                            $in: noRelationDestEntities,
+                        },
+                    },
+                }, {})
+            );
+        }
+
+        if (rewriterPromises.length > 0) {
+            await Promise.all(rewriterPromises);
+        }
+    }
+
+    private reinforceSelectionInner<Cxt extends AsyncContext<ED>, OP extends SelectOption>(
+        entity: keyof ED, 
+        selection: ED[keyof ED]['Selection'], 
+        context: Cxt, 
+        noRelationDestEntities: string[]) {
         const { filter, data, sorter } = selection;
 
         const checkNode = (projectionNode: ED[keyof ED]['Selection']['data'], attrs: string[]) => {
@@ -148,7 +189,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
         const toBeAssignNode2: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
         const projectionNodeDict: Record<string, ED[keyof ED]['Selection']['data']> = {};
-        const checkProjectionNode = (entity2: keyof ED, projectionNode: ED[keyof ED]['Selection']['data']) => {
+        const checkProjectionNode = async (entity2: keyof ED, projectionNode: ED[keyof ED]['Selection']['data']) => {
             const necessaryAttrs: string[] = ['id', '$$createAt$$']; // 有的页面依赖于其它页面取数据，有时两个页面的filter的差异会导致有一个加createAt，有一个不加，此时可能产生前台取数据不完整的异常。先统一加上
             for (const attr in projectionNode) {
                 if (attr === '#id') {
@@ -204,7 +245,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             else {
                                 checkNode(data, ['entity', 'entityId']);
                             }
-                            this.reinforceSelection(rel[0], projectionNode[attr]);
+                            this.reinforceSelectionInner(rel[0], projectionNode[attr], context, noRelationDestEntities);
                         }
                     }
                 }
@@ -232,6 +273,46 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     }
                 });
             }
+
+            // 如果对象上有relation关系，在此将本用户相关的relation和actionAuth全部取出
+            // 还要将actionAuth上没有relation关系但destEntity为本对象的行也全部取出，这些是指向userId的可能路径
+            // 放在这里有点怪异，暂先这样
+            const userId = context.getCurrentUserId(true);
+            if (userId && !SYSTEM_RESERVE_ENTITIES.includes(entity2 as string)) {
+                if (this.getSchema()[entity2].relation && !projectionNode.userRelation$entity) {
+                    Object.assign(projectionNode, {
+                        userRelation$entity: {
+                            $entity: 'userRelation',
+                            data: {
+                                id: 1,
+                                entity: 1,
+                                entityId: 1,
+                                userId: 1,
+                                relationId: 1,
+                                relation: {
+                                    id: 1,
+                                    name: 1,
+                                    display: 1,
+                                    actionAuth$relation: {
+                                        $entity: 'actionAuth',
+                                        data: {
+                                            id: 1,
+                                            deActions: 1,
+                                            destEntity: 1,
+                                            path: 1,
+                                            relationId: 1,
+                                        },
+                                    }
+                                }
+                            },
+                            filter: {
+                                userId,
+                            },
+                        } as ED['userRelation']['Selection'],
+                    });
+                }
+                noRelationDestEntities.push(entity2 as string);
+            }
         };
         checkProjectionNode(entity, data);
 
@@ -252,22 +333,19 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             });
         }
 
-        this.selectionRewriters.forEach(
-            ele => ele(this.getSchema(), entity, selection)
-        );
     }
 
-    private reinforceOperation(entity: keyof ED, operation: ED[keyof ED]['Operation']) {
-        this.operationRewriters.forEach(
-            ele => ele(this.getSchema(), entity, operation)
-        );
+    private async reinforceOperation<Cxt extends AsyncContext<ED>>(entity: keyof ED, operation: ED[keyof ED]['Operation'], context: Cxt) {
+        await Promise.all(this.operationRewriters.map(
+            ele => ele(this.getSchema(), entity, operation, context)
+        ));
     }
 
-    public registerOperationRewriter(rewriter: OperationRewriter<ED>) {
+    public registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED>>) {
         this.operationRewriters.push(rewriter);
     }
 
-    public registerSelectionRewriter(rewriter: SelectionRewriter<ED>) {
+    public registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED>>) {
         this.selectionRewriters.push(rewriter);
     }
 
@@ -1705,7 +1783,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): Promise<OperationResult<ED>> {
-        this.reinforceOperation(entity, operation);
         const { action, data, filter, id } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => Promise<any>> = [];
@@ -1768,7 +1845,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Partial<ED[T]['Schema']>[] {
-        this.reinforceSelection(entity, selection);
         const { data, filter, indexFrom, count, sorter } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
@@ -1967,7 +2043,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]> {
-        this.reinforceSelection(entity, selection);
+        await this.reinforceSelection(entity, selection, context, option);
         return this.cascadeSelectAsync(entity, selection, context, option);
     }
 
@@ -1989,12 +2065,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         return this.cascadeUpdate(entity, operation, context, option);
     }
 
-    protected operateAsync<T extends keyof ED, Cxt extends AsyncContext<ED>, OP extends OperateOption>(
+    protected async operateAsync<T extends keyof ED, Cxt extends AsyncContext<ED>, OP extends OperateOption>(
         entity: T,
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): Promise<OperationResult<ED>> {
-        this.reinforceOperation(entity, operation);
-        return this.operateAsync(entity, operation, context, option);
+        await this.reinforceOperation(entity, operation, context);
+        return this.cascadeUpdateAsync(entity, operation, context, option);
     }
 }
