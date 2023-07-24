@@ -198,7 +198,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
         const toBeAssignNode2: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
         const projectionNodeDict: Record<string, ED[keyof ED]['Selection']['data']> = {};
-        const checkProjectionNode = async (entity2: keyof ED, projectionNode: ED[keyof ED]['Selection']['data']) => {
+        const checkProjectionNode = (entity2: keyof ED, projectionNode: ED[keyof ED]['Selection']['data']) => {
             const necessaryAttrs: string[] = ['id', '$$createAt$$']; // 有的页面依赖于其它页面取数据，有时两个页面的filter的差异会导致有一个加createAt，有一个不加，此时可能产生前台取数据不完整的异常。先统一加上
             for (const attr in projectionNode) {
                 if (attr === '#id') {
@@ -286,41 +286,43 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             // 如果对象上有relation关系，在此将本用户相关的relation和actionAuth全部取出
             // 还要将actionAuth上没有relation关系但destEntity为本对象的行也全部取出，这些是指向userId的可能路径
             // 放在这里有点怪异，暂先这样
-            const userId = context.getCurrentUserId(true);
-            if (context instanceof AsyncContext && userId && !SYSTEM_RESERVE_ENTITIES.includes(entity2 as string)) {
-                if (this.getSchema()[entity2].relation && !projectionNode.userRelation$entity) {
-                    Object.assign(projectionNode, {
-                        userRelation$entity: {
-                            $entity: 'userRelation',
-                            data: {
-                                id: 1,
-                                entity: 1,
-                                entityId: 1,
-                                userId: 1,
-                                relationId: 1,
-                                relation: {
+            if (context instanceof AsyncContext) {
+                const userId = context.getCurrentUserId(true);
+                if (userId && !SYSTEM_RESERVE_ENTITIES.includes(entity2 as string)) {
+                    if (this.getSchema()[entity2].relation && !projectionNode.userRelation$entity) {
+                        Object.assign(projectionNode, {
+                            userRelation$entity: {
+                                $entity: 'userRelation',
+                                data: {
                                     id: 1,
-                                    name: 1,
-                                    display: 1,
-                                    actionAuth$relation: {
-                                        $entity: 'actionAuth',
-                                        data: {
-                                            id: 1,
-                                            deActions: 1,
-                                            destEntity: 1,
-                                            path: 1,
-                                            relationId: 1,
-                                        },
+                                    entity: 1,
+                                    entityId: 1,
+                                    userId: 1,
+                                    relationId: 1,
+                                    relation: {
+                                        id: 1,
+                                        name: 1,
+                                        display: 1,
+                                        actionAuth$relation: {
+                                            $entity: 'actionAuth',
+                                            data: {
+                                                id: 1,
+                                                deActions: 1,
+                                                destEntity: 1,
+                                                path: 1,
+                                                relationId: 1,
+                                            },
+                                        }
                                     }
-                                }
-                            },
-                            filter: {
-                                userId,
-                            },
-                        } as ED['userRelation']['Selection'],
-                    });
+                                },
+                                filter: {
+                                    userId,
+                                },
+                            } as ED['userRelation']['Selection'],
+                        });
+                    }
+                    noRelationDestEntities.push(entity2 as string);
                 }
-                noRelationDestEntities.push(entity2 as string);
             }
         };
         checkProjectionNode(entity, data);
