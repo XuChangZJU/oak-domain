@@ -1720,11 +1720,11 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
          * @param operation 
          * @returns 
          */
-        const makeCreateFilter = (operation: Omit<ED[T]['CreateSingle'], 'id'>) => {
+        const makeCreateFilter = <T2 extends keyof ED>(entity: T2, operation: Omit<ED[T2]['CreateSingle'], 'id'>) => {
             const { data, filter } = operation;
             assert(!(data instanceof Array));
             if (data) {
-                const data2: ED[T]['Selection']['filter'] = {};
+                const data2: ED[T2]['Selection']['filter'] = {};
                 for (const attr in data) {
                     const rel = judgeRelation(this.schema, entity2, attr);
                     if (rel === 1) {
@@ -1754,7 +1754,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
         const destructInner = <T2 extends keyof ED>(entity: T2, operation: Omit<ED[T2]['Operation'], 'id'>, path?: string, child?: OperationTree<ED>, hasParent?: true): OperationTree<ED> => {
             const { action, data, filter } = operation;
-            const filter2 = action === 'create' ? makeCreateFilter(operation as Omit<ED[T]['CreateSingle'], 'id'>) : filter;
+            const filter2 = action === 'create' ? makeCreateFilter(entity, operation as Omit<ED[T]['CreateSingle'], 'id'>) : filter;
             assert(filter2);
 
             const me: OperationTree<ED> = {
