@@ -26,15 +26,15 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     protected abstract supportManyToOneJoin(): boolean;
     protected abstract supportMultipleCreate(): boolean;
 
-    private selectionRewriters: SelectionRewriter<ED, AsyncContext<ED>>[] = [];
-    private operationRewriters: OperationRewriter<ED, AsyncContext<ED>>[] = [];
+    private selectionRewriters: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
+    private operationRewriters: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
 
-    private async reinforceSelection<Cxt extends AsyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {        
+    private async reinforceSelectionAsync<Cxt extends AsyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {        
         const noRelationDestEntities: string[] = [];
         
         this.reinforceSelectionInner(entity, selection, context, noRelationDestEntities);
 
-        const rewriterPromises: Promise<any>[] = this.selectionRewriters.map(
+        const rewriterPromises = this.selectionRewriters.map(
             ele => ele(this.getSchema(), entity, selection, context)
         );
         
@@ -57,7 +57,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             $in: noRelationDestEntities,
                         },
                     },
-                }, {})
+                }, {}) as any
             );
         }
 
@@ -66,7 +66,15 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         }
     }
 
-    private reinforceSelectionInner<Cxt extends AsyncContext<ED>, OP extends SelectOption>(
+    private reinforceSelectionSync<Cxt extends SyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {
+         this.reinforceSelectionInner(entity, selection, context, []);
+
+        const rewriterPromises = this.selectionRewriters.map(
+            ele => ele(this.getSchema(), entity, selection, context)
+        );
+    }
+
+    private reinforceSelectionInner<Cxt extends AsyncContext<ED> | SyncContext<ED>, OP extends SelectOption>(
         entity: keyof ED, 
         selection: ED[keyof ED]['Selection'], 
         context: Cxt, 
@@ -279,7 +287,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             // 还要将actionAuth上没有relation关系但destEntity为本对象的行也全部取出，这些是指向userId的可能路径
             // 放在这里有点怪异，暂先这样
             const userId = context.getCurrentUserId(true);
-            if (userId && !SYSTEM_RESERVE_ENTITIES.includes(entity2 as string)) {
+            if (context instanceof AsyncContext && userId && !SYSTEM_RESERVE_ENTITIES.includes(entity2 as string)) {
                 if (this.getSchema()[entity2].relation && !projectionNode.userRelation$entity) {
                     Object.assign(projectionNode, {
                         userRelation$entity: {
@@ -342,11 +350,11 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         ));
     }
 
-    public registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED>>) {
+    public registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>) {
         this.operationRewriters.push(rewriter);
     }
 
-    public registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED>>) {
+    public registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>) {
         this.selectionRewriters.push(rewriter);
     }
 
@@ -2044,7 +2052,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]> {
-        await this.reinforceSelection(entity, selection, context, option);
+        await this.reinforceSelectionAsync(entity, selection, context, option);
         return this.cascadeSelectAsync(entity, selection, context, option);
     }
 
@@ -2053,6 +2061,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Partial<ED[T]['Schema']>[] {
+        this.reinforceSelectionSync(entity, selection, context, option);
         return this.cascadeSelect(entity, selection, context, option);
     }
 
