@@ -1675,7 +1675,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         destructInner(e, {
                             data: data[attr].data,
                             filter: combineFilters([{
-                                [foreignKey.slice(foreignKey.length - 2)]: filter,
+                                [foreignKey.slice(0, foreignKey.length - 2)]: filter,
                             }, data[attr].filter || {}]),
                         } as any);
                     }
