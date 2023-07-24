@@ -7,7 +7,7 @@ import { addFilterSegment, checkFilterContains, combineFilters } from "./filter"
 import { judgeRelation } from "./relation";
 import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
-import { difference, intersection, set } from '../utils/lodash';
+import { difference, intersection, set, uniq } from '../utils/lodash';
 import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
 
 
@@ -1837,13 +1837,21 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     assert(relation);
                     const { userRelation$relation: userRelations } = relation;
                     if (userRelations!.length > 0) {
-                        const entityIds = userRelations!.map(ele => ele.entityId);
+                        const entityIds = uniq(userRelations!.map(ele => ele.entityId));
                         const contained = {};
-                        set(contained, path, {
-                            id: {
-                                $in: entityIds,
-                            }
-                        });
+                        const idFilter = entityIds.length > 0 ? {
+                            $in: entityIds,
+                        } : entityIds[0];
+                        if (path) {
+                            set(contained, path, {
+                                id: idFilter,
+                            });
+                        }
+                        else {
+                            Object.assign(contained, {
+                                id: idFilter
+                            });
+                        }
                         const contains = checkFilterContains(entity, context, contained, filter, true)
                         if (contains instanceof Promise) {
                             return contains.then(
