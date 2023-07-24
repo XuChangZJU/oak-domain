@@ -1999,6 +1999,16 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     );
                 }
             );
+            if (!r && process.env.NODE_ENV === 'development') {
+                deducedLeafSelections.forEach(
+                    (ele, idx) => {
+                        const r2 = result[idx].flat();
+                        if (!r2.find(ele2 => !!ele)) {
+                            console.warn('对象的select权限被否决，请检查', ele);
+                        }
+                    }
+                )
+            }
             return r;
         }
 
