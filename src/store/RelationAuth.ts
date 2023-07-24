@@ -1736,10 +1736,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             return filter;
         };
 
-        const { action, data, filter } = operation2;
-        const filter2 = action === 'create' ? makeCreateFilter(operation2 as Omit<ED[T]['CreateSingle'], 'id'>) : filter;
-        assert(filter2);
-
         const addChild = (node: OperationTree<ED>, path: string, child: OperationTree<ED>) => {
             if (node.children[path]) {
                 if (node.children[path] instanceof Array) {
@@ -1758,7 +1754,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
         const destructInner = <T2 extends keyof ED>(entity: T2, operation: Omit<ED[T2]['Operation'], 'id'>, path?: string, child?: OperationTree<ED>, hasParent?: true): OperationTree<ED> => {
             const { action, data, filter } = operation;
-            const filter2 = action === 'create' ? data || filter : filter;
+            const filter2 = action === 'create' ? makeCreateFilter(operation as Omit<ED[T]['CreateSingle'], 'id'>) : filter;
             assert(filter2);
 
             const me: OperationTree<ED> = {
@@ -1860,9 +1856,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     if (userRelations!.length > 0) {
                         const entityIds = uniq(userRelations!.map(ele => ele.entityId));
                         const contained = {};
-                        const idFilter = entityIds.length > 0 ? {
+                        const idFilter = entityIds.length > 1 ? {
                             $in: entityIds,
                         } : entityIds[0];
+                        assert(idFilter);
                         if (path) {
                             set(contained, path, {
                                 id: idFilter,
