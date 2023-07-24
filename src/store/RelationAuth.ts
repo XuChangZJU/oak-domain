@@ -1589,6 +1589,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     return true;
                 }
             }
+            case 'modi': {
+                // modi的权限都是由触发器触发，不用再检测了
+                return true;
+            }
             default: {
                 assert(false, `对象${entity2 as string}的权限控制没有加以控制`);
             }
