@@ -1734,7 +1734,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     const rel = judgeRelation(this.schema, entity, attr);
                     if (rel === 1) {
                         // 只需要记住id和各种外键属性，不这样处理有些古怪的属性比如coordinate，其作为createdata和作为filter并不同构
-                        if (['id', 'entity', 'entityId'].includes(attr) || this.schema[entity].attributes[attr as any]?.type === 'ref') {
+                        if ((['id', 'entity', 'entityId'].includes(attr) || this.schema[entity].attributes[attr as any]?.type === 'ref') && typeof data[attr] === 'string') {
                             data2[attr] = data[attr];
                         }
                     }

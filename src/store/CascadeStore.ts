@@ -31,7 +31,10 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
     private async reinforceSelection<Cxt extends AsyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {        
         const noRelationDestEntities: string[] = [];
-        this.reinforceSelectionInner(entity, selection, context, noRelationDestEntities);
+
+        if (!option.dontCollect) {
+            this.reinforceSelectionInner(entity, selection, context, noRelationDestEntities);
+        }
 
         const rewriterPromises: Promise<any>[] = this.selectionRewriters.map(
             ele => ele(this.getSchema(), entity, selection, context)
