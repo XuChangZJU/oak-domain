@@ -2144,7 +2144,21 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             const checkChildNodeInner = (legalAuths: ED['actionAuth']['Schema'][]) => {
                 // 因为如果children是数组的话，会把数组中所有的action并起来查询，所以在这里还要再确认一次
                 const realLegalPaths = legalAuths.filter(
-                    (ele) => ele.destEntity === node.entity && ele.deActions.includes(node.action)
+                    (ele) => {
+                        if (ele.destEntity === node.entity && ele.deActions.includes(node.action)) {
+                            return true;
+                        }
+                        // 还有一种情况，是在tree的根结点findActionAuthsOnNode时，deduce出了另外一个对象的权限，此时也需要加以判断
+                        if (this.authDeduceRelationMap[node.entity]) {
+                            assert(this.authDeduceRelationMap[node.entity] === 'entity');
+                            const deducedEntity = node.filter!.entity;
+                            assert(deducedEntity);
+                            if (ele.destEntity === deducedEntity && ele.deActions.length > 0) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
                 );
                 const checkChildren = () => {
                     const { children } = node;
