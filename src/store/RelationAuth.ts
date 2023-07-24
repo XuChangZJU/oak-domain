@@ -1726,7 +1726,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             if (data) {
                 const data2: ED[T2]['Selection']['filter'] = {};
                 for (const attr in data) {
-                    const rel = judgeRelation(this.schema, entity2, attr);
+                    const rel = judgeRelation(this.schema, entity, attr);
                     if (rel === 1) {
                         data2[attr] = data[attr];
                     }
