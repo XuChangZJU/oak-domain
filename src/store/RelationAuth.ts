@@ -1739,7 +1739,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         const addChild = (node: OperationTree<ED>, path: string, child: OperationTree<ED>) => {
             // 在这里要把可以被node deduce出来的child处理掉
             const paths = path.split('$');
-            assert(paths.length === 2);
+            assert(paths.length >= 2);
             if (this.authDeduceRelationMap[child.entity] === paths[1]) {
                 assert(paths[1] === 'entity', '当前只支持entity外键上的deduce');
                 return false;
