@@ -1590,7 +1590,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 }
             }
             case 'modi': {
-                // modi的权限都是由触发器触发，不用再检测了
+                // modi的操作权限都是由触发器触发，不用再检测了
                 return true;
             }
             default: {
