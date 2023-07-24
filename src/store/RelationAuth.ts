@@ -1956,6 +1956,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 id: 1,
                 path: 1,
                 destEntity: 1,
+                deActions: 1,
                 relation: {
                     id: 1,
                     userRelation$relation: {
