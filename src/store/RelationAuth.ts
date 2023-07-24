@@ -1541,13 +1541,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             }
                         );
                     }
-                    if (!destRelations.find(ele => ele.id === relationId)) {
+                    // 若指定了要create的relation，则必须有该relationId存在，否则只要有任意可授权的relation即可
+                    if (relationId && !destRelations.find(ele => ele.id === relationId) || destRelations.length === 0) {
                         return false;
                     }
+                    return true;
                 }
                 else {
                     assert(action === 'remove');
-                    // remove加上限制条件
                     const userId = context.getCurrentUserId();
                     assert(filter);
                     const contained = {
