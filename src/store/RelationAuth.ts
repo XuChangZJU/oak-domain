@@ -2267,19 +2267,15 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         const checkChildNode = (actionAuths: ED['actionAuth']['Schema'][] | Promise<ED['actionAuth']['Schema'][]>, node: OperationTree<ED>): boolean | Promise<boolean> => {
             const checkChildNodeInner = (legalAuths: ED['actionAuth']['Schema'][]) => {
                 // 因为如果children是数组的话，会把数组中所有的action并起来查询，所以在这里还要再确认一次
+
                 const realLegalPaths = legalAuths.filter(
                     (ele) => {
                         if (ele.destEntity === node.entity && ele.deActions.includes(node.action)) {
                             return true;
                         }
-                        // 还有一种情况，是在tree的根结点findActionAuthsOnNode时，deduce出了另外一个对象的权限，此时也需要加以判断
-                        if (this.authDeduceRelationMap[node.entity]) {
-                            assert(this.authDeduceRelationMap[node.entity] === 'entity');
-                            const deducedEntity = node.filter!.entity;
-                            assert(deducedEntity);
-                            if (ele.destEntity === deducedEntity && ele.deActions.length > 0) {
-                                return true;
-                            }
+                        // 有一种例外情况，是在tree的根结点findActionAuthsOnNode时，deduce出了另外一个对象的权限，此时肯定可以通过，但不能再使用这条路径对children进行进一步判断了
+                        if (node === tree) {
+                            return true;
                         }
                         return false;
                     }
@@ -2290,6 +2286,16 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     if (childPath.length === 0) {
                         return true;
                     }
+
+                    const selfLegalPaths = realLegalPaths.filter(
+                        (ele) => {
+                            if (ele.destEntity === node.entity && ele.deActions.includes(node.action)) {
+                                return true;
+                            }
+                            return false;
+                        }
+                    );
+                    assert(selfLegalPaths.length > 0, `对象${node.entity as string}的权限检查是用deduce的对象通过的，无法再进一步对子对象加以判断`);
                     const childResult = childPath.map(
                         (childPath) => {
                             const child = children[childPath];
