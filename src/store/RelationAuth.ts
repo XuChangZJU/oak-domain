@@ -1686,18 +1686,21 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 }, { dontCollect: true });
 
                 const dealWithData = (rows: Partial<ED[keyof ED]['OpSchema']>[]) => {
-                    assert(rows.length > 0, `查询无法界定出相应的deduce对象${entity as string}，查询条件为${JSON.stringify(filter)}`);
-                    const eGroup = groupBy(rows, 'entity');
                     // 这里如果entity指向不同的实体，一般出现这样的查询，则其权限应当不由这条deduce路径处理
                     // 同上，如果找到的行数大于1行，说明deduce路径上的对象不确定，也暂不处理，等遇到了再说  by Xc 20230725
-                    if (Object.keys(eGroup).length > 1 || rows.length > 1) {
+                    if (rows.length > 1  || rows.length === 0) {
+                        if (process.env.NODE_ENV === 'development') {
+                            console.warn(`进行deduce推导时找到了${rows.length}行${entity as string}数据`);
+                        }
                         return entityFilters;
                     }
-                    const entityIds = rows.map(ele => ele.entityId);
-                    const result = getRecursiveDeducedFilters(entity, {
-                        id: entityIds.length === 1 ? entityIds[0] : {
-                            $in: entityIds,
-                        },
+                    const { entity: deducedEntity, entityId: deducedEntityId } = rows[0];
+                    if (!deducedEntity || !deducedEntityId) {
+                        // 这种情况会出现在前台缓存里
+                        return entityFilters;
+                    }
+                    const result = getRecursiveDeducedFilters(deducedEntity, {
+                        id: deduceEntityId,
                     });
                     
                     if (result instanceof Promise) {
