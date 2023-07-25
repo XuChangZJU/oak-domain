@@ -7,7 +7,7 @@ import { addFilterSegment, checkFilterContains, combineFilters } from "./filter"
 import { judgeRelation } from "./relation";
 import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
-import { difference, intersection, set, uniq } from '../utils/lodash';
+import { difference, intersection, set, uniq, groupBy } from '../utils/lodash';
 import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
 
 
@@ -1647,29 +1647,33 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 }
             }
 
-            const addDeduceEntityFilter = (deduceEntity: keyof ED, deduceFilter: ED[keyof ED]['Selection']['filter']) => {
+            const getRecursiveDeducedFilters = (deduceEntity: keyof ED, deduceFilter: ED[keyof ED]['Selection']['filter']) => {
                 const excludeActions = readOnlyActions.concat(['create', 'remove']);
                 const updateActions = this.schema[deduceEntity].actions.filter(
                     (a) => !excludeActions.includes(a)
                 );
-                const deducedSelections = this.getDeducedEntityFilters(deduceEntity, deduceFilter, actions[0] === 'select' ? actions : updateActions, context);
+                return this.getDeducedEntityFilters(deduceEntity, deduceFilter, actions[0] === 'select' ? actions : updateActions, context);
+            };
+
+            if (deduceEntity && deduceFilter) {
+                const deducedSelections = getRecursiveDeducedFilters(deduceEntity, deduceFilter);
                 if (deducedSelections instanceof Promise) {
                     return deducedSelections.then(
                         (ds) => {
                             entityFilters.push(...ds);
                             return entityFilters;
                         }
-                    )
+                    );
                 }
                 entityFilters.push(...deducedSelections);
                 return entityFilters;
-            };
-
-            if (deduceEntity && deduceFilter) {
-                return addDeduceEntityFilter(deduceEntity, deduceFilter);
             }
             else {
-                // 这种情况说明从filter中无法确定相应的deduceFilter，需要查找
+                /**
+                 * 这种情况说明从filter中无法确定相应的deduceFilter，需要查找该实体对应的entity/entityId来进行推导。
+                 * 这种情况一般发生在entity1 -> entity2上，此时entity2应该是一个固定id查询的filter
+                 * 在这里先假设如果碰到了list类型的filter，直接不使用deduce路径上的对象来推导
+                 */
                 const rows2 = context.select(entity, {
                     data: {
                         id: 1,
@@ -1677,29 +1681,36 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         entityId: 1,
                     },
                     filter,
+                    indexFrom: 0,
+                    count: 10,
                 }, { dontCollect: true });
 
                 const dealWithData = (rows: Partial<ED[keyof ED]['OpSchema']>[]) => {
                     assert(rows.length > 0, `查询无法界定出相应的deduce对象${entity as string}，查询条件为${JSON.stringify(filter)}`);
-                    let entity2 = rows[0].entity;
-                    const entityIds2 = [] as string[];
-
-                    rows.forEach(
-                        (row) => {
-                            assert(row.entity === entity2, `单个查询所推导出的对象不唯一，相应的deduce对象${entity as string}，查询条件为${JSON.stringify(filter)}`);
-                            assert(typeof row.entityId === 'string');
-                            entityIds2.push(row.entityId);
-                        }
-                    );
-
-                    const deduceFilter2 = {
-                        entity: entity2,
-                        id: entityIds2.length === 1 ? entityIds2[0] : {
-                            $in: entityIds2,
+                    const eGroup = groupBy(rows, 'entity');
+                    // 这里如果entity指向不同的实体，一般出现这样的查询，则其权限应当不由这条deduce路径处理
+                    // 同上，如果找到的行数大于1行，说明deduce路径上的对象不确定，也暂不处理，等遇到了再说  by Xc 20230725
+                    if (Object.keys(eGroup).length > 1 || rows.length > 1) {
+                        return entityFilters;
+                    }
+                    const entityIds = rows.map(ele => ele.entityId);
+                    const result = getRecursiveDeducedFilters(entity, {
+                        id: entityIds.length === 1 ? entityIds[0] : {
+                            $in: entityIds,
                         },
-                    };
+                    });
+                    
+                    if (result instanceof Promise) {
+                        return result.then(
+                            (r2) => {
+                                entityFilters.push(...r2);
+                                return entityFilters;
+                            }
+                        );
+                    }
 
-                    return addDeduceEntityFilter(entity2 as keyof ED, deduceFilter2);
+                    entityFilters.push(...result);
+                    return entityFilters;
                 };
 
                 if (rows2 instanceof Promise) {
@@ -2161,7 +2172,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     }
                 }
             }, { dontCollect: true });
-    
+
             const getActionAuths = (result: (ED['actionAuth']['Schema'] | undefined)[][]) => {
                 const aas: ED['actionAuth']['Schema'][] = [];
                 result.forEach(
@@ -2175,7 +2186,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 );
                 return aas;
             };
-    
+
             const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['Schema'][]) => {
                 if (userRelations) {
                     const ars = actionAuths.filter(
@@ -2183,7 +2194,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             (ur) => ur.relationId === ar.relationId
                         )
                     );
-    
+
                     if (ars.length > 0) {
                         // 这里能找到actionAuth，其必然是本对象上的授权
                         assert(!ars.find(
@@ -2193,7 +2204,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     }
                 }
             }
-    
+
             if (actionAuths instanceof Promise) {
                 return actionAuths.then(
                     (ars) => {
@@ -2219,7 +2230,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     }
                 )
             }
-    
+
             assert(context instanceof SyncContext);
             const created = findOwnCreateUserRelation(actionAuths as ED['actionAuth']['Schema'][]);
             if (created) {
@@ -2421,8 +2432,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         if (!userId) {
             throw new OakUnloggedInException();
         }
-        if (!operation.filter && (!operation.data || operation.action !== 'create') ) {
-            if (process.env.NODE_ENV === 'development')             {
+        if (!operation.filter && (!operation.data || operation.action !== 'create')) {
+            if (process.env.NODE_ENV === 'development') {
                 console.warn('operation不能没有限制条件', operation);
             }
             return false;

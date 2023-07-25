@@ -2099,7 +2099,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
         else {
             // 增加了本身object的shape定义
             // assert(ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) || ts.isLiteralTypeNode(type!));
-            if (enumAttributes && enumAttributes[attrName] || ts.isUnionTypeNode(type!)) {
+            if (enumAttributes && enumAttributes[attrName] || ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0])) {
                 properties.push(
                     [name, false, undefined]
                 );
