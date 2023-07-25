@@ -1614,6 +1614,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         filter: ED[keyof ED]['Selection']['filter'];
         actions: ED[T]['Action'][];
     }>> {
+        if (RelationAuth.SPECIAL_ENTITIES.includes(entity as string)) {
+            // 特殊对象直接返回
+            return [];
+        }
         const entityFilters: Array<{
             entity: keyof ED;
             filter: ED[keyof ED]['Selection']['filter'];
@@ -2295,7 +2299,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             return false;
                         }
                     );
-                    assert(selfLegalPaths.length > 0, `对象${node.entity as string}的权限检查是用deduce的对象通过的，无法再进一步对子对象加以判断`);
+                    // assert(selfLegalPaths.length > 0, `对象${node.entity as string}的权限检查是用deduce的对象通过的，无法再进一步对子对象加以判断`);
                     const childResult = childPath.map(
                         (childPath) => {
                             const child = children[childPath];
@@ -2312,7 +2316,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             const pathToParent = childPath.endsWith('$entity') ? node.entity as string : childPath.split('$')[1];
                             if (child instanceof Array) {
                                 const childActions = child.map(ele => ele.action);
-                                const childLegalAuths = realLegalPaths.map(
+                                const childLegalAuths = selfLegalPaths.map(
                                     (ele) => {
                                         const { path, relationId } = ele;
                                         const path2 = path ? `${pathToParent}.${path}` : pathToParent;
