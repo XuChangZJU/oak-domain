@@ -1984,7 +1984,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 }
                 // 说明是通过userId关联
                 const contained = {};
-                set(contained, `${path}Id`, context.getCurrentUserId());
+                set(contained, `${path}.id`, context.getCurrentUserId());
                 if (checkFilterContains(entity, context, contained, filter, true)) {
                     return ele;
                 }
