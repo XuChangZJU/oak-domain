@@ -1600,15 +1600,20 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     }
 
 
-    private getDeducedEntityFilters<T extends keyof ED>(
+    private getDeducedEntityFilters<T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
         entity: T,
         filter: ED[T]['Selection']['filter'],
         actions: ED[T]['Action'][],
+        context: Cxt
     ): Array<{
         entity: keyof ED;
         filter: ED[keyof ED]['Selection']['filter'];
         actions: ED[T]['Action'][];
-    }> {
+    }> | Promise<Array<{
+        entity: keyof ED;
+        filter: ED[keyof ED]['Selection']['filter'];
+        actions: ED[T]['Action'][];
+    }>> {
         const entityFilters: Array<{
             entity: keyof ED;
             filter: ED[keyof ED]['Selection']['filter'];
@@ -1642,13 +1647,67 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 }
             }
 
-            if (deduceEntity && deduceFilter) {
+            const addDeduceEntityFilter = (deduceEntity: keyof ED, deduceFilter: ED[keyof ED]['Selection']['filter']) => {
                 const excludeActions = readOnlyActions.concat(['create', 'remove']);
                 const updateActions = this.schema[deduceEntity].actions.filter(
                     (a) => !excludeActions.includes(a)
                 );
-                const deducedSelections = this.getDeducedEntityFilters(deduceEntity, deduceFilter, actions[0] === 'select' ? actions : updateActions);
+                const deducedSelections = this.getDeducedEntityFilters(deduceEntity, deduceFilter, actions[0] === 'select' ? actions : updateActions, context);
+                if (deducedSelections instanceof Promise) {
+                    return deducedSelections.then(
+                        (ds) => {
+                            entityFilters.push(...ds);
+                            return entityFilters;
+                        }
+                    )
+                }
                 entityFilters.push(...deducedSelections);
+                return entityFilters;
+            };
+
+            if (deduceEntity && deduceFilter) {
+                return addDeduceEntityFilter(deduceEntity, deduceFilter);
+            }
+            else {
+                // 这种情况说明从filter中无法确定相应的deduceFilter，需要查找
+                const rows2 = context.select(entity, {
+                    data: {
+                        id: 1,
+                        entity: 1,
+                        entityId: 1,
+                    },
+                    filter,
+                }, { dontCollect: true });
+
+                const dealWithData = (rows: Partial<ED[keyof ED]['OpSchema']>[]) => {
+                    assert(rows.length > 0, `查询无法界定出相应的deduce对象${entity as string}，查询条件为${JSON.stringify(filter)}`);
+                    let entity2 = rows[0].entity;
+                    const entityIds2 = [] as string[];
+
+                    rows.forEach(
+                        (row) => {
+                            assert(row.entity === entity2, `单个查询所推导出的对象不唯一，相应的deduce对象${entity as string}，查询条件为${JSON.stringify(filter)}`);
+                            assert(typeof row.entityId === 'string');
+                            entityIds2.push(row.entityId);
+                        }
+                    );
+
+                    const deduceFilter2 = {
+                        entity: entity2,
+                        id: entityIds2.length === 1 ? entityIds2[0] : {
+                            $in: entityIds2,
+                        },
+                    };
+
+                    return addDeduceEntityFilter(entity2 as keyof ED, deduceFilter2);
+                };
+
+                if (rows2 instanceof Promise) {
+                    return rows2.then(
+                        (r2) => dealWithData(r2)
+                    );
+                }
+                return dealWithData(rows2);
             }
         }
         return entityFilters;
@@ -1719,7 +1778,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
      * @param entity 
      * @param selection 
      */
-    private destructOperation<T extends keyof ED>(entity2: T, operation2: Omit<ED[T]['Operation'], 'id'>, userId: string) {        
+    private destructOperation<T extends keyof ED>(entity2: T, operation2: Omit<ED[T]['Operation'], 'id'>, userId: string) {
         /**
          * 对create动作，把data中的cascade部分剔除后作为filter参与后续的检验
          * @param operation 
@@ -1925,117 +1984,136 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     ) {
         const leafSelections = this.destructSelection(entity, selection);
         const deducedLeafSelections = leafSelections.map(
-            ({ entity, filter }) => this.getDeducedEntityFilters(entity, filter, ['select'])
-        ).filter(
-            (ele) => {
-                const entities = ele.map(ele => ele.entity);
-                // 同一个leaf的deducedSelections中只要有一个能通过就足够了
-                if (intersection(this.selectFreeEntities, entities).length > 0) {
-                    return false;
-                }
+            ({ entity, filter }) => this.getDeducedEntityFilters(entity, filter, ['select'], context)
+        );
 
-                if (intersection(RelationAuth.SPECIAL_ENTITIES, entities).length > 0) {
-                    // todo 
-                    return false;
+        const checkDeducedLeafSelections = (dlSelections2: {
+            entity: keyof ED;
+            filter: ED[keyof ED]['Selection']['filter'];
+            actions: ED[T]['Action'][];
+        }[][]) => {
+            const dlSelections = dlSelections2.filter(
+                (ele) => {
+                    const entities = ele.map(ele2 => ele2.entity);
+                    // 同一个leaf的deducedSelections中只要有一个能通过就足够了
+                    if (intersection(this.selectFreeEntities, entities).length > 0) {
+                        return false;
+                    }
+
+                    if (intersection(RelationAuth.SPECIAL_ENTITIES, entities).length > 0) {
+                        // todo 
+                        return false;
+                    }
+                    return true;
                 }
+            );
+            if (dlSelections.length === 0) {
                 return true;
             }
-        );
 
-        if (deducedLeafSelections.length === 0) {
-            return true;
-        }
+            if (!context.getCurrentUserId()) {
+                throw new OakUnloggedInException();
+            }
 
-        if (!context.getCurrentUserId()) {
-            throw new OakUnloggedInException();
-        }
+            const allEntities: (keyof ED)[] = [];
+            dlSelections.forEach(
+                (ele) => ele.forEach(
+                    ({ entity }) => {
+                        allEntities.push(entity)
+                    }
+                )
+            );
 
-        const allEntities: (keyof ED)[] = [];
-        deducedLeafSelections.forEach(
-            (ele) => ele.forEach(
-                ({ entity }) => {
-                    allEntities.push(entity)
-                }
-            )
-        );
-
-        const actionAuths = context.select('actionAuth', {
-            data: {
-                id: 1,
-                path: 1,
-                destEntity: 1,
-                deActions: 1,
-                relation: {
+            const actionAuths = context.select('actionAuth', {
+                data: {
                     id: 1,
-                    userRelation$relation: {
-                        $entity: 'userRelation',
-                        data: {
-                            id: 1,
-                            entity: 1,
-                            entityId: 1,
-                        },
-                        filter: {
-                            userId: context.getCurrentUserId(),
+                    path: 1,
+                    destEntity: 1,
+                    deActions: 1,
+                    relation: {
+                        id: 1,
+                        userRelation$relation: {
+                            $entity: 'userRelation',
+                            data: {
+                                id: 1,
+                                entity: 1,
+                                entityId: 1,
+                            },
+                            filter: {
+                                userId: context.getCurrentUserId(),
+                            },
                         },
                     },
                 },
-            },
-            filter: {
-                deActions: {
-                    $contains: 'select',
-                },
-                destEntity: {
-                    $in: allEntities as string[],
-                }
-            }
-        }, { dontCollect: true });
-
-        /**
-         * 返回的结果中，第一层为leafNode，必须全通过，第二层为单个leafNode上的deduce，通过一个就可以，第三层为所有可能的actionAuth，通过一个就可以
-         * @param result 
-         * @returns 
-         */
-        const checkResult = (result: (ED['actionAuth']['Schema'] | undefined)[][][]) => {
-            const r = !result.find(
-                (ele) => {
-                    const eleFlated = ele.flat();
-                    return !eleFlated.find(
-                        ele2 => !!ele2
-                    );
-                }
-            );
-            if (!r && process.env.NODE_ENV === 'development') {
-                deducedLeafSelections.forEach(
-                    (ele, idx) => {
-                        const r2 = result[idx].flat();
-                        if (!r2.find(ele2 => !!ele)) {
-                            console.warn('对象的select权限被否决，请检查', ele);
-                        }
+                filter: {
+                    deActions: {
+                        $contains: 'select',
+                    },
+                    destEntity: {
+                        $in: allEntities as string[],
                     }
+                }
+            }, { dontCollect: true });
+
+            /**
+             * 返回的结果中，第一层为leafNode，必须全通过，第二层为单个leafNode上的deduce，通过一个就可以，第三层为所有可能的actionAuth，通过一个就可以
+             * @param result 
+             * @returns 
+             */
+            const checkResult = (result: (ED['actionAuth']['Schema'] | undefined)[][][]) => {
+                const r = !result.find(
+                    (ele) => {
+                        const eleFlated = ele.flat();
+                        return !eleFlated.find(
+                            ele2 => !!ele2
+                        );
+                    }
+                );
+                if (!r && process.env.NODE_ENV === 'development') {
+                    dlSelections.forEach(
+                        (ele, idx) => {
+                            const r2 = result[idx].flat();
+                            if (!r2.find(ele2 => !!ele)) {
+                                console.warn('对象的select权限被否决，请检查', ele);
+                            }
+                        }
+                    )
+                }
+                return r;
+            }
+
+            if (actionAuths instanceof Promise) {
+                assert(context instanceof AsyncContext);
+                return actionAuths.then(
+                    (aas) => Promise.all(dlSelections.map(
+                        (ele) => Promise.all(ele.map(
+                            (ele2) => Promise.all(this.checkSingleOperation(ele2.entity, ele2.filter, aas as ED['actionAuth']['Schema'][], context, ['select']))
+                        ))
+                    )).then(
+                        (result) => checkResult(result)
+                    )
                 )
             }
-            return r;
-        }
+            return checkResult(
+                dlSelections.map(
+                    ele => ele.map(
+                        ele2 => (this.checkSingleOperation(ele2.entity, ele2.filter, actionAuths as ED['actionAuth']['Schema'][], context, ['select']) as (ED['actionAuth']['Schema'] | undefined)[])
+                    )
+                )
+            );
+        };
 
-        if (actionAuths instanceof Promise) {
-            assert(context instanceof AsyncContext);
-            return actionAuths.then(
-                (aas) => Promise.all(deducedLeafSelections.map(
-                    (ele) => Promise.all(ele.map(
-                        (ele2) => Promise.all(this.checkSingleOperation(ele2.entity, ele2.filter, aas as ED['actionAuth']['Schema'][], context, ['select']))
-                    ))
-                )).then(
-                    (result) => checkResult(result)
-                )
-            )
+        if (deducedLeafSelections[0] instanceof Promise) {
+            return Promise.all(deducedLeafSelections)
+                .then(
+                    (dls) => checkDeducedLeafSelections(dls)
+                );
         }
-        return checkResult(
-            deducedLeafSelections.map(
-                ele => ele.map(
-                    ele2 => (this.checkSingleOperation(ele2.entity, ele2.filter, actionAuths as ED['actionAuth']['Schema'][], context, ['select']) as (ED['actionAuth']['Schema'] | undefined)[])
-                )
-            )
-        );
+        return checkDeducedLeafSelections(deducedLeafSelections as {
+            entity: keyof ED;
+            filter: ED[keyof ED]['Selection']['filter'];
+            actions: ED[T]['Action'][];
+        }[][]);
     }
 
     private findActionAuthsOnNode<Cxt extends AsyncContext<ED> | SyncContext<ED>>(node: OperationTree<ED>, context: Cxt) {
@@ -2046,113 +2124,127 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             return [];
         }
 
-        const deducedEntityFilters = this.getDeducedEntityFilters(entity, filter, [action]);
+        const deducedEntityFilters2 = this.getDeducedEntityFilters(entity, filter, [action], context);
 
-        const allEntities: (keyof ED)[] = deducedEntityFilters.map(ele => ele.entity);
+        const dealWithDeducedEntityFilters = (deducedEntityFilters: {
+            entity: keyof ED;
+            filter: ED[keyof ED]['Selection']['filter'];
+            actions: ED[keyof ED]['Action'][];
+        }[]) => {
+            const allEntities: (keyof ED)[] = deducedEntityFilters.map(ele => ele.entity);
 
-        // todo 这里其实可以在查询条件里通过userRelation过滤一次，但问题不大
-        const actionAuths = context.select('actionAuth', {
-            data: {
-                id: 1,
-                path: 1,
-                destEntity: 1,
-                deActions: 1,
-                relation: {
+            // todo 这里其实可以在查询条件里通过userRelation过滤一次，但问题不大
+            const actionAuths = context.select('actionAuth', {
+                data: {
                     id: 1,
-                    userRelation$relation: {
-                        $entity: 'userRelation',
-                        data: {
-                            id: 1,
-                            entity: 1,
-                            entityId: 1,
-                        },
-                        filter: {
-                            userId: context.getCurrentUserId(),
+                    path: 1,
+                    destEntity: 1,
+                    deActions: 1,
+                    relation: {
+                        id: 1,
+                        userRelation$relation: {
+                            $entity: 'userRelation',
+                            data: {
+                                id: 1,
+                                entity: 1,
+                                entityId: 1,
+                            },
+                            filter: {
+                                userId: context.getCurrentUserId(),
+                            },
                         },
                     },
                 },
-            },
-            filter: {
-                destEntity: {
-                    $in: allEntities as string[],
-                }
-            }
-        }, { dontCollect: true });
-
-        const getActionAuths = (result: (ED['actionAuth']['Schema'] | undefined)[][]) => {
-            const aas: ED['actionAuth']['Schema'][] = [];
-            result.forEach(
-                (ele) => ele.forEach(
-                    (ele2) => {
-                        if (!!ele2) {
-                            aas.push(ele2);
-                        }
+                filter: {
+                    destEntity: {
+                        $in: allEntities as string[],
                     }
-                )
-            );
-            return aas;
-        };
-
-        const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['Schema'][]) => {
-            if (userRelations) {
-                const ars = actionAuths.filter(
-                    (ar) => !!userRelations.find(
-                        (ur) => ur.relationId === ar.relationId
+                }
+            }, { dontCollect: true });
+    
+            const getActionAuths = (result: (ED['actionAuth']['Schema'] | undefined)[][]) => {
+                const aas: ED['actionAuth']['Schema'][] = [];
+                result.forEach(
+                    (ele) => ele.forEach(
+                        (ele2) => {
+                            if (!!ele2) {
+                                aas.push(ele2);
+                            }
+                        }
                     )
                 );
-                
-                if (ars.length > 0) {
-                    // 这里能找到actionAuth，其必然是本对象上的授权
-                    assert(!ars.find(
-                        ele => ele.path !== '' || ele.destEntity !== entity
-                    ));
-                    return ars;
+                return aas;
+            };
+    
+            const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['Schema'][]) => {
+                if (userRelations) {
+                    const ars = actionAuths.filter(
+                        (ar) => !!userRelations.find(
+                            (ur) => ur.relationId === ar.relationId
+                        )
+                    );
+    
+                    if (ars.length > 0) {
+                        // 这里能找到actionAuth，其必然是本对象上的授权
+                        assert(!ars.find(
+                            ele => ele.path !== '' || ele.destEntity !== entity
+                        ));
+                        return ars;
+                    }
                 }
             }
-        }
-
-        if (actionAuths instanceof Promise) {
-            return actionAuths.then(
-                (ars) => {
-                    const created = findOwnCreateUserRelation(ars as ED['actionAuth']['Schema'][]);
-                    if (created) {
-                        return created;
-                    }
-                    return Promise.all(
-                        deducedEntityFilters.map(
-                            ele => Promise.all(
-                                this.checkSingleOperation(
-                                    ele.entity, 
-                                    ele.filter, 
-                                    ars as ED['actionAuth']['Schema'][], 
-                                    context, 
-                                    ele.actions
+    
+            if (actionAuths instanceof Promise) {
+                return actionAuths.then(
+                    (ars) => {
+                        const created = findOwnCreateUserRelation(ars as ED['actionAuth']['Schema'][]);
+                        if (created) {
+                            return created;
+                        }
+                        return Promise.all(
+                            deducedEntityFilters.map(
+                                ele => Promise.all(
+                                    this.checkSingleOperation(
+                                        ele.entity,
+                                        ele.filter,
+                                        ars as ED['actionAuth']['Schema'][],
+                                        context,
+                                        ele.actions
+                                    )
                                 )
                             )
+                        ).then(
+                            (result) => getActionAuths(result)
                         )
-                    ).then(
-                        (result) => getActionAuths(result)
-                    )
-                }
-            )
+                    }
+                )
+            }
+    
+            assert(context instanceof SyncContext);
+            const created = findOwnCreateUserRelation(actionAuths as ED['actionAuth']['Schema'][]);
+            if (created) {
+                return created;
+            }
+            return getActionAuths(
+                deducedEntityFilters.map(
+                    ele => (this.checkSingleOperation(
+                        ele.entity,
+                        ele.filter,
+                        actionAuths as ED['actionAuth']['Schema'][],
+                        context,
+                        ele.actions
+                    ) as (ED['actionAuth']['Schema'] | undefined)[])
+                )
+            );
+        };
+
+        if (deducedEntityFilters2 instanceof Promise) {
+            return deducedEntityFilters2.then(
+                (def2) => dealWithDeducedEntityFilters(def2)
+            );
         }
 
-        assert(context instanceof SyncContext);
-        const created = findOwnCreateUserRelation(actionAuths as ED['actionAuth']['Schema'][]);
-        if (created) {
-            return created;
-        }
-        return getActionAuths(
-            deducedEntityFilters.map(
-                ele => (this.checkSingleOperation(
-                    ele.entity,
-                    ele.filter, 
-                    actionAuths as ED['actionAuth']['Schema'][], 
-                    context, 
-                    ele.actions
-                ) as (ED['actionAuth']['Schema'] | undefined)[])
-            )
-        );
+        return dealWithDeducedEntityFilters(deducedEntityFilters2);
     }
 
     private checkOperationTree<Cxt extends AsyncContext<ED> | SyncContext<ED>>(tree: OperationTree<ED>, context: Cxt) {
@@ -2196,8 +2288,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     return true;
                                 }
                             }
-    
-                            const pathToParent = childPath.endsWith('$entity') ? node.entity as string: childPath.split('$')[1];
+
+                            const pathToParent = childPath.endsWith('$entity') ? node.entity as string : childPath.split('$')[1];
                             if (child instanceof Array) {
                                 const childActions = child.map(ele => ele.action);
                                 const childLegalAuths = realLegalPaths.map(
@@ -2254,7 +2346,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     }, { dontCollect: true })
                                 }
                             ).flat() as ED['actionAuth']['Schema'][] | Promise<ED['actionAuth']['Schema']>[];
-    
+
                             if (childLegalAuths[0] instanceof Promise) {
                                 return Promise.all(childLegalAuths).then(
                                     (clas) => checkChildNode(clas.flat(), child)
@@ -2263,7 +2355,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             return checkChildNode(childLegalAuths as ED['actionAuth']['Schema'][], child);
                         }
                     ).flat();
-    
+
                     if (childResult[0] instanceof Promise) {
                         return Promise.all(childResult).then(
                             (r) => !r.includes(false)
@@ -2294,7 +2386,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     }
                     return false;
                 }
-                
+
                 if (realLegalPaths.length === 0) {
                     if (node === tree) {
                         if (process.env.NODE_ENV === 'development') {
