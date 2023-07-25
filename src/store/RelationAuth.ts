@@ -7,7 +7,7 @@ import { addFilterSegment, checkFilterContains, combineFilters } from "./filter"
 import { judgeRelation } from "./relation";
 import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
-import { difference, intersection, set, uniq, groupBy } from '../utils/lodash';
+import { difference, intersection, set, uniq, cloneDeep } from '../utils/lodash';
 import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
 
 
@@ -1785,7 +1785,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             }
         };
 
-        destructInner(entity, selection);
+        destructInner(entity, cloneDeep(selection));
         return leafSelections;
     }
 
@@ -1917,7 +1917,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             return root;
         };
 
-        return destructInner(entity2, operation2);
+        return destructInner(entity2, cloneDeep(operation2));
     }
 
     /**
