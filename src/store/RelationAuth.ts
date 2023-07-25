@@ -2421,6 +2421,12 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         if (!userId) {
             throw new OakUnloggedInException();
         }
+        if (!operation.filter && (!operation.data || operation.action !== 'create') ) {
+            if (process.env.NODE_ENV === 'development')             {
+                console.warn('operation不能没有限制条件', operation);
+            }
+            return false;
+        }
         const updateTree = this.destructOperation(entity, operation, userId);
 
         return this.checkOperationTree(updateTree, context);
