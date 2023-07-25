@@ -2289,11 +2289,17 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     if (result) {
                         return checkChildren();
                     }
+                    if (process.env.NODE_ENV === 'development') {
+                        console.warn('对象operate权限检查不通过', node);
+                    }
                     return false;
                 }
                 
                 if (realLegalPaths.length === 0) {
                     if (node === tree) {
+                        if (process.env.NODE_ENV === 'development') {
+                            console.warn('对象operate权限检查不通过', node);
+                        }
                         return false;
                     }
                     // 如果不是tree的根结点，相对路径上的actionAuth找不到，还可以尝试从自身的filter去重试其它路径
