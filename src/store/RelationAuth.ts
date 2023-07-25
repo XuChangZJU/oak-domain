@@ -1614,10 +1614,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         filter: ED[keyof ED]['Selection']['filter'];
         actions: ED[T]['Action'][];
     }>> {
-        if (RelationAuth.SPECIAL_ENTITIES.includes(entity as string)) {
-            // 特殊对象直接返回
-            return [];
-        }
         const entityFilters: Array<{
             entity: keyof ED;
             filter: ED[keyof ED]['Selection']['filter'];
@@ -1656,7 +1652,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 const updateActions = this.schema[deduceEntity].actions.filter(
                     (a) => !excludeActions.includes(a)
                 );
-                return this.getDeducedEntityFilters(deduceEntity, deduceFilter, actions[0] === 'select' ? actions : updateActions, context);
+                if (!RelationAuth.SPECIAL_ENTITIES.includes(deduceEntity as string)) {
+                    return this.getDeducedEntityFilters(deduceEntity, deduceFilter, actions[0] === 'select' ? actions : updateActions, context);
+                }
+                return [];
             };
 
             if (deduceEntity && deduceFilter) {
