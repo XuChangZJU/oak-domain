@@ -409,6 +409,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         const supportMtoJoin = this.supportManyToOneJoin();
         const { toModi } = this.getSchema()[entity];
 
+        assert(typeof projection2 === 'object');
         for (const attr in projection2) {
             const relation = judgeRelation(this.storageSchema, entity, attr);
             if (relation === 1 || relation == 0) {
@@ -422,6 +423,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     entity: 1,
                     entityId: 1,
                 });
+
+                assert(typeof projection2[attr] === 'object');
                 if (supportMtoJoin) {
                     cascadeSelectionFns.push(
                         (result) => {
@@ -537,6 +540,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 Object.assign(projection, {
                     [`${attr}Id`]: 1,
                 });
+                assert(typeof projection2[attr] === 'object');
                 if (supportMtoJoin) {
                     if (!toModi) {
                         // 如果不是modi，要保证外键没有空指针
