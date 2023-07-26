@@ -2511,7 +2511,16 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         destEntity: entity as string,
         relation: {
             entity: entity as string,
-            entityId,
+            $or: [
+                {
+                    entityId,
+                },
+                {
+                    entityId: {
+                        $exists: false,
+                    },
+                }
+            ]
         },
     };
     if (overlap) {
