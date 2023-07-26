@@ -1551,24 +1551,12 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     assert(action === 'remove');
                     const userId = context.getCurrentUserId();
                     assert(filter);
-                    const contained = {
-                        relationId: {
-                            $in: {
-                                entity: 'relationAuth',
-                                data: {
-                                    destRelationId: 1,
-                                },
-                                filter: {
-                                    sourceRelationId: {
-                                        $in: {
-                                            entity: 'userRelation',
-                                            data: {
-                                                relationId: 1,
-                                            },
-                                            filter: {
-                                                userId,
-                                            },
-                                        },
+                    const contained: ED['userRelation']['Selection']['filter'] = {
+                        relation: {
+                            relationAuth$destRelation: {
+                                sourceRelation: {
+                                    userRelation$relation: {
+                                        userId,
                                     },
                                 },
                             },

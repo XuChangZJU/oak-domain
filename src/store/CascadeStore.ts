@@ -969,17 +969,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         // A中data的entityId作为B中filter的主键
                         Object.assign(operationMto, {
                             filter: addFilterSegment({
-                                id: {
-                                    $in: {
-                                        entity,
-                                        data: {
-                                            entityId: 1,
-                                        },
-                                        filter: addFilterSegment({
-                                            entity: attr,
-                                        } as any, filter),
-                                    }
-                                },
+                                [`${entity as string}$entity`]: {
+                                    filter,
+                                }
                             }, filterMto),
                         });
                     }
@@ -1034,18 +1026,10 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         });
                     }
                     else {
-                        // A中data的entityId作为B中filter的主键
+                        // A中data的attrId作为B中filter的主键
                         Object.assign(operationMto, {
                             filter: addFilterSegment(filterMto || {}, {
-                                id: {
-                                    $in: {
-                                        entity,
-                                        data: {
-                                            [`${attr}Id`]: 1,
-                                        },
-                                        filter,
-                                    }
-                                },
+                                [`${entity as string}$${attr}`]: filter
                             }),
                         });
                     }
