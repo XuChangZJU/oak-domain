@@ -2538,110 +2538,118 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         filter: actionAuthfilter,
     }, { dontCollect: true });
 
-    const makeRelationIterator = (path: string, relationIds: string[]) => {
-        const paths = path.split('.');
-
-        const makeIter = (e: keyof ED, idx: number): {
-            projection: ED[keyof ED]['Selection']['data'];
-            getData: (d: Partial<ED[keyof ED]['Schema']>) => any;
-        } => {
-            if (idx === paths.length) {
-                return {
-                    projection: {
-                        id: 1,
-                        userRelation$entity: {
-                            $entity: 'userRelation',
-                            data: {
-                                id: 1,
-                                relationId: 1,
-                                relation: {
+    const getUserRelations = async (urAuths: Partial<ED['actionAuth']['Schema']>[]) => {
+        const makeRelationIterator = (path: string, relationIds: string[]) => {
+            const paths = path.split('.');
+    
+            const makeIter = (e: keyof ED, idx: number): {
+                projection: ED[keyof ED]['Selection']['data'];
+                getData: (d: Partial<ED[keyof ED]['Schema']>) => any;
+            } => {
+                if (idx === paths.length) {
+                    return {
+                        projection: {
+                            id: 1,
+                            userRelation$entity: {
+                                $entity: 'userRelation',
+                                data: {
                                     id: 1,
-                                    name: 1,                                
+                                    relationId: 1,
+                                    relation: {
+                                        id: 1,
+                                        name: 1,                                
+                                    },
+                                    entity: 1,
+                                    entityId: 1,
+                                    userId: 1,
                                 },
-                                entity: 1,
-                                entityId: 1,
-                            },
-                            filter: {
-                                relationId: {
-                                    $in: relationIds,
+                                filter: {
+                                    relationId: {
+                                        $in: relationIds,
+                                    },
                                 },
-                            },
-                        } as ED['userRelation']['Selection']
-                    } as ED[keyof ED]['Selection']['data'],
-                    getData: (d: Partial<ED[keyof ED]['Schema']>) => {
-                        return d.userRelation$entity;
-                    },
-                };
-            }
-            const attr = path[idx];
-            const rel = judgeRelation(context.getSchema(), e, attr);
-            if (rel === 2) {
-                const { projection, getData } = makeIter(attr, idx + 1);
-                return {
-                    projection: {
-                        id: 1,
-                        [attr]: projection,                        
-                    },
-                    getData: (d) => d[attr] && getData(d[attr]!),
-                };
-            }
-            else if (typeof rel === 'string') {
-                const { projection, getData } = makeIter(rel, idx + 1);
-                return {
-                    projection: {
-                        id: 1,
-                        [attr]: projection,                        
-                    },
-                    getData: (d) => d[attr] && getData(d[attr]!),
-                };
-            }
-            else {
-                assert(rel instanceof Array);
-                const [e2, fk] = rel;
-                const { projection, getData } = makeIter(e2, idx + 1);
-                return {
-                    projection: {
-                        id: 1,
-                        [attr]: {
-                            $entity: e2,
-                            data: projection,
+                            } as ED['userRelation']['Selection']
+                        } as ED[keyof ED]['Selection']['data'],
+                        getData: (d: Partial<ED[keyof ED]['Schema']>) => {
+                            return d.userRelation$entity;
                         },
-                    },
-                    getData: (d) => d[attr] && d[attr]!.map((ele: any) => getData(ele)),
+                    };
                 }
-            }
+                const attr = paths[idx];
+                const rel = judgeRelation(context.getSchema(), e, attr);
+                if (rel === 2) {
+                    const { projection, getData } = makeIter(attr, idx + 1);
+                    return {
+                        projection: {
+                            id: 1,
+                            [attr]: projection,                        
+                        },
+                        getData: (d) => d[attr] && getData(d[attr]!),
+                    };
+                }
+                else if (typeof rel === 'string') {
+                    const { projection, getData } = makeIter(rel, idx + 1);
+                    return {
+                        projection: {
+                            id: 1,
+                            [attr]: projection,                        
+                        },
+                        getData: (d) => d[attr] && getData(d[attr]!),
+                    };
+                }
+                else {
+                    assert(rel instanceof Array);
+                    const [e2, fk] = rel;
+                    const { projection, getData } = makeIter(e2, idx + 1);
+                    return {
+                        projection: {
+                            id: 1,
+                            [attr]: {
+                                $entity: e2,
+                                data: projection,
+                            },
+                        },
+                        getData: (d) => d[attr] && d[attr]!.map((ele: any) => getData(ele)),
+                    }
+                }
+            };
+    
+            return makeIter(entity, 0);
         };
+    
+        // 相同的path可以groupBy掉
+        const urAuthDict = groupBy(urAuths, 'path');
+        const urAuthGroups = Object.keys(urAuthDict).map(
+            ele => ({
+                path: ele,
+                relationIds: urAuthDict[ele].map(ele => ele.relationId!)
+            })
+        );
+    
+        const userRelations = await Promise.all(urAuthGroups.map(
+            async ({ path, relationIds }) => {
+                const { projection, getData } = makeRelationIterator(path, relationIds);
+                const rows = await context.select(entity, {
+                    data: projection,
+                    filter,
+                }, { dontCollect: true });
+                const urs = rows.map(ele => getData(ele)).flat().filter(ele => !!ele);
+                return urs as ED['userRelation']['Schema'][];
+            }
+        ));
 
-        return makeIter(entity, 0);
-    }
+        return userRelations.flat();
+    };
 
 
-    const urAuths = actionAuths.filter(
+    const urAuths2 = actionAuths.filter(
         ele => !!ele.relationId         // 有relation说明通过userRelation关联
     );
 
-    // 相同的path可以groupBy掉
-    const urAuthDict = groupBy(urAuths, 'path');
-    const urAuthGroups = Object.keys(urAuthDict).map(
-        ele => ({
-            path: ele,
-            relationIds: urAuthDict[ele].map(ele => ele.relationId!)
-        })
-    );
+    const userRelations = await getUserRelations(urAuths2);
 
-    const userRelations = await Promise.all(urAuthGroups.map(
-        async ({ path, relationIds }) => {
-            const { projection, getData } = makeRelationIterator(path, relationIds);
-            const rows = await context.select(entity, {
-                data: projection,
-                filter,
-            }, { dontCollect: true });
-            const urs = rows.map(ele => getData(ele)).flat().filter(ele => !!ele);
-            return urs as ED['userRelation']['Schema'][];
-        }
-    ));
-
+    // todo，还有直接的user
     return {
-        userRelations: userRelations.flat(),
+        userRelations,
     };
 }
