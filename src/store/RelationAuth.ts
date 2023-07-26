@@ -2496,11 +2496,11 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 };
 
 /**
- * 获取有对entity进行actions操作权限的用户Id（不包含root）
+ * 获取有对entity进行actions操作权限的userRelation关系
  * @param params 
  * @param context 
  */
- export async function getUserIdsByActions<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(params: {
+ export async function getUserRelationsByActions<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(params: {
     entity: T;
     entityId: string;
     actions: ED[T]['Action'][];
@@ -2534,6 +2534,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     data: {
                         id: 1,
                         userId: 1,
+                        relationId: 1,
+                        relation: {
+                            id: 1,
+                            name: 1,
+                            display: 1,
+                        },
+                        entity: 1,
+                        entityId: 1,
                     },
                 },
             },
@@ -2542,5 +2550,5 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     }, { dontCollect: true });
 
     const userRelations = actionAuths.map(ele => ele.relation!.userRelation$relation!);
-    return uniq(Array.prototype.concat.apply([], userRelations).map(ele => ele.userId)) as string[];
+    return userRelations;
 }
