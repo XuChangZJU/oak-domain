@@ -6,6 +6,7 @@ import { addFilterSegment } from "./filter";
 import { createDynamicCheckers } from '../checkers';
 import { createDynamicTriggers } from '../triggers';
 import { EntityDict as BaseEntityDict } from '../base-app-domain/EntityDict';
+import { triggers as ActionAuthTriggers } from './actionAuth';
 
 export function getFullProjection<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>) {
     const { attributes } = schema[entity];
@@ -307,6 +308,7 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
         }
     }
 
+    triggers.push(...(ActionAuthTriggers as Array<Trigger<ED, keyof ED, Cxt>>));
     return {
         triggers,
         checkers,
