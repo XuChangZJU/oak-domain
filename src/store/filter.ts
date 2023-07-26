@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { EntityDict as BaseEntityDict, EXPRESSION_PREFIX, OakRowInconsistencyException, StorageSchema } from '../types';
 import { EntityDict } from "../base-app-domain";
-import { difference, intersection, union } from '../utils/lodash';
+import { difference, intersection, union, cloneDeep } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
 import { judgeRelation } from './relation';
 import { SyncContext } from './SyncRowStore';
@@ -904,7 +904,7 @@ export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T ex
             $not: contained,
         }]);
         const count = context.count(entity, {
-            filter: filter2,
+            filter: cloneDeep(filter2), // 里面的查询改写可能会把原来的filter改掉，所以在此克隆
             count: 1,
         }, {
             dontCollect: true,
