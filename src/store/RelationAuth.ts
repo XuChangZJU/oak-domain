@@ -2509,19 +2509,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     const { entity, entityId, actions, overlap } = params;
     const filter = {
         destEntity: entity as string,
-        relation: {
-            entity: entity as string,
-            $or: [
-                {
-                    entityId,
-                },
-                {
-                    entityId: {
-                        $exists: false,
-                    },
-                }
-            ]
-        },
     };
     if (overlap) {
         Object.assign(filter, {
