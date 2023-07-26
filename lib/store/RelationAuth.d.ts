@@ -102,3 +102,14 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      */
     private checkActions2;
 }
+/**
+ * 获取有对entity进行actions操作权限的用户Id（不包含root）
+ * @param params
+ * @param context
+ */
+export declare function getUserIdsByActions<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(params: {
+    entity: T;
+    entityId: string;
+    actions: ED[T]['Action'][];
+    overlap?: boolean;
+}, context: Cxt): Promise<string[]>;

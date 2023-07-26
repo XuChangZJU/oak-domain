@@ -2493,4 +2493,58 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             }
         }
     }
+};
+
+/**
+ * 获取有对entity进行actions操作权限的用户Id（不包含root）
+ * @param params 
+ * @param context 
+ */
+ export async function getUserIdsByActions<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(params: {
+    entity: T;
+    entityId: string;
+    actions: ED[T]['Action'][];
+    overlap?: boolean;
+}, context: Cxt) {
+    const { entity, entityId, actions, overlap } = params;
+    const filter = {
+        destEntity: entity as string,
+        relation: {
+            entity: entity as string,
+            entityId,
+        },
+    };
+    if (overlap) {
+        Object.assign(filter, {
+            deActions: {
+                $overlaps: actions,
+            },
+        });
+    }
+    else {
+        Object.assign(filter, {
+            deActions: {
+                $contains: actions,
+            },
+        });
+    }
+    const actionAuths = await context.select('actionAuth', {
+        data: {
+            id: 1,
+            relation: {
+                id: 1,
+                userRelation$relation: {
+                    $entity: 'userRelation',
+                    data: {
+                        id: 1,
+                        userId: 1,
+                    },
+                },
+            },
+        },
+        filter,
+    }, { dontCollect: true });
+
+    const userRelations = actionAuths.map(ele => ele.relation!.userRelation$relation!);
+    return uniq(Array.prototype.concat.apply([], userRelations).map(ele => ele.userId)) as string[];
 }
