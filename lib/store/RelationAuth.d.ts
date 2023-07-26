@@ -112,4 +112,4 @@ export declare function getUserRelationsByActions<ED extends EntityDict & BaseEn
     entityId: string;
     actions: ED[T]['Action'][];
     overlap?: boolean;
-}, context: Cxt): Promise<import("../base-app-domain/UserRelation/Schema").Schema[][]>;
+}, context: Cxt): Promise<import("../base-app-domain/UserRelation/Schema").Schema[]>;

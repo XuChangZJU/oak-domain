@@ -2549,6 +2549,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         filter,
     }, { dontCollect: true });
 
-    const userRelations = actionAuths.map(ele => ele.relation!.userRelation$relation!);
+    const userRelations = actionAuths.map(ele => ele.relation!.userRelation$relation!).flat();
     return userRelations;
 }
