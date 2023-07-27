@@ -1,4 +1,4 @@
-import { AuthDefDict, Checker, EntityDict, OperateOption, SelectOption, StorageSchema, Trigger } from "../types";
+import { Checker, EntityDict, OperateOption, SelectOption, StorageSchema, Trigger } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
 import { SyncContext } from './SyncRowStore';
@@ -16,13 +16,6 @@ export declare function translateCheckerInSyncContext<ED extends EntityDict & Ba
     fn: (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => void;
     when: 'before' | 'after';
 };
-/**
- * 根据权限定义，创建出相应的checker
- * @param schema
- * @param authDict
- * @returns
- */
-export declare function createAuthCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>, authDict: AuthDefDict<ED>): Checker<ED, keyof ED, Cxt>[];
 /**
  * 对对象的删除，检查其是否会产生其他行上的空指针，不允许这种情况的出现
  * @param schema

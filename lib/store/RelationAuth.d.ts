@@ -9,36 +9,9 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
     private authDeduceRelationMap;
     private schema;
     static SPECIAL_ENTITIES: string[];
-    /**
-     * 根据当前操作条件，查找到满足actions（overlap关系）的relationId和relativePath
-     */
-    private relationalChecker;
     private selectFreeEntities;
-    private constructRelationalChecker;
     constructor(schema: StorageSchema<ED>, actionCascadePathGraph: AuthCascadePath<ED>[], relationCascadePathGraph: AuthCascadePath<ED>[], authDeduceRelationMap: AuthDeduceRelationMap<ED>, selectFreeEntities: (keyof ED)[]);
-    /**
-     * 对Operation而言，找到最顶层对象的对应权限所在的relation，再查找actionAuth中其它子对象有无相对路径授权
-     * 如一个cascade更新目标是(entity: a, action: 'update')：{
-     *      b: {
-     *          action: 'update',
-     *          data: {
-     *              c: {
-     *                  action: 'update',
-     *              },
-     *          },
-     *      },
-     *      d$entity: [{
-     *          action: 'create',
-     *          data: {},
-     *      }]
-     * }
-     * 则应检查的顶层对象是c，而b:update, a:update以及d:create都应该在c所对应权限的派生路径上
-     * @param entity
-     * @param operation
-     */
-    private destructCascadeOperation;
     checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): void;
-    private getDeducedCheckOperation;
     /**
      * 查询当前用户在对应entity上可以操作的relationIds
      * @param entity
@@ -47,17 +20,6 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      * @returns
      */
     private getGrantedRelationIds;
-    private checkSpecialEntity;
-    private tryCheckDeducedAuth;
-    private tryCheckSelfAuth;
-    /**
-     * @param entity
-     * @param operation
-     * @param context
-     * @param actions
-     * @returns
-     */
-    private checkActions;
     checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): Promise<void>;
     private checkOperateSpecialEntities2;
     private getDeducedEntityFilters;
@@ -114,4 +76,9 @@ export declare function getUserRelationsByActions<ED extends EntityDict & BaseEn
     overlap?: boolean;
 }, context: Cxt): Promise<{
     userRelations: ED["userRelation"]["Schema"][];
+    userEntities: {
+        entity: keyof ED;
+        entityId: string;
+        userId: string;
+    }[];
 }>;
