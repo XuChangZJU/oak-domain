@@ -903,6 +903,8 @@ export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T ex
         const filter2 = combineFilters([filter, {
             $not: contained,
         }]);
+
+        const closeRootModeFn = context instanceof AsyncContext && context.openRootMode();
         const count = context.count(entity, {
             filter: cloneDeep(filter2), // 里面的查询改写可能会把原来的filter改掉，所以在此克隆
             count: 1,
@@ -912,7 +914,12 @@ export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T ex
         });
         if (count instanceof Promise) {
             return count.then(
-                (count2) => count2 === 0
+                (count2) => {
+                    if (closeRootModeFn) {
+                        closeRootModeFn();
+                    }
+                    return count2 === 0;
+                }
             );
         }
         return count === 0;
@@ -938,6 +945,7 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
     // 再判断两者同时成立时取得的行数是否为0
     if (dataCompare) {
         const filter3 = combineFilters([filter2, filter1]);
+        const closeRootModeFn = context instanceof AsyncContext && context.openRootMode();
         const count = context.count(entity, {
             filter: filter3,
         }, {
@@ -946,7 +954,10 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
         });
         if (count instanceof Promise) {
             return count.then(
-                (count2) => count2 === 0
+                (count2) => {
+                    closeRootModeFn && closeRootModeFn();
+                    return count2 === 0;
+                }
             );
         }
         return count === 0;
