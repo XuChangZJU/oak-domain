@@ -38,7 +38,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     private authDeduceRelationMap: AuthDeduceRelationMap<ED>;
     private schema: StorageSchema<ED>;
     static SPECIAL_ENTITIES = SYSTEM_RESERVE_ENTITIES;
-   
+
     private selectFreeEntities: (keyof ED)[];
 
 
@@ -58,7 +58,11 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
 
     // 前台检查filter是否满足relation约束
-    checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt) {
+    checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(
+        entity: T,
+        operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>,
+        context: Cxt
+    ) {
         if (context.isRoot()) {
             return;
         }
@@ -283,7 +287,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 const dealWithData = (rows: Partial<ED[keyof ED]['OpSchema']>[]) => {
                     // 这里如果entity指向不同的实体，一般出现这样的查询，则其权限应当不由这条deduce路径处理
                     // 同上，如果找到的行数大于1行，说明deduce路径上的对象不确定，也暂不处理，等遇到了再说  by Xc 20230725
-                    if (rows.length > 1  || rows.length === 0) {
+                    if (rows.length > 1 || rows.length === 0) {
                         if (process.env.NODE_ENV === 'development') {
                             console.warn(`进行deduce推导时找到了${rows.length}行${entity as string}数据`);
                         }
@@ -297,7 +301,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     const result = getRecursiveDeducedFilters(deducedEntity, {
                         id: deduceEntityId,
                     });
-                    
+
                     if (result instanceof Promise) {
                         return result.then(
                             (r2) => {
@@ -450,6 +454,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             };
             let root = me;
 
+            // 如果当前对象是一个toModi的，意味着它的cascadeUpdate会全部被变为modi去缓存，因此不需要再向下检查了
+            // modi被apply时，这些modi产生的更新才会被实际检查
+            const isModiUpdate = this.schema[entity].toModi && action !== 'remove';
+
             if (child) {
                 assert(path);
                 addChild(me, path, child);
@@ -457,15 +465,15 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
             for (const attr in data) {
                 const rel = judgeRelation(this.schema, entity, attr);
-                if (rel === 2) {
+                if (rel === 2 && !isModiUpdate) {
                     assert(root === me && !hasParent, 'cascadeUpdate必须是树结构，避免森林');
                     root = destructInner(attr, data[attr] as any, `${entity as string}$entity`, me);
                 }
-                else if (typeof rel === 'string') {
+                else if (typeof rel === 'string' && !isModiUpdate) {
                     assert(root === me && !hasParent, 'cascadeUpdate必须是树结构，避免森林');
                     root = destructInner(rel, data[attr] as any, `${entity as string}$${attr}`, me);
                 }
-                else if (rel instanceof Array) {
+                else if (rel instanceof Array && !isModiUpdate) {
                     const [e, f] = rel;
                     const otmOperations = data[attr];
                     if (e === 'userRelation' && entity !== 'user') {
@@ -1104,7 +1112,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
  * @param params 
  * @param context 
  */
- export async function getUserRelationsByActions<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(params: {
+export async function getUserRelationsByActions<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(params: {
     entity: T;
     filter: ED[T]['Selection']['filter'];
     actions: ED[T]['Action'][];
@@ -1145,7 +1153,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     const getUserRelations = async (urAuths: Partial<ED['actionAuth']['Schema']>[]) => {
         const makeRelationIterator = (path: string, relationIds: string[]) => {
             const paths = path.split('.');
-    
+
             const makeIter = (e: keyof ED, idx: number): {
                 projection: ED[keyof ED]['Selection']['data'];
                 getData: (d: Partial<ED[keyof ED]['Schema']>) => any;
@@ -1161,7 +1169,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     relationId: 1,
                                     relation: {
                                         id: 1,
-                                        name: 1,                                
+                                        name: 1,
                                     },
                                     entity: 1,
                                     entityId: 1,
@@ -1186,7 +1194,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     return {
                         projection: {
                             id: 1,
-                            [attr]: projection,                        
+                            [attr]: projection,
                         },
                         getData: (d) => d[attr] && getData(d[attr]!),
                     };
@@ -1196,7 +1204,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     return {
                         projection: {
                             id: 1,
-                            [attr]: projection,                        
+                            [attr]: projection,
                         },
                         getData: (d) => d[attr] && getData(d[attr]!),
                     };
@@ -1217,10 +1225,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     }
                 }
             };
-    
+
             return makeIter(entity, 0);
         };
-    
+
         // 相同的path可以groupBy掉
         const urAuthDict = groupBy(urAuths, 'path');
         const urAuthGroups = Object.keys(urAuthDict).map(
@@ -1229,7 +1237,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 relationIds: urAuthDict[ele].map(ele => ele.relationId!)
             })
         );
-    
+
         const userRelations = await Promise.all(urAuthGroups.map(
             async ({ path, relationIds }) => {
                 const { projection, getData } = makeRelationIterator(path, relationIds);
@@ -1248,7 +1256,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     const getDirectUserEntities = async (directAuths: Partial<ED['actionAuth']['Schema']>[]) => {
         const makeRelationIterator = (path: string) => {
             const paths = path.split('.');
-    
+
             const makeIter = (e: keyof ED, idx: number): {
                 projection: ED[keyof ED]['Selection']['data'];
                 getData: (d: Partial<ED[keyof ED]['Schema']>) => any;
@@ -1291,7 +1299,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     }
                                 }
                             },
-                        }; 
+                        };
                     }
                 }
                 if (rel === 2) {
@@ -1299,7 +1307,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     return {
                         projection: {
                             id: 1,
-                            [attr]: projection,                        
+                            [attr]: projection,
                         },
                         getData: (d) => d[attr] && getData(d[attr]!),
                     };
@@ -1309,7 +1317,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     return {
                         projection: {
                             id: 1,
-                            [attr]: projection,                        
+                            [attr]: projection,
                         },
                         getData: (d) => d[attr] && getData(d[attr]!),
                     };
@@ -1330,7 +1338,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     }
                 }
             };
-    
+
             return makeIter(entity, 0);
         };
         const userEntities = await Promise.all(
@@ -1361,7 +1369,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         ele => !ele.relationId         // 没relation说明通过user关联
     );
 
-    const [ userRelations, userEntities ] = await Promise.all([getUserRelations(urAuths2), getDirectUserEntities(directAuths2)]);
+    const [userRelations, userEntities] = await Promise.all([getUserRelations(urAuths2), getDirectUserEntities(directAuths2)]);
 
     return {
         userRelations,

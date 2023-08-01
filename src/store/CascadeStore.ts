@@ -1267,7 +1267,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
         switch (action) {
             case 'create': {
-                this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
                 if (option.modiParentEntity && !['modi', 'modiEntity', 'oper', 'operEntity'].includes(entity as string)) {
                     // 变成对modi的插入
                     assert(option.modiParentId);
@@ -1281,9 +1280,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             entity: option.modiParentEntity!,
                             entityId: option.modiParentId!,
                             filter: {
-                                id: {
-                                    $in: [(data as any).id as string],      //这里记录这个filter是为了后面update的时候直接在其上面update，参见本函数后半段关于modiUpsert相关的优化
-                                },
+                                id: (data as any).id,  //这里记录这个filter是为了后面update的时候直接在其上面update，参见本函数后半段关于modiUpsert相关的优化
                             },
                             data,
                             iState: 'active',
@@ -1295,6 +1292,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     return 1;
                 }
                 else {
+                    this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
                     let result = 0;
                     const createInner = async (operation2: ED[T]['Create']) => {
                         try {

@@ -230,6 +230,14 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
                     targetEntity: 1,
                 },
                 filter,
+                sorter: [
+                    {
+                        $attr: {
+                            $$createAt$$: 1,
+                        },
+                        $direction: 'asc',
+                    },
+                ],
             }, option);
 
             for (const modi of modies) {
@@ -239,9 +247,7 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
                     action: action as EntityDict[keyof EntityDict]['Action'],
                     data: data as EntityDict[keyof EntityDict]['Update']['data'],
                     filter: filter as EntityDict[keyof EntityDict]['Update']['filter'],
-                }, Object.assign({}, option, {
-                    blockTrigger: true,
-                }));
+                }, option);
             }
 
             return modies.length;

@@ -452,7 +452,7 @@ function checkAttributeLegal<ED extends EntityDict & BaseEntityDict>(
         }
         else {
             // 这里似乎还有一种update中带cascade remove的case，等遇到再说（貌似cascadeUpdate没有处理完整这种情况） by Xc
-            if (typeof data[attr] === 'object' && data[attr].action === 'remove') {
+            if (typeof data[attr] === 'object' && data[attr]?.action === 'remove') {
                 console.warn('cascade remove可能是未处理的边界，请注意');
             }
         }
