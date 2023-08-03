@@ -499,7 +499,8 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                             }
                             else if (attributes[attr].type === 'ref') {
                                 const ref = attributes[attr].ref as string;
-                                if (data2[ref] && data2[ref].action === 'create') {
+                                const attr2 = attr.slice(0, attr.length - 2);
+                                if (data2[attr2] && data2[attr2].action === 'create') {
                                     continue;
                                 }
                             }
