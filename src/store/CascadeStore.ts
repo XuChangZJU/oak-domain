@@ -1899,8 +1899,13 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
      */
     private addToResultSelections<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, rows: Partial<ED[T]['Schema']>[], context: Cxt) {
         if (this.supportManyToOneJoin()) {
+            // 这里的外键连接有可能为空，需要使用所有的行的attr的并集来测试
+            const attrs = uniq(rows.map(
+                ele => Object.keys(ele)
+            ).flat());
             const attrsToPick: string[] = [];
-            for (const attr in rows[0]) {
+
+            for (const attr of attrs) {
                 const data: Partial<ED[T]['Schema']> = {}
                 const rel = this.judgeRelation(entity, attr);
                 if (rel === 2) {

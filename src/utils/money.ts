@@ -34,7 +34,7 @@ const ThousandCont: (value: number) => string | undefined = (value) => {
     if (value1) {
         result = value1 + result;
     }
-    result = result + '.' + numArr[1];
+    result = numArr[1] ? result + '.' + numArr[1] : result;
     return result;
 };
 
