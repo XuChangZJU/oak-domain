@@ -563,7 +563,8 @@ function judgeFilter2ValueRelation<ED extends EntityDict & BaseEntityDict, T ext
                     return judgeFilterRelation(rel, schema, filter[attr2], conditionalFilterAttrValue, contained);
                 }
                 else {
-                    assert(false);
+                    // 一对多情况较为复杂，先返回false，后面再详化。todo by Xc
+                    return false;
                 }
             }
         }
