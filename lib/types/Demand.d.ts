@@ -35,6 +35,7 @@ export declare type Q_DateComparisonValue = Q_NumberComparisonValue;
 export declare type Q_EnumComparisonValue<E> = E | OneOf<{
     $in: E[];
     $nin: E[];
+    $ne: E;
 }>;
 export declare type Q_ExistsValue = {
     $exists: boolean;
