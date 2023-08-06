@@ -282,11 +282,11 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     filter,
                     indexFrom: 0,
                     count: 10,
-                }, { dontCollect: true });
+                }, { dontCollect: true, blockTrigger: true });
 
                 const dealWithData = (rows: Partial<ED[keyof ED]['OpSchema']>[]) => {
                     // 这里如果entity指向不同的实体，一般出现这样的查询，则其权限应当不由这条deduce路径处理
-                    // 同上，如果找到的行数大于1行，说明deduce路径上的对象不确定，也暂不处理，等遇到了再说  by Xc 20230725
+                    // 同上，如果找到的行数大于1行，说明deduce路径上的对象不确定，也暂不处理  by Xc 20230725
                     if (rows.length > 1 || rows.length === 0) {
                         if (process.env.NODE_ENV === 'development') {
                             console.warn(`进行deduce推导时找到了${rows.length}行${entity as string}数据`);

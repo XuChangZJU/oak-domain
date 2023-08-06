@@ -34,6 +34,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     select<T extends keyof ED, OP extends SelectOption>(entity: T, selection: ED[T]['Selection'], option: OP): Promise<Partial<ED[T]["Schema"]>[]>;
     aggregate<T extends keyof ED, OP extends SelectOption>(entity: T, aggregation: ED[T]['Aggregation'], option: OP): Promise<AggregationResult<ED[T]["Schema"]>>;
     count<T extends keyof ED, OP extends SelectOption>(entity: T, selection: Pick<ED[T]['Selection'], 'filter' | 'count'>, option: OP): Promise<number>;
+    exec(script: string, txnId?: string): Promise<void>;
     mergeMultipleResults(toBeMerged: OperationResult<ED>[]): OperationResult<ED>;
     getCurrentTxnId(): string | undefined;
     getSchema(): import("../types").StorageSchema<ED>;
@@ -53,4 +54,5 @@ export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> exten
     begin(option?: TxnOption): Promise<string>;
     commit(txnId: string): Promise<void>;
     rollback(txnId: string): Promise<void>;
+    exec(script: string, txnId?: string): Promise<void>;
 }
