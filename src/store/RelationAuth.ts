@@ -244,7 +244,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             }
 
             const getRecursiveDeducedFilters = (deduceEntity: keyof ED, deduceFilter: ED[keyof ED]['Selection']['filter']) => {
-                const excludeActions = readOnlyActions.concat(['create', 'remove']);
+                const excludeActions = readOnlyActions.concat([/* 'create', 'remove' */]);
                 const updateActions = this.schema[deduceEntity].actions.filter(
                     (a) => !excludeActions.includes(a)
                 );
