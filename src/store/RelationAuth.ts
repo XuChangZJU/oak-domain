@@ -176,8 +176,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             case 'user': {
                 // 对用户的操作由应用自己去管理权限，这里只检查grant/revoke
                 if (['grant', 'revoke'].includes(action)) {
-                    assert(filter && Object.keys(filter).length === 1, 'grant/revoke只能操作userRelation$user');
-                    assert(filter!.hasOwnProperty('userRelation$user'), 'grant/revoke只能操作userRelation$user');
+                    // assert(filter && Object.keys(filter).length === 1, 'grant/revoke只能操作userRelation$user');
+                    // assert(filter!.hasOwnProperty('userRelation$user'), 'grant/revoke只能操作userRelation$user');
                     return true;
                 }
                 else {
