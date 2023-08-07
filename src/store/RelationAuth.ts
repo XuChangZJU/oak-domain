@@ -129,14 +129,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         await this.checkActions2(entity, operation, context);
     }
 
-    private checkOperateSpecialEntities2<Cxt extends AsyncContext<ED> | SyncContext<ED>>(entity2: keyof ED, action: ED[keyof ED]['Action'], filter: ED[keyof ED]['Selection']['filter'], context: Cxt) {
+    private checkOperateSpecialEntities2<Cxt extends AsyncContext<ED> | SyncContext<ED>>(entity2: keyof ED, action: ED[keyof ED]['Action'], filter: ED[keyof ED]['Selection']['filter'], context: Cxt): boolean | Promise<boolean> {
         switch (entity2) {
             case 'userRelation': {
                 assert(!(filter instanceof Array));
                 assert(['create', 'remove'].includes(action));
                 if (action === 'create') {
                     assert(!(filter instanceof Array));
-                    const { entity, entityId, relationId, userId } = filter as ED['userRelation']['CreateSingle']['data'];
+                    const { entity, entityId, relationId } = filter as ED['userRelation']['CreateSingle']['data'];
 
                     const destRelations = this.getGrantedRelationIds(entity!, entityId!, context);
                     if (destRelations instanceof Promise) {
@@ -192,6 +192,21 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             case 'relation': {
                 // 创建relation目前不支持，以后再说
                 return false;
+            }
+            case 'userEntityGrant': {
+                // userEntityGrant的创建相当于授权，领取相当于赋权
+                if (['create', 'update', 'remove'].includes(action)) {
+                    if (action === 'create') {
+                        return this.checkOperateSpecialEntities2('userRelation', 'create', filter, context);
+                    }
+                    return this.checkOperateSpecialEntities2('userRelation', 'action', {
+                        relation: {
+                            userEntityGrant$relation: filter,
+                        },
+                    }, context);
+                }
+                // 领取和读取动作公开
+                return true;
             }
             default: {
                 assert(false, `对象${entity2 as string}的权限控制没有加以控制`);

@@ -36,4 +36,5 @@ export const NUMERICAL_LITERL_DEFAULT_SCALE = 2;
 export const INT_LITERL_DEFAULT_WIDTH = 4;
 
 // 暂放在这儿
-export const SYSTEM_RESERVE_ENTITIES = ['user', 'relation', 'oper', 'operEntity', 'modi', 'modiEntity', 'userRelation', 'actionAuth', 'relationAuth', 'relation'];
+export const SYSTEM_RESERVE_ENTITIES = ['user', 'relation', 'oper', 'operEntity', 'modi', 'modiEntity',
+    'userRelation', 'actionAuth', 'relationAuth', 'relation', 'userEntityGrant'];

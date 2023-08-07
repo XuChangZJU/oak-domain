@@ -8,8 +8,9 @@ export interface Schema extends EntityShape {
     entityId: String<64>;
     relation: Relation;
 };
+type Action = 'confirm';
 
-const entityDesc: EntityDesc<Schema> = {
+const entityDesc: EntityDesc<Schema, Action> = {
     locales: {
         zh_CN: {
             name: '用户授权',
@@ -17,6 +18,9 @@ const entityDesc: EntityDesc<Schema> = {
                 relation: '关系',
                 entity: '关联对象',
                 entityId: '关联对象id',
+            },
+            action: {
+                confirm: '领取',
             },
         },
     },
