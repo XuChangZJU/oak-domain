@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { EntityDict as BaseEntityDict, EXPRESSION_PREFIX, OakRowInconsistencyException, StorageSchema } from '../types';
 import { EntityDict } from "../base-app-domain";
-import { difference, intersection, union, cloneDeep } from '../utils/lodash';
+import { pick, difference, intersection, union, omit } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
 import { judgeRelation } from './relation';
 import { SyncContext } from './SyncRowStore';
@@ -78,6 +78,15 @@ export function combineFilters<ED extends EntityDict & BaseEntityDict, T extends
     return addFilterSegment(...filters);
 }
 
+type DeducedFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED> = {
+    entity: T;
+    filter: ED[T]['Selection']['filter'];
+};
+
+type DeducedFilterCombination<ED extends EntityDict & BaseEntityDict> = {
+    $or?: (DeducedFilterCombination<ED> | DeducedFilter<ED, keyof ED>)[];
+    $and?: (DeducedFilterCombination<ED> | DeducedFilter<ED, keyof ED>)[];
+};
 /**
  * 判断value1表达的单个属性查询与同属性上value2表达的查询是包容还是相斥
  * 相容即value1所表达的查询结果一定被value2表达的查询结果所包含，例如：
@@ -493,37 +502,64 @@ export function judgeValueRelation(value1: any, value2: any, contained: boolean)
     }
 }
 
-function judgeFilter2ValueRelation<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+/**
+ * 判断filter条件对compared条件上的attr键值的条件是否相容或相斥
+ * @param entity 
+ * @param schema 
+ * @param attr 
+ * @param filter 
+ * @param compared 
+ * @param contained 
+ * @returns 返回true说明肯定相容（相斥），返回false说明无法判定相容（相斥），返回DeducedFilterCombination说明需要进一步判断此推断的条件
+ */
+function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     attr: keyof ED[T]['Schema'],
-    filter: ED[T]['Selection']['filter'],
-    conditionalFilterAttrValue: object,
-    contained: boolean): boolean {
+    filter: NonNullable<ED[T]['Selection']['filter']>,
+    compared: NonNullable<ED[T]['Selection']['filter']>,
+    contained: boolean): boolean | DeducedFilterCombination<ED> {
+    const comparedFilterAttrValue = compared![attr as any];
+    const orDeducedFilters: DeducedFilterCombination<ED>[] = [];
+
+    if (attr === 'entityId') {
+        // entityId不可能作为查询条件单独存在
+        assert(compared.hasOwnProperty('entity'));
+        return false;
+    }
     for (const attr2 in filter) {
         if (['$and', '$or', '$not'].includes(attr2)) {
             switch (attr2) {
                 case '$and':
-                case '$or':
-                case '$xor': {
+                case '$or': {
+                    const andDeducedFilters: DeducedFilterCombination<ED>[] = [];
                     const logicQueries = filter[attr2] as Array<ED[T]['Selection']['filter']>;
                     const results = logicQueries.map(
-                        (logicQuery) => judgeFilter2ValueRelation(entity, schema, attr, logicQuery, conditionalFilterAttrValue, contained)
+                        (logicQuery) => judgeFilterSingleAttrRelation(entity, schema, attr, logicQuery!, compared, contained)
                     );
                     // 如果filter的多个算子是and关系，则只要有一个包含此条件就是包含，只要有一个与此条件相斥就是相斥
                     // 如果filter的多个算子是or关系，则必须所有的条件都包含此条件才是包含，必须所有的条件都与此条件相斥才是相斥                    
-                    if (attr2 === '$and') {
-                        if (results.includes(true)) {
+                    for (const r of results) {
+                        if (r === true && attr2 === '$and') {
                             return true;
                         }
-                    }
-                    else if (attr2 === '$or') {
-                        if (!results.includes(false)) {
-                            return true;
+                        if (r === false && attr2 === '$or') {
+                            return false;
+                        }
+                        if (typeof r === 'object') {
+                            if (attr2 === '$and') {
+                                orDeducedFilters.push(r);
+                            }
+                            else {
+                                assert(attr2 === '$or');
+                                andDeducedFilters.push(r);
+                            }
                         }
                     }
-                    else {
-                        assert(false);
+                    if (andDeducedFilters.length > 0) {
+                        orDeducedFilters.push({
+                            $and: andDeducedFilters,
+                        });
                     }
                     break;
                 }
@@ -533,9 +569,15 @@ function judgeFilter2ValueRelation<ED extends EntityDict & BaseEntityDict, T ext
                     * filter包容conditionalFilterAttrValue条件暂时无法由其not条件推论出来
                     */
 
-                    const logicQuery = filter[attr2] as ED[T]['Selection']['filter'];
-                    if (!contained && judgeFilterRelation(entity, schema, logicQuery, { [attr]: conditionalFilterAttrValue }, true)) {
-                        return true;
+                    if (!contained) {
+                        const logicQuery = filter[attr2] as ED[T]['Selection']['filter'];
+                        const r = judgeFilterRelation(entity, schema, logicQuery!, { [attr]: comparedFilterAttrValue } as NonNullable<ED[T]['Selection']['filter']>, true);
+                        if (r === true) {
+                            return true;
+                        }
+                        else if (typeof r === 'object') {
+                            orDeducedFilters.push(r);
+                        }
                     }
                     break;
                 }
@@ -545,70 +587,205 @@ function judgeFilter2ValueRelation<ED extends EntityDict & BaseEntityDict, T ext
             }
         }
         else if (attr2.toLowerCase().startsWith(EXPRESSION_PREFIX)) {
-            return false;
+            // 相当于缩小了filter的查询结果集，若其它条件能判断出来filter与compared[attr]相容或相斥，此条件无影响
         }
         else if (attr2.toLowerCase() === '$text') {
-            return false;
+            // 相当于缩小了filter的查询结果集，若其它条件能判断出来filter与compared[attr]相容或相斥，此条件无影响
         }
         else {
+            const rel = judgeRelation<ED>(schema, entity, attr2);
             if (attr === attr2) {
-                const rel = judgeRelation<ED>(schema, entity, attr2);
                 if (rel === 1) {
-                    return judgeValueRelation(filter[attr2], conditionalFilterAttrValue, contained);
+                    return judgeValueRelation(filter[attr2], comparedFilterAttrValue, contained);
                 }
                 else if (rel === 2) {
-                    return judgeFilterRelation(attr2, schema, filter[attr2], conditionalFilterAttrValue, contained);
+                    const r = judgeFilterRelation(attr2, schema, filter[attr2], comparedFilterAttrValue, contained);
+                    if (r === true) {
+                        return true;
+                    }
+                    else if (typeof r === 'object') {
+                        orDeducedFilters.push(r);
+                    }
                 }
                 else if (typeof rel === 'string') {
-                    return judgeFilterRelation(rel, schema, filter[attr2], conditionalFilterAttrValue, contained);
+                    const r = judgeFilterRelation(rel, schema, filter[attr2], comparedFilterAttrValue, contained);
+                    if (r === true) {
+                        return true;
+                    }
+                    else if (typeof r === 'object') {
+                        orDeducedFilters.push(r);
+                    }
                 }
-                else {
-                    // 一对多情况较为复杂，先返回false，后面再详化。todo by Xc
-                    return false;
+            }
+            else if (rel === 2 && attr === 'entity' && comparedFilterAttrValue === attr2 && compared!.hasOwnProperty('entityId')) {
+                // compared指定了entity和entityId，而filter指定了该entity上的查询条件，此时转而比较此entity上的filter
+                const r = judgeFilterRelation(attr2, schema, filter[attr2], {
+                    id: compared.entityId
+                } as any, contained);
+                if (r === true) {
+                    return true;
+                }
+                else if (typeof r === 'object') {
+                    orDeducedFilters.push(r);
+                }
+            }
+            else if (typeof rel === 'string' && attr === `${attr2}Id`) {
+                // compared指定了外键，而filter指定了该外键对象上的查询条件，此时转而比较此entity上的filter
+                const r = judgeFilterRelation(rel, schema, filter[attr2], {
+                    id: comparedFilterAttrValue
+                } as any, contained);
+                if (r === true) {
+                    return true;
+                }
+                else if (typeof r === 'object') {
+                    orDeducedFilters.push(r);
+                }
+            }
+            else {
+                const rel2 = judgeRelation<ED>(schema, entity, attr as string);
+
+                if (rel2 === 2 && attr2 === 'entity' && filter[attr2] === attr && filter.hasOwnProperty('entityId')) {
+                    // filter限制了外键范围，而compared指定了该外键对象上的查询条件， 此时转而比较此entity上的filter
+                    const r = judgeFilterRelation(attr as keyof ED, schema, {
+                        id: filter.entityId,
+                    } as any, comparedFilterAttrValue, contained);
+                    if (r === true) {
+                        return true;
+                    }
+                    else if (typeof r === 'object') {
+                        orDeducedFilters.push(r);
+                    }
+                }
+                else if (typeof rel2 === 'string' && attr2 === `${attr as string}Id`) {
+                    // filter限制了外键范围，而compared指定了该外键对象上的查询条件， 此时转而比较此entity上的filter
+                    const r = judgeFilterRelation(rel2, schema, {
+                        id: filter[attr2],
+                    } as any, comparedFilterAttrValue, contained);
+                    if (r === true) {
+                        return true;
+                    }
+                    else if (typeof r === 'object') {
+                        orDeducedFilters.push(r);
+                    }
                 }
             }
         }
     }
 
-    // 到这里说明无法判断相容或者相斥，安全起见全返回false
+    if (orDeducedFilters.length > 0) {
+        return {
+            $or: orDeducedFilters,
+        };
+    }
+
+    // 到这里说明无法直接判断此attr上的相容或者相斥，返回false
     return false;
 }
-/**
+
+/** 判断filter条件对compared条件是否相容或相斥
  * @param entity 
  * @param schema 
  * @param filter 
- * @param conditionalFilter
- * @param contained: true代表filter包容conditionalFilter, false代表filter与conditionalFilter相斥
+ * @param compared
+ * @param contained: true代表判定filter包容compared(filter的查询结果是compared查询结果的子集), false代表判定filter与compared相斥（filter的查询结果与compared没有交集）
+ * @returns 返回true说明肯定相容（相斥），返回false说明无法判定相容（相斥），返回DeducedFilterCombination说明需要进一步判断此推断的条件
  */
 function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
-    filter: ED[T]['Selection']['filter'],
-    conditionalFilter: ED[T]['Selection']['filter'],
-    contained: boolean): boolean {
-    for (let attr in conditionalFilter) {
+    filter: NonNullable<ED[T]['Selection']['filter']>,
+    compared: NonNullable<ED[T]['Selection']['filter']>,
+    contained: boolean): boolean | DeducedFilterCombination<ED> {
+
+    const totalAndDeducedFilters: (DeducedFilterCombination<ED> | DeducedFilter<ED, T>)[] = [];
+    const totalOrDeducedFilters: (DeducedFilterCombination<ED> | DeducedFilter<ED, T>)[] = [];
+    const falseAttributes: string[] = [];
+    for (let attr in compared) {
+        let result: boolean | undefined = undefined;
+        const deducedCombinations: DeducedFilterCombination<ED>[] = [];
         if (['$and', '$or', '$not'].includes(attr)) {
             switch (attr) {
-                case '$and':
-                case '$or': {
-                    const logicQueries = conditionalFilter[attr] as Array<ED[T]['Selection']['filter']>;
+                case '$and': {
+                    const logicQueries = compared[attr] as Array<ED[T]['Selection']['filter']>;
                     const results = logicQueries.map(
-                        (logicQuery) => judgeFilterRelation(entity, schema, filter, logicQuery, contained)
+                        (logicQuery) => judgeFilterRelation(entity, schema, filter, logicQuery!, contained)
                     );
-                    if (contained) {
-                        // 如果是包容关系，or和and需要全部被包容
-                        if(results.includes(false)) {
-                            return false;
+                    const andDeducedFilters: DeducedFilterCombination<ED>[] = [];
+                    const orDeducedFilters: DeducedFilterCombination<ED>[] = [];
+                    for (const r of results) {
+                        if (contained) {
+                            // 如果是包容关系，需要全部被包容
+                            if (r === false) {
+                                result = false;
+                                break;
+                            }
+                            else if (typeof r === 'object') {
+                                andDeducedFilters.push(r);
+                            }
+                        }
+                        else {
+                            assert(!contained);
+                            // 如果是相斥关系，只要和一个相斥就可以了
+                            if (r === true) {
+                                result = true;
+                                break;
+                            }
+                            else if (typeof r === 'object') {
+                                orDeducedFilters.push(r);
+                            }
                         }
                     }
-                    else if (!contained) {
-                        // 如果是相斥关系，and只需要和一个相斥，or需要和全部相斥
-                        if (attr === '$and' && results.includes(true) || attr === '$or' && !results.includes(false)) {
-                            return true;
+                    if (andDeducedFilters.length > 0) {
+                        deducedCombinations.push({
+                            $and: andDeducedFilters,
+                        });
+                    }
+                    if (orDeducedFilters.length > 0) {
+                        deducedCombinations.push({
+                            $or: orDeducedFilters,
+                        });
+                    }
+                    break;
+                }
+                case '$or': {
+                    const logicQueries = compared[attr] as Array<ED[T]['Selection']['filter']>;
+                    const results = logicQueries.map(
+                        (logicQuery) => judgeFilterRelation(entity, schema, filter, logicQuery!, contained)
+                    );
+                    const andDeducedFilters: DeducedFilterCombination<ED>[] = [];
+                    const orDeducedFilters: DeducedFilterCombination<ED>[] = [];
+                    for (const r of results) {
+                        if (contained) {
+                            // 如果是包容关系，只要包容一个（是其查询子集）就可以
+                            if (r === true) {
+                                result = true;
+                                break;
+                            }
+                            else if (typeof r === 'object') {
+                                orDeducedFilters.push(r);
+                            }
+                        }
+                        else {
+                            assert(!contained);
+                            // 如果是相斥关系，必须和每一个都相斥
+                            if (r === false) {
+                                result = false;
+                                break;
+                            }
+                            else if (typeof r === 'object') {
+                                andDeducedFilters.push(r);
+                            }
                         }
                     }
-                    else {
-                        assert(false);
+                    if (andDeducedFilters.length > 0) {
+                        deducedCombinations.push({
+                            $and: andDeducedFilters,
+                        });
+                    }
+                    if (orDeducedFilters.length > 0) {
+                        deducedCombinations.push({
+                            $or: orDeducedFilters,
+                        });
                     }
                     break;
                 }
@@ -617,15 +794,23 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
                      * 若filter与conditionalFilter not所定义的部分相斥，则filter与conditionalFilter相容
                      * 若filter将conditionalFilter not所定义的部分包容，则filter与conditionalFilter相斥
                      */
-                    const logicQuery = conditionalFilter[attr] as ED[T]['Selection']['filter'];
+                    const logicQuery = compared[attr] as ED[T]['Selection']['filter'];
                     if (contained) {
-                        if (!judgeFilterRelation(entity, schema, filter, logicQuery, false)) {
-                            return false;
+                        const r = judgeFilterRelation(entity, schema, filter, logicQuery!, false);
+                        if (r === true) {
+                            result = true;
+                        }
+                        else if (typeof r === 'object') {
+                            deducedCombinations.push(r);
                         }
                     }
                     else {
-                        if (judgeFilterRelation(entity, schema, filter, logicQuery, true)) {
-                            return true;
+                        const r = judgeFilterRelation(entity, schema, filter, logicQuery!, true);
+                        if (r === true) {
+                            result = true;
+                        }
+                        else if (typeof r === 'object') {
+                            deducedCombinations.push(r);
                         }
                     }
                     break;
@@ -636,29 +821,89 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
             }
         }
         else if (attr.toLowerCase().startsWith(EXPRESSION_PREFIX)) {
-            return false;
+            // 相当于缩小了compared查询结果，如果是判定相斥，对结果无影响，如果是判定相容，则认为无法判定，
+            if (contained) {
+                result = false;
+            }
         }
         else if (attr.toLowerCase() === '$text') {
-            return false;
+            // 相当于缩小了compared查询结果，如果是判定相斥，对结果无影响，如果是判定相容，则认为无法判定，
+            if (contained) {
+                result = false;
+            }
         }
         else {
-            if (contained && !judgeFilter2ValueRelation(entity, schema, attr, filter, conditionalFilter[attr], contained)) {
-                // 相容关系只要有一个不相容就不相容
-                return false;
+            const r = judgeFilterSingleAttrRelation(entity, schema, attr, filter, compared, contained);
+            if (typeof r === 'object') {
+                deducedCombinations.push(r);
             }
-            if (!contained && judgeFilter2ValueRelation(entity, schema, attr, filter, conditionalFilter[attr], contained)) {
-                // 相斥关系只要有一个相斥就相斥
+            else {
+                result = r;
+            }
+        }
+
+        if (contained) {
+            // 相容必须每个都相容，有一个被否定就可以返回false了
+            if (result === false) {
+                falseAttributes.push(attr);
+            }
+            else if (deducedCombinations.length > 0) {
+                totalAndDeducedFilters.push(...deducedCombinations);
+            }
+        }
+        else {
+            // 相斥只要有一个被肻定就可以返回true了
+            if (result === true) {
                 return true;
+            }
+
+            if (deducedCombinations.length > 0) {
+                totalOrDeducedFilters.push(...deducedCombinations);
+                falseAttributes.push(attr);
             }
         }
     }
-    // 到这里说明不能否定其相容（所以要返回相容），也不能肯定其相斥（所以要返回不相斥）
+
+    if (contained) {
+        if (falseAttributes.length > 0) {
+            // 有属性无法界定，此时只能拿本行去查询
+            totalAndDeducedFilters.push({
+                entity,
+                filter: {
+                    ...filter,
+                    $not: pick(compared, falseAttributes),
+                },
+            });
+        }
+    }
+    else {
+        // falseAttributes中是已经推导了更深层次上filter的属性，剩下的如果还有可以增加一个相斥的判断
+        if (Object.keys(contained).length > falseAttributes.length) {
+            totalOrDeducedFilters.push({
+                entity,
+                filter: combineFilters([filter, omit(compared, falseAttributes)]),
+            });
+        }
+    }
+
+    if (totalAndDeducedFilters.length > 0) {
+        return {
+            $and: totalAndDeducedFilters,
+        };
+    }
+    if (totalOrDeducedFilters.length > 0) {
+        return {
+            $or: totalOrDeducedFilters,
+        };
+    }
+
+    // 到这里说明没有一个属性能马上否定相容（不然因为falseAttributes已经返回false了），或是没有一个属性能肯定相斥（否则已经返回true了）
     return contained;
 }
 
 /**
  * 
- * 判断filter是否包含conditionalFilter中的查询条件，即filter查询的结果一定满足conditionalFilter的约束
+ * 判断filter是否包含contained中的查询条件，即filter查询的结果一定是contained查询结果的子集
  * filter = {
  *      a: 1
  *      b: 2,
@@ -671,15 +916,17 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
  * @param entity 
  * @param schema 
  * @param filter 
- * @param conditionalFilter 
+ * @param contained 
  * @returns 
  */
 export function contains<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     filter: ED[T]['Selection']['filter'],
-    conditionalFilter: ED[T]['Selection']['filter']) {
-    return judgeFilterRelation(entity, schema, filter, conditionalFilter, true);
+    contained: ED[T]['Selection']['filter']) {
+    assert(filter);
+    assert(contained);
+    return judgeFilterRelation(entity, schema, filter!, contained!, true);
     // return false;
 }
 
@@ -702,8 +949,9 @@ export function repel<ED extends EntityDict & BaseEntityDict, T extends keyof ED
     schema: StorageSchema<ED>,
     filter1: ED[T]['Selection']['filter'],
     filter2: ED[T]['Selection']['filter']) {
-    // todo
-    return judgeFilterRelation(entity, schema, filter1, filter2, false);
+    assert(filter1);
+    assert(filter2);
+    return judgeFilterRelation(entity, schema, filter1!, filter2!, false);
     // return false;
 }
 
@@ -876,8 +1124,84 @@ export function makeTreeDescendantFilter<ED extends EntityDict & BaseEntityDict,
     return currentLevelInFilter;
 }
 
+export function checkDeduceFilters<ED extends EntityDict & BaseEntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
+    dfc: DeducedFilterCombination<ED>, context: Cxt
+): boolean | Promise<boolean> {
+    const { $and, $or } = dfc;
+
+    if ($and) {
+        assert(!$or);
+        const andResult = $and.map(
+            (ele) => {
+                if (ele.hasOwnProperty('entity')) {
+                    const ele2 = ele as DeducedFilter<ED, keyof ED>;
+                    return context.count(ele2.entity, {
+                        filter: ele2.filter
+                    }, {});
+                }
+                const ele2 = ele as DeducedFilterCombination<ED>;
+                return checkDeduceFilters(ele2, context);
+            }
+        );
+
+        // and 意味着只要有一个条件失败就返回false
+        if (andResult.find(ele => ele instanceof Promise)) {
+            return Promise.all(andResult).then(
+                (ar) => {
+                    for (const ele of ar) {
+                        if (ele === false || typeof ele === 'number' && ele > 0) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            );
+        }
+        
+        for (const ele of andResult) {
+            if (ele === false || typeof ele === 'number' && ele > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+    assert($or);
+    const orResult = $or.map(
+        (ele) => {
+            if (ele.hasOwnProperty('entity')) {
+                const ele2 = ele as DeducedFilter<ED, keyof ED>;
+                return context.count(ele2.entity, {
+                    filter: ele2.filter
+                }, {});
+            }
+            const ele2 = ele as DeducedFilterCombination<ED>;
+            return checkDeduceFilters(ele2, context);
+        }
+    );
+
+    // or只要有一个条件通过就返回true
+    if (orResult.find(ele => ele instanceof Promise)) {
+        return Promise.all(orResult).then(
+            (or) => {
+                for (const ele of or) {
+                    if (ele === true || ele === 0) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        );
+    }
+    for (const ele of orResult) {
+        if (ele === true || ele === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
- * 检查filter是否包含contained（filter查询的数据一定满足contained）
+ * 检查filter是否包含contained（filter查询的数据是contained查询数据的子集）
  * @param entity 
  * @param context 
  * @param contained 
@@ -895,35 +1219,13 @@ export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T ex
         throw new OakRowInconsistencyException();
     }
     const schema = context.getSchema();
-    // 优先判断两个条件是否相容
-    if (contains(entity, schema, filter, contained)) {
-        return true;
+    
+    const result = contains(entity, schema, filter, contained);
+    if (typeof result === 'boolean') {
+        return result;
     }
     if (dataCompare) {
-        // 再判断加上了conditionalFilter后取得的行数是否缩减
-        const filter2 = combineFilters([filter, {
-            $not: contained,
-        }]);
-
-        const closeRootModeFn = context instanceof AsyncContext && context.openRootMode();
-        const count = context.count(entity, {
-            filter: cloneDeep(filter2), // 里面的查询改写可能会把原来的filter改掉，所以在此克隆
-            count: 1,
-        }, {
-            dontCollect: true,
-            blockTrigger: true,
-        });
-        if (count instanceof Promise) {
-            return count.then(
-                (count2) => {
-                    if (closeRootModeFn) {
-                        closeRootModeFn();
-                    }
-                    return count2 === 0;
-                }
-            );
-        }
-        return count === 0;
+        return checkDeduceFilters(result, context);
     }
     return false;
 }
@@ -939,29 +1241,13 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
         throw new OakRowInconsistencyException();
     }
     const schema = context.getSchema();
-    // 优先判断两个条件是否相容
-    if (repel(entity, schema, filter2, filter1)) {
-        return true;
+    
+    const result = repel(entity, schema, filter2, filter1);
+    if (typeof result === 'boolean') {
+        return result;
     }
-    // 再判断两者同时成立时取得的行数是否为0
     if (dataCompare) {
-        const filter3 = combineFilters([filter2, filter1]);
-        const closeRootModeFn = context instanceof AsyncContext && context.openRootMode();
-        const count = context.count(entity, {
-            filter: filter3,
-        }, {
-            dontCollect: true,
-            blockTrigger: true,
-        });
-        if (count instanceof Promise) {
-            return count.then(
-                (count2) => {
-                    closeRootModeFn && closeRootModeFn();
-                    return count2 === 0;
-                }
-            );
-        }
-        return count === 0;
+        return checkDeduceFilters(result, context);
     }
     return false;
 }

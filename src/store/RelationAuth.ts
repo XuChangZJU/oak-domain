@@ -138,11 +138,12 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     assert(!(filter instanceof Array));
                     const { entity, entityId, relationId } = filter as ED['userRelation']['CreateSingle']['data'];
 
+                    // 创建userRelation如果是领取动作，先暂使用root身份通过
                     const destRelations = this.getGrantedRelationIds(entity!, entityId!, context);
                     if (destRelations instanceof Promise) {
                         return destRelations.then(
                             (r2) => {
-                                if (!r2.find(ele => ele.id === relationId)) {
+                                if (relationId && !r2.find(ele => ele.id === relationId) || r2.length === 0) {
                                     return false;
                                 }
                                 return true;
@@ -604,10 +605,21 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 // 说明是通过userId关联
                 const contained = {};
                 set(contained, `${path}.id`, context.getCurrentUserId());
-                if (checkFilterContains(entity, context, contained, filter, true)) {
+                const contains = checkFilterContains(entity, context, contained, filter, true)
+                if (contains instanceof Promise) {
+                    return contains.then(
+                        (c) => {
+                            if (c) {
+                                return ele;
+                            }
+                            return;
+                        }
+                    )
+                }
+
+                if (contains) {
                     return ele;
                 }
-                return;
             }
         );
     }

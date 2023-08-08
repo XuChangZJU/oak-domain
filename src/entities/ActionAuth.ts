@@ -4,10 +4,12 @@ import { Schema as Relation } from './Relation';
 import { EntityDesc } from '../types/EntityDesc';
 
 type Actions = string[];
+type Paths = string[];
 
 export interface Schema extends EntityShape {
     relation?: Relation;
     path: String<256>;
+    paths: Paths;
     destEntity: String<32>;
     deActions: Actions;
 };
@@ -19,6 +21,7 @@ const entityDesc: EntityDesc<Schema> = {
             attr: {
                 relation: '关系',
                 path: '路径',
+                paths: '路径',
                 destEntity: '目标对象',
                 deActions: '目标对象动作',
             },
