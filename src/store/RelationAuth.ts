@@ -675,7 +675,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
         const groupFilter = combineFilters(entity, this.schema, filters.flat(), true);
 
-        return checkFilterContains(entity, context, groupFilter, filter, true);
+        if (groupFilter) {
+            return checkFilterContains(entity, context, groupFilter, filter, true);
+        }
+        return false;
     }
 
 
