@@ -667,9 +667,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     return pathFilters;
                 }
                 // 说明是通过userId关联
-                const contained = {};
-                set(contained, `${path}.id`, context.getCurrentUserId());
-                return contained;
+                return paths.map(
+                    (path) => set({}, `${path}.id`, context.getCurrentUserId())
+                );
             }
         );
 
