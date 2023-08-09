@@ -121,7 +121,7 @@ function addFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyo
 
     for (const attr in oneToManyFilters) {
         const filters2 = oneToManyFilters[attr].map(ele => ele[1]);
-        const sqpOps = filters2.map(ele => ele['#sqp'] || '$in');
+        const sqpOps = filters2.map(ele => ele['#sqp'] || 'in');
         // 只有全部是同一个子查询算子才能实施合并
         if (uniq(sqpOps).length > 1) {
             filters2.forEach(
@@ -202,7 +202,7 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
      * @param attr 
      * @param justTry 
      */
-    const tryMergeAttribute = (f1: NonNullable<ED[T]['Selection']['filter']>, f2: NonNullable<ED[T]['Selection']['filter']>, attr: string, justTry?: boolean) => {
+    const tryMergeAttributeValue = (f1: NonNullable<ED[T]['Selection']['filter']>, f2: NonNullable<ED[T]['Selection']['filter']>, attr: string, justTry?: boolean) => {
         const op1 = typeof f1[attr] === 'object' && Object.keys(f1[attr])[0];
         const op2 = typeof f2[attr] === 'object' && Object.keys(f2[attr])[0];
 
@@ -363,7 +363,7 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
                 // 原生属性
                 const rel = judgeRelation(schema, entity, pca1);
                 if (rel === 1) {
-                    return tryMergeAttribute(f1, f2, pca1, justTry);
+                    return tryMergeAttributeValue(f1, f2, pca1, justTry);
                 }
                 else if (rel === 2) {
                     if (justTry) {
