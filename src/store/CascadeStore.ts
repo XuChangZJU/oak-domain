@@ -6,7 +6,7 @@ import {
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { OperationRewriter, RowStore, SelectionRewriter } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
-import { addFilterSegment, combineFilters } from "./filter";
+import { combineFilters } from "./filter";
 import { judgeRelation } from "./relation";
 import { EXPRESSION_PREFIX, getAttrRefInExpression, OakRowUnexistedException } from "../types";
 import { unset, uniq, cloneDeep, pick } from '../utils/lodash';
@@ -46,7 +46,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         id: 1,
                         deActions: 1,
                         destEntity: 1,
-                        path: 1,
+                        paths: 1,
                         relationId: 1,
                     },
                     filter: {
@@ -309,7 +309,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                                 id: 1,
                                                 deActions: 1,
                                                 destEntity: 1,
-                                                path: 1,
+                                                paths: 1,
                                                 relationId: 1,
                                             },
                                         }
@@ -667,7 +667,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     (row) => {
                                         const aggrResult = aggregateFn.call(this, entity2, {
                                             data: subProjection,
-                                            filter: combineFilters<ED, T>([{
+                                            filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
                                                 [foreignKey]: row.id,
                                             }, subFilter]),
                                             sorter: subSorter,
@@ -730,7 +730,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 if (ids.length > 0) {
                                     const subRows = cascadeSelectFn.call(this, entity2, {
                                         data: subProjection,
-                                        filter: combineFilters<ED, T>([{
+                                        filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
                                             [foreignKey]: {
                                                 $in: ids,
                                             }
@@ -760,7 +760,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     (row) => {
                                         const aggrResult = aggregateFn.call(this, entity2, {
                                             data: subProjection,
-                                            filter: combineFilters<ED, T>([{
+                                            filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
                                                 entity,
                                                 entityId: row.id,
                                             }, subFilter]),
@@ -823,7 +823,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 if (ids.length > 0) {
                                     const subRows = cascadeSelectFn.call(this, entity2, {
                                         data: subProjection,
-                                        filter: combineFilters<ED, T>([{
+                                        filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
                                             entity,
                                             entityId: {
                                                 $in: ids,
@@ -944,9 +944,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     else {
                         // A中data的entityId作为B中filter的主键
                         Object.assign(operationMto, {
-                            filter: addFilterSegment({
+                            filter: combineFilters(attr, this.getSchema(), [{
                                 id: fkId,
-                            }), filterMto,
+                            }, filterMto]),
                         });
                     }
                 }
@@ -959,24 +959,24 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     }
                     else if (filter!.entity === attr && filter!.entityId) {
                         Object.assign(operationMto, {
-                            filter: addFilterSegment({
+                            filter: combineFilters(attr, this.getSchema(), [{
                                 id: filter!.entityId,
-                            }, filterMto),
+                            }, filterMto]),
                         });
                     }
                     else if (filter![attr]) {
                         Object.assign(operationMto, {
-                            filter: addFilterSegment(filter![attr], filterMto),
+                            filter: combineFilters(attr, this.getSchema(), [filter![attr], filterMto]),
                         });
                     }
                     else {
                         // A中data的entityId作为B中filter的主键
                         Object.assign(operationMto, {
-                            filter: addFilterSegment({
+                            filter: combineFilters(attr, this.getSchema(), [{
                                 [`${entity as string}$entity`]: {
                                     filter,
                                 }
-                            }, filterMto),
+                            }, filterMto]),
                         });
                     }
                 }
@@ -1005,9 +1005,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     else {
                         // A中data的entityId作为B中filter的主键
                         Object.assign(operationMto, {
-                            filter: addFilterSegment(filterMto || {}, {
+                            filter: combineFilters(relation, this.getSchema(), [filterMto, {
                                 id: fkId,
-                            }),
+                            }]),
                         });
                     }
                 }
@@ -1019,22 +1019,22 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     }
                     else if (filter![`${attr}Id`]) {
                         Object.assign(operationMto, {
-                            filter: addFilterSegment(filterMto || {}, {
+                            filter: combineFilters(relation, this.getSchema(), [filterMto, {
                                 id: filter![`${attr}Id`],
-                            }),
+                            }]),
                         });
                     }
                     else if (filter![attr]) {
                         Object.assign(operationMto, {
-                            filter: addFilterSegment(filterMto || {}, filter![attr]),
+                            filter: combineFilters(relation, this.getSchema(), [filterMto, filter![attr]]),
                         });
                     }
                     else {
                         // A中data的attrId作为B中filter的主键
                         Object.assign(operationMto, {
-                            filter: addFilterSegment(filterMto || {}, {
+                            filter: combineFilters(relation, this.getSchema(), [filterMto, {
                                 [`${entity as string}$${attr}`]: filter
-                            }),
+                            }]),
                         });
                     }
                 }
@@ -1093,28 +1093,28 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             if (filter) {
                                 if (filter.id && Object.keys(filter).length === 1) {
                                     Object.assign(otm, {
-                                        filter: addFilterSegment({
+                                        filter: combineFilters(entityOtm, this.getSchema(), [{
                                             entity,
                                             entityId: filter.id,
-                                        }, filterOtm),
+                                        }, filterOtm]),
                                     });
                                 }
                                 else {
                                     Object.assign(otm, {
-                                        filter: addFilterSegment({
+                                        filter: combineFilters(entityOtm, this.getSchema(), [{
                                             [entity]: filter,
-                                        }, filterOtm),
+                                        }, filterOtm]),
                                     });
                                 }
                             }
                             else {
                                 Object.assign(otm, {
-                                    filter: addFilterSegment({
+                                    filter: combineFilters(entityOtm, this.getSchema(), [{
                                         entity,
                                         entityId: {
                                             $exists: true,
                                         }
-                                    }, filterOtm)
+                                    }, filterOtm])
                                 });
                             }
 
@@ -1166,26 +1166,26 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             if (filter) {
                                 if (filter.id && Object.keys(filter).length === 1) {
                                     Object.assign(otm, {
-                                        filter: addFilterSegment({
+                                        filter: combineFilters(entityOtm, this.getSchema(), [{
                                             [foreignKey]: filter.id,
-                                        }, filterOtm),
+                                        }, filterOtm]),
                                     });
                                 }
                                 else {
                                     Object.assign(otm, {
-                                        filter: addFilterSegment({
+                                        filter: combineFilters(entityOtm, this.getSchema(), [{
                                             [foreignKey.slice(0, foreignKey.length - 2)]: filter,
-                                        }, filterOtm),
+                                        }, filterOtm]),
                                     });
                                 }
                             }
                             else {
                                 Object.assign(otm, {
-                                    filter: addFilterSegment({
+                                    filter: combineFilters(entityOtm, this.getSchema(), [{
                                         [foreignKey]: {
                                             $exists: true,
                                         },
-                                    }, filterOtm),
+                                    }, filterOtm]),
                                 });
                             }
 

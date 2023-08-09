@@ -1,6 +1,6 @@
 import assert from 'assert';
 import { pull, unset } from "../utils/lodash";
-import { addFilterSegment, checkFilterRepel } from "../store/filter";
+import { checkFilterRepel, combineFilters } from "../store/filter";
 import { EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerTimestampAttribute } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
@@ -173,7 +173,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                 default: {
                     const { filter } = operation;
                     // 此时要保证更新或者删除的行上没有跨事务约束
-                    const filter2 = addFilterSegment({
+                    const filter2 = combineFilters(entity, context.getSchema(), [{
                         $or: [
                             {
                                 $$triggerData$$: {
@@ -186,7 +186,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
                                 },
                             }
                         ],
-                    }, filter);
+                    }, filter]);
                     const count = await context.count(entity, {
                         filter: filter2
                     } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, {});

@@ -2,7 +2,7 @@ import { ActionDictOfEntityDict, BBWatcher, Checker, EntityDict, StorageSchema, 
 import { SyncContext } from "./SyncRowStore";
 import { AsyncContext } from "./AsyncRowStore";
 import { uniqBy, pick, intersection } from '../utils/lodash';
-import { addFilterSegment } from "./filter";
+import { combineFilters } from "./filter";
 import { createDynamicCheckers } from '../checkers';
 import { createDynamicTriggers } from '../triggers';
 import { EntityDict as BaseEntityDict } from '../base-app-domain/EntityDict';
@@ -118,7 +118,7 @@ function checkUnique<ED extends EntityDict& BaseEntityDict, Cxt extends SyncCont
         // 说明有null值，不需要检查约束
         return;
     }
-    const filter2 = extraFilter ? addFilterSegment(filter, extraFilter) : filter;
+    const filter2 = extraFilter ? combineFilters(entity, context.getSchema(), [filter, extraFilter]) : filter;
     const count = context.count(entity, { filter: filter2 }, { dontCollect: true });
     return checkCountLessThan(count, uniqAttrs, 0, row.id)
 }
@@ -250,7 +250,7 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
 
                                 // 在这些行以外的行不和更新后的键值冲突
                                 const count = context.count(entity, {
-                                    filter: addFilterSegment([filter, {
+                                    filter: combineFilters(entity, context.getSchema(), [filter, {
                                         $not: operationFilter,
                                     }]),
                                 }, { dontCollect: true });

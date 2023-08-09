@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { addFilterSegment, checkFilterContains, combineFilters } from "../store/filter";
+import { checkFilterContains, combineFilters } from "../store/filter";
 import { OakAttrNotNullException, OakInputIllegalException, OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
 import {
     AuthDefDict, CascadeRelationItem, Checker, CreateTriggerInTxn,
@@ -50,7 +50,7 @@ export function translateCheckerInAsyncContext<
                 const { filter: operationFilter, action } = operation;
                 const filter2 = typeof filter === 'function' ? await (filter as Function)(operation, context, option) : filter;
                 if (['select', 'count', 'stat'].includes(action)) {
-                    operation.filter = addFilterSegment(operationFilter || {}, filter2);
+                    operation.filter = combineFilters(entity, context.getSchema(), [operationFilter, filter2]);
                     return 0;
                 }
                 else {
@@ -108,7 +108,7 @@ export function translateCheckerInAsyncContext<
                         return 0;
                     }
                     if (['select', 'count', 'stat'].includes(action)) {
-                        operation.filter = addFilterSegment(filter || {}, result);
+                        operation.filter = combineFilters(entity, context.getSchema(), [filter, result]);
                         return 0;
                     }
                     assert(filter);

@@ -10,7 +10,6 @@ declare type Actions = string[];
 declare type Paths = string[];
 export declare type OpSchema = EntityShape & {
     relationId?: ForeignKey<"relation"> | null;
-    path: String<256>;
     paths: Paths;
     destEntity: String<32>;
     deActions: Actions;
@@ -18,7 +17,6 @@ export declare type OpSchema = EntityShape & {
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
     relationId?: ForeignKey<"relation"> | null;
-    path: String<256>;
     paths: Paths;
     destEntity: String<32>;
     deActions: Actions;
@@ -37,7 +35,6 @@ declare type AttrFilter = {
     $$updateAt$$: Q_DateValue;
     relationId: Q_StringValue;
     relation: Relation.Filter;
-    path: Q_StringValue;
     paths: JsonFilter<Paths>;
     destEntity: Q_StringValue;
     deActions: JsonFilter<Actions>;
@@ -54,7 +51,6 @@ export declare type Projection = {
     $$seq$$?: number;
     relationId?: number;
     relation?: Relation.Projection;
-    path?: number;
     paths?: number | JsonProjection<Paths>;
     destEntity?: number;
     deActions?: number | JsonProjection<Actions>;
@@ -89,8 +85,6 @@ export declare type SortAttr = {
     relationId: number;
 } | {
     relation: Relation.SortAttr;
-} | {
-    path: number;
 } | {
     paths: number;
 } | {

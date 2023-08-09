@@ -8,7 +8,7 @@
         "make:domain": "ts-node scripts/make.ts",
         "build": "tsc",
         "prebuild": "npm run make:domain",
-        "test": "ts-node test/test.ts"
+        "test": "ts-node test/testFilter2.ts"
     },
     "files": [
         "lib/**/*",

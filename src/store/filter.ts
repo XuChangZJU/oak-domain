@@ -1,81 +1,455 @@
 import assert from 'assert';
 import { EntityDict as BaseEntityDict, EXPRESSION_PREFIX, OakRowInconsistencyException, StorageSchema } from '../types';
 import { EntityDict } from "../base-app-domain";
-import { pick, difference, intersection, union, omit } from '../utils/lodash';
+import { uniq, pick, difference, intersection, union, omit, cloneDeep } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
 import { judgeRelation } from './relation';
 import { SyncContext } from './SyncRowStore';
 
-export function addFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
+/**
+ * 尽量合并外键的连接，防止在数据库中join的对象过多
+ * @param entity 
+ * @param schema 
+ * @param filters 
+ * @returns 
+ */
+function addFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+    entity: T,
+    schema: StorageSchema<ED>,
+    ...filters: ED[T]['Selection']['filter'][]
+) {
     let filter: ED[T]['Selection']['filter'] | undefined;
-    filters.forEach(
-        ele => {
-            if (ele) {
-                if (!filter) {
-                    filter = {};
+
+    const addIntoAnd = (f: ED[T]['Selection']['filter']) => {
+        assert(filter);
+        if (filter!.$and) {
+            filter.$and.push(f);
+        }
+        else {
+            filter.$and = [f];
+        }
+    };
+    const addSingleAttr = (attr: string, value: any) => {
+        assert(filter);
+        if (!filter[attr]) {
+            filter[attr] = value;
+        }
+        // 只优化一种情况，就是两个都等值且相等
+        else if (filter[attr] === value) {
+
+        }
+        else {
+            addIntoAnd({
+                [attr]: value,
+            });
+        }
+    }
+
+    const manyToOneFilters: Record<string, [[string, any]]> = {};
+    const addManyToOneFilter = (attr: string, entity2: string, filter: any) => {
+        if (manyToOneFilters[attr]) {
+            manyToOneFilters[attr].push([entity2, filter]);
+        }
+        else {
+            manyToOneFilters[attr] = [[entity2, filter]];
+        }
+    };
+
+    const oneToManyFilters: Record<string, [[string, any]]> = {};
+    const addOneToManyFilter = (attr: string, entity2: string, filter: any) => {
+        if (oneToManyFilters[attr]) {
+            oneToManyFilters[attr].push([entity2, filter]);
+        }
+        else {
+            oneToManyFilters[attr] = [[entity2, filter]];
+        }
+    };
+
+    const addInner = (f: ED[T]['Selection']['filter']) => {
+        if (f) {
+            if (!filter) {
+                filter = {};
+            }
+            if (f.hasOwnProperty('$or')) {
+                // 如果有or是无法优化的，直接作为一个整体加入$and
+                addIntoAnd(f);
+            }
+            for (const attr in f) {
+                if (attr === '$and') {
+                    f[attr].forEach(
+                        (f2: ED[T]['Selection']['filter']) => addInner(f2)
+                    );
                 }
-                for (const k in ele) {
-                    if (k === '$and') {
-                        if (filter.$and) {
-                            filter.$and.push(...(ele[k] as any));
-                        }
-                        else {
-                            filter.$and = ele[k];
-                        }
+                else if (attr.startsWith('$')) {
+                    addIntoAnd({
+                        [attr]: f[attr],
+                    });
+                }
+                else if (attr.startsWith('#')) {
+                    assert(!filter[attr] || filter[attr] === f[attr]);
+                    filter[attr] = f[attr];
+                }
+                else {
+                    const rel = judgeRelation(schema, entity, attr);
+                    if (rel === 1) {
+                        addSingleAttr(attr, f[attr]);
                     }
-                    else if (filter.hasOwnProperty(k)) {
-                        if (filter.$and) {
-                            filter.$and.push({
-                                [k]: ele[k],
-                            })
-                        }
-                        else {
-                            filter.$and = [
-                                {
-                                    [k]: ele[k],
-                                }
-                            ]
-                        }
+                    else if (rel === 2) {
+                        addManyToOneFilter(attr, attr, f[attr]);
+                    }
+                    else if (typeof rel === 'string') {
+                        addManyToOneFilter(attr, rel, f[attr]);
                     }
                     else {
-                        filter[k] = ele[k];
+                        assert(rel instanceof Array);
+                        addOneToManyFilter(attr, rel[0], f[attr]);
                     }
                 }
             }
         }
+    };
+
+    filters.forEach(
+        ele => addInner(ele)
+    );
+
+    for (const attr in manyToOneFilters) {
+        const filters2 = manyToOneFilters[attr].map(ele => ele[1]);
+        const combined = addFilterSegment(manyToOneFilters[attr][0][0], schema, ...filters2);
+        addSingleAttr(attr, combined);
+    }
+
+    for (const attr in oneToManyFilters) {
+        const filters2 = oneToManyFilters[attr].map(ele => ele[1]);
+        const sqpOps = filters2.map(ele => ele['#sqp'] || '$in');
+        // 只有全部是同一个子查询算子才能实施合并
+        if (uniq(sqpOps).length > 1) {
+            filters2.forEach(
+                ele => {
+                    addIntoAnd({
+                        [attr]: ele,
+                    });
+                }
+            );
+        }
+        else {        
+            const unioned = unionFilterSegment(oneToManyFilters[attr][0][0], schema, ...filters2);
+            addSingleAttr(attr, Object.assign(unioned!, {
+                ['#sqp']: sqpOps[0],
+            }));
+        }
+    }
+
+    return filter;
+}
+
+/**
+ * 尽量合并外键的连接，防止在数据库中join的对象过多
+ * @param entity 
+ * @param schema 
+ * @param filters 
+ * @returns 
+ */
+function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+    entity: T,
+    schema: StorageSchema<ED>,
+    ...filters: ED[T]['Selection']['filter'][]
+) {
+    let filter: ED[T]['Selection']['filter'] | undefined;
+
+    const possibleCombiningAttrs = (f1: NonNullable<ED[T]['Selection']['filter']>, f2: NonNullable<ED[T]['Selection']['filter']>) => {
+        let pca1s: string[] = [], pca2s: string[] = [];
+        const attributes1 = Object.keys(f1);
+        const attributes2 = Object.keys(f2);
+        for (const a of attributes1) {
+            if (a.startsWith('#')) {
+                if (f1[a] !== f2[a]) {
+                    // metadata不相等，无法合并
+                    return false;
+                }
+            }
+            else {
+                pca1s.push(a);
+            } 
+        }
+
+        for (const a of attributes2) {
+            if (a.startsWith('#')) {
+                if (f1[a] !== f2[a]) {
+                    // metadata不相等，无法合并
+                    return false;
+                }
+            }
+            else {
+                pca2s.push(a);
+            } 
+
+        }
+        if (pca1s.length > 1 || pca2s.length > 1) {
+            return false;
+        }
+        assert(pca1s.length === 1 && pca2s.length === 1);
+        if (pca1s[0] !== pca2s[0] && pca1s[0] !== '$or' && pca2s[0] !== '$or') {
+            return false;
+        }
+        return [pca1s[0], pca2s[0]];
+    }
+
+    /**
+     * 尝试合并同一个属性到f1上，这里只合并等值查询和$in
+     * @param f1 
+     * @param f2 
+     * @param attr 
+     * @param justTry 
+     */
+    const tryMergeAttribute = (f1: NonNullable<ED[T]['Selection']['filter']>, f2: NonNullable<ED[T]['Selection']['filter']>, attr: string, justTry?: boolean) => {
+        const op1 = typeof f1[attr] === 'object' && Object.keys(f1[attr])[0];
+        const op2 = typeof f2[attr] === 'object' && Object.keys(f2[attr])[0];
+
+        if (!op1 && op2 && ['$eq', '$in'].includes(op2)) {
+            if (justTry) {
+                return true;
+            }
+            Object.assign(f1, {
+                [attr]: {
+                    $in: f2[attr][op2] instanceof Array ? f2[attr][op2].concat(f1[attr]) : [f1[attr], f2[attr][op2]],
+                },
+            });
+            return true;
+        }
+        else if (!op2 && op1 && ['$eq', '$in'].includes(op1)) {
+            if (justTry) {
+                return true;
+            }
+            Object.assign(f1, {
+                [attr]: {
+                    $in: f1[attr][op1] instanceof Array ? f1[attr][op1].concat(f2[attr]) : [f1[op1][attr], f2[attr]],
+                },
+            });
+            return true;
+        }
+        else if (op1 && ['$eq', '$in'].includes(op1) && op2 && ['$eq', '$in'].includes(op2)) {
+            if (justTry) {
+                return true;
+            }
+            Object.assign(f1, {
+                [attr]: {
+                    $in: f1[attr][op1] instanceof Array ? f1[attr][op1].concat(f2[attr][op2]) : [f1[attr][op1]].concat(f2[attr][op2]),
+                },
+            });
+            return true;
+        }
+        else if (!op1 && !op2) {
+            if (justTry) {
+                return true;
+            }
+            Object.assign(f1, {
+                [attr]: {
+                    $in: [f1[attr], f2[attr]],
+                },
+            });
+            return true;
+        }
+
+        return false;
+    };
+
+    /**
+     * 把f2尝试combine到f1中，保持or的语义
+     * @param f1 
+     * @param f2 
+     * @returns 
+     */
+    const tryMergeFilters = (f1: NonNullable<ED[T]['Selection']['filter']>, f2: NonNullable<ED[T]['Selection']['filter']>, justTry?: boolean): boolean => {        
+        const pcaResult = possibleCombiningAttrs(f1!, f2!);
+        
+        if (!pcaResult) {
+            return false;
+        }
+        const [ pca1, pca2 ] = pcaResult;
+        if (pca1 === '$or' && pca2 === '$or') {
+            // 如果双方都是or，有可能可以交叉合并，如：
+            /**
+             * {
+                    $or: [
+                        {
+                            password: '1234',
+                        },
+                        {
+                            ref: {
+                                nickname: 'xc',
+                            },
+                        }
+                    ]
+                },
+                {
+                    $or: [
+                        {
+                            ref: {
+                                name: 'xc2',
+                            }
+                        },
+                        {
+                            password: 'dddd',
+                        }
+                    ]
+                }
+             */
+            for (const f21 of f2[pca2]) {
+                let success = false;
+                for (const f11 of f1[pca2]) {
+                    if (tryMergeFilters(f11, f21, true)) {
+                        success = true;
+                        break;
+                    } 
+                }
+                if (!success) {
+                    return false;
+                }
+            }
+            if (justTry) {
+                return true;
+            }
+
+            for (const f21 of f2[pca2]) {
+                for (const f11 of f1[pca2]) {
+                    if (tryMergeFilters(f11, f21)) {
+                        break;
+                    } 
+                }
+            }
+            return true;
+        }
+        else if (pca1 === '$or') {
+            for (const f11 of f1[pca1]) {
+                if (tryMergeFilters(f11, f2, justTry)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        else if (pca2 === '$or') {
+            for (const f21 of f2[pca2]) {
+                if (!tryMergeFilters(f1, f21, true)) {
+                    return false;
+                }
+            }
+            if (justTry) {
+                return true;
+            }
+            for (const f12 of f2[pca2]) {
+                tryMergeFilters(f1, f12);
+            }
+            return true;
+        }
+        else if (pca1 === pca2) {
+            if (pca1 === '$and') {
+                assert(false, '只一个属性的时候不应该用$and');
+            }
+            else if (pca1 === '$not') {
+                // 先not后or 等于先and后not
+                if (justTry) {
+                    return true;
+                }
+                Object.assign(f1, {
+                    [pca1]: addFilterSegment(entity, schema, f1[pca1], f2[pca2]),
+                });
+                return true;
+            }
+            else if (pca1.startsWith('$')) {
+                return false;
+            }
+            else {
+                // 原生属性
+                const rel = judgeRelation(schema, entity, pca1);
+                if (rel === 1) {
+                    return tryMergeAttribute(f1, f2, pca1, justTry);
+                }
+                else if (rel === 2) {
+                    if (justTry) {
+                        return true;
+                    }
+                    Object.assign(f1, {
+                        [pca1]: unionFilterSegment(pca1, schema, f1[pca1], f2[pca2]),
+                    });
+                    return true;                        
+                }
+                else if (typeof rel === 'string') {
+                    if (justTry) {
+                        return true;
+                    }
+                    Object.assign(f1, {
+                        [pca1]: unionFilterSegment(rel, schema, f1[pca1], f2[pca2]),
+                    });
+                    return true;
+                }
+                else {
+                    assert(rel instanceof Array);
+                    // 一对多的子查询，只有子查询的语义算子一样才实施合并
+                    const sqpOp1 = f1[pca1]['#sqp'];
+                    const sqpOp2 = f2[pca1]['#sqp'];
+                    if (sqpOp1 !== sqpOp2) {
+                        return false;
+                    }
+                    if (justTry) {
+                        return true;
+                    }
+                    Object.assign(f1, {
+                        [pca1]: Object.assign(addFilterSegment(rel[0], schema, f1[pca1], f2[pca2])!, {
+                            ['#sqp']: sqpOp1,
+                        })
+                    });
+                }
+            }
+        }
+        return false;
+    };
+
+    const addIntoOr = (f: ED[T]['Selection']['filter']) => {
+        assert(filter);
+        if (Object.keys(filter).length === 0) {
+            Object.assign(filter, f);
+        }
+        else if (filter.$or){
+            filter.$or.push(f);
+        }
+        else {
+            filter = {
+                $or: [cloneDeep(filter), f],
+            };
+        }
+    };
+
+    const addInner = (f: ED[T]['Selection']['filter']) => {
+        if (f) {
+            if (!filter) {
+                filter = cloneDeep(f);
+                return;
+            }
+            if (tryMergeFilters(filter!, f!)) {
+                return;
+            }
+            addIntoOr(f);
+        }
+    };
+
+    filters.forEach(
+        f => addInner(f)
     );
 
     return filter;
 }
 
-export function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(...filters: ED[T]['Selection']['filter'][]) {
-    let allOnlyOneOr = true;
-    for (const f of filters) {
-        if (Object.keys(f!).length > 1 || !f!.$or) {
-            allOnlyOneOr = false;
-            break;
-        }
-    }
-    if (allOnlyOneOr) {
-        // 优化特殊情况，全部都是$or，直接合并
-        const ors = filters.map(
-            ele => ele!.$or
-        );
-        return {
-            $or: ors.reduce((prev, next) => prev!.concat(next!), [])
-        } as ED[T]['Selection']['filter'];
-    }
-
-    return {
-        $or: filters,
-    } as ED[T]['Selection']['filter'];
-}
-
-export function combineFilters<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(filters: Array<ED[T]['Selection']['filter']>, union?: true) {
+export function combineFilters<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+    entity: T,
+    schema: StorageSchema<ED>,
+    filters: Array<ED[T]['Selection']['filter']>,
+    union?: true
+) {
     if (union) {
-        return unionFilterSegment(...filters);
+        return unionFilterSegment(entity, schema, ...filters);
     }
-    return addFilterSegment(...filters);
+    return addFilterSegment(entity, schema, ...filters);
 }
 
 type DeducedFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED> = {
@@ -87,6 +461,13 @@ type DeducedFilterCombination<ED extends EntityDict & BaseEntityDict> = {
     $or?: (DeducedFilterCombination<ED> | DeducedFilter<ED, keyof ED>)[];
     $and?: (DeducedFilterCombination<ED> | DeducedFilter<ED, keyof ED>)[];
 };
+
+/**
+ * 在以下判断相容或相斥的过程中，相容/相斥的事实标准是：满足两个条件的查询集合是否被包容/互斥，但如果两个filter在逻辑上相容或者相斥，在事实上不一定相容或者相斥
+ * 例如：{ a: 1 } 和 { a: { $ne: 1 } } 是明显不相容的查询，但如果数据为空集，则这两个查询并不能否定其相容
+ * 我们在处理这类数据时，优先使用逻辑判定的结果（更符合查询本身的期望而非真实数据集），同时也可减少对真实数据集不必要的查询访问
+ */
+
 /**
  * 判断value1表达的单个属性查询与同属性上value2表达的查询是包容还是相斥
  * 相容即value1所表达的查询结果一定被value2表达的查询结果所包含，例如：
@@ -109,116 +490,144 @@ type DeducedFilterCombination<ED extends EntityDict & BaseEntityDict> = {
  * 
  * @param value1 
  * @param value2 
+ * @return true代表肯定相容/相斥，false代表肯定不相容/不相斥，undefined代表不能确定
  * @attention: 1)这里的测试不够充分，有些算子之间的相容或相斥可能有遗漏, 2)有新的算子加入需要修改代码
  */
-export function judgeValueRelation(value1: any, value2: any, contained: boolean): boolean {
+export function judgeValueRelation(value1: any, value2: any, contained: boolean): boolean | undefined {
     if (typeof value1 === 'object') {
         const attr = Object.keys(value1)[0];
         if (['$gt', '$lt', '$gte', '$lte', '$eq', '$ne', '$startsWith', '$endsWith', '$includes'].includes(attr)) {
             switch (attr) {
                 case '$gt': {
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = attr2 && ['$gt', '$gte'].includes(attr2) && value2[attr2] <= value1.$gt || (
+                        attr2 === '$exists' && value2[attr2] === true
+                    );
+                    const r = (attr2 && (
+                        ['$lt', '$lte', '$eq'].includes(attr2) && value2[attr2] <= value1.$gt ||
+                        attr2 === '$in' && value2[attr2] instanceof Array && !((value2[attr2]).find(
+                            (ele: any) => typeof ele !== typeof value1.$gt || ele > value1.$gt
+                        ))
+                    ) || (
+                            attr2 === '$exists' && value2[attr2] === false
+                        ) || ['string', 'number'].includes(typeof value2) && value2 <= value1.$gt);
                     if (contained) {
-                        // 包容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            return ['$gt', '$gte'].includes(attr2) && value2[attr2] <= value1.$gt;
+                        if (c) {
+                            return true;
+                        }
+                        else if (r) {
+                            return false;
+                        }
+                        return;
+                    }
+                    else {
+                        if (r) {
+                            return true;
                         }
                         return false;
                     }
-                    // 互斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        return ['$lt', '$lte', '$eq'].includes(attr2) && value2[attr2] <= value1.$gt
-                            || attr2 === '$in' && value2[attr2] instanceof Array && !((value2[attr2]).find(
-                                (ele: any) => typeof ele !== typeof value1.$gt || ele > value1.$gt
-                            ));
-                    }
-                    return value2 <= value1.$gt;
                 }
                 case '$gte': {
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = attr2 && ((
+                        ['$gte'].includes(attr2) && value2[attr2] <= value1.$gte
+                        || ['$gt'].includes(attr2) && value2[attr2] < value1.$gte
+                    ) || (
+                            attr2 === '$exists' && value2[attr2] === true
+                        ));
+                    const r = (attr2 && (
+                        ['$lt'].includes(attr2) && value2[attr2] <= value1.$gte
+                        || ['$eq', '$lte'].includes(attr2) && value2[attr2] < value1.gte
+                        || attr2 === '$in' && value2[attr2] instanceof Array && !(value2[attr2]).find(
+                            (ele: any) => typeof ele !== typeof value1.$gte || ele >= value1.$gte
+                        ) || (
+                            attr2 === '$exists' && value2[attr2] === false
+                        ))) || (['string', 'number'].includes(typeof value2) && value2 < value1.$gte)
                     if (contained) {
                         // 包容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            return ['$gte'].includes(attr2) && value2[attr2] <= value1.$gte
-                                || ['$gt'].includes(attr2) && value2[attr2] < value1.$gte;
+                        if (c) {
+                            return true;
                         }
-                        return false;
+                        else if (r) {
+                            return false;
+                        }
+                        return;
                     }
-                    // 互斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        return ['$lt'].includes(attr2) && value2[attr2] <= value1.$gte
-                            || ['$eq', '$lte'].includes(attr2) && value2[attr2] < value1.gte
-                            || attr2 === '$in' && value2[attr2] instanceof Array && !((value2[attr2]).find(
-                                (ele: any) => typeof ele !== typeof value1.$gte || ele >= value1.$gte
-                            ));
+                    if (r) {
+                        return true;
                     }
-                    return value2 < value1.$gte;
+                    return false;
                 }
                 case '$lt': {
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = attr2 && (['$lt', '$lte'].includes(attr2) && value2[attr2] >= value1.$lt || attr2 === '$exists' && value2[attr2] === true);
+                    const r = (attr2 && (['$gt', '$gte', '$eq'].includes(attr2) && value2[attr2] >= value1.$lt
+                        || attr2 === '$in' && value2[attr2] instanceof Array && !(value2[attr2]).find(
+                            (ele: any) => typeof ele !== typeof value1.$gt || ele < value1.$lt
+                        ) || (
+                            attr2 === '$exists' && value2[attr2] === false
+                        ))) || (['string', 'number'].includes(typeof value2) && value2 >= value1.$lt)
                     if (contained) {
-                        // 相容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            return ['$lt', '$lte'].includes(attr2) && value2[attr2] >= value1.$lt;
+                        if (c) {
+                            return true;
                         }
-                        return false;
+                        else if (r) {
+                            return false;
+                        }
+                        return;
                     }
                     // 互斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        return ['$gt', '$gte', '$eq'].includes(attr2) && value2[attr2] >= value1.$lt
-                            || attr2 === '$in' && value2[attr2] instanceof Array && !((value2[attr2]).find(
-                                (ele: any) => typeof ele !== typeof value1.$gt || ele < value1.$lt
-                            ));
+                    if (r) {
+                        return true;
                     }
-                    return value2 >= value1.$gt;
+                    return false;
                 }
                 case '$lte': {
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = attr2 && (['$lte'].includes(attr2) && value2[attr2] >= value1.$lte
+                        || ['$lt'].includes(attr2) && value2[attr2] > value1.$lte) || (
+                            attr2 === '$exists' && value2[attr2] === true
+                        );
+                    const r = (attr2 && (['$gt'].includes(attr2) && value2[attr2] >= value1.$lte
+                        || ['$eq', '$gte'].includes(attr2) && value2[attr2] > value1.lte
+                        || attr2 === '$in' && value2[attr2] instanceof Array && !(value2[attr2]).find(
+                            (ele: any) => typeof ele !== typeof value1.$lte || ele <= value1.$lte
+                        ) || (
+                            attr2 === '$exists' && value2[attr2] === false
+                        ))) || (['string', 'number'].includes(typeof value2) && value2 > value1.$lte);
                     if (contained) {
                         // 包容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            return ['$lte'].includes(attr2) && value2[attr2] >= value1.$lte
-                                || ['$lt'].includes(attr2) && value2[attr2] > value1.$lte;
+                        if (c) {
+                            return true;
                         }
-                        return false;
+                        else if (r) {
+                            return false;
+                        }
+                        return;
                     }
                     // 互斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        return ['$gt'].includes(attr2) && value2[attr2] >= value1.$lte
-                            || ['$eq', '$gte'].includes(attr2) && value2[attr2] > value1.lte
-                            || attr2 === '$in' && value2[attr2] instanceof Array && !((value2[attr2]).find(
-                                (ele: any) => typeof ele !== typeof value1.$lte || ele <= value1.$lte
-                            ));
+                    if (r) {
+                        return true;
                     }
-                    return value2 > value1.$gte;
+                    return false;
                 }
                 case '$eq': {
-                    if (contained) {
-                        // 相容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            return attr2 === '$eq' && value2[attr2] === value1.$eq || attr2 === '$ne' && value2[attr2] !== value1.$eq
-                                || attr2 === '$gt' && value2[attr2] < value1.$eq || attr2 === '$lt' && value2[attr2] > value1.$eq
-                                || attr2 === '$gte' && value2[attr2] <= value1.$eq || attr2 === '$lte' && value2[attr2] >= value1.$eq
-                                || attr2 === '$startsWith' && value1.$eq.startsWith(value2[attr2])
-                                || attr2 === '$endsWith' && value1.$eq.endsWith(value2[attr2])
-                                || attr2 === '$includes' && value1.$eq.includes(value2[attr2])
-                                || attr2 === '$in' && value2[attr2] instanceof Array && value2[attr2].includes(value1.$eq)
-                                || attr2 === '$nin' && value2[attr2] instanceof Array && !value2[attr2].includes(value1.$eq)
-                                || attr2 === '$between' && value2[attr2][0] <= value1.$eq && value2[attr2][1] >= value1.$eq
-                                || attr2 === '$exists' && value2[attr2] === true;
-
-                        }
-                        return value2 === value1.$eq;
-                    }
-                    // 互斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        return attr2 === '$eq' && value2[attr2] !== value1.$eq || attr2 === '$gt' && value2[attr2] >= value1.$eq
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = (attr2 && (
+                        attr2 === '$eq' && value2[attr2] === value1.$eq || attr2 === '$ne' && value2[attr2] !== value1.$eq
+                        || attr2 === '$gt' && value2[attr2] < value1.$eq || attr2 === '$lt' && value2[attr2] > value1.$eq
+                        || attr2 === '$gte' && value2[attr2] <= value1.$eq || attr2 === '$lte' && value2[attr2] >= value1.$eq
+                        || attr2 === '$startsWith' && value1.$eq.startsWith(value2[attr2])
+                        || attr2 === '$endsWith' && value1.$eq.endsWith(value2[attr2])
+                        || attr2 === '$includes' && value1.$eq.includes(value2[attr2])
+                        || attr2 === '$in' && value2[attr2] instanceof Array && value2[attr2].includes(value1.$eq)
+                        || attr2 === '$nin' && value2[attr2] instanceof Array && !value2[attr2].includes(value1.$eq)
+                        || attr2 === '$between' && value2[attr2][0] <= value1.$eq && value2[attr2][1] >= value1.$eq
+                        || attr2 === '$exists' && value2[attr2] === true
+                    )) || (['string', 'number'].includes(typeof value2) && value2 === value1.$eq);
+                    const r = (
+                        attr2 && (
+                            attr2 === '$eq' && value2[attr2] !== value1.$eq || attr2 === '$gt' && value2[attr2] >= value1.$eq
                             || attr2 === '$lt' && value2[attr2] <= value1.$eq
                             || attr2 === '$gte' && value2[attr2] > value1.$eq || attr2 === '$lte' && value2[attr2] < value1.$eq
                             || attr2 === '$startsWith' && !value1.$eq.startsWith(value2[attr2])
@@ -226,85 +635,118 @@ export function judgeValueRelation(value1: any, value2: any, contained: boolean)
                             || attr2 === '$includes' && !value1.$eq.includes(value2[attr2])
                             || attr2 === '$in' && value2[attr2] instanceof Array && !value2[attr2].includes(value1.$eq)
                             || attr2 === '$between' && (value2[attr2][0] > value1.$eq || value2[attr2][1] < value1.$eq)
-                            || attr2 === '$exists' && value2[attr2] === false;
+                            || attr2 === '$exists' && value2[attr2] === false
+                        )
+                    ) || value2 !== value1.$eq;
+                    if (contained) {
+                        // 相容
+                        if (c) {
+                            return true;
+                        }
+                        else if (r) {
+                            return false;
+                        }
+                        return undefined;
                     }
-                    return value2 !== value1.$eq;
+                    // 互斥
+                    if (r) {
+                        return true;
+                    }
+                    return false;
                 }
                 case '$ne': {
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = attr2 && attr2 === '$ne' && value2[attr2] === value1.$ne
+                    const r = (attr2 === '$eq' && value2[attr2] === value1.$ne) || value2 === value1.$ne;
                     if (contained) {
-                        // 相容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            return attr2 === '$ne' && value2[attr2] === value1.$ne;
+                        if (c) {
+                            return true;
                         }
-                        return false;
+                        else if (r) {
+                            return false;
+                        }
                     }
                     // 互斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        return attr2 === '$eq' && value2[attr2] === value1.$ne;
+                    if (r) {
+                        return true;
                     }
-                    return value2 === value1.$ne;
+                    return false;
                 }
                 case '$startsWith': {
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = attr2 === '$startsWith' && typeof (value2[attr2]) === 'string'
+                        && value1.$startsWith.startsWith(value2[attr2]);
+                    const r = attr2 === '$startsWith' && typeof (value2[attr2]) === 'string'
+                        && !value1.$startsWith.startsWith(value2[attr2]) && !value2[attr2].startsWith(value1.$startsWith)
+                        || attr2 === '$eq' && !value2[attr2].startsWith(value1.$startsWith)
+                        || typeof value2 === 'string' && !value2.startsWith(value1.$startsWith);
+                    // 这里似乎还有更多情况，但实际中不可能跑到，不处理了
+
                     if (contained) {
-                        // 相容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            return attr2 === '$startsWith' && typeof (value2[attr2]) === 'string'
-                                && value1.$startsWith.startsWith(value2[attr2]);
+                        if (c) {
+                            return true;
                         }
-                        return typeof value2 === 'string' && value1.$startsWith.startsWith(value2);
+                        else if (r) {
+                            return false;
+                        }
+                        return;
                     }
                     // 互斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        return attr2 === '$startsWith' && typeof (value2[attr2]) === 'string'
-                            && !value1.$startsWith.startsWith(value2[attr2]) && !value2[attr2].startsWith(value1.$startsWith)
-                            || attr2 === '$eq' && !value2[attr2].startsWith(value1.$startsWith);
+                    if (r) {
+                        return true;
                     }
-                    return !value2.startsWith(value1.$startsWith);
+                    return false;
                 }
                 case '$endsWith': {
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = attr2 === '$endsWith' && typeof (value2[attr2]) === 'string'
+                        && value1.$endsWith.endsWith(value2[attr2]);
+                    const r = (
+                        attr2 === '$endsWith' && typeof (value2[attr2]) === 'string'
+                        && !value1.$endsWith.endsWith(value2[attr2]) && !value2[attr2].endsWith(value1.$endsWith)
+                        || attr2 === '$eq' && !value2[attr2].endsWith(value1.$endsWith)
+                    ) || typeof value2 === 'string' && !value2.endsWith(value1.$endsWith);
                     if (contained) {
                         // 相容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            return attr2 === '$endsWith' && typeof (value2[attr2]) === 'string'
-                                && value1.$startsWith.endsWith(value2[attr2]);
+                        if (c) {
+                            return true;
                         }
-                        return typeof value2 === 'string' && value1.$startsWith.endsWith(value2);
+                        else if (r) {
+                            return false;
+                        }
+                        return;
                     }
-                    // 互斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        return attr2 === '$startsWith' && typeof (value2[attr2]) === 'string'
-                            && !value1.$startsWith.endsWith(value2[attr2]) && !value2[attr2].endsWith(value1.$startsWith)
-                            || attr2 === '$eq' && !value2[attr2].endsWith(value1.$startsWith);
+                    if (r) {
+                        return true;
                     }
-                    return !value2.endsWith(value1.$startsWith);
+                    return false;
                 }
                 case '$includes': {
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = (
+                        attr2 && ['$includes', '$startsWith', '$endsWith'].includes(attr2)
+                        && typeof (value2[attr2]) === 'string'
+                        && (value2[attr2]).includes(value1.$includes)
+                    ) || typeof value2 === 'string' && value2.includes(value1.$includes as string);
+                    const r = (
+                        attr2 === '$eq' && !value2[attr2].includes(value1.$includes)
+                        || attr2 === '$in' && value2[attr2] instanceof Array && !value2[attr2].find(
+                            (ele: string) => ele.includes(value1.$includes)
+                        )
+                    ) || typeof value2 === 'string' && !value2.includes(value1.$includes);
                     if (contained) {
-                        // 相容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            return ['$includes', '$startsWith', '$endsWith'].includes(attr2)
-                                && typeof (value2[attr2]) === 'string'
-                                && (value2[attr2]).includes(value1.$includes);
+                        if (c) {
+                            return true;
                         }
-                        return typeof value2 === 'string' && value2.includes(value1.$includes as string);
+                        else if (r) {
+                            return false;
+                        }
+                        return;
                     }
-                    // 互斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        return attr2 === '$eq' && !value2[attr2].includes(value1.$includes)
-                            || attr2 === '$in' && value2[attr2] instanceof Array && !value2[attr2].find(
-                                (ele: string) => ele.includes(value1.$includes)
-                            );
+                    if (r) {
+                        return true;
                     }
-                    return typeof value2 === 'string' && !value2.includes(value1.$includes);
-
+                    return false;
                 }
                 default: {
                     assert(false, `不能处理的算子「${attr}」`);
@@ -312,149 +754,154 @@ export function judgeValueRelation(value1: any, value2: any, contained: boolean)
             }
         }
         else if (['$exists'].includes(attr)) {
-            assert(attr === '$exists');
+            const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+            const c = attr2 === '$exists' && value2[attr2] === value1.$exists;
+            const r = attr2 === '$exists' && value2[attr2] !== value1.$exists;
+
             if (contained) {
-                if (typeof value2 === 'object') {
-                    const attr2 = Object.keys(value2)[0];
-                    return attr2 === '$exists' && value2[attr2] === value1.$exists;
+                if (c) {
+                    return true;
                 }
-                return false;
+                else if (r) {
+                    return false;
+                }
+                return;
             }
-            return typeof value2 === 'object' && value2.$exists === !(value1.$exists);
+            if (r) {
+                return true;
+            }
+            return false;
         }
         else if (['$in', '$nin', '$between'].includes(attr)) {
             switch (attr) {
                 case '$in': {
+                    assert(value1.$in instanceof Array);
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    let c = (
+                        attr2 === '$in' && value2[attr2] instanceof Array && difference(value1.$in, value2[attr2]).length === 0
+                    ) || (
+                            attr2 === '$nin' && value2[attr2] instanceof Array && intersection(value1.$in, value2[attr2]).length === 0
+                        ) || (
+                            attr2 === '$exists' && value2[attr2] === true
+                        );
+                    if (!c && attr2 && ['$gt', '$gte', '$lt', '$lte', '$between'].includes(attr2)) {
+                        let min33: number, max33: number;
+                        value1.$in.forEach(
+                            (ele: number) => {
+                                if (!min33 || min33 > ele) {
+                                    min33 = ele;
+                                }
+                                if (!max33 || max33 < ele) {
+                                    max33 = ele;
+                                }
+                            }
+                        );
+                        c = attr2 === '$gt' && value2[attr2] < min33! || attr2 === '$gte' && value2[attr2] <= min33!
+                            || attr2 === '$lt' && value2[attr2] > max33! || attr2 === '$lte' && value2[attr2] >= max33!
+                            || attr2 === '$between' && value2[attr2][0] < min33! && value2[attr2][1] > max33!;
+                    }
+
+                    let r = (
+                        attr2 === '$in' && intersection(value2[attr2], value1.$in).length === 0
+                    ) || (
+                            attr2 === '$eq' && !value1.$in.includes(value2[attr2])
+                        ) || (
+                            attr2 === '$exists' && value2[attr2] === false
+                        ) || (
+                            !value1.$in.includes(value2)
+                        );
+                    if (!r && attr2 && ['$gt', '$gte', '$lt', '$lte', '$between'].includes(attr2)) {
+                        let min44: number, max44: number;
+                        value1.$in.forEach(
+                            (ele: number) => {
+                                if (!min44 || min44 > ele) {
+                                    min44 = ele;
+                                }
+                                if (!max44 || max44 < ele) {
+                                    max44 = ele;
+                                }
+                            }
+                        );
+
+                        r = attr2 === '$gt' && value2[attr2] >= max44! || attr2 === '$gte' && value2[attr2] > max44!
+                            || attr2 === '$lt' && value2[attr2] <= min44! || attr2 === '$lte' && value2[attr2] < min44!
+                            || attr2 === '$between' && (value2[attr2][0] > max44! || value2[attr2][1] < min44!);
+                    }
                     if (contained) {
                         // 相容
-                        if (value1.$in instanceof Array) {
-                            if (typeof value2 === 'object') {
-                                const attr2 = Object.keys(value2)[0];
-                                if (attr2 === '$in') {
-                                    return value2[attr2] instanceof Array && difference(value1.$in, value2[attr2]).length === 0;
-                                }
-                                else if (attr2 === '$nin') {
-                                    return value2[attr2] instanceof Array && intersection(value1.$in, value2[attr2]).length === 0;
-                                }
-                                else if (attr2 === '$exists') {
-                                    return value2[attr2] === true;
-                                }
-                                else if (['$gt', '$gte', '$lt', '$lte', '$between'].includes(attr2)) {
-                                    let min33: number, max33: number;
-                                    value1.$in.forEach(
-                                        (ele: number) => {
-                                            if (!min33 || min33 > ele) {
-                                                min33 = ele;
-                                            }
-                                            if (!max33 || max33 < ele) {
-                                                max33 = ele;
-                                            }
-                                        }
-                                    );
-                                    return attr2 === '$gt' && value2[attr2] < min33! || attr2 === '$gte' && value2[attr2] <= min33!
-                                        || attr2 === '$lt' && value2[attr2] > max33! || attr2 === '$lte' && value2[attr2] >= max33!
-                                        || attr2 === '$between' && value2[attr2][0] < min33! && value2[attr2][1] > max33!;
-                                }
-                            }
+                        if (c) {
+                            return true;
                         }
-                        return false;
+                        else if (r) {
+                            return false;
+                        }
+                        return;
                     }
                     // 相斥
-                    if (value1.$in instanceof Array) {
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            if (attr2 === '$in') {
-                                return intersection(value2[attr2], value1.$in).length === 0;
-                            }
-                            else if (attr2 === '$eq') {
-                                return !value1.$in.includes(value2[attr2]);
-                            }
-                            else if (attr2 === '$exists') {
-                                return value2[attr2] === false;
-                            }
-                            else if (['$gt', '$gte', '$lt', '$lte', '$between'].includes(attr2)) {
-                                let min44: number, max44: number;
-                                value1.$in.forEach(
-                                    (ele: number) => {
-                                        if (!min44 || min44 > ele) {
-                                            min44 = ele;
-                                        }
-                                        if (!max44 || max44 < ele) {
-                                            max44 = ele;
-                                        }
-                                    }
-                                );
-
-                                return attr2 === '$gt' && value2[attr2] >= max44! || attr2 === '$gte' && value2[attr2] > max44!
-                                    || attr2 === '$lt' && value2[attr2] <= min44! || attr2 === '$lte' && value2[attr2] < min44!
-                                    || attr2 === '$between' && (value2[attr2][0] > max44! || value2[attr2][1] < min44!);
-                            }
-                        }
-                        return !value1.$in.includes(value2);
+                    if (r) {
+                        return true;
                     }
                     return false;
                 }
                 case '$nin': {
+                    assert(value1.$nin instanceof Array);
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = attr2 && (
+                        attr2 === '$nin' && value2[attr2] instanceof Array && intersection(value2[attr2], value1.$nin).length === 0
+                        || attr2 === '$ne' && value1.$nin.includes(value2[attr2])
+                    );
+                    const r = attr2 && (
+                        attr2 === '$in' && value2[attr2] instanceof Array && intersection(value2[attr2], value1.$nin).length > 0
+                    ) || value1.$nin.includes(value2);
+
                     if (contained) {
                         // 相容
-                        if (value1.$nin instanceof Array) {
-                            if (typeof value2 === 'object') {
-                                const attr2 = Object.keys(value2)[0];
-                                if (attr2 === '$nin') {
-                                    return value2[attr2] instanceof Array && intersection(value2[attr2], value1.$nin).length === 0;
-                                }
-                            }
+                        if (c) {
+                            return true;
                         }
-                        return false;
+                        else if (r) {
+                            return false;
+                        }
+                        return;
                     }
-                    // 相斥
-                    if (value1.$nin instanceof Array) {
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            if (attr2 === '$in') {
-                                return value2[attr2] instanceof Array && difference(value2[attr2], value1.$nin).length === 0;
-                            }
-                        }
+                    if (r) {
+                        return true;
                     }
                     return false;
                 }
                 case '$between': {
                     assert(value1.$between instanceof Array);
+                    const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+                    const c = attr2 && (
+                        attr2 === '$between' && value2[attr2][0] <= value1.$between[0] && value2[attr2][1] >= value1.$between[1]
+                        || attr2 === '$gt' && value2[attr2] < value1.$between[0] || attr2 === '$gte' && value2[attr2] <= value1.$between[0]
+                        || attr2 === '$lt' && value2[attr2] > value1.$between[1] || attr2 === '$lte' && value2[attr2] >= value1.$between[1]
+                        || attr2 === '$exists' && value2[attr2] === true
+                    );
+                    const r = attr2 && (
+                        attr2 === '$between' && (value2[attr2][0] > value1.$between[1] || value2[attr2][1] < value1.$between[0])
+                        || attr2 === '$gt' && value2[attr2] > value1.$between[1] || attr2 === '$gte' && value2[attr2] >= value1.$between[1]
+                        || attr2 === '$lt' && value2[attr2] < value1.$between[0] || attr2 === '$lte' && value2[attr2] <= value1.$between[0]
+                        || attr2 === '$eq' && (value2[attr2] > value1.$between[1] || value2[attr2] < value1.$between[0])
+                        || attr2 === '$exists' && value2[attr2] === false
+                        || attr2 === '$in' && value2[attr2] instanceof Array && !value2[attr2].find(
+                            (ele: number) => ele >= value1.$between[0] && ele <= value1.$between[1]
+                        )
+                    ) || value2 > value1.$between[1] || value2 < value1.$between[0]
                     if (contained) {
-                        // 相容
-                        if (typeof value2 === 'object') {
-                            const attr2 = Object.keys(value2)[0];
-                            if (['$gt', '$gte', '$lt', '$lte', '$between', '$eq'].includes(attr2)) {
-                                return attr2 === '$between' && value2[attr2][0] <= value1.$between[0] && value2[attr2][1] >= value1.$between[1]
-                                    || attr2 === '$gt' && value2[attr2] < value1.$between[0] || attr2 === '$gte' && value2[attr2] <= value1.$between[0]
-                                    || attr2 === '$lt' && value2[attr2] > value1.$between[1] || attr2 === '$lte' && value2[attr2] >= value1.$between[1];
-                            }
-                            else if (attr2 === '$exists') {
-                                return value2[attr2] === true;
-                            }
+                        if (c) {
+                            return true;
                         }
-                        return false;
+                        else if (r) {
+                            return false;
+                        }
+                        return;
                     }
                     // 相斥
-                    if (typeof value2 === 'object') {
-                        const attr2 = Object.keys(value2)[0];
-                        if (['$gt', '$gte', '$lt', '$lte', '$between', '$eq'].includes(attr2)) {
-                            return attr2 === '$between' && (value2[attr2][0] > value1.$between[1] || value2[attr2][1] < value1.$between[0])
-                                || attr2 === '$gt' && value2[attr2] > value1.$between[1] || attr2 === '$gte' && value2[attr2] >= value1.$between[1]
-                                || attr2 === '$lt' && value2[attr2] < value1.$between[0] || attr2 === '$lte' && value2[attr2] <= value1.$between[0]
-                                || attr2 === '$eq' && (value2[attr2] > value1.$between[1] || value2[attr2] < value1.$between[0]);
-                        }
-                        else if (attr2 === '$exists') {
-                            return value2[attr2] === false;
-                        }
-                        else if (attr2 === '$in' && value2[attr2] instanceof Array) {
-                            return !value2[attr2].find(
-                                (ele: number) => ele >= value1.$between[0] && ele <= value1.$between[1]
-                            );
-                        }
-                        return false;
+                    if (r) {
+                        return true;
                     }
-
+                    return false;
                 }
                 default: {
                     assert(false, `暂不支持的算子${attr}`);
@@ -462,43 +909,49 @@ export function judgeValueRelation(value1: any, value2: any, contained: boolean)
             }
         }
         else {
+            console.warn(`「judgeValueRelation」未知算子「${attr}」`);
             return false;
         }
     }
     else {
         // value1是一个等值查询
+        const attr2 = (typeof value2 === 'object') && Object.keys(value2)[0];
+        const c = attr2 === '$eq' && value2[attr2] === value1 || attr2 === '$ne' && value2[attr2] !== value1
+            || attr2 === '$gt' && value2[attr2] < value1 || attr2 === '$lt' && value2[attr2] > value1
+            || attr2 === '$gte' && value2[attr2] <= value1 || attr2 === '$lte' && value2[attr2] >= value1
+            || attr2 === '$startsWith' && value1.startsWith(value2[attr2])
+            || attr2 === '$endsWith' && value1.endsWith(value2[attr2])
+            || attr2 === '$includes' && value1.includes(value2[attr2])
+            || attr2 === '$in' && value2[attr2] instanceof Array && value2[attr2].includes(value1)
+            || attr2 === '$nin' && value2[attr2] instanceof Array && !value2[attr2].includes(value1)
+            || attr2 === '$between' && value2[attr2][0] <= value1 && value2[attr2][1] >= value1
+            || attr2 === '$exists' && value2[attr2] === true
+            || value2 === value1;
+        const r = attr2 === '$eq' && value2[attr2] !== value1 || attr2 === '$gt' && value2[attr2] >= value1
+            || attr2 === '$lt' && value2[attr2] <= value1
+            || attr2 === '$gte' && value2[attr2] > value1 || attr2 === '$lte' && value2[attr2] < value1
+            || attr2 === '$startsWith' && !value1.startsWith(value2[attr2])
+            || attr2 === '$endsWith' && !value1.endsWith(value2[attr2])
+            || attr2 === '$includes' && !value1.includes(value2[attr2])
+            || attr2 === '$in' && value2[attr2] instanceof Array && !value2[attr2].includes(value1)
+            || attr2 === '$between' && (value2[attr2][0] > value1 || value2[attr2][1] < value1)
+            || attr2 === '$exists' && value2[attr2] === false
+            || typeof value2 === typeof value1 && value2 !== value1;
         if (contained) {
             // 相容
-            if (typeof value2 === 'object') {
-                const attr2 = Object.keys(value2)[0];
-                return attr2 === '$eq' && value2[attr2] === value1 || attr2 === '$ne' && value2[attr2] !== value1
-                    || attr2 === '$gt' && value2[attr2] < value1 || attr2 === '$lt' && value2[attr2] > value1
-                    || attr2 === '$gte' && value2[attr2] <= value1 || attr2 === '$lte' && value2[attr2] >= value1
-                    || attr2 === '$startsWith' && value1.startsWith(value2[attr2])
-                    || attr2 === '$endsWith' && value1.endsWith(value2[attr2])
-                    || attr2 === '$includes' && value1.includes(value2[attr2])
-                    || attr2 === '$in' && value2[attr2] instanceof Array && value2[attr2].includes(value1)
-                    || attr2 === '$nin' && value2[attr2] instanceof Array && !value2[attr2].includes(value1)
-                    || attr2 === '$between' && value2[attr2][0] <= value1 && value2[attr2][1] >= value1
-                    || attr2 === '$exists' && value2[attr2] === true;
-
+            if (c) {
+                return true;
             }
-            return value2 === value1;
+            else if (r) {
+                return false;
+            }
+            return;
         }
         // 互斥
-        if (typeof value2 === 'object') {
-            const attr2 = Object.keys(value2)[0];
-            return attr2 === '$eq' && value2[attr2] !== value1 || attr2 === '$gt' && value2[attr2] >= value1
-                || attr2 === '$lt' && value2[attr2] <= value1
-                || attr2 === '$gte' && value2[attr2] > value1 || attr2 === '$lte' && value2[attr2] < value1
-                || attr2 === '$startsWith' && !value1.startsWith(value2[attr2])
-                || attr2 === '$endsWith' && !value1.endsWith(value2[attr2])
-                || attr2 === '$includes' && !value1.includes(value2[attr2])
-                || attr2 === '$in' && value2[attr2] instanceof Array && !value2[attr2].includes(value1)
-                || attr2 === '$between' && (value2[attr2][0] > value1 || value2[attr2][1] < value1)
-                || attr2 === '$exists' && value2[attr2] === false;
+        if (r) {
+            return true;
         }
-        return value2 !== value1;
+        return false;
     }
 }
 
@@ -510,7 +963,7 @@ export function judgeValueRelation(value1: any, value2: any, contained: boolean)
  * @param filter 
  * @param compared 
  * @param contained 
- * @returns 返回true说明肯定相容（相斥），返回false说明无法判定相容（相斥），返回DeducedFilterCombination说明需要进一步判断此推断的条件
+ * @returns 返回true说明肯定相容（相斥），返回false说明肯定不相容（相斥），返回undefined说明无法判定相容（相斥），返回DeducedFilterCombination说明需要进一步判断此推断的条件
  */
 function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
@@ -518,14 +971,14 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
     attr: keyof ED[T]['Schema'],
     filter: NonNullable<ED[T]['Selection']['filter']>,
     compared: NonNullable<ED[T]['Selection']['filter']>,
-    contained: boolean): boolean | DeducedFilterCombination<ED> {
+    contained: boolean): boolean | undefined | DeducedFilterCombination<ED> {
     const comparedFilterAttrValue = compared![attr as any];
     const orDeducedFilters: DeducedFilterCombination<ED>[] = [];
 
     if (attr === 'entityId') {
         // entityId不可能作为查询条件单独存在
         assert(compared.hasOwnProperty('entity'));
-        return false;
+        return;
     }
     for (const attr2 in filter) {
         if (['$and', '$or', '$not'].includes(attr2)) {
@@ -546,6 +999,12 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
                         if (r === false && attr2 === '$or') {
                             return false;
                         }
+                        if (r === undefined) {
+                            if (attr2 === '$or') {
+                                // or有一个不能确定就返回不确定
+                                return;
+                            }
+                        }
                         if (typeof r === 'object') {
                             if (attr2 === '$and') {
                                 orDeducedFilters.push(r);
@@ -565,13 +1024,13 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
                 }
                 case '$not': {
                     /* 
-                    * 若filter的not条件被conditionalFilterAttrValue条件包容，则说明两者互斥
-                    * filter包容conditionalFilterAttrValue条件暂时无法由其not条件推论出来
+                    * 若filter的not条件被comparedFilterAttrValue条件包容，则说明两者互斥
+                    * filter包容comparedFilterAttrValue条件暂时无法由其not条件推论出来
                     */
 
                     if (!contained) {
                         const logicQuery = filter[attr2] as ED[T]['Selection']['filter'];
-                        const r = judgeFilterRelation(entity, schema, logicQuery!, { [attr]: comparedFilterAttrValue } as NonNullable<ED[T]['Selection']['filter']>, true);
+                        const r = judgeFilterRelation(entity, schema, { [attr]: comparedFilterAttrValue } as NonNullable<ED[T]['Selection']['filter']>, logicQuery!, true);
                         if (r === true) {
                             return true;
                         }
@@ -596,12 +1055,15 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
             const rel = judgeRelation<ED>(schema, entity, attr2);
             if (attr === attr2) {
                 if (rel === 1) {
-                    return judgeValueRelation(filter[attr2], comparedFilterAttrValue, contained);
+                    const r = judgeValueRelation(filter[attr2], comparedFilterAttrValue, contained);
+                    if (typeof r === 'boolean') {
+                        return r;
+                    }
                 }
                 else if (rel === 2) {
                     const r = judgeFilterRelation(attr2, schema, filter[attr2], comparedFilterAttrValue, contained);
-                    if (r === true) {
-                        return true;
+                    if (typeof r === 'boolean') {
+                        return r;
                     }
                     else if (typeof r === 'object') {
                         orDeducedFilters.push(r);
@@ -609,12 +1071,15 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
                 }
                 else if (typeof rel === 'string') {
                     const r = judgeFilterRelation(rel, schema, filter[attr2], comparedFilterAttrValue, contained);
-                    if (r === true) {
-                        return true;
+                    if (typeof r === 'boolean') {
+                        return r;
                     }
                     else if (typeof r === 'object') {
                         orDeducedFilters.push(r);
                     }
+                }
+                else {
+                    // todo 一对多如何判定？
                 }
             }
             else if (rel === 2 && attr === 'entity' && comparedFilterAttrValue === attr2 && compared!.hasOwnProperty('entityId')) {
@@ -622,8 +1087,8 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
                 const r = judgeFilterRelation(attr2, schema, filter[attr2], {
                     id: compared.entityId
                 } as any, contained);
-                if (r === true) {
-                    return true;
+                if (typeof r === 'boolean') {
+                    return r;
                 }
                 else if (typeof r === 'object') {
                     orDeducedFilters.push(r);
@@ -634,8 +1099,8 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
                 const r = judgeFilterRelation(rel, schema, filter[attr2], {
                     id: comparedFilterAttrValue
                 } as any, contained);
-                if (r === true) {
-                    return true;
+                if (typeof r === 'boolean') {
+                    return r;
                 }
                 else if (typeof r === 'object') {
                     orDeducedFilters.push(r);
@@ -649,8 +1114,8 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
                     const r = judgeFilterRelation(attr as keyof ED, schema, {
                         id: filter.entityId,
                     } as any, comparedFilterAttrValue, contained);
-                    if (r === true) {
-                        return true;
+                    if (typeof r === 'boolean') {
+                        return r;
                     }
                     else if (typeof r === 'object') {
                         orDeducedFilters.push(r);
@@ -661,8 +1126,8 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
                     const r = judgeFilterRelation(rel2, schema, {
                         id: filter[attr2],
                     } as any, comparedFilterAttrValue, contained);
-                    if (r === true) {
-                        return true;
+                    if (typeof r === 'boolean') {
+                        return r;
                     }
                     else if (typeof r === 'object') {
                         orDeducedFilters.push(r);
@@ -678,8 +1143,8 @@ function judgeFilterSingleAttrRelation<ED extends EntityDict & BaseEntityDict, T
         };
     }
 
-    // 到这里说明无法直接判断此attr上的相容或者相斥，返回false
-    return false;
+    // 到这里说明无法直接判断此attr上的相容或者相斥，也无法把判定推断到更深层的算子之上
+    return;
 }
 
 /** 判断filter条件对compared条件是否相容或相斥
@@ -699,7 +1164,9 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
 
     const totalAndDeducedFilters: (DeducedFilterCombination<ED> | DeducedFilter<ED, T>)[] = [];
     const totalOrDeducedFilters: (DeducedFilterCombination<ED> | DeducedFilter<ED, T>)[] = [];
-    const falseAttributes: string[] = [];
+    const uncertainAttributes: string[] = [];
+    const sureAttributes: string[] = [];        // 对包容查询，肯定此属性可包容；对相斥查询，肯定此属性不相斥
+
     for (let attr in compared) {
         let result: boolean | undefined = undefined;
         const deducedCombinations: DeducedFilterCombination<ED>[] = [];
@@ -714,9 +1181,15 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
                     const orDeducedFilters: DeducedFilterCombination<ED>[] = [];
                     for (const r of results) {
                         if (contained) {
-                            // 如果是包容关系，需要全部被包容
+                            // 如果是包容关系，需要全部被包容，有一个被证伪就已经失败了
                             if (r === false) {
                                 result = false;
+                                break;
+                            }
+                            else if (r === undefined) {
+                                // 有一个无法判断就放弃
+                                andDeducedFilters.splice(0, andDeducedFilters.length);
+                                result = undefined;
                                 break;
                             }
                             else if (typeof r === 'object') {
@@ -725,8 +1198,9 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
                         }
                         else {
                             assert(!contained);
-                            // 如果是相斥关系，只要和一个相斥就可以了
+                            // 如果是相斥关系，只要和一个相斥就可以，有一个被证实就成功了
                             if (r === true) {
+                                orDeducedFilters.splice(0, orDeducedFilters.length);
                                 result = true;
                                 break;
                             }
@@ -758,11 +1232,13 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
                         if (contained) {
                             // 如果是包容关系，只要包容一个（是其查询子集）就可以
                             if (r === true) {
+                                orDeducedFilters.splice(0, orDeducedFilters.length);
                                 result = true;
                                 break;
                             }
                             else if (typeof r === 'object') {
-                                orDeducedFilters.push(r);
+                                // 这里不能把or下降到所有的查询中去分别判定，有可能此条件需要多个compared中的情况来共同满足
+                                // orDeducedFilters.push(r);
                             }
                         }
                         else {
@@ -770,6 +1246,12 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
                             // 如果是相斥关系，必须和每一个都相斥
                             if (r === false) {
                                 result = false;
+                                break;
+                            }
+                            else if (r === undefined) {
+                                // 有一个无法判断就放弃
+                                andDeducedFilters.splice(0, andDeducedFilters.length);
+                                result = undefined;
                                 break;
                             }
                             else if (typeof r === 'object') {
@@ -791,8 +1273,8 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
                 }
                 case '$not': {
                     /**
-                     * 若filter与conditionalFilter not所定义的部分相斥，则filter与conditionalFilter相容
-                     * 若filter将conditionalFilter not所定义的部分包容，则filter与conditionalFilter相斥
+                     * 若filter与compared not所定义的部分相斥，则filter与conditionalFilter相容
+                     * 若filter将compared not所定义的部分包容，则filter与conditionalFilter相斥
                      */
                     const logicQuery = compared[attr] as ED[T]['Selection']['filter'];
                     if (contained) {
@@ -823,13 +1305,13 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
         else if (attr.toLowerCase().startsWith(EXPRESSION_PREFIX)) {
             // 相当于缩小了compared查询结果，如果是判定相斥，对结果无影响，如果是判定相容，则认为无法判定，
             if (contained) {
-                result = false;
+                result = undefined;
             }
         }
         else if (attr.toLowerCase() === '$text') {
             // 相当于缩小了compared查询结果，如果是判定相斥，对结果无影响，如果是判定相容，则认为无法判定，
             if (contained) {
-                result = false;
+                result = undefined;
             }
         }
         else {
@@ -843,12 +1325,19 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
         }
 
         if (contained) {
-            // 相容必须每个都相容，有一个被否定就可以返回false了
-            if (result === false) {
-                falseAttributes.push(attr);
+            // 相容必须compared中的每个属性都被相容
+            if (result === true) {
+                sureAttributes.push(attr);
+            }
+            else if (result === false) {
+                return false;
             }
             else if (deducedCombinations.length > 0) {
                 totalAndDeducedFilters.push(...deducedCombinations);
+            }
+            else {
+                // 判定不了，也推断不了
+                uncertainAttributes.push(attr);
             }
         }
         else {
@@ -856,49 +1345,51 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
             if (result === true) {
                 return true;
             }
-
-            if (deducedCombinations.length > 0) {
+            else if (result === false) {
+                sureAttributes.push(attr);
+            }
+            else if (deducedCombinations.length > 0) {
                 totalOrDeducedFilters.push(...deducedCombinations);
-                falseAttributes.push(attr);
+            }
+            else {
+                // 判定不了，也推断不了
+                uncertainAttributes.push(attr);
             }
         }
     }
 
     if (contained) {
-        if (falseAttributes.length > 0) {
+        if (sureAttributes.length === Object.keys(compared).length) {
+            return true;
+        }
+        if (uncertainAttributes.length > 0) {
             // 有属性无法界定，此时只能拿本行去查询
             totalAndDeducedFilters.push({
                 entity,
-                filter: {
-                    ...filter,
-                    $not: pick(compared, falseAttributes),
-                },
+                filter: combineFilters(entity, schema, [filter, {
+                    $not: pick(compared, uncertainAttributes),
+                }]),
             });
         }
-    }
-    else {
-        // falseAttributes中是已经推导了更深层次上filter的属性，剩下的如果还有可以增加一个相斥的判断
-        if (Object.keys(contained).length > falseAttributes.length) {
-            totalOrDeducedFilters.push({
-                entity,
-                filter: combineFilters([filter, omit(compared, falseAttributes)]),
-            });
-        }
-    }
-
-    if (totalAndDeducedFilters.length > 0) {
         return {
             $and: totalAndDeducedFilters,
         };
     }
-    if (totalOrDeducedFilters.length > 0) {
+    else {
+        if (sureAttributes.length === Object.keys(compared).length) {
+            return false;
+        }
+        // uncertainAttributes中是无法判定的属性，和filter合并之后（同时满足）的查询结果如果不为空说明不互斥
+        if (uncertainAttributes.length > 0) {
+            totalOrDeducedFilters.push({
+                entity,
+                filter: combineFilters(entity, schema, [filter, pick(compared, uncertainAttributes)]),
+            });
+        }
         return {
             $or: totalOrDeducedFilters,
         };
     }
-
-    // 到这里说明没有一个属性能马上否定相容（不然因为falseAttributes已经返回false了），或是没有一个属性能肯定相斥（否则已经返回true了）
-    return contained;
 }
 
 /**
@@ -1157,7 +1648,7 @@ export function checkDeduceFilters<ED extends EntityDict & BaseEntityDict, Cxt e
                 }
             );
         }
-        
+
         for (const ele of andResult) {
             if (ele === false || typeof ele === 'number' && ele > 0) {
                 return false;
@@ -1219,7 +1710,7 @@ export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T ex
         throw new OakRowInconsistencyException();
     }
     const schema = context.getSchema();
-    
+
     const result = contains(entity, schema, filter, contained);
     if (typeof result === 'boolean') {
         return result;
@@ -1241,7 +1732,7 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
         throw new OakRowInconsistencyException();
     }
     const schema = context.getSchema();
-    
+
     const result = repel(entity, schema, filter2, filter1);
     if (typeof result === 'boolean') {
         return result;
@@ -1252,7 +1743,7 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
     return false;
 }
 
-export function getCascadeEntityFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+/* export function getCascadeEntityFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     filter: NonNullable<ED[T]['Selection']['filter']>,
     attr: keyof NonNullable<ED[T]['Selection']['filter']>
 ): ED[keyof ED]['Selection']['filter'] {
@@ -1274,4 +1765,4 @@ export function getCascadeEntityFilter<ED extends EntityDict & BaseEntityDict, T
     if (filters.length > 0) {
         return combineFilters(filters);
     }
-}
+} */

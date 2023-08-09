@@ -38,14 +38,23 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      */
     private destructOperation;
     /**
-     * 定位到了当前用户所有可能的actionAuth，再用以判定对应的entity是不是满足当前的查询约束
+     * 定位到了当前用户所有可能的actionAuth，对单条actionAuth加以判断，找到可以满足当前操作的actionAuth
      * @param entity
      * @param filter
      * @param actionAuths
      * @param context
      * @return  string代表用户获得授权的relationId，空字符串代表通过userId赋权，false代表失败
      */
-    private checkSingleOperation;
+    private filterActionAuths;
+    /**
+     * 对于有些特殊的查询（带很多$or的查询，多发生在系统级别），单个actionAuth无法满足，需要共同加以判定
+     * @param entity
+     * @param filter
+     * @param actionAuths
+     * @param context
+     * @param actions
+     */
+    private checkActionAuthInGroup;
     private checkSelection;
     private findActionAuthsOnNode;
     private checkOperationTree;
@@ -68,6 +77,7 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
  * 获取有对entity进行actions操作权限的userRelation关系
  * @param params
  * @param context
+ * todo paths改成复数以后这里还未充分测试过
  */
 export declare function getUserRelationsByActions<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(params: {
     entity: T;
@@ -76,9 +86,9 @@ export declare function getUserRelationsByActions<ED extends EntityDict & BaseEn
     overlap?: boolean;
 }, context: Cxt): Promise<{
     userRelations: ED["userRelation"]["Schema"][];
-    userEntities: {
+    userEntities: Promise<{
         entity: keyof ED;
         entityId: string;
         userId: string;
-    }[];
+    }[]>[];
 }>;
