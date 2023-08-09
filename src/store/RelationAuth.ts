@@ -603,8 +603,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     return;
                 }
                 // 说明是通过userId关联
-                const contained = {};
-                set(contained, `${path}.id`, context.getCurrentUserId());
+                const pathFilters = paths.map(
+                    (path) => set({}, `${path}.id`, context.getCurrentUserId())
+                );
+                const contained = combineFilters(entity, context.getSchema(), pathFilters, true);
                 const contains = checkFilterContains(entity, context, contained, filter, true)
                 if (contains instanceof Promise) {
                     return contains.then(
