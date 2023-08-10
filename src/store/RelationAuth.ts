@@ -462,10 +462,17 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             return true;
         };
 
-        const destructInner = <T2 extends keyof ED>(entity: T2, operation: Omit<ED[T2]['Operation'], 'id'>, path?: string, child?: OperationTree<ED>, hasParent?: true): OperationTree<ED> => {
+        const destructInner = <T2 extends keyof ED>(
+            entity: T2, 
+            operation: Omit<ED[T2]['Operation'], 'id'>, 
+            // extraFilter?: ED[T2]['Selection']['filter'],
+            path?: string, 
+            child?: OperationTree<ED>, 
+            hasParent?: true): OperationTree<ED> => {
             const { action, data, filter } = operation;
             const filter2 = action === 'create' ? makeCreateFilter(entity, operation as Omit<ED[T]['CreateSingle'], 'id'>) : filter;
             assert(filter2);
+            // const filter3 = extraFilter ? combineFilters(entity, schema, [filter2, extraFilter]) : filter2;
 
             const me: OperationTree<ED> = {
                 entity: entity,
@@ -1134,6 +1141,20 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         );
                     }
                     if (result) {
+                        if (node.entity === 'user') {
+                            // 如果当前是对user对象操作，需要加上一个指向它自身的actionAuth，否则剩下的子对象会判定不过
+                            // user的操作权限由应用自己决定，如果user的操作最终过不去，这里放过也没关系
+                            assert(node === tree && realLegalPaths.length === 0);  // user不可能是非根结点
+                            realLegalPaths.push({
+                                id: 'temp',
+                                paths: [''],
+                                $$createAt$$: 1,
+                                $$updateAt$$: 1,
+                                $$seq$$: 'temp',
+                                destEntity: 'user',
+                                deActions: [node.action],
+                            });
+                        }
                         return checkChildren();
                     }
                     if (process.env.NODE_ENV === 'development') {
