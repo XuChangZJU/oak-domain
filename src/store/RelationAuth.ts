@@ -647,7 +647,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         actionAuths: ED['actionAuth']['Schema'][],
         context: Cxt,
     ) {
-        const filters = actionAuths.map(
+        const filters = actionAuths.filter(
+            ele => ele.destEntity === entity
+        ).map(
             (ele) => {
                 const { paths, relation, relationId } = ele;
                 if (relationId) {
