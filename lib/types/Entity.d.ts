@@ -57,7 +57,9 @@ export declare type Selection<A extends ReadOnlyAction, D extends Projection, F 
     action?: A;
     data: D;
     sorter?: S;
-} & FilterPart<A, F>;
+} & FilterPart<A, F> & {
+    randomRange?: number;
+};
 export interface EntityShape {
     id: PrimaryKey;
     $$seq$$: Sequence;

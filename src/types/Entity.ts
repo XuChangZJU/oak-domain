@@ -71,7 +71,9 @@ export type Selection<A extends ReadOnlyAction,
         action?: A;
         data: D;
         sorter?: S;
-    } & FilterPart<A, F>;
+    } & FilterPart<A, F> & {
+        randomRange?: number;
+    };
 
 export interface EntityShape {
     id: PrimaryKey;
