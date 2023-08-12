@@ -8,15 +8,17 @@ import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 export declare type OpSchema = EntityShape & {
     module: String<64>;
-    position: String<256>;
-    languange: String<32>;
+    position: String<188>;
+    namespace: String<256>;
+    language: String<32>;
     data: Object;
 };
 export declare type OpAttr = keyof OpSchema;
 export declare type Schema = EntityShape & {
     module: String<64>;
-    position: String<256>;
-    languange: String<32>;
+    position: String<188>;
+    namespace: String<256>;
+    language: String<32>;
     data: Object;
     modiEntity$entity?: Array<ModiEntity.Schema>;
     modiEntity$entity$$aggr?: AggregationResult<ModiEntity.Schema>;
@@ -32,7 +34,8 @@ declare type AttrFilter = {
     $$updateAt$$: Q_DateValue;
     module: Q_StringValue;
     position: Q_StringValue;
-    languange: Q_StringValue;
+    namespace: Q_StringValue;
+    language: Q_StringValue;
     data: Object;
     modiEntity$entity: ModiEntity.Filter & SubQueryPredicateMetadata;
     operEntity$entity: OperEntity.Filter & SubQueryPredicateMetadata;
@@ -47,7 +50,8 @@ export declare type Projection = {
     $$seq$$?: number;
     module?: number;
     position?: number;
-    languange?: number;
+    namespace?: number;
+    language?: number;
     data?: number | Object;
     modiEntity$entity?: ModiEntity.Selection & {
         $entity: "modiEntity";
@@ -78,7 +82,9 @@ export declare type SortAttr = {
 } | {
     position: number;
 } | {
-    languange: number;
+    namespace: number;
+} | {
+    language: number;
 } | {
     [k: string]: any;
 } | OneOf<ExprOp<OpAttr | string>>;

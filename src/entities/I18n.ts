@@ -4,8 +4,9 @@ import { EntityDesc } from '../types/EntityDesc';
 
 export interface Schema extends EntityShape {
     module: String<64>;
-    position: String<256>;
-    languange: String<32>;
+    position: String<188>;
+    namespace: String<256>;
+    language: String<32>;
     data: Object;
 };
 
@@ -16,7 +17,8 @@ const entityDesc: EntityDesc<Schema> = {
             attr: {
                 module: '模块',
                 position: '文件位置',
-                languange: '语言',
+                namespace: '命名空间',
+                language: '语言',
                 data: '数据'
             },
         },
