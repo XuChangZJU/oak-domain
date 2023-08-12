@@ -27,7 +27,7 @@ export const ACTION_CONSTANT_IN_OAK_DOMAIN = (level = 2) => {
 
 // export const OUTPUT_PATH = 'app-domain/entities';
 
-export const RESERVED_ENTITY_NAMES = ['Schema', 'Filter', 'Query', 'SubQuery', 'Entity', 'Selection', 'Operation', 'File', 'Common', 
+export const RESERVED_ENTITY_NAMES = ['Schema', 'Filter', 'Query', 'SubQuery', 'Entity', 'Selection', 'Operation', 'File', 'Common', 'Config', 'Configuration',
 'Locale', 'Projection', 'Data'];
 export const ENTITY_NAME_MAX_LENGTH = 32;
 export const STRING_LITERAL_MAX_LENGTH = 24;

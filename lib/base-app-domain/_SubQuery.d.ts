@@ -1,4 +1,5 @@
 import * as ActionAuth from "./ActionAuth/Schema";
+import * as I18n from "./I18n/Schema";
 import * as Modi from "./Modi/Schema";
 import * as ModiEntity from "./ModiEntity/Schema";
 import * as Oper from "./Oper/Schema";
@@ -15,6 +16,15 @@ export declare type ActionAuthIdSubQuery = {
         entity: "operEntity";
     }) | (ActionAuth.ActionAuthIdSubQuery & {
         entity: "actionAuth";
+    }) | any;
+};
+export declare type I18nIdSubQuery = {
+    [K in "$in" | "$nin"]?: (ModiEntity.I18nIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.I18nIdSubQuery & {
+        entity: "operEntity";
+    }) | (I18n.I18nIdSubQuery & {
+        entity: "i18n";
     }) | any;
 };
 export declare type ModiIdSubQuery = {

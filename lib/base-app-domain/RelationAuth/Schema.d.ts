@@ -1,8 +1,10 @@
-import { String, ForeignKey } from "../../types/DataType";
+import { ForeignKey } from "../../types/DataType";
 import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
+import { String } from "../../types/DataType";
+import { EntityShape } from "../../types/Entity";
 import * as Relation from "../Relation/Schema";
 import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
@@ -104,18 +106,18 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "sourceR
     sourceRelationId?: never;
     sourceRelation: Relation.CreateSingleOperation;
 } | {
-    sourceRelationId: String<64>;
+    sourceRelationId: ForeignKey<"sourceRelation">;
     sourceRelation?: Relation.UpdateOperation;
 } | {
-    sourceRelationId: String<64>;
+    sourceRelationId: ForeignKey<"sourceRelation">;
 }) & ({
     destRelationId?: never;
     destRelation: Relation.CreateSingleOperation;
 } | {
-    destRelationId: String<64>;
+    destRelationId: ForeignKey<"destRelation">;
     destRelation?: Relation.UpdateOperation;
 } | {
-    destRelationId: String<64>;
+    destRelationId: ForeignKey<"destRelation">;
 })) & {
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
     operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
@@ -134,7 +136,7 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "sourceR
     sourceRelationId?: never;
 } | {
     sourceRelation?: never;
-    sourceRelationId?: String<64> | null;
+    sourceRelationId?: ForeignKey<"sourceRelation"> | null;
 }) & ({
     destRelation: Relation.CreateSingleOperation;
     destRelationId?: never;
@@ -146,7 +148,7 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "sourceR
     destRelationId?: never;
 } | {
     destRelation?: never;
-    destRelationId?: String<64> | null;
+    destRelationId?: ForeignKey<"destRelation"> | null;
 })) & {
     [k: string]: any;
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;

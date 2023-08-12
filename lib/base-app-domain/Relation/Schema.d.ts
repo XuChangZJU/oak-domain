@@ -1,8 +1,9 @@
-import { String } from "../../types/DataType";
 import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
+import { String } from "../../types/DataType";
+import { EntityShape } from "../../types/Entity";
 import * as ActionAuth from "../ActionAuth/Schema";
 import * as RelationAuth from "../RelationAuth/Schema";
 import * as UserEntityGrant from "../UserEntityGrant/Schema";

@@ -1,8 +1,10 @@
-import { String, ForeignKey } from "../../types/DataType";
+import { ForeignKey } from "../../types/DataType";
 import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
 import { Action, ParticularAction } from "./Action";
+import { String } from "../../types/DataType";
+import { EntityShape } from "../../types/Entity";
 import * as Relation from "../Relation/Schema";
 import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
@@ -98,10 +100,10 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity"
     relationId?: never;
     relation: Relation.CreateSingleOperation;
 } | {
-    relationId: String<64>;
+    relationId: ForeignKey<"relation">;
     relation?: Relation.UpdateOperation;
 } | {
-    relationId: String<64>;
+    relationId: ForeignKey<"relation">;
 })) & ({
     entity?: string;
     entityId?: string;
@@ -124,7 +126,7 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "relatio
     relationId?: never;
 } | {
     relation?: never;
-    relationId?: String<64> | null;
+    relationId?: ForeignKey<"relation"> | null;
 })) & {
     [k: string]: any;
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;

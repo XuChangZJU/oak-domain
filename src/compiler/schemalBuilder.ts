@@ -560,24 +560,21 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
             if (entityImported) {
                 referencedSchemas.push(entityImported);
             }
-            else if (!process.env.COMPLING_IN_DOMAIN && !relativePath?.startsWith(LIB_OAK_DOMAIN)) {
-                /**import了domain以外的其它定义类型，需要被复制到生成的Schema文件中
-                 * 这里必须注意，1、假设了domain当中定义的几个entity不会引用其它文件上的定义（除了type里的那些通用类型，默认都会被输出到文件中）
-                 * 2、假设了其它项目文件不会引用domain当中除了type通用类型之外的其它内容，否则不会被输出到文件中
-                 * 这里主要是对import的处理比较粗略，日后有需要的时候再精修
-                */
+            else {
                 const { moduleSpecifier, importClause } = node;
-                if (ts.isStringLiteral(moduleSpecifier) && !moduleSpecifier.text.startsWith(LIB_OAK_DOMAIN)) {
-                    // 编译后的路径默认要深一层
-                    const moduleSpecifier2Text = relativePath
+                if (ts.isStringLiteral(moduleSpecifier)) {
+                    const { text } = moduleSpecifier;
+                    // 和数据类型相关的会自动引入，这里忽略（见initialStatements）
+                    // 如果是相对路径，编译后的路径默认要深一层
+                    const moduleSpecifier2Text = text.startsWith('.') ? (relativePath
                         ? PathLib.join(
                             relativePath,
-                            moduleSpecifier.text
+                            text
                         ).replace(/\\/g, '/')
-                        : PathLib.join('..', moduleSpecifier.text).replace(
-                            /\\/g,
-                            '/'
-                        );
+                        : PathLib.join(
+                            '..',
+                            text
+                        ).replace(/\\/g, '/')) : text;
                     additionalImports.push(
                         factory.updateImportDeclaration(
                             node,
@@ -588,6 +585,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                             undefined
                         )
                     );
+                }
+                else {
+                    assert(false, '未处理的import方式');
                 }
             }
         }
@@ -1723,7 +1723,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                     case 'Image':
                     case 'File': {
                         if (ReversePointerRelations[entity] && attrName === 'entity') {
-                            type2 =factory.createTypeReferenceNode(
+                            type2 = factory.createTypeReferenceNode(
                                 factory.createIdentifier('Q_EnumValue'),
                                 [
                                     factory.createUnionTypeNode(
@@ -3009,7 +3009,7 @@ function constructFullAttrs(statements: Array<ts.Statement>, entity: string) {
 
 }
 
-function constructActions(statements: Array<ts.Statement>, entity: string) {
+function constructOperations(statements: Array<ts.Statement>, entity: string) {
     // Selection
     statements.push(
         factory.createTypeAliasDeclaration(
@@ -3223,8 +3223,8 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                             factory.createIdentifier(`${one[1]}Id`),
                             undefined,
                             factory.createTypeReferenceNode(
-                                factory.createIdentifier("String"),
-                                [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
+                                factory.createIdentifier("ForeignKey"),
+                                [factory.createLiteralTypeNode(factory.createStringLiteral(one[1]))]
                             )
                         ),
                         factory.createPropertySignature(
@@ -3244,8 +3244,8 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                             factory.createIdentifier(`${one[1]}Id`),
                             one[2] ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
                             factory.createTypeReferenceNode(
-                                factory.createIdentifier("String"),
-                                [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
+                                factory.createIdentifier("ForeignKey"),
+                                [factory.createLiteralTypeNode(factory.createStringLiteral(one[1]))]
                             )
                         )
                     ]
@@ -3344,8 +3344,8 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                             factory.createIdentifier('entityId'),
                             undefined,           // 反向指针好像不能为空，以后或许会有特例  by Xc
                             factory.createTypeReferenceNode(
-                                factory.createIdentifier("String"),
-                                [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
+                                factory.createIdentifier("ForeignKey"),
+                                [factory.createLiteralTypeNode(factory.createStringLiteral(one))]
                             )
                         ),
                         factory.createPropertySignature(
@@ -3372,8 +3372,8 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                             factory.createIdentifier('entityId'),
                             entityIdQuestionToken,
                             factory.createTypeReferenceNode(
-                                factory.createIdentifier("String"),
-                                [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
+                                factory.createIdentifier("ForeignKey"),
+                                [factory.createLiteralTypeNode(factory.createStringLiteral(one))]
                             )
                         )
                     ]
@@ -3770,8 +3770,8 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                             factory.createUnionTypeNode(
                                 [
                                     factory.createTypeReferenceNode(
-                                        factory.createIdentifier("String"),
-                                        [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
+                                        factory.createIdentifier("ForeignKey"),
+                                        [factory.createLiteralTypeNode(factory.createStringLiteral(one[1]))]
                                     ),
                                     factory.createLiteralTypeNode(factory.createNull())
                                 ]
@@ -3946,8 +3946,14 @@ function constructActions(statements: Array<ts.Statement>, entity: string) {
                             factory.createUnionTypeNode(
                                 [
                                     factory.createTypeReferenceNode(
-                                        factory.createIdentifier("String"),
-                                        [factory.createLiteralTypeNode(factory.createNumericLiteral("64"))]
+                                        factory.createIdentifier("ForeignKey"),
+                                        [factory.createUnionTypeNode(
+                                            ReversePointerRelations[entity].map(
+                                                ele => factory.createLiteralTypeNode(
+                                                    factory.createStringLiteral(ele)
+                                                )
+                                            )
+                                        )]
                                     ),
                                     factory.createLiteralTypeNode(factory.createNull())
                                 ]
@@ -4630,77 +4636,12 @@ const initialStatements = () => [
                     factory.createImportSpecifier(
                         false,
                         undefined,
-                        factory.createIdentifier('String')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Int')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Uint')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Float')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Double')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Boolean')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Text')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Datetime')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('File')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Price')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Image')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
                         factory.createIdentifier('PrimaryKey')
                     ),
                     factory.createImportSpecifier(
                         false,
                         undefined,
                         factory.createIdentifier('ForeignKey')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('Geo')
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier('SingleGeo')
                     ),
                     factory.createImportSpecifier(
                         false,
@@ -4860,11 +4801,6 @@ const initialStatements = () => [
                     false,
                     factory.createIdentifier("MakeAction"),
                     factory.createIdentifier("OakMakeAction")
-                ),
-                factory.createImportSpecifier(
-                    false,
-                    undefined,
-                    factory.createIdentifier("EntityShape")
                 ),
                 factory.createImportSpecifier(
                     false,
@@ -5098,28 +5034,29 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     localActions.push(s);
                 }
                 else if (actionDefNames.includes(firstLetterLowerCase(a.slice(0, a.length - 6)))) {
-                    const { moduleSpecifier } = importedFrom[a] as ts.ImportDeclaration;
-                    statements.push(
-                        factory.createImportDeclaration(
-                            undefined,
-                            undefined,
-                            factory.createImportClause(
-                                false,
-                                undefined,
-                                factory.createNamedImports(
-                                    [
-                                        factory.createImportSpecifier(
-                                            false,
-                                            undefined,
-                                            factory.createIdentifier(s)
-                                        )
-                                    ]
-                                )
-                            ),
-                            moduleSpecifier,
-                            undefined
-                        )
-                    );
+                    // 现在源文件中的import语句保留下来了
+                    // const { moduleSpecifier } = importedFrom[a] as ts.ImportDeclaration;
+                    // statements.push(
+                    //     factory.createImportDeclaration(
+                    //         undefined,
+                    //         undefined,
+                    //         factory.createImportClause(
+                    //             false,
+                    //             undefined,
+                    //             factory.createNamedImports(
+                    //                 [
+                    //                     factory.createImportSpecifier(
+                    //                         false,
+                    //                         undefined,
+                    //                         factory.createIdentifier(s)
+                    //                     )
+                    //                 ]
+                    //             )
+                    //         ),
+                    //         moduleSpecifier,
+                    //         undefined
+                    //     )
+                    // );
                 }
             }
             statements.push(
@@ -5229,7 +5166,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         constructFilter(statements, entity);
         constructProjection(statements, entity);
         constructSorter(statements, entity);
-        constructActions(statements, entity);
+        constructOperations(statements, entity);
         constructQuery(statements, entity);
         // 现在FullAttrs和NativeAttrs似乎没什么用，还会引起递归
         // constructFullAttrs(statements, entity);
