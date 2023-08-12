@@ -11,3 +11,4 @@ export declare const NUMERICAL_LITERL_DEFAULT_PRECISION = 8;
 export declare const NUMERICAL_LITERL_DEFAULT_SCALE = 2;
 export declare const INT_LITERL_DEFAULT_WIDTH = 4;
 export declare const SYSTEM_RESERVE_ENTITIES: string[];
+export declare const OAK_EXTERNAL_LIBS_FILEPATH: (path: string) => string;

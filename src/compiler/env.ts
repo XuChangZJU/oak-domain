@@ -1,3 +1,4 @@
+import Path from 'path';
 export const LIB_OAK_DOMAIN = 'oak-domain';
 const LIB_OAK_GENERAL_BUSINESS = 'oak-general-business';
 export const LIB_PATH = () => 'lib';
@@ -38,3 +39,8 @@ export const INT_LITERL_DEFAULT_WIDTH = 4;
 // 暂放在这儿
 export const SYSTEM_RESERVE_ENTITIES = ['user', 'relation', 'oper', 'operEntity', 'modi', 'modiEntity',
     'userRelation', 'actionAuth', 'relationAuth', 'relation', 'userEntityGrant'];
+
+// 项目依赖的第三方oak lib配置文件所在的固定路径
+export const OAK_EXTERNAL_LIBS_FILEPATH = (path: string) => {
+    return Path.join(path, 'config/oakExternalLib.json');
+}
