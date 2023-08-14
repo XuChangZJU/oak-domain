@@ -36,9 +36,6 @@ const entityDesc: EntityDesc<Schema> = {
                     name: 'relation',
                 },
             ],
-            config: {
-                unique: true,
-            },
         },
     ],
 };
