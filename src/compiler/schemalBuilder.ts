@@ -345,7 +345,7 @@ const OriginActionDict = {
     'appendOnly': 'AppendOnlyAction',
     'readOnly': 'ReadOnlyAction',
 };
-function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program, sourceFile: ts.SourceFile, hasRelationDef?: boolean) {
+function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program, sourceFile: ts.SourceFile) {
     const actionTexts = genericActions.map(
         ele => ele
     );
@@ -776,44 +776,10 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     ),
                     sourceFile!
                 );
-                const actionDefNodes = [
-                    factory.createTypeReferenceNode(
-                        OriginActionDict[actionType as keyof typeof OriginActionDict],
-                        undefined
-                    ),
-                    factory.createTypeReferenceNode(
-                        'ParticularAction',
-                        undefined
-                    )
-                ] as ts.TypeNode[];
-                if (moduleName === 'User') {
-                    actionDefNodes.push(
-                        factory.createTypeReferenceNode(
-                            'RelationAction',
-                            undefined
-                        )
-                    );
-                }
-                if (process.env.COMPLING_AS_LIB) {
-                    actionDefNodes.push(
-                        factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-                    );
-                }
-                pushStatementIntoActionAst(
-                    moduleName,
-                    factory.createTypeAliasDeclaration(
-                        undefined,
-                        [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-                        factory.createIdentifier("Action"),
-                        undefined,
-                        factory.createUnionTypeNode(actionDefNodes)
-                    ),
-                    sourceFile!
-                );
-                dealWithActions(moduleName, filename, node.type, program, sourceFile!, !!hasRelationDef || moduleName === 'User');
+                
+                dealWithActions(moduleName, filename, node.type, program, sourceFile!);
             }
             else if (node.name.text === 'Relation') {
-                assert(!hasActionDef, `【${filename}】action定义须在Relation之后`);
                 assert(!localeDef, `【${filename}】locale定义须在Relation之后`);
                 const relationValues = [] as string[];
                 if (ts.isLiteralTypeNode(node.type)) {
@@ -831,68 +797,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         }
                     ));
                 }
-
-                // 增加userXXX对象的描述(todo 这里后面要删掉，现在是为了编译通过)
-                /* const entityLc = firstLetterLowerCase(moduleName);
-                const relationEntityName = `User${moduleName}`;
-                const relationSchemaAttrs: ts.TypeElement[] = [
-                    factory.createPropertySignature(
-                        undefined,
-                        factory.createIdentifier("user"),
-                        undefined,
-                        factory.createTypeReferenceNode(
-                            factory.createIdentifier("User"),
-                            undefined
-                        )
-                    ),
-                    factory.createPropertySignature(
-                        undefined,
-                        factory.createIdentifier(entityLc),
-                        undefined,
-                        factory.createTypeReferenceNode(
-                            factory.createIdentifier(moduleName),
-                            undefined
-                        )
-                    ),
-                    factory.createPropertySignature(
-                        undefined,
-                        factory.createIdentifier('relation'),
-                        undefined,
-                        factory.createTypeReferenceNode(
-                            factory.createIdentifier("Relation"),
-                            undefined
-                        )
-                    ),
-                ];
-                assign(Schema, {
-                    [relationEntityName]: {
-                        schemaAttrs: relationSchemaAttrs,
-                        sourceFile,
-                        enumAttributes: {
-                            relation: relationValues,
-                        },
-                        actionType: 'excludeUpdate',
-                        additionalImports: [
-                            factory.createImportDeclaration(
-                                undefined,
-                                undefined,
-                                factory.createImportClause(
-                                    false,
-                                    undefined,
-                                    factory.createNamedImports([factory.createImportSpecifier(
-                                        false,
-                                        undefined,
-                                        factory.createIdentifier("Relation")
-                                    )])
-                                ),
-                                factory.createStringLiteral(`../${moduleName}/Schema`),
-                                undefined
-                            )
-                        ],
-                    },
-                });
-                addRelationship(relationEntityName, 'User', 'user', true);
-                addRelationship(relationEntityName, moduleName, entityLc, true); */
 
                 // 对UserEntityGrant对象，建立相应的反指关系
                 if (ReversePointerRelations['UserEntityGrant']) {
@@ -1164,7 +1068,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 localeDef = declaration;
             };
             const dealWithConfiguration = (declaration: ts.ObjectLiteralExpression) => {
-                assert(!hasActionDef, `${moduleName}中的Configuration定义在Action之后`);
+                // assert(!hasActionDef, `${moduleName}中的Configuration定义在Action之后`);
                 const { properties } = declaration;
                 const atProperty = properties.find(
                     ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'actionType'
@@ -1281,6 +1185,44 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
             );
         }
     });
+
+    // 要等configuration确定了actionType后再处理
+    if (hasActionDef) {        
+        const actionDefNodes = [
+            factory.createTypeReferenceNode(
+                OriginActionDict[actionType as keyof typeof OriginActionDict],
+                undefined
+            ),
+            factory.createTypeReferenceNode(
+                'ParticularAction',
+                undefined
+            )
+        ] as ts.TypeNode[];
+        if (moduleName === 'User') {
+            actionDefNodes.push(
+                factory.createTypeReferenceNode(
+                    'RelationAction',
+                    undefined
+                )
+            );
+        }
+        if (process.env.COMPLING_AS_LIB) {
+            actionDefNodes.push(
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+            );
+        }
+        pushStatementIntoActionAst(
+            moduleName,
+            factory.createTypeAliasDeclaration(
+                undefined,
+                [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                factory.createIdentifier("Action"),
+                undefined,
+                factory.createUnionTypeNode(actionDefNodes)
+            ),
+            sourceFile!
+        );
+    }
 
     if (!hasActionDef && hasActionOrStateDef) {
         throw new Error(`${filename}中有Action或State定义，但没有定义完整的Action类型`);
