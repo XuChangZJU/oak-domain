@@ -62,7 +62,7 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         }
 
         const message = response.headers.get('oak-message');
-        const responseType = response.headers.get('Content-Type');
+        const responseType = response.headers.get('Content-Type') || response.headers.get('content-type');
         if (responseType?.toLocaleLowerCase().match(/application\/json/i)) {
             const {
                 exception,
