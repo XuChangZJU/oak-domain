@@ -156,14 +156,6 @@ export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "entity"
     entity: "actionAuth";
     entityId: ForeignKey<"ActionAuth">;
 } | {
-    entity?: never;
-    entityId?: never;
-    i18n: I18n.CreateSingleOperation;
-} | {
-    entity: "i18n";
-    entityId: ForeignKey<"I18n">;
-    i18n: I18n.UpdateOperation;
-} | {
     entity: "i18n";
     entityId: ForeignKey<"I18n">;
 } | {
@@ -240,10 +232,6 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity"
     entityId?: never;
     entity?: never;
 } | {
-    i18n?: I18n.CreateSingleOperation | I18n.UpdateOperation | I18n.RemoveOperation;
-    entityId?: never;
-    entity?: never;
-} | {
     relation?: Relation.CreateSingleOperation | Relation.UpdateOperation | Relation.RemoveOperation;
     entityId?: never;
     entity?: never;
@@ -272,8 +260,6 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity"
 export declare type UpdateOperation = OakOperation<"update" | string, UpdateOperationData, Filter, Sorter>;
 export declare type RemoveOperationData = {} & ({
     actionAuth?: ActionAuth.UpdateOperation | ActionAuth.RemoveOperation;
-} | {
-    i18n?: I18n.UpdateOperation | I18n.RemoveOperation;
 } | {
     relation?: Relation.UpdateOperation | Relation.RemoveOperation;
 } | {

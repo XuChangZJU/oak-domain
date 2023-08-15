@@ -1,7 +1,7 @@
 import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
-import { GenericAction } from "../../actions/action";
+import { ReadOnlyAction } from "../../actions/action";
 import { String } from "../../types/DataType";
 import { EntityShape } from "../../types/Entity";
 import * as ModiEntity from "../ModiEntity/Schema";
@@ -116,7 +116,7 @@ export declare type I18nIdSubQuery = Selection<I18nIdProjection>;
 export declare type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;
-    Action: OakMakeAction<GenericAction> | string;
+    Action: OakMakeAction<ReadOnlyAction> | string;
     Selection: Selection;
     Aggregation: Aggregation;
     Operation: Operation;

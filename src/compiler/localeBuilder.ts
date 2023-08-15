@@ -5,7 +5,7 @@ import { join } from 'path';
 import { v4 } from 'uuid';
 import fs from 'fs';
 import { OAK_EXTERNAL_LIBS_FILEPATH } from './env';
-import { unescapeUnicode } from '../utils/string';
+import { firstLetterLowerCase, unescapeUnicode } from '../utils/string';
 
 /**
  * 将一个object展开编译为一棵语法树，只有string和object两种键值对象
@@ -193,9 +193,9 @@ export default class LocaleBuilder {
     }
 
     private parseFile(module: string, namespace: string, position: string, filename: string, filepath: string, watch?: boolean) {
-        const language = filename.split('.')[0];
+        const language = (filename.split('.')[0]).replace('_', '-');            // 历史原因，会命名成zh_CN.json
         const data = require(filepath);
-        const ns = `${module}-${namespace}`;
+        const ns = module ? `${module}-${namespace}` : firstLetterLowerCase(namespace);
         this.locales[ns] = [module, position, language, data];
 
         if (watch) {
@@ -217,8 +217,9 @@ export default class LocaleBuilder {
                     this.parseFile(module, nsPrefix, position, file, filepath, watch);
                 }
                 else if (stat.isDirectory() && !inLocale) {
+                    const nsPrefix2 = nsPrefix ? `${nsPrefix}-${file}` : file;
                     const isLocaleFolder = file === localeFolderName;
-                    this.traverse(module, isLocaleFolder ? nsPrefix : `${nsPrefix}-${file}`, isLocaleFolder ? position : join(position, file), join(dirPath, file), isLocaleFolder, localeFolderName, watch);
+                    this.traverse(module, isLocaleFolder ? nsPrefix : nsPrefix2, isLocaleFolder ? position : join(position, file), join(dirPath, file), isLocaleFolder, localeFolderName, watch);
                 }
             }
         );
@@ -228,11 +229,11 @@ export default class LocaleBuilder {
         const packageJson = join(root, 'package.json');
         const { name } = require(packageJson);
         const pagePath = join(src ? 'src' : 'lib', 'pages');
-        this.traverse(name, 'p', 'pages', join(root, pagePath), false, 'locales', watch);
+        this.traverse(name, 'p', pagePath, join(root, pagePath), false, 'locales', watch);
         const componentPath = join(src ? 'src' : 'lib', 'components');
-        this.traverse(name, 'c', 'components', join(root, componentPath), false, 'locales', watch);
+        this.traverse(name, 'c', componentPath, join(root, componentPath), false, 'locales', watch);
 
-        const localePath = join(src ? 'src' : 'lib', 'locales');
+        const localePath = join(root, src ? 'src' : 'lib', 'locales');
         if (fs.existsSync(localePath)) {
             const files = fs.readdirSync(localePath);
             files.forEach(
@@ -240,10 +241,38 @@ export default class LocaleBuilder {
                     const filepath = join(localePath, file);
                     const stat = fs.statSync(filepath);
                     if (stat.isDirectory()) {
-                        this.traverse(name, `l-${file}`, join('locales', file), join(root, localePath, file), true, file, watch);
+                        this.traverse(name, `l-${file}`, join('locales', file), join(localePath, file), true, file, watch);
                     }
                 }
             );
+        }
+
+        if (!this.asLib && src) {
+            // 不是lib的话将oak-app-domain中的对象的locale也收集起来
+            const domainPath = join(root, 'src', 'oak-app-domain');
+            if (fs.existsSync(domainPath)) {
+                this.traverse('', '', 'oak-app-domain', domainPath, false, 'locales', watch);
+            }
+
+            // 还有web和wechatMp的目录            
+            const webSrcPath = join('web', 'src');
+            this.traverse(name, 'w', webSrcPath, join(root, webSrcPath), false, 'locales', watch);
+
+            // 小程序可能有多于一个，按规范用wechatMp, wechatMp2这样命名
+            const wechatMpSrcPath = join('wechatMp', 'src');
+            this.traverse(name, 'wmp', wechatMpSrcPath, join(root, webSrcPath), false, 'locales', watch);
+            let iter = 1;
+            while (true) {
+                const mpSrcPath = `${wechatMpSrcPath}${iter}`;
+                if (fs.existsSync(join(root, mpSrcPath))) {
+                    this.traverse(name, `wmp${iter}`, mpSrcPath, join(root, mpSrcPath), false, 'locales', watch);
+                    iter++;
+                }
+                else {
+                    break;
+                }
+            }
+
         }
     }
 

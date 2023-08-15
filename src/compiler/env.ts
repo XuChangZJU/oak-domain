@@ -38,7 +38,7 @@ export const INT_LITERL_DEFAULT_WIDTH = 4;
 
 // 暂放在这儿
 export const SYSTEM_RESERVE_ENTITIES = ['user', 'relation', 'oper', 'operEntity', 'modi', 'modiEntity',
-    'userRelation', 'actionAuth', 'relationAuth', 'relation', 'userEntityGrant'];
+    'userRelation', 'actionAuth', 'relationAuth', 'relation', 'userEntityGrant', 'i18n'];
 
 // 项目依赖的第三方oak lib配置文件所在的固定路径
 export const OAK_EXTERNAL_LIBS_FILEPATH = (path: string) => {
