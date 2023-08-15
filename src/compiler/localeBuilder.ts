@@ -196,12 +196,12 @@ export default class LocaleBuilder {
         const language = (filename.split('.')[0]).replace('_', '-');            // 历史原因，会命名成zh_CN.json
         const data = require(filepath);
         const ns = module ? `${module}-${namespace}` : firstLetterLowerCase(namespace);
-        this.locales[ns] = [module, position, language, data];
+        this.locales[ns] = [module, position.replace(/\\/g, '/'), language, data];
 
         if (watch) {
             fs.watch(filepath, () => {
                 const data = require(filepath);
-                this.locales[ns] = [module, position, language, data];
+                this.locales[ns] = [module, position.replace(/\\/g, '/'), language, data];
                 this.outputDataFile();
             });
         }
