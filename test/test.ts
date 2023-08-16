@@ -1,5 +1,7 @@
-import merge from 'lodash/merge';
+import { createHash } from 'crypto';
 
-console.log(
-    merge([{ a: 1 }, { a: 2 }], [null, { b: 2 }])
-);
+const hash = createHash('md5');
+
+hash.update('oak-frontend-base-c-list-columnSetting-zh-CN9999999999999999999-adab');
+const v = hash.digest('hex');
+console.log(v, v.length);

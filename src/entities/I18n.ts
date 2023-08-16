@@ -23,6 +23,22 @@ const entityDesc: EntityDesc<Schema> = {
             },
         },
     },
+    indexes: [
+        {
+            name: 'namespace-language',
+            attributes: [
+                {
+                    name: 'namespace',
+                },
+                {
+                    name: 'language',
+                }
+            ],
+            config: {
+                unique: true,
+            },
+        }
+    ],
     configuration: {
         actionType: 'readOnly',
         static: true,

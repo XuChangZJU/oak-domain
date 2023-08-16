@@ -2,7 +2,7 @@ import assert from 'assert';
 import * as ts from 'typescript';
 const { factory } = ts;
 import { join } from 'path';
-import { v4 } from 'uuid';
+import { Hash, createHash } from 'crypto';
 import fs from 'fs';
 import { OAK_EXTERNAL_LIBS_FILEPATH } from './env';
 import { firstLetterLowerCase, unescapeUnicode } from '../utils/string';
@@ -41,6 +41,7 @@ export default class LocaleBuilder {
     dependencies: string[];
     pwd: string;
     locales: Record<string, [string, string, string, object]>;      // key: namespace, value: [module, position, language, data]
+    hash: Hash;
 
     constructor(asLib?: boolean) {
         const pwd = process.cwd();
@@ -54,6 +55,7 @@ export default class LocaleBuilder {
             this.dependencies = [];
         }
         this.locales = {};
+        this.hash = createHash('md5');
     }
 
     /**
@@ -112,11 +114,17 @@ export default class LocaleBuilder {
                             Object.keys(this.locales).map(
                                 (k) => {
                                     const [module, position, language, data] = this.locales[k];
+
+                                    // 用哈希计算来保证id唯一性
+                                    this.hash.update(`${k}-${language}`);
+                                    const id = this.hash.copy().digest('hex');
+                                    assert(id.length <= 36);
+
                                     return factory.createObjectLiteralExpression(
                                         [
                                             factory.createPropertyAssignment(
                                                 factory.createIdentifier("id"),
-                                                factory.createStringLiteral(v4())
+                                                factory.createStringLiteral(id)
                                             ),
                                             factory.createPropertyAssignment(
                                                 factory.createIdentifier("namespace"),
