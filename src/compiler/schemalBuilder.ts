@@ -6317,7 +6317,7 @@ export function registerIgnoredForeignKeyMap(map: Record<string, string[]>) {
     IGNORED_FOREIGN_KEY_MAP = map;
 }
 
-export function registerFreeEntites(
+export function registerFreeEntities(
     selectFreeEntities: string[] = [],
     createFreeEntities: string[] = [],
     updateFreeEntities: string[] = []) {
