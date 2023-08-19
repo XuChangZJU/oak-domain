@@ -776,7 +776,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     ),
                     sourceFile!
                 );
-                
+
                 dealWithActions(moduleName, filename, node.type, program, sourceFile!);
             }
             else if (node.name.text === 'Relation') {
@@ -1187,7 +1187,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     });
 
     // 要等configuration确定了actionType后再处理
-    if (hasActionDef) {        
+    if (hasActionDef) {
         const actionDefNodes = [
             factory.createTypeReferenceNode(
                 OriginActionDict[actionType as keyof typeof OriginActionDict],
@@ -6308,6 +6308,8 @@ let IGNORED_FOREIGN_KEY_MAP: Record<string, string[]> = {};
 let IGNORED_RELATION_PATH_MAP: Record<string, string[]> = {};
 let DEDUCED_RELATION_MAP: Record<string, string> = {};
 let SELECT_FREE_ENTITIES: string[] = [];
+let CREATE_FREE_ENTITIES: string[] = [];
+let UPDATE_FREE_ENTITIES: string[] = [];
 let FIXED_DESTINATION_PATH_MAP: Record<string, string[]> = {};
 let FIXED_FOR_ALL_DESTINATION_PATH_ENTITIES: string[] = [];
 
@@ -6315,8 +6317,13 @@ export function registerIgnoredForeignKeyMap(map: Record<string, string[]>) {
     IGNORED_FOREIGN_KEY_MAP = map;
 }
 
-export function registerSelectFreeEntities(entities: string[]) {
-    SELECT_FREE_ENTITIES = entities;
+export function registerFreeEntites(
+    selectFreeEntities: string[] = [],
+    createFreeEntities: string[] = [],
+    updateFreeEntities: string[] = []) {
+    SELECT_FREE_ENTITIES = selectFreeEntities;
+    CREATE_FREE_ENTITIES = createFreeEntities;
+    UPDATE_FREE_ENTITIES = updateFreeEntities;
 }
 
 export function registerIgnoredRelationPathMap(map: Record<string, string[]>) {
@@ -6512,11 +6519,6 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
                         false,
                         undefined,
                         factory.createIdentifier("AuthDeduceRelationMap")
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier("SelectFreeEntities")
                     )
                 ])
             ),
@@ -6697,15 +6699,77 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
                 [factory.createVariableDeclaration(
                     factory.createIdentifier("selectFreeEntities"),
                     undefined,
-                    factory.createTypeReferenceNode(
-                        factory.createIdentifier("SelectFreeEntities"),
-                        [factory.createTypeReferenceNode(
-                            factory.createIdentifier("EntityDict"),
-                            undefined
-                        )]
+                    factory.createArrayTypeNode(
+                        factory.createParenthesizedType(
+                            factory.createTypeOperatorNode(
+                                ts.SyntaxKind.KeyOfKeyword,
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier("EntityDict"),
+                                    undefined
+                                )
+                            )
+                        )
                     ),
                     factory.createArrayLiteralExpression(
                         SELECT_FREE_ENTITIES.map(
+                            ele => factory.createStringLiteral(ele)
+                        ),
+                        false
+                    )
+                )],
+                ts.NodeFlags.Const
+            )
+        ),
+        factory.createVariableStatement(
+            [
+                factory.createToken(ts.SyntaxKind.ExportKeyword)
+            ],
+            factory.createVariableDeclarationList(
+                [factory.createVariableDeclaration(
+                    factory.createIdentifier("updateFreeEntities"),
+                    undefined,
+                    factory.createArrayTypeNode(
+                        factory.createParenthesizedType(
+                            factory.createTypeOperatorNode(
+                                ts.SyntaxKind.KeyOfKeyword,
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier("EntityDict"),
+                                    undefined
+                                )
+                            )
+                        )
+                    ),
+                    factory.createArrayLiteralExpression(
+                        UPDATE_FREE_ENTITIES.map(
+                            ele => factory.createStringLiteral(ele)
+                        ),
+                        false
+                    )
+                )],
+                ts.NodeFlags.Const
+            )
+        ),
+        factory.createVariableStatement(
+            [
+                factory.createToken(ts.SyntaxKind.ExportKeyword)
+            ],
+            factory.createVariableDeclarationList(
+                [factory.createVariableDeclaration(
+                    factory.createIdentifier("createFreeEntities"),
+                    undefined,
+                    factory.createArrayTypeNode(
+                        factory.createParenthesizedType(
+                            factory.createTypeOperatorNode(
+                                ts.SyntaxKind.KeyOfKeyword,
+                                factory.createTypeReferenceNode(
+                                    factory.createIdentifier("EntityDict"),
+                                    undefined
+                                )
+                            )
+                        )
+                    ),
+                    factory.createArrayLiteralExpression(
+                        CREATE_FREE_ENTITIES.map(
                             ele => factory.createStringLiteral(ele)
                         ),
                         false

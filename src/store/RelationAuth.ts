@@ -41,17 +41,23 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     static SPECIAL_ENTITIES = SYSTEM_RESERVE_ENTITIES;
 
     private selectFreeEntities: (keyof ED)[];
+    private createFreeEntities: (keyof ED)[];
+    private updateFreeEntities: (keyof ED)[];
 
 
     constructor(schema: StorageSchema<ED>,
         actionCascadePathGraph: AuthCascadePath<ED>[],
         relationCascadePathGraph: AuthCascadePath<ED>[],
         authDeduceRelationMap: AuthDeduceRelationMap<ED>,
-        selectFreeEntities: (keyof ED)[]) {
+        selectFreeEntities: (keyof ED)[],
+        createFreeEntities: (keyof ED)[] = [],
+        updateFreeEntities: (keyof ED)[] = []) {
         this.actionCascadePathGraph = actionCascadePathGraph;
         this.relationCascadePathGraph = relationCascadePathGraph;
         this.schema = schema;
         this.selectFreeEntities = selectFreeEntities;
+        this.createFreeEntities = createFreeEntities;
+        this.updateFreeEntities = updateFreeEntities;
         this.authDeduceRelationMap = Object.assign({}, authDeduceRelationMap, {
             modi: 'entity',
         });
@@ -1195,11 +1201,18 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         operation: Omit<ED[T]['Operation'], 'id'>,
         context: Cxt,
     ) {
+        const { action, filter, data } = operation;
+        if (action === 'create' && this.createFreeEntities.includes(entity)) {
+            return true;
+        }
+        else if (action === 'update' && this.updateFreeEntities.includes(entity)) {
+            return true;
+        }
         const userId = context.getCurrentUserId();
         if (!userId) {
             throw new OakUnloggedInException();
         }
-        if (!operation.filter && (!operation.data || operation.action !== 'create')) {
+        if (!filter && (!data || action !== 'create')) {
             if (process.env.NODE_ENV === 'development') {
                 console.warn('operation不能没有限制条件', operation);
             }
