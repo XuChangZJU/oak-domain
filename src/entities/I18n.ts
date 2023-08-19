@@ -25,7 +25,7 @@ const entityDesc: EntityDesc<Schema> = {
     },
     indexes: [
         {
-            name: 'namespace-language',
+            name: 'namespace_language',
             attributes: [
                 {
                     name: 'namespace',
