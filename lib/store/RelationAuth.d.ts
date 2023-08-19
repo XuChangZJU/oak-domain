@@ -12,7 +12,7 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
     private selectFreeEntities;
     private createFreeEntities;
     private updateFreeEntities;
-    constructor(schema: StorageSchema<ED>, actionCascadePathGraph: AuthCascadePath<ED>[], relationCascadePathGraph: AuthCascadePath<ED>[], authDeduceRelationMap: AuthDeduceRelationMap<ED>, selectFreeEntities: (keyof ED)[], createFreeEntities?: (keyof ED)[], updateFreeEntities?: (keyof ED)[]);
+    constructor(schema: StorageSchema<ED>, actionCascadePathGraph: AuthCascadePath<ED>[], relationCascadePathGraph: AuthCascadePath<ED>[], authDeduceRelationMap: AuthDeduceRelationMap<ED>, selectFreeEntities: (keyof ED)[], createFreeEntities: (keyof ED)[], updateFreeEntities: (keyof ED)[]);
     checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): void;
     /**
      * 查询当前用户在对应entity上可以操作的relationIds
