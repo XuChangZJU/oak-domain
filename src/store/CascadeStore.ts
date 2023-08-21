@@ -39,7 +39,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         );
         
         // 这个设计每次都要取actionAuth的数据，感觉不是很优雅。by Xc 20230722
-        if (noRelationDestEntities.length > 0 && !option.dontCollect) {
+        // 这个设计废除了，前台页面自己来取需要的actionAUth，通过cache的缓存和KeepFresh机制来减少对后台数据的访问
+        /* if (noRelationDestEntities.length > 0 && !option.dontCollect) {
             rewriterPromises.push(
                 context.select('actionAuth', {
                     data: {
@@ -59,7 +60,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     },
                 }, {}) as any
             );
-        }
+        } */
 
         if (rewriterPromises.length > 0) {
             await Promise.all(rewriterPromises);
@@ -199,7 +200,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         const toBeAssignNode2: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
         const projectionNodeDict: Record<string, ED[keyof ED]['Selection']['data']> = {};
         const checkProjectionNode = (entity2: keyof ED, projectionNode: ED[keyof ED]['Selection']['data']) => {
-            const necessaryAttrs: string[] = ['id', '$$createAt$$']; // 有的页面依赖于其它页面取数据，有时两个页面的filter的差异会导致有一个加createAt，有一个不加，此时可能产生前台取数据不完整的异常。先统一加上
+            const necessaryAttrs: string[] = ['id', '$$createAt$$', '$$updateAt$$']; // 有的页面依赖于其它页面取数据，有时两个页面的filter的差异会导致有一个加createAt，有一个不加，此时可能产生前台取数据不完整的异常。先统一加上
             for (const attr in projectionNode) {
                 if (attr === '#id') {
                     assert(!projectionNodeDict[projectionNode[attr]!], `projection中结点的id有重复, ${projectionNode[attr]}`);
@@ -303,16 +304,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         id: 1,
                                         name: 1,
                                         display: 1,
-                                        actionAuth$relation: {
-                                            $entity: 'actionAuth',
-                                            data: {
-                                                id: 1,
-                                                deActions: 1,
-                                                destEntity: 1,
-                                                paths: 1,
-                                                relationId: 1,
-                                            },
-                                        }
                                     }
                                 },
                                 filter: {

@@ -73,6 +73,7 @@ function addFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyo
             if (f.hasOwnProperty('$or')) {
                 // 如果有or是无法优化的，直接作为一个整体加入$and
                 addIntoAnd(f);
+                return;
             }
             for (const attr in f) {
                 if (attr === '$and') {

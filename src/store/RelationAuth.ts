@@ -49,15 +49,15 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         actionCascadePathGraph: AuthCascadePath<ED>[],
         relationCascadePathGraph: AuthCascadePath<ED>[],
         authDeduceRelationMap: AuthDeduceRelationMap<ED>,
-        selectFreeEntities: (keyof ED)[],
-        createFreeEntities: (keyof ED)[],
-        updateFreeEntities: (keyof ED)[]) {
+        selectFreeEntities?: (keyof ED)[],
+        createFreeEntities?: (keyof ED)[],
+        updateFreeEntities?: (keyof ED)[]) {
         this.actionCascadePathGraph = actionCascadePathGraph;
         this.relationCascadePathGraph = relationCascadePathGraph;
         this.schema = schema;
-        this.selectFreeEntities = selectFreeEntities;
-        this.createFreeEntities = createFreeEntities;
-        this.updateFreeEntities = updateFreeEntities;
+        this.selectFreeEntities = selectFreeEntities || [];
+        this.createFreeEntities = createFreeEntities || [];
+        this.updateFreeEntities = updateFreeEntities || [];
         this.authDeduceRelationMap = Object.assign({}, authDeduceRelationMap, {
             modi: 'entity',
         });
