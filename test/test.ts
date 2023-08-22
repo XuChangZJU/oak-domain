@@ -2,6 +2,12 @@ import { createHash } from 'crypto';
 
 const hash = createHash('md5');
 
-hash.update('oak-frontend-base-c-list-columnSetting-zh-CN9999999999999999999-adab');
-const v = hash.digest('hex');
+let h = hash.copy();
+h.update('oak-frontend-base-c-list-columnSetting-zh-CN9999999999999999999-adab');
+let v = h.digest('hex');
+console.log(v, v.length);
+
+h = hash.copy();
+h.update('oak-frontend-base-c-list-columnSetting-zh-CN9999999999999999999-adab');
+v = h.digest('hex');
 console.log(v, v.length);

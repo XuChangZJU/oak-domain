@@ -116,8 +116,9 @@ export default class LocaleBuilder {
                                     const [module, position, language, data] = this.locales[k];
 
                                     // 用哈希计算来保证id唯一性
-                                    this.hash.update(`${k}-${language}`);
-                                    const id = this.hash.copy().digest('hex');
+                                    const h = this.hash.copy();
+                                    h.update(`${k}-${language}`);
+                                    const id = h.digest('hex');
                                     assert(id.length <= 36);
 
                                     return factory.createObjectLiteralExpression(
