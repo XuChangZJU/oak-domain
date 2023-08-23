@@ -860,7 +860,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             const allEntities: (keyof ED)[] = deducedEntityFilters.map(ele => ele.entity);
             const allActions = uniq(deducedEntityFilters.map(ele => ele.actions).flat());
 
-            // todo 这里其实可以在查询条件里通过userRelation过滤一次，但问题不大
             const actionAuths = context.select('actionAuth', {
                 data: {
                     id: 1,
@@ -889,20 +888,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     deActions: {
                         $overlaps: allActions,
                     },
-                    $or: [
-                        {
-                            relation: {
-                                userRelation$relation: {
-                                    userId: context.getCurrentUserId(),
-                                },
-                            }
-                        },
-                        {
-                            relationId: {
-                                $exists: false,
-                            },
-                        }
-                    ]
                 }
             }, { dontCollect: true });
 
