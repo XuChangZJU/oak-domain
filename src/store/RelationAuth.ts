@@ -905,21 +905,21 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 return aas;
             };
 
+            /**
+             * 搜索判定是否允许自建对象，自建的条件是 path = ''，destEntity === entity
+             * @param actionAuths 
+             * @returns 
+             */
             const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['Schema'][]) => {
                 if (userRelations) {
+                    assert(action === 'create');
                     const ars = actionAuths.filter(
                         (ar) => !!userRelations.find(
                             (ur) => ur.relationId === ar.relationId
-                        )
+                        ) && ar.paths.includes('') && ar.destEntity === entity
                     );
 
                     if (ars.length > 0) {
-                        // 这里能找到actionAuth，其必然是本对象上的授权
-                        // 下面这个看不懂，跑到了再说
-                        // assert(!ars.find(
-                        //     ele => ele.path !== '' || ele.destEntity !== entity
-                        // ));
-                        console.log('跑到你要看的代码了');
                         return ars;
                     }
                 }
