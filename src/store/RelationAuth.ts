@@ -574,45 +574,47 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 const { paths, relation, relationId } = ele;
 
                 // 在cache中，可能出现relation外键指向的对象为null的情况，要容错
-                if (relation) {
-                    const { userRelation$relation: userRelations } = relation;
-                    if (userRelations!.length > 0) {
-                        const entityIds = uniq(userRelations!.map(ele => ele.entityId));
-                        const idFilter = entityIds.length > 1 ? {
-                            $in: entityIds,
-                        } : entityIds[0];
-                        assert(idFilter);
-                        const pathFilters = paths.map(
-                            (path) => {
-                                if (path) {
-                                    return set({}, path, {
-                                        id: idFilter,
-                                    });
-                                }
-                                return {
-                                    id: idFilter,
-                                };
-                            }
-                        );
-
-                        // 这里是或关系，只要对象落在任意一条路径上就可以
-                        const contained = combineFilters(entity, context.getSchema(), pathFilters, true);
-                        const contains = checkFilterContains(entity, context, contained, filter, true)
-                        if (contains instanceof Promise) {
-                            return contains.then(
-                                (c) => {
-                                    if (c) {
-                                        return ele;
+                if (relationId) {
+                    if (relation) {
+                        const { userRelation$relation: userRelations } = relation;
+                        if (userRelations!.length > 0) {
+                            const entityIds = uniq(userRelations!.map(ele => ele.entityId));
+                            const idFilter = entityIds.length > 1 ? {
+                                $in: entityIds,
+                            } : entityIds[0];
+                            assert(idFilter);
+                            const pathFilters = paths.map(
+                                (path) => {
+                                    if (path) {
+                                        return set({}, path, {
+                                            id: idFilter,
+                                        });
                                     }
-                                    return;
+                                    return {
+                                        id: idFilter,
+                                    };
                                 }
-                            )
+                            );
+    
+                            // 这里是或关系，只要对象落在任意一条路径上就可以
+                            const contained = combineFilters(entity, context.getSchema(), pathFilters, true);
+                            const contains = checkFilterContains(entity, context, contained, filter, true)
+                            if (contains instanceof Promise) {
+                                return contains.then(
+                                    (c) => {
+                                        if (c) {
+                                            return ele;
+                                        }
+                                        return;
+                                    }
+                                )
+                            }
+    
+                            if (contains) {
+                                return ele;
+                            }
+                            return;
                         }
-
-                        if (contains) {
-                            return ele;
-                        }
-                        return;
                     }
                     return;
                 }
