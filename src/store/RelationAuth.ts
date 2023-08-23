@@ -572,8 +572,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         return actionAuths.map(
             (ele) => {
                 const { paths, relation, relationId } = ele;
-                if (relationId) {
-                    assert(relation);
+
+                // 在cache中，可能出现relation外键指向的对象为null的情况，要容错
+                if (relation) {
                     const { userRelation$relation: userRelations } = relation;
                     if (userRelations!.length > 0) {
                         const entityIds = uniq(userRelations!.map(ele => ele.entityId));
