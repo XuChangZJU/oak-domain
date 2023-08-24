@@ -790,7 +790,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         }
                     ]
                 }
-            }, { dontCollect: true });
+            }, { dontCollect: true, ignoreForeignKeyMiss: true });
 
             /**
              * 返回的结果中，第一层为leafNode，必须全通过，第二层为单个leafNode上的deduce，通过一个就可以
@@ -892,7 +892,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         $overlaps: allActions,
                     },
                 }
-            }, { dontCollect: true });
+            }, { dontCollect: true, ignoreForeignKeyMiss: true });
 
             const getActionAuths = (result: (ED['actionAuth']['Schema'] | undefined)[][]) => {
                 const aas: ED['actionAuth']['Schema'][] = [];

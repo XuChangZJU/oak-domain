@@ -32,6 +32,7 @@ export type SelectOption = {
     obscure?: boolean;      // 如果为置为true，则在filter过程中因数据不完整而不能判断为真的时候都假设为真（前端缓存专用）
     forUpdate?: true;
     includedDeleted?: true; // 是否包含删除行的信息
+    ignoreForeignKeyMiss?: true;        // 作为cache时是否允许外键缺失
     dummy?: 1;           // 无用，为了继承Option通过编译
 };
 
