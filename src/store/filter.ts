@@ -133,11 +133,22 @@ function addFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyo
                 }
             );
         }
-        else {        
-            const unioned = unionFilterSegment(oneToManyFilters[attr][0][0], schema, ...filters2);
-            addSingleAttr(attr, Object.assign(unioned!, {
-                ['#sqp']: sqpOps[0],
-            }));
+        else {
+            const sqpOp = sqpOps[0];
+            if (sqpOp === 'not in') {
+                // not in 在此变成or查询
+                const unioned = unionFilterSegment(oneToManyFilters[attr][0][0], schema, ...filters2);
+                addSingleAttr(attr, Object.assign(unioned!, {
+                    ['#sqp']: sqpOp,
+                }));
+            }
+            else {
+                assert (sqpOp === 'in');        // all 和 not all暂时不会出现
+                const combined = addFilterSegment(oneToManyFilters[attr][0][0], schema, ...filters2);
+                addSingleAttr(attr, Object.assign(combined!, {
+                    ['#sqp']: sqpOp,
+                }));
+            }
         }
     }
 
@@ -395,11 +406,24 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
                     if (justTry) {
                         return true;
                     }
-                    Object.assign(f1, {
-                        [pca1]: Object.assign(addFilterSegment(rel[0], schema, f1[pca1], f2[pca2])!, {
-                            ['#sqp']: sqpOp1,
-                        })
-                    });
+
+                    if (sqpOp1 === 'in') {
+                        Object.assign(f1, {
+                            [pca1]: Object.assign(unionFilterSegment(rel[0], schema, f1[pca1], f2[pca2])!, {
+                                ['#sqp']: sqpOp1,
+                            })
+                        });                        
+
+                    }
+                    else {
+                        // not in情况子查询变成and
+                        assert(sqpOp1 === 'not in');        // all和not all暂时不支持
+                        Object.assign(f1, {
+                            [pca1]: Object.assign(addFilterSegment(rel[0], schema, f1[pca1], f2[pca2])!, {
+                                ['#sqp']: sqpOp1,
+                            })
+                        });
+                    }
                 }
             }
         }

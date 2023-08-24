@@ -275,10 +275,11 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 const updateActions = this.schema[deduceEntity].actions.filter(
                     (a) => !excludeActions.includes(a)
                 );
-                if (!RelationAuth.SPECIAL_ENTITIES.includes(deduceEntity as string)) {
+                /* if (!RelationAuth.SPECIAL_ENTITIES.includes(deduceEntity as string)) {
                     return this.getDeducedEntityFilters(deduceEntity, deduceFilter, actions[0] === 'select' ? actions : updateActions, context);
                 }
-                return [];
+                return []; */
+                return this.getDeducedEntityFilters(deduceEntity, deduceFilter, actions[0] === 'select' ? actions : updateActions, context);
             };
 
             if (deduceEntity && deduceFilter) {
@@ -469,11 +470,11 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         };
 
         const destructInner = <T2 extends keyof ED>(
-            entity: T2, 
-            operation: Omit<ED[T2]['Operation'], 'id'>, 
+            entity: T2,
+            operation: Omit<ED[T2]['Operation'], 'id'>,
             // extraFilter?: ED[T2]['Selection']['filter'],
-            path?: string, 
-            child?: OperationTree<ED>, 
+            path?: string,
+            child?: OperationTree<ED>,
             hasParent?: true): OperationTree<ED> => {
             const { action, data, filter } = operation;
             const filter2 = action === 'create' ? makeCreateFilter(entity, operation as Omit<ED[T]['CreateSingle'], 'id'>) : filter;
@@ -595,7 +596,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     };
                                 }
                             );
-    
+
                             // 这里是或关系，只要对象落在任意一条路径上就可以
                             const contained = combineFilters(entity, context.getSchema(), pathFilters, true);
                             const contains = checkFilterContains(entity, context, contained, filter, true)
@@ -609,7 +610,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                     }
                                 )
                             }
-    
+
                             if (contains) {
                                 return ele;
                             }
@@ -990,6 +991,43 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
         return dealWithDeducedEntityFilters(deducedEntityFilters2);
     }
+
+    /* private checkOperationTree2<Cxt extends AsyncContext<ED> | SyncContext<ED>>(tree: OperationTree<ED>, context: Cxt) {
+        const checkNode = (node: OperationTree<ED>, parentAuths?: ED['actionAuth']['OpSchema'][], parentPath?: string) => {
+            const { entity, action } = node;
+            // 先根据parent传下来的合法auths来搜寻，只需要查找actionAuth，降低开销
+            if (parentAuths && parentAuths.length > 0) {
+                assert(parentPath);
+
+                const childAuthss = parentAuths.map(
+                    (ele) => {
+                        const { paths, relationId } = ele;
+                        const paths2 = paths.map(
+                            (path) => path ? `${parentPath}.${path}` : parentPath
+                        );
+                        return context.select('actionAuth', {
+                            data: {
+                                id: 1,
+                            },
+                            filter: {
+                                paths: {
+                                    $overlaps: paths2,
+                                },
+                                destEntity: entity as string,
+                                deActions: {
+                                    $overlaps: childActions,
+                                },
+                                relationId: relationId || {
+                                    $exists: false,
+                                },
+                            }
+                        }, { dontCollect: true })
+                    }
+                )
+
+            }
+        };
+    } */
 
     private checkOperationTree<Cxt extends AsyncContext<ED> | SyncContext<ED>>(tree: OperationTree<ED>, context: Cxt) {
         const actionAuths2 = this.findActionAuthsOnNode(tree, context);
