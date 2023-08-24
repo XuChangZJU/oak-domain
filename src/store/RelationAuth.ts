@@ -876,7 +876,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
          * @returns 
          */
         const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['OpSchema'][]) => {
-            if (userRelations) {
+            if (userRelations && userRelations.length > 0) {
                 assert(action === 'create');
                 const ars = actionAuths.filter(
                     (ar) => !!userRelations.find(
