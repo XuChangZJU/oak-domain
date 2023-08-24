@@ -556,21 +556,20 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     }
 
     /**
-     * 定位到了当前用户所有可能的actionAuth，对单条actionAuth加以判断，找到可以满足当前操作的actionAuth
+     * 对所有满足操作要求的actionAuth加以判断，找到可以满足当前用户身份的actionAuth
      * @param entity 
      * @param filter 
      * @param actionAuths 
      * @param context 
-     * @return  string代表用户获得授权的relationId，空字符串代表通过userId赋权，false代表失败
+     * @return
      */
     private filterActionAuths<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
         entity: T,
         filter: ED[T]['Selection']['filter'],
         actionAuths: ED['actionAuth']['Schema'][],
         context: Cxt,
-        actions: ED[T]['Action'][],
     ) {
-        return actionAuths.map(
+        const result = actionAuths.map(
             (ele) => {
                 const { paths, relation, relationId } = ele;
 
@@ -641,6 +640,18 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 }
             }
         );
+
+        if (result.find(ele => ele instanceof Promise)) {
+            return Promise.all(result).then(
+                (r2) => r2.filter(
+                    ele => !!ele
+                ) as ED['actionAuth']['Schema'][]
+            );
+        }
+
+        return result.filter(
+            ele => !!ele
+        ) as ED['actionAuth']['Schema'][];
     }
 
     /**
@@ -846,141 +857,167 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         }[][]);
     }
 
+    /**
+     * 此函数判定一个结点是否能通过权限检测，同时寻找该结点本身对象上成立的actionAuth，用于本结点子孙结点的快速检测
+     * 如果结点因其deduce的对象通过了检测，其被推断对象的actionAuth无法用于更低对象的权限检测
+     * @param node 
+     * @param context 
+     * @returns 
+     */
     private findActionAuthsOnNode<Cxt extends AsyncContext<ED> | SyncContext<ED>>(node: OperationTree<ED>, context: Cxt) {
         const { entity, filter, action, userRelations } = node;
 
-        if (RelationAuth.SPECIAL_ENTITIES.includes(entity as string)) {
-            // 特殊对象不用查询
-            return [];
-        }
-
         const deducedEntityFilters2 = this.getDeducedEntityFilters(entity, filter, [action], context);
 
+
+        /**
+         * 搜索判定是否允许自建对象，自建的条件是 path = ''，destEntity === entity
+         * @param actionAuths 
+         * @returns 
+         */
+        const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['OpSchema'][]) => {
+            if (userRelations) {
+                assert(action === 'create');
+                const ars = actionAuths.filter(
+                    (ar) => !!userRelations.find(
+                        (ur) => ur.relationId === ar.relationId
+                    ) && ar.paths.includes('') && ar.destEntity === entity
+                );
+
+                if (ars.length > 0) {
+                    return ars;
+                }
+            }
+        };
+
+
+        const actionAuthOnEntities: ED['actionAuth']['Schema'][] = [];
         const dealWithDeducedEntityFilters = (deducedEntityFilters: {
             entity: keyof ED;
             filter: ED[keyof ED]['Selection']['filter'];
             actions: ED[keyof ED]['Action'][];
         }[]) => {
-            const allEntities: (keyof ED)[] = deducedEntityFilters.map(ele => ele.entity);
-            const allActions = uniq(deducedEntityFilters.map(ele => ele.actions).flat());
+            const specialEntities = deducedEntityFilters.filter(
+                ele => RelationAuth.SPECIAL_ENTITIES.includes(ele.entity as string)
+            );
+            const unspecicalEntities = deducedEntityFilters.filter(
+                ele => !RelationAuth.SPECIAL_ENTITIES.includes(ele.entity as string)
+            );
 
-            const actionAuths = context.select('actionAuth', {
-                data: {
-                    id: 1,
-                    paths: 1,
-                    destEntity: 1,
-                    deActions: 1,
-                    relation: {
+            const result: (boolean | Promise<boolean>)[] = [];
+            if (specialEntities.length > 0) {
+                // 对special对象，直接判定create应该问题不大，否则写起来太烦琐
+                result.push(
+                    ...specialEntities.map(
+                        ele => this.checkOperateSpecialEntities2(ele.entity, 'create', ele.filter, context)
+                    )
+                );
+            }
+            if (unspecicalEntities.length > 0) {
+                const allEntities: (keyof ED)[] = unspecicalEntities.map(ele => ele.entity);
+                const allActions = uniq(unspecicalEntities.map(ele => ele.actions).flat());
+
+                const actionAuths2 = context.select('actionAuth', {
+                    data: {
                         id: 1,
-                        userRelation$relation: {
-                            $entity: 'userRelation',
-                            data: {
-                                id: 1,
-                                entity: 1,
-                                entityId: 1,
-                            },
-                            filter: {
-                                userId: context.getCurrentUserId(),
+                        paths: 1,
+                        destEntity: 1,
+                        deActions: 1,
+                        relation: {
+                            id: 1,
+                            userRelation$relation: {
+                                $entity: 'userRelation',
+                                data: {
+                                    id: 1,
+                                    entity: 1,
+                                    entityId: 1,
+                                },
+                                filter: {
+                                    userId: context.getCurrentUserId(),
+                                },
                             },
                         },
                     },
-                },
-                filter: {
-                    destEntity: {
-                        $in: allEntities as string[],
-                    },
-                    deActions: {
-                        $overlaps: allActions,
-                    },
-                }
-            }, { dontCollect: true, ignoreForeignKeyMiss: true });
-
-            const getActionAuths = (result: (ED['actionAuth']['Schema'] | undefined)[][]) => {
-                const aas: ED['actionAuth']['Schema'][] = [];
-                result.forEach(
-                    (ele) => ele.forEach(
-                        (ele2) => {
-                            if (!!ele2) {
-                                aas.push(ele2);
-                            }
-                        }
-                    )
-                );
-                return aas;
-            };
-
-            /**
-             * 搜索判定是否允许自建对象，自建的条件是 path = ''，destEntity === entity
-             * @param actionAuths 
-             * @returns 
-             */
-            const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['Schema'][]) => {
-                if (userRelations) {
-                    assert(action === 'create');
-                    const ars = actionAuths.filter(
-                        (ar) => !!userRelations.find(
-                            (ur) => ur.relationId === ar.relationId
-                        ) && ar.paths.includes('') && ar.destEntity === entity
-                    );
-
-                    if (ars.length > 0) {
-                        return ars;
+                    filter: {
+                        destEntity: {
+                            $in: allEntities as string[],
+                        },
+                        deActions: {
+                            $overlaps: allActions,
+                        },
                     }
-                }
-            };
+                }, { dontCollect: true, ignoreForeignKeyMiss: true });
 
-            if (actionAuths instanceof Promise) {
-                return actionAuths.then(
-                    (ars) => {
-                        const created = findOwnCreateUserRelation(ars as ED['actionAuth']['Schema'][]);
-                        if (created) {
-                            return created;
-                        }
-                        return Promise.all(
-                            deducedEntityFilters.map(
-                                ele => {
-                                    const ars2 = ars.filter(
-                                        ele2 => ele2.destEntity === ele.entity && intersection(ele2.deActions, ele.actions).length > 0     // 这里只要overlap就可以了
-                                    );
-                                    return Promise.all(
-                                        this.filterActionAuths(
-                                            ele.entity,
-                                            ele.filter,
-                                            ars2 as ED['actionAuth']['Schema'][],
-                                            context,
-                                            ele.actions
-                                        )
-                                    );
+                const checkActionAuths = (actionAuths: ED['actionAuth']['Schema'][]) => {
+                    const created = findOwnCreateUserRelation(actionAuths);
+                    if (created) {
+                        actionAuthOnEntities.push(...created);
+                        return true;
+                    }
+
+                    const result = deducedEntityFilters.map(
+                        (ele) => {
+                            const ars2 = actionAuths.filter(
+                                ele2 => ele2.destEntity === ele.entity && intersection(ele2.deActions, ele.actions).length > 0     // 这里只要overlap就可以了
+                            );
+
+                            const ars3 = this.filterActionAuths(ele.entity, ele.filter, ars2, context);
+
+                            const checkFilteredArs = (actionAuths2: ED['actionAuth']['Schema'][]) => {
+                                if (actionAuths2.length > 0) {
+                                    if (ele.entity === entity) {
+                                        actionAuthOnEntities.push(...actionAuths2);
+                                    }
+                                    return true;
                                 }
-                            )
-                        ).then(
-                            (result) => getActionAuths(result)
+                                return false;
+                            };
+                            if (ars3 instanceof Promise) {
+                                return ars3.then(
+                                    (ars4) => checkFilteredArs(ars4)
+                                );
+                            }
+                            return checkFilteredArs(ars3);
+                        }
+                    );
+                    
+                    if (result.find(ele => ele instanceof Promise)) {
+                        return Promise.all(result).then(
+                            (r2) => r2.includes(true)
                         )
                     }
-                )
+                    return result.includes(true);
+                };
+                if (actionAuths2 instanceof Promise) {
+                    result.push(
+                        actionAuths2.then(
+                            (ars2) => checkActionAuths(ars2 as ED['actionAuth']['Schema'][])
+                        )
+                    );
+                }
+                else {
+                    result.push(
+                        checkActionAuths(actionAuths2 as ED['actionAuth']['Schema'][])
+                    );
+                }
             }
 
-            assert(context instanceof SyncContext);
-            const created = findOwnCreateUserRelation(actionAuths as ED['actionAuth']['Schema'][]);
-            if (created) {
-                return created;
-            }
-            return getActionAuths(
-                deducedEntityFilters.map(
-                    ele => {
-                        const ars2 = actionAuths.filter(
-                            ele2 => ele2.destEntity === ele.entity && intersection(ele2.deActions, ele.actions).length > 0     // 这里只要overlap就可以了
-                        );
-                        return this.filterActionAuths(
-                            ele.entity,
-                            ele.filter,
-                            ars2 as ED['actionAuth']['Schema'][],
-                            context,
-                            ele.actions
-                        ) as (ED['actionAuth']['Schema'] | undefined)[];
+            if (result.find(ele => ele instanceof Promise)) {
+                return Promise.all(result).then(
+                    (r2) => {
+                        // r2中只有一个通过就能通过
+                        if (r2.includes(true)) {
+                            return actionAuthOnEntities;
+                        }
+                        return false;
                     }
-                )
-            );
+                );
+            }
+
+            if (result.includes(true)) {
+                return actionAuthOnEntities;
+            }
+            return false;
         };
 
         if (deducedEntityFilters2 instanceof Promise) {
@@ -992,44 +1029,151 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         return dealWithDeducedEntityFilters(deducedEntityFilters2);
     }
 
-    /* private checkOperationTree2<Cxt extends AsyncContext<ED> | SyncContext<ED>>(tree: OperationTree<ED>, context: Cxt) {
-        const checkNode = (node: OperationTree<ED>, parentAuths?: ED['actionAuth']['OpSchema'][], parentPath?: string) => {
-            const { entity, action } = node;
-            // 先根据parent传下来的合法auths来搜寻，只需要查找actionAuth，降低开销
-            if (parentAuths && parentAuths.length > 0) {
-                assert(parentPath);
+    private checkOperationTree2<Cxt extends AsyncContext<ED> | SyncContext<ED>>(tree: OperationTree<ED>, context: Cxt) {
+        const checkNode = (node: OperationTree<ED>, actionAuths?: ED['actionAuth']['OpSchema'][]): boolean | Promise<boolean> => {
+            const checkChildren = (legalPaths: ED['actionAuth']['OpSchema'][]) => {
+                const { children } = node;
+                const childPath = Object.keys(children);
+                if (childPath.length === 0) {
+                    return true;
+                }
 
-                const childAuthss = parentAuths.map(
-                    (ele) => {
-                        const { paths, relationId } = ele;
-                        const paths2 = paths.map(
-                            (path) => path ? `${parentPath}.${path}` : parentPath
-                        );
-                        return context.select('actionAuth', {
-                            data: {
-                                id: 1,
-                            },
-                            filter: {
-                                paths: {
-                                    $overlaps: paths2,
-                                },
-                                destEntity: entity as string,
-                                deActions: {
-                                    $overlaps: childActions,
-                                },
-                                relationId: relationId || {
-                                    $exists: false,
-                                },
+                const childResult = childPath.map(
+                    (childPath) => {
+                        const child = children[childPath];
+                        const childEntity = child instanceof Array ? child[0].entity : child.entity;
+                        // 这里如果该子结点能deduce到父，则直接通过
+                        if (this.authDeduceRelationMap[childEntity]) {
+                            assert(this.authDeduceRelationMap[childEntity] === 'entity');
+                            const rel = judgeRelation(this.schema, childEntity, childPath);
+                            if (rel === 2) {
+                                return true;
                             }
-                        }, { dontCollect: true })
+                        }
+
+                        const pathToParent = childPath.endsWith('$entity') ? node.entity as string : childPath.split('$')[1];
+                        if (child instanceof Array) {
+                            const childActions = child.map(ele => ele.action);
+                            const childLegalAuths = legalPaths.map(
+                                (ele) => {
+                                    const { paths, relationId } = ele;
+                                    const paths2 = paths.map(
+                                        (path) => path ? `${pathToParent}.${path}` : pathToParent
+                                    );
+                                    return context.select('actionAuth', {
+                                        data: {
+                                            id: 1,
+                                        },
+                                        filter: {
+                                            paths: {
+                                                $overlaps: paths2,
+                                            },
+                                            destEntity: childEntity as string,
+                                            deActions: {
+                                                $overlaps: childActions,
+                                            },
+                                            relationId: relationId || {
+                                                $exists: false,
+                                            },
+                                        }
+                                    }, { dontCollect: true })
+                                }
+                            ).flat() as ED['actionAuth']['OpSchema'][] | Promise<ED['actionAuth']['OpSchema']>[];
+                            if (childLegalAuths[0] instanceof Promise) {
+                                return Promise.all(childLegalAuths).then(
+                                    (clas) => child.map(
+                                        (c) => checkNode(c, clas)
+                                    )
+                                )
+                            }
+                            return child.map(
+                                (c) => checkNode(c, childLegalAuths as ED['actionAuth']['OpSchema'][])
+                            );
+                        }
+
+                        const childLegalAuths = legalPaths.map(
+                            (ele) => {
+                                const { paths, relationId } = ele;
+                                const paths2 = paths.map(
+                                    (path) => path ? `${pathToParent}.${path}` : pathToParent
+                                );
+                                return context.select('actionAuth', {
+                                    data: {
+                                        id: 1,
+                                    },
+                                    filter: {
+                                        paths: {
+                                            $overlaps: paths2,
+                                        },
+                                        destEntity: childEntity as string,
+                                        deActions: {
+                                            $overlaps: child.action,
+                                        },
+                                        relationId: relationId || {
+                                            $exists: false,
+                                        },
+                                    }
+                                }, { dontCollect: true })
+                            }
+                        ).flat() as ED['actionAuth']['Schema'][] | Promise<ED['actionAuth']['Schema']>[];
+
+                        if (childLegalAuths[0] instanceof Promise) {
+                            return Promise.all(childLegalAuths).then(
+                                (clas) => checkNode(child, clas.flat())
+                            );
+                        }
+                        return checkNode(child, childLegalAuths as ED['actionAuth']['Schema'][]);
                     }
-                )
+                ).flat();
 
+                if (childResult[0] instanceof Promise) {
+                    return Promise.all(childResult).then(
+                        (r) => !r.includes(false)
+                    );
+                }
+                return !childResult.includes(false);
+            };
+
+            // 先根据parent传下来的合法auths来搜寻，只需要查找actionAuth，降低开销
+            // 这里有可能父结点根据actionAuths能通过，但子结点需要重新搜索父结点上的新actionAuths才能通过吗？应该不存在这种情况。 by Xc 20230824
+            if (actionAuths && actionAuths.length > 0) {
+                return checkChildren(actionAuths);
             }
-        };
-    } */
 
-    private checkOperationTree<Cxt extends AsyncContext<ED> | SyncContext<ED>>(tree: OperationTree<ED>, context: Cxt) {
+            // 没有能根据父亲传下来的actionAuth判定，只能自己找
+            const result = this.findActionAuthsOnNode(node, context);
+
+            const checkResult = (result2: false | ED['actionAuth']['OpSchema'][]) => {
+                if (result2 === false) {
+                    return false;
+                }
+                // 如果是对user对象操作通过，需要增添一条虚假的的actionAuth
+                if (node.entity === 'user') {
+                    result2.push({
+                        id: 'temp',
+                        paths: [''],
+                        $$createAt$$: 1,
+                        $$updateAt$$: 1,
+                        $$seq$$: 'temp',
+                        destEntity: 'user',
+                        deActions: [node.action],
+                    });
+                }
+                return checkChildren(result2);
+            }
+            if (result instanceof Promise) {
+                return result.then(
+                    (r2) => checkResult(r2)
+                );
+            }
+
+            return checkResult(result);
+        };
+        
+        return checkNode(tree);
+    }
+
+    /* private checkOperationTree<Cxt extends AsyncContext<ED> | SyncContext<ED>>(tree: OperationTree<ED>, context: Cxt) {
         const actionAuths2 = this.findActionAuthsOnNode(tree, context);
 
         const checkChildNode = (actionAuths: ED['actionAuth']['Schema'][] | Promise<ED['actionAuth']['Schema'][]>, node: OperationTree<ED>): boolean | Promise<boolean> => {
@@ -1220,7 +1364,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         };
 
         return checkChildNode(actionAuths2, tree);
-    }
+    } */
 
     private checkOperation<T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>(
         entity: T,
@@ -1246,7 +1390,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         }
         const updateTree = this.destructOperation(entity, operation, userId);
 
-        return this.checkOperationTree(updateTree, context);
+        return this.checkOperationTree2(updateTree, context);
     }
 
     /**

@@ -40,12 +40,12 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      */
     private destructOperation;
     /**
-     * 定位到了当前用户所有可能的actionAuth，对单条actionAuth加以判断，找到可以满足当前操作的actionAuth
+     * 对所有满足操作要求的actionAuth加以判断，找到可以满足当前用户身份的actionAuth
      * @param entity
      * @param filter
      * @param actionAuths
      * @param context
-     * @return  string代表用户获得授权的relationId，空字符串代表通过userId赋权，false代表失败
+     * @return
      */
     private filterActionAuths;
     /**
@@ -58,8 +58,15 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      */
     private checkActionAuthInGroup;
     private checkSelection;
+    /**
+     * 此函数判定一个结点是否能通过权限检测，同时寻找该结点本身对象上成立的actionAuth，用于本结点子孙结点的快速检测
+     * 如果结点因其deduce的对象通过了检测，其被推断对象的actionAuth无法用于更低对象的权限检测
+     * @param node
+     * @param context
+     * @returns
+     */
     private findActionAuthsOnNode;
-    private checkOperationTree;
+    private checkOperationTree2;
     private checkOperation;
     /**
      * 检查一个operation是否能被通过权限测试
