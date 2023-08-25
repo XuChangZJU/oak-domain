@@ -155,7 +155,7 @@ let ID_OPTION: GenerateIdOption = {
 
 export async function produceIds() {
     let iter = 0;
-    for (; iter < 128; iter++) {
+    for (; iter < 1024; iter++) {
         ID_BUFFER.push(await generateNewIdAsync());
     }
 }
@@ -171,7 +171,7 @@ export function setGenerateIdOption(option: GenerateIdOption) {
 export function generateNewId() {
     if (ID_BUFFER.length > 0) {
         const id = ID_BUFFER.pop()!;
-        if (ID_BUFFER.length < 64) {
+        if (ID_BUFFER.length < 128) {
             produceIds();
         }
         return id;

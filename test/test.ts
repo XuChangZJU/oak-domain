@@ -1,13 +1,26 @@
-import { createHash } from 'crypto';
+import { groupBy } from '../src/utils/lodash';
 
-const hash = createHash('md5');
+const data = [
+    {
+        id: '113',
+        name: 'xc',
+        gender: 'male',
+    },
+    {
+        id: '123',
+        name: 'zz',
+        gender: 'female',
+    },
+    {
+        id: '1234',
+        name: 'xzw',
+        gender: 'female',
+    },
+    {
+        id: '3321',
+        name: null,
+        gender: null
+    }
+];
 
-let h = hash.copy();
-h.update('oak-frontend-base-c-list-columnSetting-zh-CN9999999999999999999-adab');
-let v = h.digest('hex');
-console.log(v, v.length);
-
-h = hash.copy();
-h.update('oak-frontend-base-c-list-columnSetting-zh-CN9999999999999999999-adab');
-v = h.digest('hex');
-console.log(v, v.length);
+console.log(JSON.stringify(groupBy(data, 'gender')));
