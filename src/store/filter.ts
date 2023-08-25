@@ -398,8 +398,8 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
                 else {
                     assert(rel instanceof Array);
                     // 一对多的子查询，只有子查询的语义算子一样才实施合并
-                    const sqpOp1 = f1[pca1]['#sqp'];
-                    const sqpOp2 = f2[pca1]['#sqp'];
+                    const sqpOp1 = f1[pca1]['#sqp'] || 'in';
+                    const sqpOp2 = f2[pca1]['#sqp'] || 'in';
                     if (sqpOp1 !== sqpOp2) {
                         return false;
                     }
