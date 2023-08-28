@@ -906,10 +906,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
             const result: (boolean | Promise<boolean>)[] = [];
             if (specialEntities.length > 0) {
-                // 对special对象，直接判定create应该问题不大，否则写起来太烦琐
+                // 对于deduce出来的special对象，直接判定create应该问题不大，否则写起来太烦琐（具体情况遇到了再调试）
                 result.push(
                     ...specialEntities.map(
-                        ele => this.checkOperateSpecialEntities2(ele.entity, 'create', ele.filter, context)
+                        ele => this.checkOperateSpecialEntities2(ele.entity, ele.entity === entity ? node.action : 'create', ele.filter, context)
                     )
                 );
             }
