@@ -268,3 +268,9 @@ export type AuthDeduceRelationMap<ED extends EntityDict> = {
 export type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];
 // 一对多的键值的扩展
 export type OtmKey<K extends string> = K | `${K}$${number}`;
+
+export interface SubDataDef<ED extends EntityDict, T extends keyof ED> {
+    id: string;    
+    entity: T,
+    filter: ED[T]['Selection']['filter'],
+};

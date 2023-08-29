@@ -29,38 +29,14 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     private selectionRewriters: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
     private operationRewriters: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
 
-    private async reinforceSelectionAsync<Cxt extends AsyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {        
-        const noRelationDestEntities: string[] = [];
-        
-        this.reinforceSelectionInner(entity, selection, context, noRelationDestEntities);
+    private async reinforceSelectionAsync<Cxt extends AsyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {
+
+
+        this.reinforceSelectionInner(entity, selection, context);
 
         const rewriterPromises = this.selectionRewriters.map(
             ele => ele(this.getSchema(), entity, selection, context)
         );
-        
-        // 这个设计每次都要取actionAuth的数据，感觉不是很优雅。by Xc 20230722
-        // 这个设计废除了，前台页面自己来取需要的actionAUth，通过cache的缓存和KeepFresh机制来减少对后台数据的访问
-        /* if (noRelationDestEntities.length > 0 && !option.dontCollect) {
-            rewriterPromises.push(
-                context.select('actionAuth', {
-                    data: {
-                        id: 1,
-                        deActions: 1,
-                        destEntity: 1,
-                        paths: 1,
-                        relationId: 1,
-                    },
-                    filter: {
-                        relationId: {
-                            $exists: false,
-                        },
-                        destEntity: {
-                            $in: noRelationDestEntities,
-                        },
-                    },
-                }, {}) as any
-            );
-        } */
 
         if (rewriterPromises.length > 0) {
             await Promise.all(rewriterPromises);
@@ -68,21 +44,24 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     }
 
     private reinforceSelectionSync<Cxt extends SyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {
-         this.reinforceSelectionInner(entity, selection, context, []);
+        this.reinforceSelectionInner(entity, selection, context);
 
-        const rewriterPromises = this.selectionRewriters.map(
-            ele => ele(this.getSchema(), entity, selection, context)
+        this.selectionRewriters.forEach(
+            ele => {
+                const result = ele(this.getSchema(), entity, selection, context);
+                assert(!(result instanceof Promise));
+            }
         );
     }
 
     private reinforceSelectionInner<Cxt extends AsyncContext<ED> | SyncContext<ED>, OP extends SelectOption>(
-        entity: keyof ED, 
-        selection: ED[keyof ED]['Selection'], 
-        context: Cxt, 
-        noRelationDestEntities: string[]) {
+        entity: keyof ED,
+        selection: ED[keyof ED]['Selection'],
+        context: Cxt
+    ) {
         const { filter, data, sorter } = selection;
 
-        const checkNode = (projectionNode: ED[keyof ED]['Selection']['data'], attrs: string[]) => {
+        const assignNecessaryProjectionAttrs = (projectionNode: ED[keyof ED]['Selection']['data'], attrs: string[]) => {
             attrs.forEach(
                 (attr) => {
                     if (!projectionNode.hasOwnProperty(attr)) {
@@ -94,102 +73,109 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             );
         };
 
+
+        const checkFilterNode = (
+            entity2: keyof ED,
+            filterNode: ED[keyof ED]['Selection']['filter'],
+            projectionNode: ED[keyof ED]['Selection']['data'],
+            toBeAssignNode: Record<string, string[]>,
+            filterNodeDict: Record<string, ED[keyof ED]['Selection']['data']>) => {
+            const necessaryAttrs: string[] = ['id'];
+            for (const attr in filterNode) {
+                if (attr === '#id') {
+                    assert(!filterNodeDict[filterNode[attr]!], `projection中结点的id有重复, ${filterNode[attr]}`);
+                    Object.assign(filterNodeDict, {
+                        [filterNode[attr]!]: projectionNode,
+                    });
+                    if (toBeAssignNode[filterNode[attr]!]) {
+                        assignNecessaryProjectionAttrs(projectionNode, toBeAssignNode[filterNode[attr]!]);
+                    }
+                }
+                else if (['$and', '$or'].includes(attr)) {
+                    for (const node of filterNode[attr]!) {
+                        checkFilterNode(entity2, node, projectionNode, toBeAssignNode, filterNodeDict);
+                    }
+                }
+                else if (attr === '$not') {
+                    checkFilterNode(entity2, filterNode[attr]!, projectionNode, toBeAssignNode, filterNodeDict);
+                }
+                else if (attr === '$text') {
+                    // 全文检索首先要有fulltext索引，其次要把fulltext的相关属性加到projection里
+                    const { indexes } = this.getSchema()[entity2];
+
+                    const fulltextIndex = indexes!.find(
+                        ele => ele.config && ele.config.type === 'fulltext'
+                    );
+
+                    const { attributes } = fulltextIndex!;
+                    necessaryAttrs.push(...(attributes.map(ele => ele.name as string)));
+                }
+                else {
+                    if (attr.toLowerCase().startsWith(EXPRESSION_PREFIX)) {
+                        const exprResult = getAttrRefInExpression(filterNode[attr]!);
+                        for (const nodeName in exprResult) {
+                            if (nodeName === '#current') {
+                                assignNecessaryProjectionAttrs(projectionNode, exprResult[nodeName]);
+                            }
+                            else if (filterNodeDict[nodeName]) {
+                                assignNecessaryProjectionAttrs(filterNodeDict[nodeName], exprResult[nodeName]);
+                            }
+                            else {
+                                if (toBeAssignNode[nodeName]) {
+                                    toBeAssignNode[nodeName].push(...exprResult[nodeName]);
+                                }
+                                else {
+                                    Object.assign(toBeAssignNode, {
+                                        [nodeName]: exprResult[nodeName],
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        const rel = this.judgeRelation(entity2, attr);
+                        if (rel === 1) {
+                            necessaryAttrs.push(attr);
+                        }
+                        else if (rel === 2) {
+                            // entity/entityId反指
+                            necessaryAttrs.push('entity', 'entityId');
+                            if (!projectionNode[attr]) {
+                                Object.assign(projectionNode, {
+                                    [attr]: {
+                                        id: 1,
+                                    }
+                                });
+                            }
+                            checkFilterNode(attr, filterNode[attr]!, projectionNode[attr], toBeAssignNode, filterNodeDict);
+                        }
+                        else if (typeof rel === 'string') {
+                            necessaryAttrs.push(`${attr}Id`);
+                            if (!projectionNode[attr]) {
+                                Object.assign(projectionNode, {
+                                    [attr]: {
+                                        id: 1,
+                                    }
+                                });
+                            }
+                            checkFilterNode(rel, filterNode[attr]!, projectionNode[attr], toBeAssignNode, filterNodeDict);
+                        }
+                        else if (rel instanceof Array) {
+                            // 子查询，暂时不处理
+                        }
+                    }
+                }
+                assignNecessaryProjectionAttrs(projectionNode, necessaryAttrs);
+            }
+        };
+
         let relevantIds: string[] = [];
         if (filter) {
             const toBeAssignNode: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
             // filter当中所关联到的属性必须在projection中
             const filterNodeDict: Record<string, ED[keyof ED]['Selection']['data']> = {};
-            const checkFilterNode = (entity2: keyof ED, filterNode: ED[keyof ED]['Selection']['filter'], projectionNode: ED[keyof ED]['Selection']['data']) => {
-                const necessaryAttrs: string[] = ['id'];
-                for (const attr in filterNode) {
-                    if (attr === '#id') {
-                        assert(!filterNodeDict[filterNode[attr]!], `projection中结点的id有重复, ${filterNode[attr]}`);
-                        Object.assign(filterNodeDict, {
-                            [filterNode[attr]!]: projectionNode,
-                        });
-                        if (toBeAssignNode[filterNode[attr]!]) {
-                            checkNode(projectionNode, toBeAssignNode[filterNode[attr]!]);
-                        }
-                    }
-                    else if (['$and', '$or'].includes(attr)) {
-                        for (const node of filterNode[attr]!) {
-                            checkFilterNode(entity2, node, projectionNode);
-                        }
-                    }
-                    else if (attr === '$not') {
-                        checkFilterNode(entity2, filterNode[attr]!, projectionNode);
-                    }
-                    else if (attr === '$text') {
-                        // 全文检索首先要有fulltext索引，其次要把fulltext的相关属性加到projection里
-                        const { indexes } = this.getSchema()[entity2];
 
-                        const fulltextIndex = indexes!.find(
-                            ele => ele.config && ele.config.type === 'fulltext'
-                        );
-
-                        const { attributes } = fulltextIndex!;
-                        necessaryAttrs.push(...(attributes.map(ele => ele.name as string)));
-                    }
-                    else {
-                        if (attr.toLowerCase().startsWith(EXPRESSION_PREFIX)) {
-                            const exprResult = getAttrRefInExpression(filterNode[attr]!);
-                            for (const nodeName in exprResult) {
-                                if (nodeName === '#current') {
-                                    checkNode(projectionNode, exprResult[nodeName]);
-                                }
-                                else if (filterNodeDict[nodeName]) {
-                                    checkNode(filterNodeDict[nodeName], exprResult[nodeName]);
-                                }
-                                else {
-                                    if (toBeAssignNode[nodeName]) {
-                                        toBeAssignNode[nodeName].push(...exprResult[nodeName]);
-                                    }
-                                    else {
-                                        Object.assign(toBeAssignNode, {
-                                            [nodeName]: exprResult[nodeName],
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                        else {
-                            const rel = this.judgeRelation(entity2, attr);
-                            if (rel === 1) {
-                                necessaryAttrs.push(attr);
-                            }
-                            else if (rel === 2) {
-                                // entity/entityId反指
-                                necessaryAttrs.push('entity', 'entityId');
-                                if (!projectionNode[attr]) {
-                                    Object.assign(projectionNode, {
-                                        [attr]: {
-                                            id: 1,
-                                        }
-                                    });
-                                }
-                                checkFilterNode(attr, filterNode[attr]!, projectionNode[attr]);
-                            }
-                            else if (typeof rel === 'string') {
-                                necessaryAttrs.push(`${attr}Id`);
-                                if (!projectionNode[attr]) {
-                                    Object.assign(projectionNode, {
-                                        [attr]: {
-                                            id: 1,
-                                        }
-                                    });
-                                }
-                                checkFilterNode(rel, filterNode[attr]!, projectionNode[attr]);
-                            }
-                            else if (rel instanceof Array) {
-                                // 现在filter中还不支持一对多的语义，先放着吧
-                            }
-                        }
-                    }
-                    checkNode(projectionNode, necessaryAttrs);
-                }
-            };
-
-            checkFilterNode(entity, filter, data);
+            checkFilterNode(entity, filter, data, toBeAssignNode, filterNodeDict);
             relevantIds = getRelevantIds(filter);
         }
 
@@ -208,7 +194,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         [projectionNode[attr]!]: projectionNode,
                     });
                     if (toBeAssignNode2[projectionNode[attr]!]) {
-                        checkNode(projectionNode, toBeAssignNode2[projectionNode[attr]!]);
+                        assignNecessaryProjectionAttrs(projectionNode, toBeAssignNode2[projectionNode[attr]!]);
                     }
                 }
                 else {
@@ -216,10 +202,10 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         const exprResult = getAttrRefInExpression(projectionNode[attr]!);
                         for (const nodeName in exprResult) {
                             if (nodeName === '#current') {
-                                checkNode(projectionNode, exprResult[nodeName]);
+                                assignNecessaryProjectionAttrs(projectionNode, exprResult[nodeName]);
                             }
                             else if (projectionNodeDict[nodeName]) {
-                                checkNode(projectionNodeDict[nodeName], exprResult[nodeName]);
+                                assignNecessaryProjectionAttrs(projectionNodeDict[nodeName], exprResult[nodeName]);
                             }
                             else {
                                 if (toBeAssignNode2[nodeName]) {
@@ -248,18 +234,18 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             checkProjectionNode(rel, projectionNode[attr]);
                         }
                         else if (rel instanceof Array && !attr.endsWith('$$aggr')) {
-                            const { data } = projectionNode[attr];
+                            const { data, filter } = projectionNode[attr];
                             if (rel[1]) {
-                                checkNode(data, [rel[1]]);
+                                assignNecessaryProjectionAttrs(data, [rel[1]]);
                             }
                             else {
-                                checkNode(data, ['entity', 'entityId']);
+                                assignNecessaryProjectionAttrs(data, ['entity', 'entityId']);
                             }
-                            this.reinforceSelectionInner(rel[0], projectionNode[attr], context, noRelationDestEntities);
+                            this.reinforceSelectionInner(rel[0], projectionNode[attr], context);
                         }
                     }
                 }
-                checkNode(projectionNode, necessaryAttrs);
+                assignNecessaryProjectionAttrs(projectionNode, necessaryAttrs);
             }
 
             // 如果对象中指向一对多的Modi，此时加上指向Modi的projection
@@ -312,7 +298,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             } as ED['userRelation']['Selection'],
                         });
                     }
-                    noRelationDestEntities.push(entity2 as string);
                 }
             }
         };

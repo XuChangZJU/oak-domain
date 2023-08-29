@@ -190,4 +190,9 @@ export declare type AuthDeduceRelationMap<ED extends EntityDict> = {
 };
 export declare type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];
 export declare type OtmKey<K extends string> = K | `${K}$${number}`;
+export interface SubDataDef<ED extends EntityDict, T extends keyof ED> {
+    id: string;
+    entity: T;
+    filter: ED[T]['Selection']['filter'];
+}
 export {};
