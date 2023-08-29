@@ -26,6 +26,7 @@ function makeContentTypeAndBody(data: any) {
 export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
     static ASPECT_ROUTER = '/aspect';
     static BRIDGE_ROUTER = '/bridge';
+    static SUBSCRIBE_ROUTER = '/subscribe';
     private serverAspectUrl: string;
     private serverBridgeUrl: string;
     private makeException: (exceptionData: any) => OakException<ED>;
@@ -93,6 +94,10 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
 
     getRouter(): string {
         return SimpleConnector.ASPECT_ROUTER;
+    }
+
+    getSubscribeRouter(): string {
+        return SimpleConnector.SUBSCRIBE_ROUTER;
     }
 
     async parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{ name: string; params: any; context: BackCxt; }> {

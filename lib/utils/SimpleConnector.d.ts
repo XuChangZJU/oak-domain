@@ -6,6 +6,7 @@ import { Connector, EntityDict, OakException } from "../types";
 export declare class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
     static ASPECT_ROUTER: string;
     static BRIDGE_ROUTER: string;
+    static SUBSCRIBE_ROUTER: string;
     private serverAspectUrl;
     private serverBridgeUrl;
     private makeException;
@@ -21,6 +22,7 @@ export declare class SimpleConnector<ED extends EntityDict, BackCxt extends Asyn
         opRecords?: undefined;
     }>;
     getRouter(): string;
+    getSubscribeRouter(): string;
     parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{
         name: string;
         params: any;

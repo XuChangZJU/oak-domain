@@ -26,6 +26,8 @@ export abstract class Connector<ED extends EntityDict, BackCxt extends AsyncCont
         headers?: Record<string, any>;
     };
 
+    abstract getSubscribeRouter(): string;
+
     abstract getBridgeRouter(): string;
     
     abstract makeBridgeUrl(url: string, headers?: Record<string, string>): string;
