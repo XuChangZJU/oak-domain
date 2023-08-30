@@ -23,19 +23,38 @@ function makeContentTypeAndBody(data: any) {
     };
 }
 
-export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
+type ServerOption = {
+    protocol: string;
+    hostname: string;
+    port?: number;
+    apiPath?: string;
+};
+
+export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> implements Connector<ED, BackCxt, FrontCxt> {
     static ASPECT_ROUTER = '/aspect';
     static BRIDGE_ROUTER = '/bridge';
     static SUBSCRIBE_ROUTER = '/subscribe';
     private serverAspectUrl: string;
     private serverBridgeUrl: string;
+    private serverSubscribeUrl: string;
+    private option: ServerOption;
     private makeException: (exceptionData: any) => OakException<ED>;
     private contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>;
 
-    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException<ED>, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>) {
-        super();
+    constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>) {
+        this.option = option;
+        const { protocol, hostname, port, apiPath } = option;
+        let serverUrl = `${protocol}${hostname}`;
+        if (typeof port === 'number') {
+            serverUrl += `:${port}`;
+        }
+        if (apiPath) {
+            assert(apiPath.startsWith('/'));
+            serverUrl += apiPath;
+        }
         this.serverAspectUrl = `${serverUrl}${SimpleConnector.ASPECT_ROUTER}`;
         this.serverBridgeUrl = `${serverUrl}${SimpleConnector.BRIDGE_ROUTER}`;
+        this.serverSubscribeUrl = `${serverUrl}${SimpleConnector.SUBSCRIBE_ROUTER}`;
         this.makeException = makeException;
         this.contextBuilder = contextBuilder;
     }
@@ -98,6 +117,36 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
 
     getSubscribeRouter(): string {
         return SimpleConnector.SUBSCRIBE_ROUTER;
+    }
+
+    async getSubscribePoint() {
+        const response = await global.fetch(this.serverSubscribeUrl);
+        if (response.status > 299) {
+            const err = new OakExternalException(`网络请求返回异常，status是${response.status}`);
+            throw err;
+        }
+
+        const message = response.headers.get('oak-message');
+        const responseType = response.headers.get('Content-Type') || response.headers.get('content-type');
+        if (responseType?.toLocaleLowerCase().match(/application\/json/i)) {
+            const {
+                url,
+                path,
+                port,
+            } = await response.json();
+
+            let url2 = url || `${this.option.protocol}${this.option.hostname}`;
+            assert(port);
+            url2 += ':port';
+
+            return {
+                url: url2,
+                path,
+            };
+        }
+        else {
+            throw new Error(`尚不支持的content-type类型${responseType}`);
+        }
     }
 
     async parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{ name: string; params: any; context: BackCxt; }> {
