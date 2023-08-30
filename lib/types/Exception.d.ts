@@ -76,6 +76,11 @@ export declare class OakAttrNotNullException<ED extends EntityDict> extends OakI
 export declare class OakUserUnpermittedException<ED extends EntityDict> extends OakUserException<ED> {
 }
 /**
+ * 用户查询权限不够抛出异常
+ */
+export declare class OakUserInvisibleException<ED extends EntityDict> extends OakUserException<ED> {
+}
+/**
  * 用户未登录抛的异常
  */
 export declare class OakUnloggedInException<ED extends EntityDict> extends OakUserException<ED> {

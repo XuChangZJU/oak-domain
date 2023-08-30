@@ -203,6 +203,14 @@ export class OakUserUnpermittedException<ED extends EntityDict> extends OakUserE
 };
 
 /**
+ * 用户查询权限不够抛出异常
+ */
+export class OakUserInvisibleException<ED extends EntityDict> extends OakUserException<ED> {
+
+};
+
+
+/**
  * 用户未登录抛的异常
  */
 export class OakUnloggedInException<ED extends EntityDict> extends OakUserException<ED> {
@@ -307,6 +315,11 @@ export function makeException<ED extends EntityDict>(data: {
         }
         case 'OakUserUnpermittedException': {
             const e = new OakUserUnpermittedException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
+        }
+        case 'OakUserInvisibleException': {
+            const e = new OakUserInvisibleException(data.message);
             e.setOpRecords(data.opRecords);
             return e;
         }

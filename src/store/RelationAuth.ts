@@ -1,6 +1,6 @@
 import assert from "assert";
 import { EntityDict } from "../base-app-domain";
-import { OakException, OakUniqueViolationException, OakUnloggedInException, OakUserUnpermittedException, StorageSchema } from "../types";
+import { OakException, OakUniqueViolationException, OakUnloggedInException, OakUserInvisibleException, OakUserUnpermittedException, StorageSchema } from "../types";
 import { AuthCascadePath, EntityDict as BaseEntityDict, AuthDeduceRelationMap } from "../types/Entity";
 import { AsyncContext } from "./AsyncRowStore";
 import { checkFilterContains, combineFilters } from "./filter";
@@ -1418,13 +1418,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 return result.then(
                     (r) => {
                         if (!r) {
-                            throw new OakUserUnpermittedException();
+                            throw new OakUserInvisibleException();
                         }
                     }
                 );
             }
             if (!result) {
-                throw new OakUserUnpermittedException();
+                throw new OakUserInvisibleException();
             }
         }
         else {
