@@ -2,7 +2,6 @@ import assert from 'assert';
 import { IncomingHttpHeaders } from "http";
 import { Stream } from 'stream';
 import URL from 'url';
-import { AsyncContext, AsyncRowStore } from '../store/AsyncRowStore';
 import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException, OakExternalException, OpRecord } from "../types";
 
@@ -30,7 +29,7 @@ type ServerOption = {
     apiPath?: string;
 };
 
-export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> implements Connector<ED, BackCxt, FrontCxt> {
+export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext<ED>> implements Connector<ED, FrontCxt> {
     static ASPECT_ROUTER = '/aspect';
     static BRIDGE_ROUTER = '/bridge';
     static SUBSCRIBE_ROUTER = '/subscribe';
@@ -39,9 +38,8 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
     private serverSubscribeUrl: string;
     private option: ServerOption;
     private makeException: (exceptionData: any) => OakException<ED>;
-    private contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>;
 
-    constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>) {
+    constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>) {
         this.option = option;
         const { protocol, hostname, port, apiPath } = option;
         let serverUrl = `${protocol}${hostname}`;
@@ -56,7 +54,6 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         this.serverBridgeUrl = `${serverUrl}${SimpleConnector.BRIDGE_ROUTER}`;
         this.serverSubscribeUrl = `${serverUrl}${SimpleConnector.SUBSCRIBE_ROUTER}`;
         this.makeException = makeException;
-        this.contextBuilder = contextBuilder;
     }
 
     async callAspect(name: string, params: any, context: FrontCxt) {
