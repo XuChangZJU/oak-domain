@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { IncomingHttpHeaders } from "http";
-import { AsyncContext, AsyncRowStore } from "../store/AsyncRowStore";
+import { AsyncContext } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OpRecord } from "./Entity";
 import { OakException } from "./Exception";
@@ -11,12 +11,11 @@ export interface Connector<ED extends EntityDict, BackCxt extends AsyncContext<E
         message?: string | null;
     }>;
     getRouter: () => string;
-    parseRequest: (headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>) => Promise<{
-        name: string;
-        params: any;
-        context: BackCxt;
-    }>;
-    serializeResult: (result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any) => Promise<{
+    parseRequestHeaders: (headers: IncomingHttpHeaders) => {
+        contextString?: string;
+        aspectName: string;
+    };
+    serializeResult: (result: any, opRecords: OpRecord<ED>[], headers: IncomingHttpHeaders, body: any, message?: string) => Promise<{
         body: any;
         headers?: Record<string, any>;
     }>;

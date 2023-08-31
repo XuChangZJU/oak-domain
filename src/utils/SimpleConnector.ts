@@ -149,34 +149,33 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         }
     }
 
-    async parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{ name: string; params: any; context: BackCxt; }> {
+    parseRequestHeaders(headers: IncomingHttpHeaders) {
         const { 'oak-cxt': oakCxtStr, 'oak-aspect': aspectName } = headers;
         assert(typeof oakCxtStr === 'string' || oakCxtStr === undefined);
         assert(typeof aspectName === 'string');
-        const context = await this.contextBuilder(oakCxtStr as string | undefined)(store);
-        context.setHeaders(headers);
         return {
-            name: aspectName,
-            params: body,
-            context,
-        };
+            contextString: oakCxtStr,
+            aspectName,
+        }
     }
 
-    async serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): Promise<{ body: any; headers?: Record<string, any> | undefined; }> {
+    async serializeResult(result: any, opRecords: OpRecord<ED>[], headers: IncomingHttpHeaders, body: any, message?: string): Promise<{ body: any; headers?: Record<string, any> | undefined; }> {
         if (result instanceof Stream || result instanceof Buffer) {
             return {
                 body: result,
+                headers: {
+                    'oak-message': message,
+                },
             };
         }
 
-        await context.refineOpRecords();
         return {
             body: {
                 result,
-                opRecords: context.opRecords,
+                opRecords,
             },
             headers: {
-                'oak-message': context.getMessage(),
+                'oak-message': message,
             },
         };
     }

@@ -14,9 +14,12 @@ export interface Connector<ED extends EntityDict, BackCxt extends AsyncContext<E
 
     getRouter: () => string;
 
-    parseRequest: (headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>) => Promise<{ name: string; params: any; context: BackCxt; }>;
+    parseRequestHeaders: (headers: IncomingHttpHeaders) => {
+        contextString?: string;
+        aspectName: string;
+    }
 
-    serializeResult: (result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any) => Promise<{
+    serializeResult: (result: any, opRecords: OpRecord<ED>[], headers: IncomingHttpHeaders, body: any, message?: string) => Promise<{
         body: any;
         headers?: Record<string, any>;
     }>;
