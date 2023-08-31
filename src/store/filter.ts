@@ -1653,7 +1653,7 @@ export function checkDeduceFilters<ED extends EntityDict & BaseEntityDict, Cxt e
                     const ele2 = ele as DeducedFilter<ED, keyof ED>;
                     return context.count(ele2.entity, {
                         filter: ele2.filter
-                    }, {});
+                    }, { ignoreForeignKeyMiss: true });
                 }
                 const ele2 = ele as DeducedFilterCombination<ED>;
                 return checkDeduceFilters(ele2, context);
