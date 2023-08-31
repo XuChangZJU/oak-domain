@@ -478,6 +478,7 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                 const checkData = (data2: ED[keyof ED]['CreateSingle']['data']) => {
                     const illegalNullAttrs = difference(notNullAttrs, Object.keys(data2));
                     if (illegalNullAttrs.length > 0) {
+                        const emtpyAttrs: string[] = [];
                         // 要处理多对一的cascade create
                         for (const attr of illegalNullAttrs) {
                             if (attr === 'entityId') {
@@ -505,7 +506,10 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                                 }
                             }
                             // 到这里说明确实是有not null的属性没有赋值
-                            throw new OakAttrNotNullException(entity, illegalNullAttrs);
+                            emtpyAttrs.push(attr);
+                        }
+                        if (emtpyAttrs.length > 0) {
+                            throw new OakAttrNotNullException(entity, emtpyAttrs);
                         }
                     }
                     checkAttributeLegal(schema, entity, data2);
