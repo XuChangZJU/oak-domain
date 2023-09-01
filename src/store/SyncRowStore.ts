@@ -13,6 +13,7 @@ export abstract class SyncContext<ED extends EntityDict> implements Context {
     abstract toString(): string;
     
     begin(option?: TxnOption) {
+        assert(!this.uuid, '事务不允许嵌套');
         this.uuid = this.rowStore.begin(option);
     }
     commit() {

@@ -93,6 +93,12 @@ export type AuthDef<ED extends EntityDict, T extends keyof ED> = {
     }
 };
 
+export type CascadeRemoveDefDict<ED extends EntityDict> = {
+    [T in keyof ED]?: {
+        [E in (keyof ED | keyof ED[T]['Schema'] | '@entity')]?: ActionOnRemove;
+    }
+}
+
 export type AuthDefDict<ED extends EntityDict> = {
     [K in keyof ED]?: AuthDef<ED, K>;
 };

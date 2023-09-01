@@ -20,3 +20,5 @@ export * from './Timer';
 export * from './Port';
 export * from './Endpoint';
 export * from './Style';
+export * from './EntityDesc';
+export * from './Environment';

@@ -1,8 +1,7 @@
 import { ActionDef } from '../types/Action';
 import { String } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
-import { LocaleDef } from '../types/Locale';
-import { Index } from '../types/Storage';
+import { EntityDesc } from '../types/EntityDesc';
 
 export interface Schema extends EntityShape {
     targetEntity: String<32>;       // 要操作的目标对象
@@ -27,43 +26,44 @@ const IActionDef: ActionDef<IAction, IState> = {
 
 type Action = IAction;
 
-const indexes: Index<Schema>[] = [
-    {
-        name: 'index_state',
-        attributes: [
-            {
-                name: 'iState',
-                direction: 'ASC',
-            }
-        ],
-    },
-];
-
-const locale: LocaleDef<Schema, Action, '', {
+const entityDesc: EntityDesc<Schema, Action, '', {
     iState: IState,
 }> = {
-    zh_CN: {
-        name: '更新',
-        attr: {
-            targetEntity: '目标对象',
-            entity: '关联对象',
-            entityId: '关联对象Id',
-            action: '动作',
-            data: '数据',
-            filter: '条件',
-            extra: '其它',
-            iState: '状态',
-        },
-        action: {
-            abandon: '放弃',
-            apply: '应用',
-        },
-        v: {
-            iState: {
-                active: '活跃的',
-                abandoned: '放弃的',
-                applied: '应用的',
+    locales: {
+        zh_CN: {
+            name: '更新',
+            attr: {
+                targetEntity: '目标对象',
+                entity: '关联对象',
+                entityId: '关联对象Id',
+                action: '动作',
+                data: '数据',
+                filter: '条件',
+                extra: '其它',
+                iState: '状态',
+            },
+            action: {
+                abandon: '放弃',
+                apply: '应用',
+            },
+            v: {
+                iState: {
+                    active: '活跃的',
+                    abandoned: '放弃的',
+                    applied: '应用的',
+                },
             },
         },
     },
+    indexes: [
+        {
+            name: 'index_state',
+            attributes: [
+                {
+                    name: 'iState',
+                    direction: 'ASC',
+                }
+            ],
+        },
+    ],
 };

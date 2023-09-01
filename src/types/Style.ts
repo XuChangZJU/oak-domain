@@ -1,7 +1,7 @@
 import { EntityDict } from './Entity';
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 
-type ThemeColor = 'default' | 'success' | 'warning' | 'error';
+type ThemeColor = 'default' | 'success' | 'warning' | 'error' | 'primary' | 'danger';
 
 export type ColorDict<ED extends BaseEntityDict & EntityDict> = {
     [T in keyof ED]?: {

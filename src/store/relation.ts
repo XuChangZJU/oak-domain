@@ -1,6 +1,7 @@
 import assert from "assert";
+import { EntityDict } from "../base-app-domain";
 import { EXPRESSION_PREFIX } from "../types/Demand";
-import { EntityDef, initinctiveAttributes } from "../types/Entity";
+import { EntityDict as BaseEntityDict, initinctiveAttributes } from "../types/Entity";
 import { StorageSchema } from "../types/Storage";
 
 /**
@@ -11,9 +12,7 @@ import { StorageSchema } from "../types/Storage";
  * @param row 
  * @returns 
  */
-export function judgeRelation<ED extends {
-    [E: string]: EntityDef;
-}>(schema: StorageSchema<ED>, entity: keyof ED, attr: string) {
+export function judgeRelation<ED extends EntityDict & BaseEntityDict>(schema: StorageSchema<ED>, entity: keyof ED, attr: string) {
     const { [entity]: { attributes } } = schema;
 
     if (attr.startsWith(EXPRESSION_PREFIX) || attr.startsWith('#')) {

@@ -1,25 +1,27 @@
 import { String } from '../types/DataType';
-import { LocaleDef } from '../types/Locale';
 import { EntityShape } from '../types/Entity';
+import { Schema as Relation } from './Relation';
+import { EntityDesc } from '../types/EntityDesc';
 
 export interface Schema extends EntityShape {
     entity: String<32>;
     entityId: String<64>;
-    relation: String<32>;
+    relation: Relation;
 };
+type Action = 'confirm';
 
-const locale: LocaleDef<
-    Schema,
-    '',
-    '',
-    {}
-> = {
-    zh_CN: {
-        name: '用户授权',
-        attr: {
-            relation: '关系',
-            entity: '关联对象',
-            entityId: '关联对象id',
+const entityDesc: EntityDesc<Schema, Action> = {
+    locales: {
+        zh_CN: {
+            name: '用户授权',
+            attr: {
+                relation: '关系',
+                entity: '关联对象',
+                entityId: '关联对象id',
+            },
+            action: {
+                confirm: '领取',
+            },
         },
     },
 };

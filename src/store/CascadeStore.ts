@@ -6,7 +6,7 @@ import {
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { OperationRewriter, RowStore, SelectionRewriter } from '../types/RowStore';
 import { StorageSchema } from '../types/Storage';
-import { addFilterSegment, combineFilters } from "./filter";
+import { combineFilters } from "./filter";
 import { judgeRelation } from "./relation";
 import { EXPRESSION_PREFIX, getAttrRefInExpression, OakRowUnexistedException } from "../types";
 import { unset, uniq, cloneDeep, pick } from '../utils/lodash';
@@ -16,6 +16,7 @@ import { getRelevantIds } from "./filter";
 import { CreateSingleOperation as CreateSingleOperOperation } from '../base-app-domain/Oper/Schema';
 import { CreateOperation as CreateModiOperation, UpdateOperation as UpdateModiOperation } from '../base-app-domain/Modi/Schema';
 import { generateNewIdAsync } from "../utils/uuid";
+import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
 
 /**这个用来处理级联的select和update，对不同能力的 */
 export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> extends RowStore<ED> {
@@ -25,13 +26,42 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     protected abstract supportManyToOneJoin(): boolean;
     protected abstract supportMultipleCreate(): boolean;
 
-    private selectionRewriters: SelectionRewriter<any>[] = [];
-    private operationRewriters: OperationRewriter<any>[] = [];
+    private selectionRewriters: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
+    private operationRewriters: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
 
-    private reinforceSelection(entity: keyof ED, selection: ED[keyof ED]['Selection']) {
+    private async reinforceSelectionAsync<Cxt extends AsyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {
+
+
+        this.reinforceSelectionInner(entity, selection, context);
+
+        const rewriterPromises = this.selectionRewriters.map(
+            ele => ele(this.getSchema(), entity, selection, context)
+        );
+
+        if (rewriterPromises.length > 0) {
+            await Promise.all(rewriterPromises);
+        }
+    }
+
+    private reinforceSelectionSync<Cxt extends SyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {
+        this.reinforceSelectionInner(entity, selection, context);
+
+        this.selectionRewriters.forEach(
+            ele => {
+                const result = ele(this.getSchema(), entity, selection, context);
+                assert(!(result instanceof Promise));
+            }
+        );
+    }
+
+    private reinforceSelectionInner<Cxt extends AsyncContext<ED> | SyncContext<ED>, OP extends SelectOption>(
+        entity: keyof ED,
+        selection: ED[keyof ED]['Selection'],
+        context: Cxt
+    ) {
         const { filter, data, sorter } = selection;
 
-        const checkNode = (projectionNode: ED[keyof ED]['Selection']['data'], attrs: string[]) => {
+        const assignNecessaryProjectionAttrs = (projectionNode: ED[keyof ED]['Selection']['data'], attrs: string[]) => {
             attrs.forEach(
                 (attr) => {
                     if (!projectionNode.hasOwnProperty(attr)) {
@@ -42,114 +72,121 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
             );
         };
-    
+
+
+        const checkFilterNode = (
+            entity2: keyof ED,
+            filterNode: ED[keyof ED]['Selection']['filter'],
+            projectionNode: ED[keyof ED]['Selection']['data'],
+            toBeAssignNode: Record<string, string[]>,
+            filterNodeDict: Record<string, ED[keyof ED]['Selection']['data']>) => {
+            const necessaryAttrs: string[] = ['id'];
+            for (const attr in filterNode) {
+                if (attr === '#id') {
+                    assert(!filterNodeDict[filterNode[attr]!], `projection中结点的id有重复, ${filterNode[attr]}`);
+                    Object.assign(filterNodeDict, {
+                        [filterNode[attr]!]: projectionNode,
+                    });
+                    if (toBeAssignNode[filterNode[attr]!]) {
+                        assignNecessaryProjectionAttrs(projectionNode, toBeAssignNode[filterNode[attr]!]);
+                    }
+                }
+                else if (['$and', '$or'].includes(attr)) {
+                    for (const node of filterNode[attr]!) {
+                        checkFilterNode(entity2, node, projectionNode, toBeAssignNode, filterNodeDict);
+                    }
+                }
+                else if (attr === '$not') {
+                    checkFilterNode(entity2, filterNode[attr]!, projectionNode, toBeAssignNode, filterNodeDict);
+                }
+                else if (attr === '$text') {
+                    // 全文检索首先要有fulltext索引，其次要把fulltext的相关属性加到projection里
+                    const { indexes } = this.getSchema()[entity2];
+
+                    const fulltextIndex = indexes!.find(
+                        ele => ele.config && ele.config.type === 'fulltext'
+                    );
+
+                    const { attributes } = fulltextIndex!;
+                    necessaryAttrs.push(...(attributes.map(ele => ele.name as string)));
+                }
+                else {
+                    if (attr.toLowerCase().startsWith(EXPRESSION_PREFIX)) {
+                        const exprResult = getAttrRefInExpression(filterNode[attr]!);
+                        for (const nodeName in exprResult) {
+                            if (nodeName === '#current') {
+                                assignNecessaryProjectionAttrs(projectionNode, exprResult[nodeName]);
+                            }
+                            else if (filterNodeDict[nodeName]) {
+                                assignNecessaryProjectionAttrs(filterNodeDict[nodeName], exprResult[nodeName]);
+                            }
+                            else {
+                                if (toBeAssignNode[nodeName]) {
+                                    toBeAssignNode[nodeName].push(...exprResult[nodeName]);
+                                }
+                                else {
+                                    Object.assign(toBeAssignNode, {
+                                        [nodeName]: exprResult[nodeName],
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        const rel = this.judgeRelation(entity2, attr);
+                        if (rel === 1) {
+                            necessaryAttrs.push(attr);
+                        }
+                        else if (rel === 2) {
+                            // entity/entityId反指
+                            necessaryAttrs.push('entity', 'entityId');
+                            if (!projectionNode[attr]) {
+                                Object.assign(projectionNode, {
+                                    [attr]: {
+                                        id: 1,
+                                    }
+                                });
+                            }
+                            checkFilterNode(attr, filterNode[attr]!, projectionNode[attr], toBeAssignNode, filterNodeDict);
+                        }
+                        else if (typeof rel === 'string') {
+                            necessaryAttrs.push(`${attr}Id`);
+                            if (!projectionNode[attr]) {
+                                Object.assign(projectionNode, {
+                                    [attr]: {
+                                        id: 1,
+                                    }
+                                });
+                            }
+                            checkFilterNode(rel, filterNode[attr]!, projectionNode[attr], toBeAssignNode, filterNodeDict);
+                        }
+                        else if (rel instanceof Array) {
+                            // 子查询，暂时不处理
+                        }
+                    }
+                }
+                assignNecessaryProjectionAttrs(projectionNode, necessaryAttrs);
+            }
+        };
+
         let relevantIds: string[] = [];
         if (filter) {
             const toBeAssignNode: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
             // filter当中所关联到的属性必须在projection中
             const filterNodeDict: Record<string, ED[keyof ED]['Selection']['data']> = {};
-            const checkFilterNode = (entity2: keyof ED, filterNode: ED[keyof ED]['Selection']['filter'], projectionNode: ED[keyof ED]['Selection']['data']) => {
-                const necessaryAttrs: string[] = ['id'];
-                for (const attr in filterNode) {
-                    if (attr === '#id') {
-                        assert(!filterNodeDict[filterNode[attr]!], `projection中结点的id有重复, ${filterNode[attr]}`);
-                        Object.assign(filterNodeDict, {
-                            [filterNode[attr]!]: projectionNode,
-                        });
-                        if (toBeAssignNode[filterNode[attr]!]) {
-                            checkNode(projectionNode, toBeAssignNode[filterNode[attr]!]);
-                        }
-                    }
-                    else if (['$and', '$or'].includes(attr)) {
-                        for (const node of filterNode[attr]!) {
-                            checkFilterNode(entity2, node, projectionNode);
-                        }
-                    }
-                    else if (attr === '$not') {
-                        checkFilterNode(entity2, filterNode[attr]!, projectionNode);
-                    }
-                    else if (attr === '$text') {
-                        // 全文检索首先要有fulltext索引，其次要把fulltext的相关属性加到projection里
-                        const { indexes } = this.getSchema()[entity2];
-    
-                        const fulltextIndex = indexes!.find(
-                            ele => ele.config && ele.config.type === 'fulltext'
-                        );
-    
-                        const { attributes } = fulltextIndex!;
-                        necessaryAttrs.push(...(attributes.map(ele => ele.name as string)));
-                    }
-                    else {
-                        if (attr.toLowerCase().startsWith(EXPRESSION_PREFIX)) {
-                            const exprResult = getAttrRefInExpression(filterNode[attr]!);
-                            for (const nodeName in exprResult) {
-                                if (nodeName === '#current') {
-                                    checkNode(projectionNode, exprResult[nodeName]);
-                                }
-                                else if (filterNodeDict[nodeName]) {
-                                    checkNode(filterNodeDict[nodeName], exprResult[nodeName]);
-                                }
-                                else {
-                                    if (toBeAssignNode[nodeName]) {
-                                        toBeAssignNode[nodeName].push(...exprResult[nodeName]);
-                                    }
-                                    else {
-                                        Object.assign(toBeAssignNode, {
-                                            [nodeName]: exprResult[nodeName],
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                        else {
-                            const rel = this.judgeRelation(entity2, attr);
-                            if (rel === 1) {
-                                necessaryAttrs.push(attr);
-                            }
-                            else if (rel === 2) {
-                                // entity/entityId反指
-                                necessaryAttrs.push('entity', 'entityId');
-                                if (!projectionNode[attr]) {
-                                    Object.assign(projectionNode, {
-                                        [attr]: {
-                                            id: 1,
-                                        }
-                                    });
-                                }
-                                checkFilterNode(attr, filterNode[attr]!, projectionNode[attr]);
-                            }
-                            else if (typeof rel === 'string') {
-                                necessaryAttrs.push(`${attr}Id`);
-                                if (!projectionNode[attr]) {
-                                    Object.assign(projectionNode, {
-                                        [attr]: {
-                                            id: 1,
-                                        }
-                                    });
-                                }
-                                checkFilterNode(rel, filterNode[attr]!, projectionNode[attr]);
-                            }
-                            else if (rel instanceof Array) {
-                                // 现在filter中还不支持一对多的语义，先放着吧
-                            }
-                        }
-                    }
-                    checkNode(projectionNode, necessaryAttrs);
-                }
-            };
-    
-            checkFilterNode(entity, filter, data);
+
+            checkFilterNode(entity, filter, data, toBeAssignNode, filterNodeDict);
             relevantIds = getRelevantIds(filter);
         }
-    
+
         // sorter感觉现在取不取影响不大，前端的list直接获取返回的ids了，先不管之
         if (sorter) {
         }
-    
+
         const toBeAssignNode2: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
         const projectionNodeDict: Record<string, ED[keyof ED]['Selection']['data']> = {};
         const checkProjectionNode = (entity2: keyof ED, projectionNode: ED[keyof ED]['Selection']['data']) => {
-            const necessaryAttrs: string[] = ['id', '$$createAt$$']; // 有的页面依赖于其它页面取数据，有时两个页面的filter的差异会导致有一个加createAt，有一个不加，此时可能产生前台取数据不完整的异常。先统一加上
+            const necessaryAttrs: string[] = ['id', '$$createAt$$', '$$updateAt$$']; // 有的页面依赖于其它页面取数据，有时两个页面的filter的差异会导致有一个加createAt，有一个不加，此时可能产生前台取数据不完整的异常。先统一加上
             for (const attr in projectionNode) {
                 if (attr === '#id') {
                     assert(!projectionNodeDict[projectionNode[attr]!], `projection中结点的id有重复, ${projectionNode[attr]}`);
@@ -157,7 +194,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         [projectionNode[attr]!]: projectionNode,
                     });
                     if (toBeAssignNode2[projectionNode[attr]!]) {
-                        checkNode(projectionNode, toBeAssignNode2[projectionNode[attr]!]);
+                        assignNecessaryProjectionAttrs(projectionNode, toBeAssignNode2[projectionNode[attr]!]);
                     }
                 }
                 else {
@@ -165,10 +202,10 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         const exprResult = getAttrRefInExpression(projectionNode[attr]!);
                         for (const nodeName in exprResult) {
                             if (nodeName === '#current') {
-                                checkNode(projectionNode, exprResult[nodeName]);
+                                assignNecessaryProjectionAttrs(projectionNode, exprResult[nodeName]);
                             }
                             else if (projectionNodeDict[nodeName]) {
-                                checkNode(projectionNodeDict[nodeName], exprResult[nodeName]);
+                                assignNecessaryProjectionAttrs(projectionNodeDict[nodeName], exprResult[nodeName]);
                             }
                             else {
                                 if (toBeAssignNode2[nodeName]) {
@@ -197,20 +234,20 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             checkProjectionNode(rel, projectionNode[attr]);
                         }
                         else if (rel instanceof Array && !attr.endsWith('$$aggr')) {
-                            const { data } = projectionNode[attr];
+                            const { data, filter } = projectionNode[attr];
                             if (rel[1]) {
-                                checkNode(data, [rel[1]]);
+                                assignNecessaryProjectionAttrs(data, [rel[1]]);
                             }
                             else {
-                                checkNode(data, ['entity', 'entityId']);
+                                assignNecessaryProjectionAttrs(data, ['entity', 'entityId']);
                             }
-                            this.reinforceSelection(rel[0], projectionNode[attr]);
+                            this.reinforceSelectionInner(rel[0], projectionNode[attr], context);
                         }
                     }
                 }
-                checkNode(projectionNode, necessaryAttrs);
+                assignNecessaryProjectionAttrs(projectionNode, necessaryAttrs);
             }
-    
+
             // 如果对象中指向一对多的Modi，此时加上指向Modi的projection
             if (this.getSchema()[entity2].toModi) {
                 Object.assign(projectionNode, {
@@ -232,9 +269,40 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     }
                 });
             }
+
+            // 如果对象上有relation关系，在此将本用户相关的relation和actionAuth全部取出
+            // 还要将actionAuth上没有relation关系但destEntity为本对象的行也全部取出，这些是指向userId的可能路径
+            // 放在这里有点怪异，暂先这样
+            if (context instanceof AsyncContext) {
+                const userId = context.getCurrentUserId(true);
+                if (userId && !SYSTEM_RESERVE_ENTITIES.includes(entity2 as string)) {
+                    if (this.getSchema()[entity2].relation && !projectionNode.userRelation$entity) {
+                        Object.assign(projectionNode, {
+                            userRelation$entity: {
+                                $entity: 'userRelation',
+                                data: {
+                                    id: 1,
+                                    entity: 1,
+                                    entityId: 1,
+                                    userId: 1,
+                                    relationId: 1,
+                                    relation: {
+                                        id: 1,
+                                        name: 1,
+                                        display: 1,
+                                    }
+                                },
+                                filter: {
+                                    userId,
+                                },
+                            } as ED['userRelation']['Selection'],
+                        });
+                    }
+                }
+            }
         };
         checkProjectionNode(entity, data);
-    
+
         if (!sorter && relevantIds.length === 0) {
             // 如果没有sorter，就给予一个按createAt逆序的sorter
             Object.assign(selection, {
@@ -251,23 +319,20 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 $$createAt$$: 1,
             });
         }
-    
-        this.selectionRewriters.forEach(
-            ele => ele(this.getSchema(), entity, selection)
-        );
+
     }
 
-    private reinforceOperation(entity: keyof ED, operation: ED[keyof ED]['Operation']) {
-        this.operationRewriters.forEach(
-            ele => ele(this.getSchema(), entity, operation)
-        );
+    private async reinforceOperation<Cxt extends AsyncContext<ED>>(entity: keyof ED, operation: ED[keyof ED]['Operation'], context: Cxt) {
+        await Promise.all(this.operationRewriters.map(
+            ele => ele(this.getSchema(), entity, operation, context)
+        ));
     }
 
-    public registerOperationRewriter(rewriter: OperationRewriter<ED>) {
+    public registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>) {
         this.operationRewriters.push(rewriter);
     }
 
-    public registerSelectionRewriter(rewriter:  SelectionRewriter<ED>) {
+    public registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>) {
         this.selectionRewriters.push(rewriter);
     }
 
@@ -314,25 +379,19 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         cascadeSelectFn: <T2 extends keyof ED>(entity2: T2, selection: ED[T2]['Selection'], context: Cxt, op: OP) => Partial<ED[T2]['Schema']>[] | Promise<Partial<ED[T2]['Schema']>[]>,
         aggregateFn: <T2 extends keyof ED>(entity2: T2, aggregation: ED[T2]['Aggregation'], context: Cxt, op: OP) => AggregationResult<ED[T2]['Schema']> | Promise<AggregationResult<ED[T2]['Schema']>>,
         option: OP) {
-        const projection: ED[T]['Selection']['data'] = {};
         const cascadeSelectionFns: Array<(result: Partial<ED[T]['Schema']>[]) => Promise<void> | void> = [];
 
         const supportMtoJoin = this.supportManyToOneJoin();
         const { toModi } = this.getSchema()[entity];
 
+        assert(typeof projection2 === 'object');
         for (const attr in projection2) {
             const relation = judgeRelation(this.storageSchema, entity, attr);
             if (relation === 1 || relation == 0) {
-                Object.assign(projection, {
-                    [attr]: projection2[attr],
-                });
             }
             else if (relation === 2) {
                 // 基于entity/entityId的多对一
-                Object.assign(projection, {
-                    entity: 1,
-                    entityId: 1,
-                });
+                assert(typeof projection2[attr] === 'object');
                 if (supportMtoJoin) {
                     cascadeSelectionFns.push(
                         (result) => {
@@ -362,9 +421,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         projection: subProjection,
                         cascadeSelectionFns: subCascadeSelectionFns,
                     } = this.destructCascadeSelect(attr, projection2[attr], context, cascadeSelectFn, aggregateFn, option);
-                    Object.assign(projection, {
-                        [attr]: subProjection,
-                    });
                     subCascadeSelectionFns.forEach(
                         ele => cascadeSelectionFns.push(
                             (result) => {
@@ -388,17 +444,20 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             const dealWithSubRows = (subRows: Partial<ED[T]['Schema']>[]) => {
                                 assert(subRows.length <= entityIds.length);
                                 if (subRows.length < entityIds.length && !toModi) {
-                                    throw new OakRowUnexistedException([{
-                                        entity: attr,
-                                        selection: {
-                                            data: projection2[attr],
-                                            filter: {
-                                                id: {
-                                                    $in: entityIds
+                                    // 后台不允许数据不一致
+                                    if (context instanceof AsyncContext || !option.ignoreForeignKeyMiss) {
+                                        throw new OakRowUnexistedException([{
+                                            entity: attr,
+                                            selection: {
+                                                data: projection2[attr],
+                                                filter: {
+                                                    id: {
+                                                        $in: entityIds
+                                                    },
                                                 },
                                             },
-                                        },
-                                    }]);
+                                        }]);
+                                    }
                                 }
 
                                 result.forEach(
@@ -445,9 +504,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
             }
             else if (typeof relation === 'string') {
-                Object.assign(projection, {
-                    [`${attr}Id`]: 1,
-                });
+                assert(typeof projection2[attr] === 'object');
                 if (supportMtoJoin) {
                     if (!toModi) {
                         // 如果不是modi，要保证外键没有空指针
@@ -477,9 +534,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         projection: subProjection,
                         cascadeSelectionFns: subCascadeSelectionFns,
                     } = this.destructCascadeSelect(relation, projection2[attr], context, cascadeSelectFn, aggregateFn, option);
-                    Object.assign(projection, {
-                        [attr]: subProjection,
-                    });
                     subCascadeSelectionFns.forEach(
                         ele => cascadeSelectionFns.push(
                             (result) => {
@@ -500,17 +554,19 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             const dealWithSubRows = (subRows: Partial<ED[keyof ED]['Schema']>[]) => {
                                 assert(subRows.length <= ids.length);
                                 if (subRows.length < ids.length && !toModi) {
-                                    throw new OakRowUnexistedException([{
-                                        entity: relation,
-                                        selection: {
-                                            data: projection2[attr],
-                                            filter: {
-                                                id: {
-                                                    $in: ids
+                                    if (context instanceof AsyncContext || !option.ignoreForeignKeyMiss) {
+                                        throw new OakRowUnexistedException([{
+                                            entity: relation,
+                                            selection: {
+                                                data: projection2[attr],
+                                                filter: {
+                                                    id: {
+                                                        $in: ids
+                                                    },
                                                 },
-                                            },
-                                        }
-                                    }]);
+                                            }
+                                        }]);
+                                    }
                                 }
 
                                 result.forEach(
@@ -574,7 +630,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     (row) => {
                                         const aggrResult = aggregateFn.call(this, entity2, {
                                             data: subProjection,
-                                            filter: combineFilters([{
+                                            filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
                                                 [foreignKey]: row.id,
                                             }, subFilter]),
                                             sorter: subSorter,
@@ -637,7 +693,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 if (ids.length > 0) {
                                     const subRows = cascadeSelectFn.call(this, entity2, {
                                         data: subProjection,
-                                        filter: combineFilters([{
+                                        filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
                                             [foreignKey]: {
                                                 $in: ids,
                                             }
@@ -667,7 +723,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     (row) => {
                                         const aggrResult = aggregateFn.call(this, entity2, {
                                             data: subProjection,
-                                            filter: combineFilters([{
+                                            filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
                                                 entity,
                                                 entityId: row.id,
                                             }, subFilter]),
@@ -730,7 +786,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 if (ids.length > 0) {
                                     const subRows = cascadeSelectFn.call(this, entity2, {
                                         data: subProjection,
-                                        filter: combineFilters([{
+                                        filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
                                             entity,
                                             entityId: {
                                                 $in: ids,
@@ -755,7 +811,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         }
 
         return {
-            projection,
+            projection: projection2,
             cascadeSelectionFns,
         }
     }
@@ -851,9 +907,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     else {
                         // A中data的entityId作为B中filter的主键
                         Object.assign(operationMto, {
-                            filter: addFilterSegment({
+                            filter: combineFilters(attr, this.getSchema(), [{
                                 id: fkId,
-                            }), filterMto,
+                            }, filterMto]),
                         });
                     }
                 }
@@ -864,22 +920,26 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
                         assert(typeof filterMto.id === 'string');
                     }
+                    else if (filter!.entity === attr && filter!.entityId) {
+                        Object.assign(operationMto, {
+                            filter: combineFilters(attr, this.getSchema(), [{
+                                id: filter!.entityId,
+                            }, filterMto]),
+                        });
+                    }
+                    else if (filter![attr]) {
+                        Object.assign(operationMto, {
+                            filter: combineFilters(attr, this.getSchema(), [filter![attr], filterMto]),
+                        });
+                    }
                     else {
                         // A中data的entityId作为B中filter的主键
                         Object.assign(operationMto, {
-                            filter: addFilterSegment({
-                                id: {
-                                    $in: {
-                                        entity,
-                                        data: {
-                                            entityId: 1,
-                                        },
-                                        filter: addFilterSegment({
-                                            entity: attr,
-                                        } as any, filter),
-                                    }
-                                },
-                            }, filterMto),
+                            filter: combineFilters(attr, this.getSchema(), [{
+                                [`${entity as string}$entity`]: {
+                                    filter,
+                                }
+                            }, filterMto]),
                         });
                     }
                 }
@@ -908,9 +968,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     else {
                         // A中data的entityId作为B中filter的主键
                         Object.assign(operationMto, {
-                            filter: addFilterSegment(filterMto || {}, {
+                            filter: combineFilters(relation, this.getSchema(), [filterMto, {
                                 id: fkId,
-                            }),
+                            }]),
                         });
                     }
                 }
@@ -920,20 +980,24 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         // 若已有id则不用处理，否则会干扰modi的后续判断(会根据filter来判断对象id，如果判断不出来去查实际的对象，但实际的对象其实还未创建好)
                         assert(typeof filterMto.id === 'string');
                     }
-                    else {
-                        // A中data的entityId作为B中filter的主键
+                    else if (filter![`${attr}Id`]) {
                         Object.assign(operationMto, {
-                            filter: addFilterSegment(filterMto || {}, {
-                                id: {
-                                    $in: {
-                                        entity,
-                                        data: {
-                                            [`${attr}Id`]: 1,
-                                        },
-                                        filter,
-                                    }
-                                },
-                            }),
+                            filter: combineFilters(relation, this.getSchema(), [filterMto, {
+                                id: filter![`${attr}Id`],
+                            }]),
+                        });
+                    }
+                    else if (filter![attr]) {
+                        Object.assign(operationMto, {
+                            filter: combineFilters(relation, this.getSchema(), [filterMto, filter![attr]]),
+                        });
+                    }
+                    else {
+                        // A中data的attrId作为B中filter的主键
+                        Object.assign(operationMto, {
+                            filter: combineFilters(relation, this.getSchema(), [filterMto, {
+                                [`${entity as string}$${attr}`]: filter
+                            }]),
                         });
                     }
                 }
@@ -988,33 +1052,40 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             }
                         }
                         else {
-                            // 这里优化一下，如果filter上有id，直接更新成根据entityId来过滤
-                            // 除了性能原因之外，还因为会制造出user: { id: xxx }这样的查询，general中不允许这样查询的出现
-                            // 暂时先封掉user上的相关更新条件，会制造出连接表上的update
-                            if (entity !== 'user') {
-                                if (filter) {
-                                    if (filter.id && Object.keys(filter).length === 1) {
-                                        Object.assign(otm, {
-                                            filter: addFilterSegment({
-                                                entity,
-                                                entityId: filter.id,
-                                            }, filterOtm),
-                                        });
-                                    }
-                                    else {
-                                        Object.assign(otm, {
-                                            filter: addFilterSegment({
-                                                [entity]: filter,
-                                            }, filterOtm),
-                                        });
-                                    }
-                                }
-                                if (action === 'remove' && actionOtm === 'update') {
-                                    Object.assign(dataOtm, {
-                                        entity: null,
-                                        entityId: null,
+                            // 这里优化一下，如果filter上有id，直接更新成根据entityId来过滤                            
+                            if (filter) {
+                                if (filter.id && Object.keys(filter).length === 1) {
+                                    Object.assign(otm, {
+                                        filter: combineFilters(entityOtm, this.getSchema(), [{
+                                            entity,
+                                            entityId: filter.id,
+                                        }, filterOtm]),
                                     });
                                 }
+                                else {
+                                    Object.assign(otm, {
+                                        filter: combineFilters(entityOtm, this.getSchema(), [{
+                                            [entity]: filter,
+                                        }, filterOtm]),
+                                    });
+                                }
+                            }
+                            else {
+                                Object.assign(otm, {
+                                    filter: combineFilters(entityOtm, this.getSchema(), [{
+                                        entity,
+                                        entityId: {
+                                            $exists: true,
+                                        }
+                                    }, filterOtm])
+                                });
+                            }
+
+                            if (action === 'remove' && actionOtm === 'update') {
+                                Object.assign(dataOtm, {
+                                    entity: null,
+                                    entityId: null,
+                                });
                             }
                         }
                     }
@@ -1055,27 +1126,32 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                         else {
                             // 这里优化一下，如果filter上有id，直接更新成根据entityId来过滤
-                            // 除了性能原因之外，还因为会制造出user: { id: xxx }这样的查询，general中不允许这样查询的出现
-                            // 绝大多数情况都是id，但也有可能update可能出现上层filter不是根据id的（userEntityGrant的过期触发的wechatQrCode的过期，见general中的userEntityGrant的trigger）
-                            // 暂时先封掉user上的连接，以避免生成连接表更新
-                            if (entity !== 'user') {
-                                if (filter) {
-                                    if (filter.id && Object.keys(filter).length === 1) {
-                                        Object.assign(otm, {
-                                            filter: addFilterSegment({
-                                                [foreignKey]: filter.id,
-                                            }, filterOtm),
-                                        });
-                                    }
-                                    else {
-                                        Object.assign(otm, {
-                                            filter: addFilterSegment({
-                                                [foreignKey.slice(0, foreignKey.length - 2)]: filter,
-                                            }, filterOtm),
-                                        });
-                                    }
+                            if (filter) {
+                                if (filter.id && Object.keys(filter).length === 1) {
+                                    Object.assign(otm, {
+                                        filter: combineFilters(entityOtm, this.getSchema(), [{
+                                            [foreignKey]: filter.id,
+                                        }, filterOtm]),
+                                    });
+                                }
+                                else {
+                                    Object.assign(otm, {
+                                        filter: combineFilters(entityOtm, this.getSchema(), [{
+                                            [foreignKey.slice(0, foreignKey.length - 2)]: filter,
+                                        }, filterOtm]),
+                                    });
                                 }
                             }
+                            else {
+                                Object.assign(otm, {
+                                    filter: combineFilters(entityOtm, this.getSchema(), [{
+                                        [foreignKey]: {
+                                            $exists: true,
+                                        },
+                                    }, filterOtm]),
+                                });
+                            }
+
                             if (action === 'remove' && actionOtm === 'update') {
                                 Object.assign(dataOtm, {
                                     [foreignKey]: null,
@@ -1166,7 +1242,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
         switch (action) {
             case 'create': {
-                this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
                 if (option.modiParentEntity && !['modi', 'modiEntity', 'oper', 'operEntity'].includes(entity as string)) {
                     // 变成对modi的插入
                     assert(option.modiParentId);
@@ -1180,18 +1255,19 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             entity: option.modiParentEntity!,
                             entityId: option.modiParentId!,
                             filter: {
-                                id: {
-                                    $in: [(data as any).id as string],      //这里记录这个filter是为了后面update的时候直接在其上面update，参见本函数后半段关于modiUpsert相关的优化
-                                },
+                                id: (data as any).id,  //这里记录这个filter是为了后面update的时候直接在其上面update，参见本函数后半段关于modiUpsert相关的优化
                             },
                             data,
                             iState: 'active',
                         },
                     };
+                    const closeRootMode = context.openRootMode();
                     await this.cascadeUpdateAsync('modi', modiCreate, context, option);
+                    closeRootMode();
                     return 1;
                 }
                 else {
+                    this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
                     let result = 0;
                     const createInner = async (operation2: ED[T]['Create']) => {
                         try {
@@ -1334,10 +1410,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     }]
                                 },
                             };
+                            const closeRootMode = context.openRootMode();
                             await this.cascadeUpdateAsync('oper', createOper, context, {
                                 dontCollect: true,
                                 dontCreateOper: true,
                             });
+                            closeRootMode();
                         }
                     }
                     return result!;
@@ -1445,7 +1523,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             };
                         }
                     }
+                    const closeRootMode = context.openRootMode();
                     await this.cascadeUpdateAsync('modi', modiUpsert!, context, option);
+                    closeRootMode();
                     return 1;
                 }
                 else {
@@ -1476,10 +1556,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     },
                                 },
                             }
+                            const closeRootMode = context.openRootMode();
                             await this.cascadeUpdateAsync('oper', createOper, context, {
                                 dontCollect: true,
                                 dontCreateOper: true,
                             });
+                            closeRootMode();
                         }
                     };
                     if (action === 'remove') {
@@ -1608,7 +1690,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): OperationResult<ED> {
-        this.reinforceOperation(entity, operation);
+
         const { action, data, filter, id } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => any> = [];
@@ -1673,7 +1755,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): Promise<OperationResult<ED>> {
-        this.reinforceOperation(entity, operation);
         const { action, data, filter, id } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => Promise<any>> = [];
@@ -1736,7 +1817,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Partial<ED[T]['Schema']>[] {
-        this.reinforceSelection(entity, selection);
         const { data, filter, indexFrom, count, sorter } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
@@ -1881,7 +1961,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]> {
-        this.reinforceSelection(entity, selection);
         const { data, filter, indexFrom, count, sorter } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
@@ -1934,5 +2013,42 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         }
 
         return rows;
+    }
+
+    protected async selectAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        selection: ED[T]['Selection'],
+        context: Cxt,
+        option: OP): Promise<Partial<ED[T]['Schema']>[]> {
+        await this.reinforceSelectionAsync(entity, selection, context, option);
+        return this.cascadeSelectAsync(entity, selection, context, option);
+    }
+
+    protected selectSync<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
+        entity: T,
+        selection: ED[T]['Selection'],
+        context: Cxt,
+        option: OP): Partial<ED[T]['Schema']>[] {
+        this.reinforceSelectionSync(entity, selection, context, option);
+        return this.cascadeSelect(entity, selection, context, option);
+    }
+
+    protected operateSync<T extends keyof ED, Cxt extends SyncContext<ED>, OP extends OperateOption>(
+        entity: T,
+        operation: ED[T]['Operation'],
+        context: Cxt,
+        option: OP): OperationResult<ED> {
+
+        //this.reinforceOperation(entity, operation);       // 感觉前台可以无视?
+        return this.cascadeUpdate(entity, operation, context, option);
+    }
+
+    protected async operateAsync<T extends keyof ED, Cxt extends AsyncContext<ED>, OP extends OperateOption>(
+        entity: T,
+        operation: ED[T]['Operation'],
+        context: Cxt,
+        option: OP): Promise<OperationResult<ED>> {
+        await this.reinforceOperation(entity, operation, context);
+        return this.cascadeUpdateAsync(entity, operation, context, option);
     }
 }

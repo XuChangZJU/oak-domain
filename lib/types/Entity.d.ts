@@ -27,6 +27,7 @@ export declare type SelectOption = {
     obscure?: boolean;
     forUpdate?: true;
     includedDeleted?: true;
+    ignoreForeignKeyMiss?: true;
     dummy?: 1;
 };
 export declare type OperateOption = {
@@ -54,10 +55,12 @@ export declare type Operation<A extends string, D extends Projection, F extends 
 } & FilterPart<A, F>;
 export declare type Selection<A extends ReadOnlyAction, D extends Projection, F extends Filter | undefined = undefined, S extends Sorter | undefined = undefined> = {
     id?: string;
-    action: A;
+    action?: A;
     data: D;
     sorter?: S;
-} & FilterPart<A, F>;
+} & FilterPart<A, F> & {
+    randomRange?: number;
+};
 export interface EntityShape {
     id: PrimaryKey;
     $$seq$$: Sequence;
@@ -74,7 +77,7 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<Selection<'select', Projection, Filter, Sorter>, 'action'>;
+    Selection: Selection<'select', Projection, Filter, Sorter>;
     Aggregation: DeduceAggregation<Projection, Filter, Sorter>;
     Operation: CUDOperation;
     Create: CreateOperation;
@@ -181,5 +184,15 @@ export declare type Configuration = {
     actionType?: ActionType;
     static?: boolean;
 };
+export declare type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, keyof ED, boolean];
+export declare type AuthDeduceRelationMap<ED extends EntityDict> = {
+    [T in keyof ED]?: keyof ED[T]['OpSchema'];
+};
+export declare type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];
 export declare type OtmKey<K extends string> = K | `${K}$${number}`;
+export interface SubDataDef<ED extends EntityDict, T extends keyof ED> {
+    id: string;
+    entity: T;
+    filter: ED[T]['Selection']['filter'];
+}
 export {};

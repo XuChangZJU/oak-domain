@@ -1,0 +1,10 @@
+import { AuthCascadePath, AuthDeduceRelationMap } from "../types/Entity";
+import { EntityDict } from "./EntityDict";
+import { CreateOperationData as Relation } from "./Relation/Schema";
+export declare const ActionCascadePathGraph: AuthCascadePath<EntityDict>[];
+export declare const RelationCascadePathGraph: AuthCascadePath<EntityDict>[];
+export declare const relations: Relation[];
+export declare const deducedRelationMap: AuthDeduceRelationMap<EntityDict>;
+export declare const selectFreeEntities: (keyof EntityDict)[];
+export declare const updateFreeEntities: (keyof EntityDict)[];
+export declare const createFreeEntities: (keyof EntityDict)[];

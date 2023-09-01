@@ -1,3 +1,4 @@
+import { EnumType } from "typescript";
 import { RefOrExpression } from "./Expression";
 import { OneOf } from "./Polyfill";
 
@@ -46,6 +47,7 @@ export type Q_DateComparisonValue = Q_NumberComparisonValue;
 export type Q_EnumComparisonValue<E> = E | OneOf<{
     $in: E[];
     $nin: E[];
+    $ne: E;
 }>
 
 export type Q_ExistsValue = {
@@ -105,3 +107,20 @@ export type RefAttr<A> = {
 export function isRefAttrNode<A>(node: any): node is RefAttr<A> {
     return node.hasOwnProperty('#attr') || (node.hasOwnProperty('#refId') && node.hasOwnProperty('#refAttr'));
 };
+
+export type JsonFilter<O extends any> = O extends Array<infer P> ? (JsonFilter<P> | undefined)[] | {
+    $contains?: P | P[];
+    $overlaps?: P | P[];
+} : O extends number ? Q_NumberValue 
+: O extends string ? Q_StringValue
+: O extends boolean ? Q_BooleanValue
+: O extends Record<string, any> ? {
+    [A in keyof O]?: JsonFilter<O[A]>;
+} : never;
+
+export type SubQueryPredicateMetadata = {
+    '#sqp'?: 'in' | 'not in' | 'all' | 'not all';
+};
+
+export const SUB_QUERY_PREDICATE_KEYWORD = '#sqp';
+

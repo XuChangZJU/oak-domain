@@ -5,4 +5,5 @@ export declare const ActionDefDict: {
     user: {
         userState: import("../types").ActionDef<string, string>;
     };
+    userEntityGrant: {};
 };

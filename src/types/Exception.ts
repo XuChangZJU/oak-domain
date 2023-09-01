@@ -82,6 +82,25 @@ export class OakImportDataParseException<ED extends EntityDict> extends OakExcep
     }
 }
 
+export class OakNoRelationDefException<ED extends EntityDict, T extends keyof ED> extends OakDataException<ED> {
+    entity: T;
+    actions: ED[T]['Action'][];
+    constructor(entity: T, actions: ED[T]['Action'][], msg?: string) {
+        super(msg || `对象${entity as string}的操作${actions.join(',')}找不到有效的relation定义`);
+        this.entity = entity;
+        this.actions = actions;
+    }
+    
+    toString(): string {
+        return JSON.stringify({
+            name: this.constructor.name,
+            message: this.message,
+            entity: this.entity,
+            action: this.actions,
+        });
+    }
+}
+
 export class OakOperExistedException<ED extends EntityDict> extends OakDataException<ED> {
     // 进行操作时发现同样id的Oper对象已经存在
 }
@@ -182,6 +201,14 @@ export class OakAttrNotNullException<ED extends EntityDict> extends OakInputIlle
 export class OakUserUnpermittedException<ED extends EntityDict> extends OakUserException<ED> {
 
 };
+
+/**
+ * 用户查询权限不够抛出异常
+ */
+export class OakUserInvisibleException<ED extends EntityDict> extends OakUserException<ED> {
+
+};
+
 
 /**
  * 用户未登录抛的异常
@@ -291,6 +318,11 @@ export function makeException<ED extends EntityDict>(data: {
             e.setOpRecords(data.opRecords);
             return e;
         }
+        case 'OakUserInvisibleException': {
+            const e = new OakUserInvisibleException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
+        }
         case 'OakUnloggedInException': {
             const e = new OakUnloggedInException(data.message);
             e.setOpRecords(data.opRecords);
@@ -318,6 +350,11 @@ export function makeException<ED extends EntityDict>(data: {
         }
         case 'OakDataException': {
             const e = new OakDataException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
+        }
+        case 'OakNoRelationDefException': {
+            const e = new OakNoRelationDefException(data.entity, data.action, data.message);
             e.setOpRecords(data.opRecords);
             return e;
         }

@@ -24,6 +24,7 @@ export declare abstract class Connector<ED extends EntityDict, BackCxt extends A
         body: any;
         headers?: Record<string, any>;
     };
+    abstract getSubscribeRouter(): string;
     abstract getBridgeRouter(): string;
     abstract makeBridgeUrl(url: string, headers?: Record<string, string>): string;
     abstract parseBridgeRequestQuery(urlParams: string): {

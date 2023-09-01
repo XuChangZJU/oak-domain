@@ -124,6 +124,10 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
         return this.rowStore.count(entity, selection, this, option);
     }
 
+    exec(script: string, txnId?: string) {
+        return this.rowStore.exec(script, txnId);
+    }
+
     mergeMultipleResults(toBeMerged: OperationResult<ED>[]) {
         return this.rowStore.mergeMultipleResults(toBeMerged);
     }
@@ -151,6 +155,8 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     abstract toString(): string;
 
     abstract allowUserUpdate(): boolean;
+
+    abstract openRootMode(): () => void;
 };
 
 export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> extends RowStore<ED> {
@@ -188,4 +194,6 @@ export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> exten
     commit(txnId: string): Promise<void>;
 
     rollback(txnId: string): Promise<void>;
+
+    exec(script: string, txnId?: string): Promise<void>;
 };

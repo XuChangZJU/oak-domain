@@ -55,3 +55,14 @@ export const randomName = (prefix?: string, randomLength: number = 8): string =>
     name += random(randomLength);
     return name;
 };
+
+/**
+ * 将字符串中的u16编码转换回汉字
+ * @param str 
+ * @returns 
+ */
+export function unescapeUnicode(str: string) {
+    return str.replace(/\\u[\dA-F]{4}/gi, (match) => {
+        return String.fromCharCode(parseInt(match.replace(/\\u/g, ''), 16));
+    });
+};

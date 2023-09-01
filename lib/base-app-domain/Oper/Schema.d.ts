@@ -1,9 +1,10 @@
-import { String, ForeignKey } from "../../types/DataType";
-import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
+import { ForeignKey } from "../../types/DataType";
+import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import * as SubQuery from "../_SubQuery";
-import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape, AggregationResult } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
 import { AppendOnlyAction } from "../../actions/action";
+import { String } from "../../types/DataType";
+import { EntityShape } from "../../types/Entity";
 import * as User from "../User/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 export declare type OpSchema = EntityShape & {
@@ -29,7 +30,7 @@ export declare type Schema = EntityShape & {
     [A in ExpressionKey]?: any;
 };
 declare type AttrFilter = {
-    id: Q_StringValue | SubQuery.OperIdSubQuery;
+    id: Q_StringValue;
     $$createAt$$: Q_DateValue;
     $$seq$$: Q_StringValue;
     $$updateAt$$: Q_DateValue;
@@ -37,9 +38,10 @@ declare type AttrFilter = {
     data: Object;
     filter: Object;
     extra: Object;
-    operatorId: Q_StringValue | SubQuery.UserIdSubQuery;
+    operatorId: Q_StringValue;
     operator: User.Filter;
     targetEntity: Q_StringValue;
+    operEntity$oper: OperEntity.Filter & SubQueryPredicateMetadata;
 };
 export declare type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
 export declare type Projection = {
@@ -50,9 +52,9 @@ export declare type Projection = {
     $$updateAt$$?: number;
     $$seq$$?: number;
     action?: number;
-    data?: number;
-    filter?: number;
-    extra?: number;
+    data?: number | Object;
+    filter?: number | Object;
+    extra?: number | Object;
     operatorId?: number;
     operator?: User.Projection;
     targetEntity?: number;
@@ -94,16 +96,16 @@ export declare type SortNode = {
 };
 export declare type Sorter = SortNode[];
 export declare type SelectOperation<P extends Object = Projection> = OakSelection<"select", P, Filter, Sorter>;
-export declare type Selection<P extends Object = Projection> = Omit<SelectOperation<P>, "action">;
+export declare type Selection<P extends Object = Projection> = SelectOperation<P>;
 export declare type Aggregation = DeduceAggregation<Projection, Filter, Sorter>;
 export declare type CreateOperationData = FormCreateData<Omit<OpSchema, "operatorId">> & (({
     operatorId?: never;
     operator?: User.CreateSingleOperation;
 } | {
-    operatorId: String<64>;
+    operatorId: ForeignKey<"operator">;
     operator?: User.UpdateOperation;
 } | {
-    operatorId?: String<64>;
+    operatorId?: ForeignKey<"operator">;
 })) & {
     operEntity$oper?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">>>;
 };
@@ -121,7 +123,7 @@ export declare type UpdateOperationData = FormUpdateData<Omit<OpSchema, "operato
     operatorId?: never;
 } | {
     operator?: never;
-    operatorId?: String<64> | null;
+    operatorId?: ForeignKey<"operator"> | null;
 })) & {
     [k: string]: any;
     operEntity$oper?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">>>;

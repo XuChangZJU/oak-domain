@@ -23,6 +23,12 @@ export declare class OakImportDataParseException<ED extends EntityDict> extends 
     header?: string;
     constructor(message: string, line: number, header?: string);
 }
+export declare class OakNoRelationDefException<ED extends EntityDict, T extends keyof ED> extends OakDataException<ED> {
+    entity: T;
+    actions: ED[T]['Action'][];
+    constructor(entity: T, actions: ED[T]['Action'][], msg?: string);
+    toString(): string;
+}
 export declare class OakOperExistedException<ED extends EntityDict> extends OakDataException<ED> {
 }
 export declare class OakRowUnexistedException<ED extends EntityDict> extends OakDataException<ED> {
@@ -68,6 +74,11 @@ export declare class OakAttrNotNullException<ED extends EntityDict> extends OakI
  * 用户权限不够时抛的异常
  */
 export declare class OakUserUnpermittedException<ED extends EntityDict> extends OakUserException<ED> {
+}
+/**
+ * 用户查询权限不够抛出异常
+ */
+export declare class OakUserInvisibleException<ED extends EntityDict> extends OakUserException<ED> {
 }
 /**
  * 用户未登录抛的异常

@@ -32,6 +32,7 @@ export type SelectOption = {
     obscure?: boolean;      // 如果为置为true，则在filter过程中因数据不完整而不能判断为真的时候都假设为真（前端缓存专用）
     forUpdate?: true;
     includedDeleted?: true; // 是否包含删除行的信息
+    ignoreForeignKeyMiss?: true;        // 作为cache时是否允许外键缺失
     dummy?: 1;           // 无用，为了继承Option通过编译
 };
 
@@ -68,10 +69,12 @@ export type Selection<A extends ReadOnlyAction,
     F extends Filter | undefined = undefined,
     S extends Sorter | undefined = undefined> = {
         id?: string;     // selection的id可传可不传，如果传意味着该select会记录在oper中
-        action: A;
+        action?: A;
         data: D;
         sorter?: S;
-    } & FilterPart<A, F>;
+    } & FilterPart<A, F> & {
+        randomRange?: number;
+    };
 
 export interface EntityShape {
     id: PrimaryKey;
@@ -93,7 +96,7 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<Selection<'select', Projection, Filter, Sorter>, 'action'>;
+    Selection: Selection<'select', Projection, Filter, Sorter>;
     Aggregation: DeduceAggregation<Projection, Filter, Sorter>;
     Operation: CUDOperation;
     Create: CreateOperation;
@@ -258,5 +261,16 @@ export type Configuration = {
     static?: boolean;    // 标识是维表（变动较小，相对独立）
 };
 
+export type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, keyof ED, boolean];
+export type AuthDeduceRelationMap<ED extends EntityDict> = {
+    [T in keyof ED]?: keyof ED[T]['OpSchema'];
+};
+export type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];
 // 一对多的键值的扩展
 export type OtmKey<K extends string> = K | `${K}$${number}`;
+
+export interface SubDataDef<ED extends EntityDict, T extends keyof ED> {
+    id: string;    
+    entity: T,
+    filter: ED[T]['Selection']['filter'],
+};

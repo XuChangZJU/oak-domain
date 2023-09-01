@@ -20,3 +20,9 @@ export declare const random: (randomLength?: number) => string;
  * @returns
  */
 export declare const randomName: (prefix?: string, randomLength?: number) => string;
+/**
+ * 将字符串中的u16编码转换回汉字
+ * @param str
+ * @returns
+ */
+export declare function unescapeUnicode(str: string): string;
