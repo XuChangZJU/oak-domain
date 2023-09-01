@@ -379,7 +379,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         cascadeSelectFn: <T2 extends keyof ED>(entity2: T2, selection: ED[T2]['Selection'], context: Cxt, op: OP) => Partial<ED[T2]['Schema']>[] | Promise<Partial<ED[T2]['Schema']>[]>,
         aggregateFn: <T2 extends keyof ED>(entity2: T2, aggregation: ED[T2]['Aggregation'], context: Cxt, op: OP) => AggregationResult<ED[T2]['Schema']> | Promise<AggregationResult<ED[T2]['Schema']>>,
         option: OP) {
-        const projection: ED[T]['Selection']['data'] = {};
         const cascadeSelectionFns: Array<(result: Partial<ED[T]['Schema']>[]) => Promise<void> | void> = [];
 
         const supportMtoJoin = this.supportManyToOneJoin();
@@ -389,17 +388,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         for (const attr in projection2) {
             const relation = judgeRelation(this.storageSchema, entity, attr);
             if (relation === 1 || relation == 0) {
-                Object.assign(projection, {
-                    [attr]: projection2[attr],
-                });
             }
             else if (relation === 2) {
                 // 基于entity/entityId的多对一
-                Object.assign(projection, {
-                    entity: 1,
-                    entityId: 1,
-                });
-
                 assert(typeof projection2[attr] === 'object');
                 if (supportMtoJoin) {
                     cascadeSelectionFns.push(
@@ -430,9 +421,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         projection: subProjection,
                         cascadeSelectionFns: subCascadeSelectionFns,
                     } = this.destructCascadeSelect(attr, projection2[attr], context, cascadeSelectFn, aggregateFn, option);
-                    Object.assign(projection, {
-                        [attr]: subProjection,
-                    });
                     subCascadeSelectionFns.forEach(
                         ele => cascadeSelectionFns.push(
                             (result) => {
@@ -516,9 +504,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
             }
             else if (typeof relation === 'string') {
-                Object.assign(projection, {
-                    [`${attr}Id`]: 1,
-                });
                 assert(typeof projection2[attr] === 'object');
                 if (supportMtoJoin) {
                     if (!toModi) {
@@ -549,9 +534,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         projection: subProjection,
                         cascadeSelectionFns: subCascadeSelectionFns,
                     } = this.destructCascadeSelect(relation, projection2[attr], context, cascadeSelectFn, aggregateFn, option);
-                    Object.assign(projection, {
-                        [attr]: subProjection,
-                    });
                     subCascadeSelectionFns.forEach(
                         ele => cascadeSelectionFns.push(
                             (result) => {
@@ -829,7 +811,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         }
 
         return {
-            projection,
+            projection: projection2,
             cascadeSelectionFns,
         }
     }
