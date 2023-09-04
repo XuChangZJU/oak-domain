@@ -31,6 +31,8 @@ export interface Connector<ED extends EntityDict, FrontCxt extends SyncContext<E
 
     getSubscribeRouter: () => string;
 
+    getSubscribePointRouter: () => string;
+
     getSubscribePoint: () => Promise<{
         url: string;
         path: string;

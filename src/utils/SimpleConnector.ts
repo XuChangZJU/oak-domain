@@ -33,16 +33,17 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
     static ASPECT_ROUTER = '/aspect';
     static BRIDGE_ROUTER = '/bridge';
     static SUBSCRIBE_ROUTER = '/subscribe';
+    static SUBSCRIBE_POINT_ROUTER = '/subscribePoint';
     private serverAspectUrl: string;
     private serverBridgeUrl: string;
-    private serverSubscribeUrl: string;
+    private serverSubscribePointUrl: string;
     private option: ServerOption;
     private makeException: (exceptionData: any) => OakException<ED>;
 
     constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>) {
         this.option = option;
         const { protocol, hostname, port, apiPath } = option;
-        let serverUrl = `${protocol}${hostname}`;
+        let serverUrl = `${protocol}//${hostname}`;
         if (typeof port === 'number') {
             serverUrl += `:${port}`;
         }
@@ -52,7 +53,7 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         }
         this.serverAspectUrl = `${serverUrl}${SimpleConnector.ASPECT_ROUTER}`;
         this.serverBridgeUrl = `${serverUrl}${SimpleConnector.BRIDGE_ROUTER}`;
-        this.serverSubscribeUrl = `${serverUrl}${SimpleConnector.SUBSCRIBE_ROUTER}`;
+        this.serverSubscribePointUrl = `${serverUrl}${SimpleConnector.SUBSCRIBE_POINT_ROUTER}`;
         this.makeException = makeException;
     }
 
@@ -116,8 +117,12 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         return SimpleConnector.SUBSCRIBE_ROUTER;
     }
 
+    getSubscribePointRouter():  string {
+        return SimpleConnector.SUBSCRIBE_POINT_ROUTER;
+    }
+
     async getSubscribePoint() {
-        const response = await global.fetch(this.serverSubscribeUrl);
+        const response = await global.fetch(this.serverSubscribePointUrl);
         if (response.status > 299) {
             const err = new OakExternalException(`网络请求返回异常，status是${response.status}`);
             throw err;
@@ -132,9 +137,9 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
                 port,
             } = await response.json();
 
-            let url2 = url || `${this.option.protocol}${this.option.hostname}`;
+            let url2 = url || `${this.option.protocol}//${this.option.hostname}`;
             assert(port);
-            url2 += ':port';
+            url2 += `:${port}`;
 
             return {
                 url: url2,

@@ -12,9 +12,10 @@ export declare class SimpleConnector<ED extends EntityDict, FrontCxt extends Syn
     static ASPECT_ROUTER: string;
     static BRIDGE_ROUTER: string;
     static SUBSCRIBE_ROUTER: string;
+    static SUBSCRIBE_POINT_ROUTER: string;
     private serverAspectUrl;
     private serverBridgeUrl;
-    private serverSubscribeUrl;
+    private serverSubscribePointUrl;
     private option;
     private makeException;
     constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>);
@@ -29,6 +30,7 @@ export declare class SimpleConnector<ED extends EntityDict, FrontCxt extends Syn
     }>;
     getRouter(): string;
     getSubscribeRouter(): string;
+    getSubscribePointRouter(): string;
     getSubscribePoint(): Promise<{
         url: any;
         path: any;
