@@ -12,8 +12,4 @@ export interface AspectWrapper<ED extends EntityDict, Cxt extends AsyncContext<E
         opRecords?: OpRecord<ED>[];
         message?: string | null;
     }>;
-
-    sub: (data: Array<SubDataDef<ED, keyof ED>>, callback: (records: OpRecord<ED>[], ids: string[]) => void) => Promise<void>;
-
-    unsub: (ids: string[]) => Promise<void>;
 };

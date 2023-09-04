@@ -1,4 +1,4 @@
-import { EntityDict, SubDataDef } from "./Entity";
+import { EntityDict } from "./Entity";
 import { OpRecord } from "./Entity";
 import { AsyncContext } from "../store/AsyncRowStore";
 export interface Aspect<ED extends EntityDict, Cxt extends AsyncContext<ED>> {
@@ -10,6 +10,4 @@ export interface AspectWrapper<ED extends EntityDict, Cxt extends AsyncContext<E
         opRecords?: OpRecord<ED>[];
         message?: string | null;
     }>;
-    sub: (data: Array<SubDataDef<ED, keyof ED>>, callback: (records: OpRecord<ED>[], ids: string[]) => void) => Promise<void>;
-    unsub: (ids: string[]) => Promise<void>;
 }

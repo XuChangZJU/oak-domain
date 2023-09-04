@@ -2,7 +2,6 @@ import assert from 'assert';
 import { IncomingHttpHeaders } from "http";
 import { Stream } from 'stream';
 import URL from 'url';
-import { AsyncContext, AsyncRowStore } from '../store/AsyncRowStore';
 import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException, OakExternalException, OpRecord } from "../types";
 
@@ -23,21 +22,39 @@ function makeContentTypeAndBody(data: any) {
     };
 }
 
-export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
+type ServerOption = {
+    protocol: string;
+    hostname: string;
+    port?: number;
+    apiPath?: string;
+};
+
+export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext<ED>> implements Connector<ED, FrontCxt> {
     static ASPECT_ROUTER = '/aspect';
     static BRIDGE_ROUTER = '/bridge';
     static SUBSCRIBE_ROUTER = '/subscribe';
+    static SUBSCRIBE_POINT_ROUTER = '/subscribePoint';
     private serverAspectUrl: string;
     private serverBridgeUrl: string;
+    private serverSubscribePointUrl: string;
+    private option: ServerOption;
     private makeException: (exceptionData: any) => OakException<ED>;
-    private contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>;
 
-    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException<ED>, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>) {
-        super();
+    constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>) {
+        this.option = option;
+        const { protocol, hostname, port, apiPath } = option;
+        let serverUrl = `${protocol}//${hostname}`;
+        if (typeof port === 'number') {
+            serverUrl += `:${port}`;
+        }
+        if (apiPath) {
+            assert(apiPath.startsWith('/'));
+            serverUrl += apiPath;
+        }
         this.serverAspectUrl = `${serverUrl}${SimpleConnector.ASPECT_ROUTER}`;
         this.serverBridgeUrl = `${serverUrl}${SimpleConnector.BRIDGE_ROUTER}`;
+        this.serverSubscribePointUrl = `${serverUrl}${SimpleConnector.SUBSCRIBE_POINT_ROUTER}`;
         this.makeException = makeException;
-        this.contextBuilder = contextBuilder;
     }
 
     async callAspect(name: string, params: any, context: FrontCxt) {
@@ -100,34 +117,67 @@ export class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext
         return SimpleConnector.SUBSCRIBE_ROUTER;
     }
 
-    async parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{ name: string; params: any; context: BackCxt; }> {
+    getSubscribePointRouter():  string {
+        return SimpleConnector.SUBSCRIBE_POINT_ROUTER;
+    }
+
+    async getSubscribePoint() {
+        const response = await global.fetch(this.serverSubscribePointUrl);
+        if (response.status > 299) {
+            const err = new OakExternalException(`网络请求返回异常，status是${response.status}`);
+            throw err;
+        }
+
+        const message = response.headers.get('oak-message');
+        const responseType = response.headers.get('Content-Type') || response.headers.get('content-type');
+        if (responseType?.toLocaleLowerCase().match(/application\/json/i)) {
+            const {
+                url,
+                path,
+                port,
+            } = await response.json();
+
+            let url2 = url || `${this.option.protocol}//${this.option.hostname}`;
+            assert(port);
+            url2 += `:${port}`;
+
+            return {
+                url: url2,
+                path,
+            };
+        }
+        else {
+            throw new Error(`尚不支持的content-type类型${responseType}`);
+        }
+    }
+
+    parseRequestHeaders(headers: IncomingHttpHeaders) {
         const { 'oak-cxt': oakCxtStr, 'oak-aspect': aspectName } = headers;
         assert(typeof oakCxtStr === 'string' || oakCxtStr === undefined);
         assert(typeof aspectName === 'string');
-        const context = await this.contextBuilder(oakCxtStr as string | undefined)(store);
-        context.setHeaders(headers);
         return {
-            name: aspectName,
-            params: body,
-            context,
-        };
+            contextString: oakCxtStr,
+            aspectName,
+        }
     }
 
-    async serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): Promise<{ body: any; headers?: Record<string, any> | undefined; }> {
+    async serializeResult(result: any, opRecords: OpRecord<ED>[], headers: IncomingHttpHeaders, body: any, message?: string): Promise<{ body: any; headers?: Record<string, any> | undefined; }> {
         if (result instanceof Stream || result instanceof Buffer) {
             return {
                 body: result,
+                headers: {
+                    'oak-message': message,
+                },
             };
         }
 
-        await context.refineOpRecords();
         return {
             body: {
                 result,
-                opRecords: context.opRecords,
+                opRecords,
             },
             headers: {
-                'oak-message': context.getMessage(),
+                'oak-message': message,
             },
         };
     }

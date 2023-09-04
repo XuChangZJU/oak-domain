@@ -1,17 +1,24 @@
 /// <reference types="node" />
 import { IncomingHttpHeaders } from "http";
-import { AsyncContext, AsyncRowStore } from '../store/AsyncRowStore';
 import { SyncContext } from '../store/SyncRowStore';
-import { Connector, EntityDict, OakException } from "../types";
-export declare class SimpleConnector<ED extends EntityDict, BackCxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>> extends Connector<ED, BackCxt, FrontCxt> {
+import { Connector, EntityDict, OakException, OpRecord } from "../types";
+declare type ServerOption = {
+    protocol: string;
+    hostname: string;
+    port?: number;
+    apiPath?: string;
+};
+export declare class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext<ED>> implements Connector<ED, FrontCxt> {
     static ASPECT_ROUTER: string;
     static BRIDGE_ROUTER: string;
     static SUBSCRIBE_ROUTER: string;
+    static SUBSCRIBE_POINT_ROUTER: string;
     private serverAspectUrl;
     private serverBridgeUrl;
+    private serverSubscribePointUrl;
+    private option;
     private makeException;
-    private contextBuilder;
-    constructor(serverUrl: string, makeException: (exceptionData: any) => OakException<ED>, contextBuilder: (str: string | undefined) => (store: AsyncRowStore<ED, BackCxt>) => Promise<BackCxt>);
+    constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>);
     callAspect(name: string, params: any, context: FrontCxt): Promise<{
         result: any;
         opRecords: any;
@@ -23,12 +30,16 @@ export declare class SimpleConnector<ED extends EntityDict, BackCxt extends Asyn
     }>;
     getRouter(): string;
     getSubscribeRouter(): string;
-    parseRequest(headers: IncomingHttpHeaders, body: any, store: AsyncRowStore<ED, BackCxt>): Promise<{
-        name: string;
-        params: any;
-        context: BackCxt;
+    getSubscribePointRouter(): string;
+    getSubscribePoint(): Promise<{
+        url: any;
+        path: any;
     }>;
-    serializeResult(result: any, context: BackCxt, headers: IncomingHttpHeaders, body: any): Promise<{
+    parseRequestHeaders(headers: IncomingHttpHeaders): {
+        contextString: string | undefined;
+        aspectName: string;
+    };
+    serializeResult(result: any, opRecords: OpRecord<ED>[], headers: IncomingHttpHeaders, body: any, message?: string): Promise<{
         body: any;
         headers?: Record<string, any> | undefined;
     }>;
@@ -48,3 +59,4 @@ export declare class SimpleConnector<ED extends EntityDict, BackCxt extends Asyn
         headers?: Record<string, string> | undefined;
     };
 }
+export {};
