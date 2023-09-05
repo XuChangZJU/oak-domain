@@ -8,4 +8,4 @@ export interface EndpointItem<ED extends EntityDict, BackCxt extends AsyncContex
     method: 'get' | 'post' | 'put' | 'delete';
     fn: (context: BackCxt, params: Record<string, string>, headers: IncomingHttpHeaders, req: IncomingMessage, body?: any) => Promise<any>;
 }
-export declare type Endpoint<ED extends EntityDict, BackCxt extends AsyncContext<ED>> = EndpointItem<ED, BackCxt> | EndpointItem<ED, BackCxt>[];
+export type Endpoint<ED extends EntityDict, BackCxt extends AsyncContext<ED>> = EndpointItem<ED, BackCxt> | EndpointItem<ED, BackCxt>[];

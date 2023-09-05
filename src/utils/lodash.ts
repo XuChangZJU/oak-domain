@@ -34,21 +34,3 @@ export {
     difference,
     groupBy, 
 }
-
-// export {
-//     unset,
-//     pull,
-//     uniq,
-//     uniqBy,
-//     get,
-//     set,
-//     intersection,
-//     omit,
-//     merge,
-//     cloneDeep,
-//     pick,
-//     isEqual,
-//     union,
-//     difference,
-//     groupBy,
-// } from 'lodash';

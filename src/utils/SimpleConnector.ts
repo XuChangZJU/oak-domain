@@ -48,7 +48,7 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
             serverUrl += `:${port}`;
         }
         if (apiPath) {
-            assert(apiPath.startsWith('/'));
+            assert(apiPath.startsWith('/'), 'apiPath前缀必须存在/');
             serverUrl += apiPath;
         }
         this.serverAspectUrl = `${serverUrl}${SimpleConnector.ASPECT_ROUTER}`;

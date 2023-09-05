@@ -1,9 +1,9 @@
 export declare const ActionDefDict: {
     modi: {
-        iState: import("../types").ActionDef<string, string>;
+        iState: import("../index").ActionDef<string, string>;
     };
     user: {
-        userState: import("../types").ActionDef<string, string>;
+        userState: import("../index").ActionDef<string, string>;
     };
     userEntityGrant: {};
 };

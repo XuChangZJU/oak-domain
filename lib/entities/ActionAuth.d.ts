@@ -1,8 +1,8 @@
 import { String } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
 import { Schema as Relation } from './Relation';
-declare type Actions = string[];
-declare type Paths = string[];
+type Actions = string[];
+type Paths = string[];
 export interface Schema extends EntityShape {
     relation?: Relation;
     paths: Paths;

@@ -22,3 +22,4 @@ export * from './Endpoint';
 export * from './Style';
 export * from './EntityDesc';
 export * from './Environment';
+export * from './Locale';
