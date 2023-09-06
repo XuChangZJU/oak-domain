@@ -2,7 +2,7 @@
 import { IncomingHttpHeaders } from "http";
 import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException, OpRecord } from "../types";
-type ServerOption = {
+declare type ServerOption = {
     protocol: string;
     hostname: string;
     port?: number;

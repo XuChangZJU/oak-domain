@@ -615,197 +615,158 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     );
                 }
             }
-            else {
+            else {                
                 assert(relation instanceof Array);
                 const { data: subProjection, filter: subFilter, indexFrom, count, sorter: subSorter } = projection2[attr];
                 const [entity2, foreignKey] = relation;
                 const isAggr = attr.endsWith('$$aggr');
-                if (foreignKey) {
-                    // 基于属性的一对多
-                    if (isAggr) {
-                        // 是聚合运算，只有后台才需要执行
-                        (context instanceof AsyncContext) && cascadeSelectionFns.push(
-                            (result) => {
-                                const aggrResults = result.map(
-                                    (row) => {
-                                        const aggrResult = aggregateFn.call(this, entity2, {
-                                            data: subProjection,
-                                            filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
-                                                [foreignKey]: row.id,
-                                            }, subFilter]),
-                                            sorter: subSorter,
-                                            indexFrom,
-                                            count
-                                        }, context, option);
-                                        if (aggrResult instanceof Promise) {
-                                            return aggrResult.then(
-                                                (aggrResultResult) => Object.assign(row, {
-                                                    [attr]: aggrResultResult,
-                                                })
-                                            );
+
+                const otmAggrFn = (result: Partial<ED[T]['Schema']>[]) => {
+                    const aggrResults = result.map(
+                        async (row) => {
+                            const filter2 = foreignKey ? combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
+                                [foreignKey]: row.id,
+                            }, subFilter]) : combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
+                                entity,
+                                entityId: row.id,
+                            }, subFilter]);
+
+                            const aggrResult = aggregateFn.call(this, entity2, {
+                                data: subProjection,
+                                filter: filter2,
+                                sorter: subSorter,
+                                indexFrom,
+                                count
+                            }, context, option);
+                            assert (aggrResult instanceof Promise);
+                            const aggrResultResult = await aggrResult;
+                            return Object.assign(row, {
+                                [attr]: aggrResultResult,
+                            });
+                        }
+                    );
+                    if (aggrResults.length > 0) {
+                        return Promise.all(aggrResults).then(
+                            () => undefined
+                        );
+                    }
+                };
+
+                /** 若一对多子查询没有indexFrom和count，可以优化成组查 */
+                const otmGroupFn = (result: Partial<ED[T]['Schema']>[]) => {
+                    const dealWithSubRows = (subRows: Partial<ED[T]['Schema']>[]) => {
+                        // 这里如果result只有一行，则把返回结果直接置上，不对比外键值
+                        // 这样做的原因是有的对象的filter会被改写掉（userId)，只能临时这样处理
+                        // 看不懂了，应该不需要这个if了，不知道怎么重现测试 by Xc 20230906
+                        if (result.length === 1) {
+                            Object.assign(result[0], {
+                                [attr]: subRows,
+                            });
+                        }
+                        else {
+                            result.forEach(
+                                (ele) => {
+                                    const subRowss = subRows.filter(
+                                        (ele2) => {
+                                            if (foreignKey) {
+                                                return ele2[foreignKey] === ele.id;
+                                            }
+                                            return ele2.entityId === ele.id
                                         }
-                                        else {
-                                            Object.assign(row, {
-                                                [attr]: aggrResult,
-                                            });
-                                        }
-                                    }
-                                );
-                                if (aggrResults.length > 0 && aggrResults[0] instanceof Promise) {
-                                    return Promise.all(aggrResults).then(
-                                        () => undefined
+                                    );
+                                    assert(subRowss);
+                                    Object.assign(ele, {
+                                        [attr]: subRowss,
+                                    });
+                                }
+                            );
+                        }
+                    };
+
+                    const ids = result.map(
+                        ele => ele.id
+                    ) as string[];
+                    if (ids.length > 0) {
+                        const filter2 = foreignKey ? combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
+                            [foreignKey]: {
+                                $in: ids,
+                            },
+                        }, subFilter]) : combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
+                            entity,
+                            entityId: {
+                                $in: ids,
+                            },
+                        }, subFilter]);
+                        const subRows = cascadeSelectFn.call(this, entity2, {
+                            data: subProjection,
+                            filter: filter2,
+                            sorter: subSorter,
+                        }, context, option);
+                        if (subRows instanceof Promise) {
+                            return subRows.then(
+                                (subRowss) => dealWithSubRows(subRowss)
+                            );
+                        }
+                        dealWithSubRows(subRows as any);
+                    }
+                };
+
+                /** 若一对多子查询有indexFrom和count，只能单行去连接 */
+                const otmSingleFn =  (result: Partial<ED[T]['Schema']>[]) => {
+                    const dealWithSubRows2 = (row: Partial<ED[T]['Schema']>, subRows: Partial<ED[T]['Schema']>[]) => {                        
+                        Object.assign(row, {
+                            [attr]: subRows,
+                        });
+                    };
+
+                    if (result.length > 0) {
+                        const getSubRows = result.map(
+                            (row) => {
+                                const filter2 = foreignKey ? combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
+                                    [foreignKey]: row.id!,
+                                }, subFilter]) : combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
+                                    entity,
+                                    entityId: row.id!,
+                                }, subFilter]);
+                                const subRows = cascadeSelectFn.call(this, entity2, {
+                                    data: subProjection,
+                                    filter: filter2,
+                                    sorter: subSorter,
+                                    indexFrom,
+                                    count
+                                }, context, option);
+                                if (subRows instanceof Promise) {
+                                    return subRows.then(
+                                        (subRowss) => dealWithSubRows2(row, subRowss)
                                     );
                                 }
+                                return dealWithSubRows2(row, subRows);
                             }
                         );
+                        if (getSubRows[0] instanceof Promise) {
+                            return Promise.all(getSubRows).then(
+                                () => undefined
+                            );
+                        }
+                        return;
                     }
-                    else {
-                        // 是一对多查询
-                        cascadeSelectionFns.push(
-                            (result) => {
-                                const ids = result.map(
-                                    ele => ele.id
-                                ) as string[];
+                };
 
-                                const dealWithSubRows = (subRows: Partial<ED[keyof ED]['Schema']>[]) => {
-                                    // 这里如果result只有一行，则把返回结果直接置上，不对比外键值
-                                    // 这样做的原因是有的对象的filter会被改写掉（userId)，只能临时这样处理
-                                    if (result.length == 1) {
-                                        Object.assign(result[0], {
-                                            [attr]: subRows,
-                                        });
-                                    }
-                                    else {
-                                        result.forEach(
-                                            (ele) => {
-                                                const subRowss = subRows.filter(
-                                                    ele2 => ele2[foreignKey] === ele.id
-                                                );
-                                                assert(subRowss);
-                                                Object.assign(ele, {
-                                                    [attr]: subRowss,
-                                                });
-                                            }
-                                        );
-                                    }
-                                };
-
-                                if (ids.length > 0) {
-                                    const subRows = cascadeSelectFn.call(this, entity2, {
-                                        data: subProjection,
-                                        filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
-                                            [foreignKey]: {
-                                                $in: ids,
-                                            }
-                                        }, subFilter]),
-                                        sorter: subSorter,
-                                        indexFrom,
-                                        count
-                                    }, context, option);
-                                    if (subRows instanceof Promise) {
-                                        return subRows.then(
-                                            (subRowss) => dealWithSubRows(subRowss)
-                                        );
-                                    }
-                                    dealWithSubRows(subRows as any);
-                                }
-                            }
-                        );
-                    }
+                if (isAggr) {
+                    (context instanceof AsyncContext) && cascadeSelectionFns.push(
+                        result => otmAggrFn(result)
+                    );
                 }
                 else {
-                    // 基于entity的多对一
-                    if (isAggr) {
-                        // 是聚合运算，只有后台才需要执行
-                        (context instanceof AsyncContext) && cascadeSelectionFns.push(
-                            (result) => {
-                                const aggrResults = result.map(
-                                    (row) => {
-                                        const aggrResult = aggregateFn.call(this, entity2, {
-                                            data: subProjection,
-                                            filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
-                                                entity,
-                                                entityId: row.id,
-                                            }, subFilter]),
-                                            sorter: subSorter,
-                                            indexFrom,
-                                            count
-                                        }, context, option);
-                                        if (aggrResult instanceof Promise) {
-                                            return aggrResult.then(
-                                                (aggrResultResult) => Object.assign(row, {
-                                                    [attr]: aggrResultResult,
-                                                })
-                                            );
-                                        }
-                                        else {
-                                            Object.assign(row, {
-                                                [attr]: aggrResult,
-                                            });
-                                        }
-                                    }
-                                );
-                                if (aggrResults.length > 0 && aggrResults[0] instanceof Promise) {
-                                    return Promise.all(aggrResults).then(
-                                        () => undefined
-                                    );
-                                }
+                    cascadeSelectionFns.push(
+                        (result) => {
+                            if (typeof indexFrom === 'number') {
+                                assert(typeof count === 'number' && count > 0);
+                                return otmSingleFn(result);
                             }
-                        );
-                    }
-                    else {
-                        // 是一对多查询
-                        cascadeSelectionFns.push(
-                            (result) => {
-                                const ids = result.map(
-                                    ele => ele.id
-                                ) as string[];
-                                const dealWithSubRows = (subRows: Partial<ED[T]['Schema']>[]) => {
-                                    // 这里如果result只有一行，则把返回结果直接置上，不对比外键值
-                                    // 这样做的原因是有的对象的filter会被改写掉（userId)，只能临时这样处理
-                                    if (result.length === 1) {
-                                        Object.assign(result[0], {
-                                            [attr]: subRows,
-                                        });
-                                    }
-                                    else {
-                                        result.forEach(
-                                            (ele) => {
-                                                const subRowss = subRows.filter(
-                                                    ele2 => ele2.entityId === ele.id
-                                                );
-                                                assert(subRowss);
-                                                Object.assign(ele, {
-                                                    [attr]: subRowss,
-                                                });
-                                            }
-                                        );
-                                    }
-                                };
-
-                                if (ids.length > 0) {
-                                    const subRows = cascadeSelectFn.call(this, entity2, {
-                                        data: subProjection,
-                                        filter: combineFilters<ED, keyof ED>(entity2, this.getSchema(), [{
-                                            entity,
-                                            entityId: {
-                                                $in: ids,
-                                            }
-                                        }, subFilter]),
-                                        sorter: subSorter,
-                                        indexFrom,
-                                        count
-                                    }, context, option);
-                                    if (subRows instanceof Promise) {
-                                        return subRows.then(
-                                            (subRowss) => dealWithSubRows(subRowss)
-                                        );
-                                    }
-                                    dealWithSubRows(subRows as any);
-                                }
-                            }
-                        );
-                    }
+                            return otmGroupFn(result);
+                        }
+                    );
                 }
             }
         }

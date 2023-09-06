@@ -1,4 +1,4 @@
-export type WechatMpEnv = {
+export declare type WechatMpEnv = {
     type: 'wechatMp';
     brand: string;
     model: string;
@@ -33,7 +33,7 @@ export type WechatMpEnv = {
     deviceOrientation: 'portrait' | 'landscape';
     localStorageEnabled: true;
 };
-export type WebEnv = {
+export declare type WebEnv = {
     type: 'web';
     visitorId: string;
     platform: {
@@ -51,7 +51,7 @@ export type WebEnv = {
     language: string;
     localStorageEnabled: boolean;
 };
-export type ServerEnv = {
+export declare type ServerEnv = {
     type: 'server';
 };
-export type Environment = WechatMpEnv | WebEnv | ServerEnv;
+export declare type Environment = WechatMpEnv | WebEnv | ServerEnv;

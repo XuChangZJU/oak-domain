@@ -32,7 +32,7 @@ export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED
     when: 'commit';
     strict?: 'takeEasy' | 'makeSure';
 }
-export type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTriggerInTxn<ED, T, Cxt> | CreateTriggerCrossTxn<ED, T, Cxt>;
+export declare type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTriggerInTxn<ED, T, Cxt> | CreateTriggerCrossTxn<ED, T, Cxt>;
 /**
  * update trigger如果带有filter，说明只对存在限定条件的行起作用。此时系统在进行相应动作时，
  * 会判定当前动作的filter条件和trigger所定义的filter是否有交集（即有同时满足两个条件的行）
@@ -54,7 +54,7 @@ export interface UpdateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED
     when: 'commit';
     strict?: 'takeEasy' | 'makeSure';
 }
-export type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = UpdateTriggerInTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt>;
+export declare type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = UpdateTriggerInTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt>;
 /**
  * 同update trigger一样，remove trigger如果带有filter，说明只对存在限定条件的行起作用。此时系统在进行相应动作时，
  * 会判定当前动作的filter条件和trigger所定义的filter是否有交集（即有同时满足两个条件的行）
@@ -75,7 +75,7 @@ export interface RemoveTriggerCrossTxn<ED extends EntityDict, T extends keyof ED
     when: 'commit';
     strict?: 'takeEasy' | 'makeSure';
 }
-export type RemoveTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = RemoveTriggerInTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;
+export declare type RemoveTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = RemoveTriggerInTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;
 export interface SelectTriggerBase<ED extends EntityDict, T extends keyof ED> extends TriggerBase<ED, T> {
     action: 'select';
 }
@@ -96,8 +96,8 @@ export interface SelectTriggerAfter<ED extends EntityDict, T extends keyof ED, C
         result: Partial<ED[T]['Schema']>[];
     }, context: Cxt, params?: SelectOption) => Promise<number> | number;
 }
-export type SelectTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = SelectTriggerBefore<ED, T, Cxt> | SelectTriggerAfter<ED, T, Cxt>;
-export type Trigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTrigger<ED, T, Cxt> | UpdateTrigger<ED, T, Cxt> | RemoveTrigger<ED, T, Cxt> | SelectTrigger<ED, T, Cxt>;
+export declare type SelectTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = SelectTriggerBefore<ED, T, Cxt> | SelectTriggerAfter<ED, T, Cxt>;
+export declare type Trigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTrigger<ED, T, Cxt> | UpdateTrigger<ED, T, Cxt> | RemoveTrigger<ED, T, Cxt> | SelectTrigger<ED, T, Cxt>;
 export interface TriggerEntityShape extends EntityShape {
     $$triggerData$$?: {
         name: string;
