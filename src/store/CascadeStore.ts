@@ -445,7 +445,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 assert(subRows.length <= entityIds.length);
                                 if (subRows.length < entityIds.length && !toModi) {
                                     // 后台不允许数据不一致
-                                    if (context instanceof AsyncContext || !option.ignoreForeignKeyMiss) {
+                                    if (context instanceof AsyncContext || !option.ignoreAttrMiss) {
                                         throw new OakRowUnexistedException([{
                                             entity: attr,
                                             selection: {
@@ -554,7 +554,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             const dealWithSubRows = (subRows: Partial<ED[keyof ED]['Schema']>[]) => {
                                 assert(subRows.length <= ids.length);
                                 if (subRows.length < ids.length && !toModi) {
-                                    if (context instanceof AsyncContext || !option.ignoreForeignKeyMiss) {
+                                    if (context instanceof AsyncContext || !option.ignoreAttrMiss) {
                                         throw new OakRowUnexistedException([{
                                             entity: relation,
                                             selection: {

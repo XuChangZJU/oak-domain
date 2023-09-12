@@ -27,7 +27,7 @@ export declare type SelectOption = {
     obscure?: boolean;
     forUpdate?: true;
     includedDeleted?: true;
-    ignoreForeignKeyMiss?: true;
+    ignoreAttrMiss?: true;
     dummy?: 1;
 };
 export declare type OperateOption = {
