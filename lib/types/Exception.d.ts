@@ -43,8 +43,14 @@ export declare class OakRowUnexistedException<ED extends EntityDict> extends Oak
         selection: any;
     }[];
 }
+/**
+ * 生态外部造成的异常，比如网络中断
+ */
 export declare class OakExternalException extends Error {
 }
+/**
+ * 可接受的、由用户操作造成的异常
+ */
 export declare class OakUserException<ED extends EntityDict> extends OakException<ED> {
 }
 /**
@@ -67,6 +73,9 @@ export declare class OakInputIllegalException<ED extends EntityDict> extends Oak
     addAttributesPrefix(prefix: string): void;
     toString(): string;
 }
+/**
+ * 属性为空时抛的异常
+ */
 export declare class OakAttrNotNullException<ED extends EntityDict> extends OakInputIllegalException<ED> {
     constructor(entity: keyof ED, attributes: string[], message?: string);
 }
@@ -103,9 +112,15 @@ export declare class OakCongruentRowExists<ED extends EntityDict, T extends keyo
     getEntity(): T;
     toString(): string;
 }
+/**
+ * 死锁抛的异常
+ */
 export declare class OakDeadlock<ED extends EntityDict> extends OakUserException<ED> {
     constructor(message?: string | undefined);
 }
+/**
+ * 前置条件不满足抛的异常
+ */
 export declare class OakPreConditionUnsetException<ED extends EntityDict> extends OakUserException<ED> {
     entity?: keyof ED;
     code?: string;

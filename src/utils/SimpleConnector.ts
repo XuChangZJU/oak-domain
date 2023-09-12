@@ -6,7 +6,6 @@ import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException, OakExternalException, OpRecord } from "../types";
 
 function makeContentTypeAndBody(data: any) {
-    //
     if (process.env.OAK_PLATFORM !== 'wechatMp') {
         if (data instanceof FormData) {
             return {
@@ -205,13 +204,6 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         //     return url;
         // }
         const encodeUrl = encodeURIComponent(url);
-        // const urlParse = URL.parse(url, true);
-        // const { search } = urlParse as {
-        //     search: string;
-        // };
-        // if (headers) {
-        //     search.append('headers', JSON.stringify(headers));
-        // }
 
         return `${this.serverBridgeUrl}?url=${encodeUrl}`;
     }

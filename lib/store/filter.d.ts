@@ -3,11 +3,11 @@ import { EntityDict } from "../base-app-domain";
 import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
 export declare function combineFilters<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filters: Array<ED[T]['Selection']['filter']>, union?: true): ED[T]["Selection"]["filter"] | undefined;
-declare type DeducedFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED> = {
+type DeducedFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED> = {
     entity: T;
     filter: ED[T]['Selection']['filter'];
 };
-declare type DeducedFilterCombination<ED extends EntityDict & BaseEntityDict> = {
+type DeducedFilterCombination<ED extends EntityDict & BaseEntityDict> = {
     $or?: (DeducedFilterCombination<ED> | DeducedFilter<ED, keyof ED>)[];
     $and?: (DeducedFilterCombination<ED> | DeducedFilter<ED, keyof ED>)[];
 };
