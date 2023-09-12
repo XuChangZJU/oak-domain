@@ -309,7 +309,7 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                             filter,
                             indexFrom: 0,
                             count: 1
-                        }, { dontCollect: true, ...option });
+                        }, { dontCollect: true, ignoreAttrMiss: true });
                         if (result instanceof Promise) {
                             promises.push(
                                 result.then(
@@ -348,7 +348,7 @@ export function createRemoveCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                             filter,
                             indexFrom: 0,
                             count: 1
-                        }, { dontCollect: true, ...option });
+                        }, { dontCollect: true, ignoreAttrMiss: true });
                         if (result instanceof Promise) {
                             promises.push(
                                 result.then(
