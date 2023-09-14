@@ -42,7 +42,6 @@ const ReversePointerRelations: Record<string, string[]> = {};
 const ActionImportStatements = () => [
     factory.createImportDeclaration(
         undefined,
-        undefined,
         factory.createImportClause(
             false,
             undefined,
@@ -56,7 +55,6 @@ const ActionImportStatements = () => [
         undefined
     ),
     factory.createImportDeclaration(
-        undefined,
         undefined,
         factory.createImportClause(
             false,
@@ -579,7 +577,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         factory.updateImportDeclaration(
                             node,
                             undefined,
-                            undefined,
                             importClause,
                             factory.createStringLiteral(moduleSpecifier2Text),
                             undefined
@@ -768,7 +765,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     moduleName,
                     factory.updateTypeAliasDeclaration(
                         node,
-                        node.decorators,
                         modifiers,
                         factory.createIdentifier('ParticularAction'),
                         node.typeParameters,
@@ -844,7 +840,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     pushStatementIntoActionAst(moduleName,
                         factory.updateTypeAliasDeclaration(
                             node,
-                            node.decorators,
                             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                             node.name,
                             node.typeParameters,
@@ -860,7 +855,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     pushStatementIntoActionAst(moduleName,
                         factory.updateTypeAliasDeclaration(
                             node,
-                            node.decorators,
                             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                             node.name,
                             node.typeParameters,
@@ -1214,7 +1208,6 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
         pushStatementIntoActionAst(
             moduleName,
             factory.createTypeAliasDeclaration(
-                undefined,
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 factory.createIdentifier("Action"),
                 undefined,
@@ -1501,7 +1494,6 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
             if (ele !== entity) {
                 statements.push(factory.createImportDeclaration(
                     undefined,
-                    undefined,
                     factory.createImportClause(
                         false,
                         undefined,
@@ -1523,7 +1515,6 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
 
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [
                 factory.createModifier(ts.SyntaxKind.ExportKeyword)
             ],
@@ -1535,7 +1526,6 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
             ])
         ),
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("OpAttr"),
             undefined,
@@ -1551,7 +1541,6 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
 
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [
                 factory.createModifier(ts.SyntaxKind.ExportKeyword)
             ],
@@ -1870,7 +1859,6 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
     statements.push(
         factory.createTypeAliasDeclaration(
             undefined,
-            undefined,
             factory.createIdentifier('AttrFilter'),
             undefined,
             factory.createTypeLiteralNode(members)
@@ -1916,7 +1904,6 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
 
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("Filter"),
             undefined,
@@ -2193,9 +2180,7 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
         MetaPropertySignatures.push(
             factory.createIndexSignature(
                 undefined,
-                undefined,
                 [factory.createParameterDeclaration(
-                    undefined,
                     undefined,
                     undefined,
                     factory.createIdentifier("k"),
@@ -2210,7 +2195,6 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
     // Projection，正常查询的投影
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("Projection"),
             undefined,
@@ -2267,7 +2251,6 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
         const identifier = `${foreignKey}IdProjection`;
         statements.push(
             factory.createTypeAliasDeclaration(
-                undefined,
                 undefined,
                 factory.createIdentifier(identifier),
                 undefined,
@@ -2409,7 +2392,6 @@ function constructQuery(statements: Array<ts.Statement>, entity: string) {
             ([oneEntity, foreignKey]) => {
                 statements.push(
                     factory.createTypeAliasDeclaration(
-                        undefined,
                         [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                         factory.createIdentifier(`${oneEntity}IdSubQuery`),
                         undefined,
@@ -2434,7 +2416,6 @@ function constructQuery(statements: Array<ts.Statement>, entity: string) {
     if (!manyToSelf) {
         statements.push(
             factory.createTypeAliasDeclaration(
-                undefined,
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 factory.createIdentifier(`${entity}IdSubQuery`),
                 undefined,
@@ -2600,9 +2581,7 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
         members.push(
             factory.createTypeLiteralNode([factory.createIndexSignature(
                 undefined,
-                undefined,
                 [factory.createParameterDeclaration(
-                    undefined,
                     undefined,
                     undefined,
                     factory.createIdentifier("k"),
@@ -2653,7 +2632,6 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
      */
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("SortAttr"),
             undefined,
@@ -2669,7 +2647,6 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
      */
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("SortNode"),
             undefined,
@@ -2701,7 +2678,6 @@ function constructSorter(statements: Array<ts.Statement>, entity: string) {
      */
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("Sorter"),
             undefined,
@@ -2801,7 +2777,6 @@ function constructFullAttrs(statements: Array<ts.Statement>, entity: string) {
         }
         statements.push(
             factory.createTypeAliasDeclaration(
-                undefined,
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 factory.createIdentifier("NativeAttr"),
                 undefined,
@@ -2820,7 +2795,6 @@ function constructFullAttrs(statements: Array<ts.Statement>, entity: string) {
     }
     else {
         statements.push(factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("NativeAttr"),
             undefined,
@@ -2922,7 +2896,6 @@ function constructFullAttrs(statements: Array<ts.Statement>, entity: string) {
 
         statements.push(
             factory.createTypeAliasDeclaration(
-                undefined,
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 factory.createIdentifier("FullAttr"),
                 undefined,
@@ -2938,7 +2911,6 @@ function constructFullAttrs(statements: Array<ts.Statement>, entity: string) {
     }
     else {
         statements.push(factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("FullAttr"),
             undefined,
@@ -2955,7 +2927,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
     // Selection
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("SelectOperation"),
             [
@@ -2992,7 +2963,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
             )
         ),
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("Selection"),
             [
@@ -3020,7 +2990,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
             )
         ),
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createToken(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("Aggregation"),
             undefined,
@@ -3366,9 +3335,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                         ),
                         factory.createIndexSignature(
                             undefined,
-                            undefined,
                             [factory.createParameterDeclaration(
-                                undefined,
                                 undefined,
                                 undefined,
                                 factory.createIdentifier("K"),
@@ -3540,7 +3507,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
     }
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("CreateOperationData"),
             undefined,
@@ -3551,7 +3517,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
     // CreateOperation
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("CreateSingleOperation"),
             undefined,
@@ -3566,7 +3531,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
             )
         ),
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("CreateMultipleOperation"),
             undefined,
@@ -3584,7 +3548,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
             )
         ),
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("CreateOperation"),
             undefined,
@@ -3921,9 +3884,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
         propertySignatures2.push(
             factory.createIndexSignature(
                 undefined,
-                undefined,
                 [factory.createParameterDeclaration(
-                    undefined,
                     undefined,
                     undefined,
                     factory.createIdentifier("k"),
@@ -4169,7 +4130,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
     }
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("UpdateOperationData"),
             undefined,
@@ -4198,7 +4158,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
 
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("UpdateOperation"),
             undefined,
@@ -4397,9 +4356,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                         [
                             factory.createIndexSignature(
                                 undefined,
-                                undefined,
                                 [factory.createParameterDeclaration(
-                                    undefined,
                                     undefined,
                                     undefined,
                                     factory.createIdentifier("k"),
@@ -4505,7 +4462,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
 
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("RemoveOperationData"),
             undefined,
@@ -4516,7 +4472,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
     // RemoveOperation
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("RemoveOperation"),
             undefined,
@@ -4543,7 +4498,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
 
     statements.push(
         factory.createTypeAliasDeclaration(
-            undefined,
             [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             factory.createIdentifier("Operation"),
             undefined,
@@ -4568,7 +4522,6 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
 const initialStatements = () => [
     // import { String, Text, Int, SpecificKey } from 'oak-domain/types/DataType';
     factory.createImportDeclaration(
-        undefined,
         undefined,
         factory.createImportClause(
             false,
@@ -4602,7 +4555,6 @@ const initialStatements = () => [
         Q_BooleanValue,
     } from 'oak-domain/types/Demand'; */
     factory.createImportDeclaration(
-        undefined,
         undefined,
         factory.createImportClause(
             false,
@@ -4676,7 +4628,6 @@ const initialStatements = () => [
     ),
     factory.createImportDeclaration(
         undefined,
-        undefined,
         factory.createImportClause(
             false,
             undefined,
@@ -4708,7 +4659,6 @@ const initialStatements = () => [
     ), */
     // import { Filter as OakFilter } from 'oak-domain/src/types/Entity';
     factory.createImportDeclaration(
-        undefined,
         undefined,
         factory.createImportClause(
             false,
@@ -4765,7 +4715,6 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
         statements.push(
             factory.createImportDeclaration(
                 undefined,
-                undefined,
                 factory.createImportClause(
                     false,
                     undefined,
@@ -4816,7 +4765,6 @@ function outputSubQuery(outputDir: string, printer: ts.Printer) {
         }
         statements.push(
             factory.createTypeAliasDeclaration(
-                undefined,
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 factory.createIdentifier(identifier),
                 undefined,
@@ -4863,7 +4811,6 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
         statements.push(
             factory.createImportDeclaration(
                 undefined,
-                undefined,
                 factory.createImportClause(
                     false,
                     undefined,
@@ -4892,7 +4839,6 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
         statements.push(
             factory.createImportDeclaration(
                 undefined,
-                undefined,
                 factory.createImportClause(
                     false,
                     undefined,
@@ -4906,7 +4852,6 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
                 undefined
             ),
             factory.createTypeAliasDeclaration(
-                undefined,
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 factory.createIdentifier("EntityDict"),
                 undefined,
@@ -4917,9 +4862,7 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
                     factory.createTypeLiteralNode([
                         factory.createIndexSignature(
                             undefined,
-                            undefined,
                             [factory.createParameterDeclaration(
-                                undefined,
                                 undefined,
                                 undefined,
                                 factory.createIdentifier("E"),
@@ -4940,7 +4883,6 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
     else {
         statements.push(
             factory.createTypeAliasDeclaration(
-                undefined,
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 factory.createIdentifier("EntityDict"),
                 undefined,
@@ -5004,7 +4946,6 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
             statements.push(
                 factory.createImportDeclaration(
                     undefined,
-                    undefined,
                     factory.createImportClause(
                         false,
                         undefined,
@@ -5020,7 +4961,6 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     undefined
                 ),
                 factory.createImportDeclaration(
-                    undefined,
                     undefined,
                     factory.createImportClause(
                         false,
@@ -5041,7 +4981,6 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         else {
             statements.push(
                 factory.createImportDeclaration(
-                    undefined,
                     undefined,
                     factory.createImportClause(
                         false,
@@ -5265,7 +5204,6 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
         } */
         statements.push(
             factory.createTypeAliasDeclaration(
-                undefined,
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 factory.createIdentifier("EntityDef"),
                 undefined,
@@ -5336,7 +5274,6 @@ function outputAction(outputDir: string, printer: ts.Printer) {
 
         actionDictStatements.push(
             factory.createImportDeclaration(
-                undefined,
                 undefined,
                 factory.createImportClause(
                     false,
@@ -5836,7 +5773,6 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
     const importStatements: ts.Statement[] = [
         factory.createImportDeclaration(
             undefined,
-            undefined,
             factory.createImportClause(
                 false,
                 undefined,
@@ -5850,7 +5786,6 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
             undefined
         ),
         factory.createImportDeclaration(
-            undefined,
             undefined,
             factory.createImportClause(
                 false,
@@ -5889,7 +5824,6 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
         const statements: ts.Statement[] = [
             factory.createImportDeclaration(
                 undefined,
-                undefined,
                 factory.createImportClause(
                     false,
                     undefined,
@@ -5903,7 +5837,6 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 undefined
             ),
             factory.createImportDeclaration(
-                undefined,
                 undefined,
                 factory.createImportClause(
                     false,
@@ -5952,7 +5885,6 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                     statements.push(
                         factory.createImportDeclaration(
                             undefined,
-                            undefined,
                             factory.createImportClause(
                                 false,
                                 undefined,
@@ -5991,7 +5923,6 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
         if (needImportActions.length > 0) {
             statements.push(
                 factory.createImportDeclaration(
-                    undefined,
                     undefined,
                     factory.createImportClause(
                         false,
@@ -6157,7 +6088,6 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
 
         importStatements.push(
             factory.createImportDeclaration(
-                undefined,
                 undefined,
                 factory.createImportClause(
                     false,
@@ -6505,7 +6435,6 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
     const stmts: ts.Statement[] = [
         factory.createImportDeclaration(
             undefined,
-            undefined,
             factory.createImportClause(
                 false,
                 undefined,
@@ -6527,7 +6456,6 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
         ),
         factory.createImportDeclaration(
             undefined,
-            undefined,
             factory.createImportClause(
                 false,
                 undefined,
@@ -6541,7 +6469,6 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
             undefined
         ),
         factory.createImportDeclaration(
-            undefined,
             undefined,
             factory.createImportClause(
                 false,

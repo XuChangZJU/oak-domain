@@ -177,8 +177,9 @@ interface AggrAvgExpression<A> {
 
 export type AggrExpression<A> = AggrAvgExpression<A> | AggrCountExpression<A> | AggrSumExpression<A> | AggrMaxExpression<A> | AggrMinExpression<A>;
 
+// 这里expression声明太复杂会导致上层库编译内存堆栈溢出，尚未找到好的解决方案 by Xc 20230914
 export type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> 
-    | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A> | AggrExpression<A>;
+    | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A>/*  | AggrExpression<A> */;
 
 export type ExpressionConstant = Geo | number | Date | string | boolean;
 

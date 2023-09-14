@@ -138,7 +138,7 @@ interface AggrAvgExpression<A> {
     $$avg: RefOrExpression<A>;
 }
 export type AggrExpression<A> = AggrAvgExpression<A> | AggrCountExpression<A> | AggrSumExpression<A> | AggrMaxExpression<A> | AggrMinExpression<A>;
-export type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A> | AggrExpression<A>;
+export type Expression<A> = GeoExpression<A> | DateExpression<A> | LogicExpression<A> | BoolExpression<A> | CompareExpression<A> | MathExpression<A> | StringExpression<A>;
 export type ExpressionConstant = Geo | number | Date | string | boolean;
 export declare function isGeoExpression<A>(expression: any): expression is GeoExpression<A>;
 export declare function isDateExpression<A>(expression: any): expression is DateExpression<A>;

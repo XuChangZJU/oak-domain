@@ -66,7 +66,6 @@ export default class LocaleBuilder {
         const statements: ts.Statement[] = [
             factory.createImportDeclaration(
                 undefined,
-                undefined,
                 factory.createImportClause(
                     false,
                     undefined,
@@ -85,7 +84,6 @@ export default class LocaleBuilder {
             this.dependencies.forEach(
                 (ele, idx) => statements.push(
                     factory.createImportDeclaration(
-                        undefined,
                         undefined,
                         factory.createImportClause(
                             false,
@@ -166,7 +164,6 @@ export default class LocaleBuilder {
                 factory.createExportAssignment(
                     undefined,
                     undefined,
-                    undefined,
                     factory.createCallExpression(
                         factory.createPropertyAccessExpression(
                             factory.createIdentifier("i18ns"),
@@ -183,7 +180,6 @@ export default class LocaleBuilder {
         else {
             statements.push(
                 factory.createExportAssignment(
-                    undefined,
                     undefined,
                     undefined,
                     factory.createIdentifier("i18ns")
