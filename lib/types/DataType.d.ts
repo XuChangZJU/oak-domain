@@ -3,6 +3,7 @@ export type Int<L extends 1 | 2 | 4 | 8> = number;
 export type Uint<L extends 1 | 2 | 4 | 8> = number;
 export type Double<P extends number, S extends number> = number;
 export type Float<P extends number, S extends number> = number;
+export type Decimal<P extends number, S extends number> = number;
 export type String<L extends number> = string;
 export type Text = string;
 export type Image = string;

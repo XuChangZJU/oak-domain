@@ -262,6 +262,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             iState: 1,
                             data: 1,
                             filter: 1,
+                            $$createAt$$: 1,
+                            $$updateAt$$: 1,
                         },
                         filter: {
                             iState: 'active',

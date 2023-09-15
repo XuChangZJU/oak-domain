@@ -134,11 +134,15 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
                 url,
                 path,
                 port,
+                namespace,
             } = await response.json();
 
             let url2 = url || `${this.option.protocol}//${this.option.hostname}`;
             assert(port);
             url2 += `:${port}`;
+            if (namespace) {
+                url2 += namespace;
+            }
 
             return {
                 url: url2,

@@ -1674,7 +1674,8 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
                     case 'Uint':
                     case 'Float':
                     case 'Double':
-                    case 'Price': {
+                    case 'Price':
+                    case 'Decimal': {
                         type2 = factory.createTypeReferenceNode(
                             factory.createIdentifier('Q_NumberValue'),
                         );
@@ -1956,7 +1957,8 @@ function constructProjection(statements: Array<ts.Statement>, entity: string) {
                     case 'File':
                     case 'SingleGeo':
                     case 'Geo':
-                    case 'Price': {
+                    case 'Price':
+                    case 'Decimal': {
                         properties.push(
                             [name, false]
                         )
