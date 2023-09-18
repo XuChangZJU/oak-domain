@@ -1492,16 +1492,28 @@ export function getRelevantIds<ED extends EntityDict & BaseEntityDict, T extends
     }
 
     if (filter?.$and) {
-        const idss = filter.$and.map(
+        const idss: string[][] = filter.$and.map(
             (ele: ED[T]['Selection']['filter']) => getRelevantIds(ele)
         );
+        // and有一个不能判断就返回空集
+        if (idss.find(
+            ele => ele.length === 0
+        )) {
+            return [];
+        }
         idsAnd = intersection(...idss);
     }
 
     if (filter?.$or) {
-        const idss = filter.$or.map(
+        const idss: string[][] = filter.$or.map(
             (ele: ED[T]['Selection']['filter']) => getRelevantIds(ele)
         );
+        // or有一个不能判断就返回空集
+        if (idss.find(
+            ele => ele.length === 0
+        )) {
+            return [];
+        }
         idsOr = union(...idss);
     }
 
@@ -1509,11 +1521,14 @@ export function getRelevantIds<ED extends EntityDict & BaseEntityDict, T extends
         if (typeof filter.id === 'string') {
             ids = [filter.id];
         }
-        if (filter.id?.$eq) {
+        else if (filter.id?.$eq) {
             ids = [filter.id.$eq as string];
         }
-        if (filter.id?.$in && filter.id.$in instanceof Array) {
+        else if (filter.id?.$in && filter.id.$in instanceof Array) {
             ids = filter.id.$in;
+        }
+        else {
+            return [];
         }
     }
 
