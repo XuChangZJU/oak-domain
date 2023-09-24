@@ -1491,6 +1491,35 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
 
     const getUserRelations = async (urAuths: Partial<ED['actionAuth']['Schema']>[]) => {
         const makeRelationIterator = (path: string, relationIds: string[]) => {
+            if (path === '') {
+                return {
+                    projection: {
+                        id: 1,
+                        userRelation$entity: {
+                            $entity: 'userRelation',
+                            data: {
+                                id: 1,
+                                relationId: 1,
+                                relation: {
+                                    id: 1,
+                                    name: 1,
+                                },
+                                entity: 1,
+                                entityId: 1,
+                                userId: 1,
+                            },
+                            filter: {
+                                relationId: {
+                                    $in: relationIds,
+                                },
+                            },
+                        } as ED['userRelation']['Selection'],
+                    } as ED[keyof ED]['Selection']['data'],
+                    getData: (d: Partial<ED[keyof ED]['Schema']>) => {
+                        return d.userRelation$entity;
+                    },
+                };
+            }
             const paths = path.split('.');
 
             const makeIter = (e: keyof ED, idx: number): {
