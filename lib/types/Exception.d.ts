@@ -44,14 +44,16 @@ export declare class OakRowUnexistedException<ED extends EntityDict> extends Oak
     }[];
 }
 /**
- * 生态外部造成的异常，比如网络中断
- */
-export declare class OakExternalException extends Error {
-}
-/**
  * 可接受的、由用户操作造成的异常
  */
 export declare class OakUserException<ED extends EntityDict> extends OakException<ED> {
+}
+/**
+ * 网络中断异常
+ */
+export declare class OakNetworkException<ED extends EntityDict> extends OakException<ED> {
+}
+export declare class OakServerProxyException<ED extends EntityDict> extends OakException<ED> {
 }
 /**
  * 数据不一致异常，系统认为现有的数据不允许相应的动作时抛此异常
@@ -125,6 +127,15 @@ export declare class OakPreConditionUnsetException<ED extends EntityDict> extend
     entity?: keyof ED;
     code?: string;
     constructor(message?: string | undefined, entity?: keyof ED | undefined, code?: string | undefined);
+    toString(): string;
+}
+/**
+ * 调用外部接口抛出的异常
+ */
+export declare class OakExternalException<ED extends EntityDict> extends OakUserException<ED> {
+    code?: string;
+    source: string;
+    constructor(source: string, code?: string, message?: string);
     toString(): string;
 }
 export declare function makeException<ED extends EntityDict>(data: {

@@ -3,7 +3,7 @@ import { IncomingHttpHeaders } from "http";
 import { Stream } from 'stream';
 import URL from 'url';
 import { SyncContext } from '../store/SyncRowStore';
-import { Connector, EntityDict, OakException, OakExternalException, OpRecord } from "../types";
+import { Connector, EntityDict, OakException, OakNetworkException, OakServerProxyException, OpRecord } from "../types";
 
 function makeContentTypeAndBody(data: any) {
     if (process.env.OAK_PLATFORM !== 'wechatMp') {
@@ -60,21 +60,28 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         const cxtStr = context.toString();
 
         const { contentType, body } = makeContentTypeAndBody(params);
-        const response = await global.fetch(this.serverAspectUrl, {
-            method: 'POST',
-            headers: Object.assign(
-                {
-                    'oak-cxt': cxtStr,
-                    'oak-aspect': name as string,
-                },
-                contentType && {
-                    'Content-Type': contentType as string,
-                }
-            ) as RequestInit['headers'],
-            body,
-        });
+        let response: Response;
+        try {
+            response = await global.fetch(this.serverAspectUrl, {
+                method: 'POST',
+                headers: Object.assign(
+                    {
+                        'oak-cxt': cxtStr,
+                        'oak-aspect': name as string,
+                    },
+                    contentType && {
+                        'Content-Type': contentType as string,
+                    }
+                ) as RequestInit['headers'],
+                body,
+            });
+        }
+        catch (err) {
+            // fetch返回异常一定是网络异常
+            throw new OakNetworkException();
+        }
         if (response.status > 299) {
-            const err = new OakExternalException(`网络请求返回异常，status是${response.status}`);
+            const err = new OakServerProxyException(`网络请求返回status是${response.status}`);
             throw err;
         }
 
@@ -116,14 +123,21 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         return SimpleConnector.SUBSCRIBE_ROUTER;
     }
 
-    getSubscribePointRouter():  string {
+    getSubscribePointRouter(): string {
         return SimpleConnector.SUBSCRIBE_POINT_ROUTER;
     }
 
     async getSubscribePoint() {
-        const response = await global.fetch(this.serverSubscribePointUrl);
+        let response: Response;
+        try {
+            response = await global.fetch(this.serverSubscribePointUrl);
+        }
+        catch (err) {
+            throw new OakNetworkException();
+        }
+        
         if (response.status > 299) {
-            const err = new OakExternalException(`网络请求返回异常，status是${response.status}`);
+            const err = new OakServerProxyException(`网络请求返回status是${response.status}`);
             throw err;
         }
 

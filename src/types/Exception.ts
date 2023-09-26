@@ -126,18 +126,24 @@ export class OakRowUnexistedException<ED extends EntityDict> extends OakDataExce
 }
 
 /**
- * 生态外部造成的异常，比如网络中断
- */
-export class OakExternalException extends Error {
-    // 表示由oak生态外部造成的异常，比如网络中断
-}
-
-/**
  * 可接受的、由用户操作造成的异常
  */
 export class OakUserException<ED extends EntityDict> extends OakException<ED> {
     // 继承了这个类的异常统一视为“可接受的、由用户操作造成的异常”
 };
+
+/**
+ * 网络中断异常
+ */
+export class OakNetworkException<ED extends EntityDict> extends OakException<ED> {
+    // 网络访问异常
+}
+
+// 
+export class OakServerProxyException<ED extends EntityDict> extends OakException<ED> {
+    // 服务器反射异常（请求未能到达应用服务程序）
+}
+
 
 // 在系统更新数据时，以下三个异常应按规范依次抛出。
 /**
@@ -299,6 +305,28 @@ export class OakPreConditionUnsetException<ED extends EntityDict> extends OakUse
     }
 }
 
+/**
+ * 调用外部接口抛出的异常
+ */
+export class OakExternalException<ED extends EntityDict> extends OakUserException<ED> {
+    code?: string;
+    source: string;
+
+    constructor(source: string, code?: string, message?: string) {
+        super(message);
+        this.code = code;
+        this.source = source;
+    }
+
+    toString(): string {
+        return JSON.stringify({
+            code: this.code,
+            message: this.message,
+            source: this.source,
+        });
+    }
+}
+
 export function makeException<ED extends EntityDict>(data: {
     name: string;
     message?: string;
@@ -394,6 +422,18 @@ export function makeException<ED extends EntityDict>(data: {
                 data.message
             );
             e.setOpRecords(data.opRecords);
+            return e;
+        }
+        case 'OakExternalException': {
+            const e = new OakExternalException(data.source, data.code, data.message);
+            return e;
+        }
+        case 'OakNetworkException': {
+            const e = new OakNetworkException();
+            return e;
+        }
+        case 'OakServerProxyException': {
+            const e = new OakServerProxyException();
             return e;
         }
         default:
