@@ -429,11 +429,11 @@ export function makeException<ED extends EntityDict>(data: {
             return e;
         }
         case 'OakNetworkException': {
-            const e = new OakNetworkException();
+            const e = new OakNetworkException(data.message);
             return e;
         }
         case 'OakServerProxyException': {
-            const e = new OakServerProxyException();
+            const e = new OakServerProxyException(data.message);
             return e;
         }
         default:
