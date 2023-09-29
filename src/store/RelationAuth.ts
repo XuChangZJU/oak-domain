@@ -802,7 +802,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         }
                     ]
                 }
-            }, { dontCollect: true, ignoreForeignKeyMiss: true });
+            }, { dontCollect: true, ignoreAttrMiss: true });
 
             /**
              * 返回的结果中，第一层为leafNode，必须全通过，第二层为单个leafNode上的deduce，通过一个就可以
@@ -946,7 +946,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             $overlaps: allActions,
                         },
                     }
-                }, { dontCollect: true, ignoreForeignKeyMiss: true });
+                }, { dontCollect: true, ignoreAttrMiss: true });
 
                 const checkActionAuths = (actionAuths: ED['actionAuth']['Schema'][]) => {
                     const created = findOwnCreateUserRelation(actionAuths);
