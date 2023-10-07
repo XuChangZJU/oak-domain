@@ -91,7 +91,7 @@ let rrr = repel('modi', storageSchema, {
         id: 'ddd',
     }
 });
-assert(typeof rrr === 'object');
+assert(rrr === false);
 
 rrr = contains('modi', storageSchema, {
     $not: {
@@ -211,7 +211,6 @@ r = contains('modiEntity', storageSchema, {
 // {"$and":[{"$or":[{"$and":[{"id":"user","filter":{"id":"xc","$not":{"name":"xcxc"}}}]}]}]}
 console.log(5, JSON.stringify(r));
 
-
 r = contains('modiEntity', storageSchema, {
     id: 'user',
     $$seq$$: 'xc',
@@ -228,7 +227,7 @@ r = contains('modiEntity', storageSchema, {
 });
 assert(r === false);
 
-
+// 这个查询应当可以过滤掉modiId: 'cdcd'的条件
 r = contains('modiEntity', storageSchema, {
     id: 'user',
     $$seq$$: 'xc',
@@ -243,6 +242,12 @@ r = contains('modiEntity', storageSchema, {
     },
     modiId: 'cdcd',
 });
-// 这个查询应当可以过滤掉modiId: 'cdcd'的条件
-console.log(8, r);
+
+r = repel('modiEntity', storageSchema, {
+    id: 'user',
+}, {
+    id: 'user',
+    $$seq$$: 'xc',
+});
+console.log(9, JSON.stringify(r));
 

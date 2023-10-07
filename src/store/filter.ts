@@ -6,6 +6,30 @@ import { AsyncContext } from './AsyncRowStore';
 import { judgeRelation } from './relation';
 import { SyncContext } from './SyncRowStore';
 
+/* function getFilterAttributes(filter: Record<string, any>) {
+    const attributes = [] as string[];
+
+    for (const attr in filter) {
+        if (attr.startsWith('$') || attr.startsWith('#')) {
+            if (['$and', '$or'].includes(attr)) {
+                for (const f of filter[attr]) {
+                    const a = getFilterAttributes(f);
+                    attributes.push(...a);
+                }
+            }
+            else if (attr === '$not') {
+                const a = getFilterAttributes(filter[attr]);
+                attributes.push(...a);
+            }
+        }
+        else {
+            attributes.push(attr);
+        }
+    }
+
+    return uniq(attributes);
+} */
+
 /**
  * 尽量合并外键的连接，防止在数据库中join的对象过多
  * @param entity 
@@ -1467,8 +1491,25 @@ export function repel<ED extends EntityDict & BaseEntityDict, T extends keyof ED
     filter2: ED[T]['Selection']['filter']) {
     assert(filter1);
     assert(filter2);
-    return judgeFilterRelation(entity, schema, filter1!, filter2!, false);
-    // return false;
+    /**
+     * 现在的算法检查相斥有一种情况，若filter1被filter2相容，可以判断出来是false，但如果filter2被filter1相容则检查不出来
+     * filter1 = {
+     *    id: 'user',
+     * }
+     * filter2 = {
+        id: 'user',
+        $$seq$$: 'xc',
+     * }
+     * 这种情况就检查不出来，所以再反向判断一次是否相容
+     */
+    const repelled = judgeFilterRelation(entity, schema, filter1!, filter2!, false);
+    if (typeof repelled === 'boolean') {
+        return repelled;
+    }
+    if (contains(entity, schema, filter2, filter1) === true) {
+        return false;
+    }
+    return repelled;
 }
 
 /**
