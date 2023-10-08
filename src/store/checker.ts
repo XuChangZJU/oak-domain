@@ -476,7 +476,7 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
             action: 'create' as ED[keyof ED]['Action'],
             checker: (data) => {
                 const checkData = (data2: ED[keyof ED]['CreateSingle']['data']) => {
-                    const illegalNullAttrs = difference(notNullAttrs, Object.keys(data2));
+                    const illegalNullAttrs = difference(notNullAttrs, Object.keys(data2).filter(ele => data2[ele] !== null));
                     if (illegalNullAttrs.length > 0) {
                         const emtpyAttrs: string[] = [];
                         // 要处理多对一的cascade create
