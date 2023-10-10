@@ -32,16 +32,17 @@ interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
 export interface CreateTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends TriggerBase<ED, T> {
     action: 'create',
     check?: (operation: ED[T]['Create']) => boolean;
-    fn: (event: { operation: ED[T]['Create']; }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
 export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after',
+    fn: (event: { operation: ED[T]['Create']; }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
 export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt> {
     when: 'commit',
     strict?: 'takeEasy' | 'makeSure';
+    fn: (event: { rows: ED[T]['OpSchema'][] }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
 export type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTriggerInTxn<ED, T, Cxt> | CreateTriggerCrossTxn<ED, T, Cxt>;
@@ -55,17 +56,18 @@ export interface UpdateTriggerBase<ED extends EntityDict, T extends keyof ED, Cx
     action: Exclude<ED[T]['Action'], GenericAction> | 'update' | Array<Exclude<ED[T]['Action'], GenericAction> | 'update'>,
     attributes?: keyof ED[T]['OpSchema'] | Array<keyof ED[T]['OpSchema']>;
     check?: (operation: ED[T]['Update']) => boolean;
-    fn: (event: { operation: ED[T]['Update'] }, context: Cxt, option: OperateOption) => Promise<number> | number;
     filter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Update'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Update']['filter']>);
 };
 
 export interface UpdateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after',
+    fn: (event: { operation: ED[T]['Update'] }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
 export interface UpdateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
     when: 'commit',
     strict?: 'takeEasy' | 'makeSure';
+    fn: (event: { rows: ED[T]['OpSchema'][] }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
 export type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = UpdateTriggerInTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt>;
@@ -79,17 +81,18 @@ export type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends
 export interface RemoveTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends TriggerBase<ED, T> {
     action: 'remove',
     check?: (operation: ED[T]['Remove']) => boolean;
-    fn: (event: { operation: ED[T]['Remove'] }, context: Cxt, option: OperateOption) => Promise<number> | number;
     filter?: ED[T]['Remove']['filter'] | ((operation: ED[T]['Remove'], context: Cxt, option: OperateOption) => ED[T]['Remove']['filter'] | Promise<ED[T]['Remove']['filter']>);
 };
 
 export interface RemoveTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends RemoveTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after',
+    fn: (event: { operation: ED[T]['Remove'] }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
 export interface RemoveTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends RemoveTriggerBase<ED, T, Cxt> {
     when: 'commit',
     strict?: 'takeEasy' | 'makeSure';
+    fn: (event: { rows: ED[T]['OpSchema'][] }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
 export type RemoveTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = RemoveTriggerInTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;

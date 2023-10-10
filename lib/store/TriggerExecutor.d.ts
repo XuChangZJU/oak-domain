@@ -7,25 +7,24 @@ import { AsyncContext } from './AsyncRowStore';
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
  */
-export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict> {
+export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> {
     private counter;
     private triggerMap;
     private triggerNameMap;
     private volatileEntities;
     private logger;
     private contextBuilder;
-    constructor(contextBuilder: (cxtString: string) => Promise<AsyncContext<ED>>, logger?: Logger);
-    registerChecker<T extends keyof ED, Cxt extends AsyncContext<ED>>(checker: Checker<ED, T, Cxt>): void;
-    registerTrigger<T extends keyof ED, Cxt extends AsyncContext<ED>>(trigger: Trigger<ED, T, Cxt>): void;
-    unregisterTrigger<T extends keyof ED, Cxt extends AsyncContext<ED>>(trigger: Trigger<ED, T, Cxt>): void;
+    constructor(contextBuilder: (cxtString: string) => Promise<Cxt>, logger?: Logger);
+    registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void;
+    registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
+    unregisterTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
     private preCommitTrigger;
-    preOperation<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
+    preOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
         action: 'select';
     }, context: Cxt, option: OperateOption | SelectOption): Promise<void> | void;
-    private onCommit;
-    private postCommitTrigger;
-    postOperation<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
+    private execVolatileTrigger;
+    postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
         action: 'select';
     }, context: Cxt, option: OperateOption | SelectOption, result?: Partial<ED[T]['Schema']>[]): Promise<void> | void;
-    checkpoint<Cxt extends AsyncContext<ED>>(context: Cxt, timestamp: number): Promise<number>;
+    checkpoint(context: Cxt, timestamp: number): Promise<number>;
 }

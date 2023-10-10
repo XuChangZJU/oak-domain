@@ -1,26 +1,8 @@
-import { groupBy } from '../src/utils/lodash';
+import { v1 } from 'uuid';
 
-const data = [
-    {
-        id: '113',
-        name: 'xc',
-        gender: 'male',
-    },
-    {
-        id: '123',
-        name: 'zz',
-        gender: 'female',
-    },
-    {
-        id: '1234',
-        name: 'xzw',
-        gender: 'female',
-    },
-    {
-        id: '3321',
-        name: null,
-        gender: null
-    }
-];
+let iter = 20;
 
-console.log(JSON.stringify(groupBy(data, 'gender')));
+while (iter > 0) {
+    console.log(v1());
+    iter --;
+}

@@ -3,6 +3,7 @@ import { PrimaryKey, Sequence } from './DataType';
 
 type TriggerDataAttributeType = '$$triggerData$$';
 type TriggerTimestampAttributeType = '$$triggerTimestamp$$';
+type TriggerUuidAttributeType = '$$triggerUuid$$';
 type PrimaryKeyAttributeType = 'id';
 type CreateAtAttributeType = '$$createAt$$';
 type UpdateAtAttributeType = '$$updateAt$$';
@@ -11,13 +12,14 @@ type SeqAttributeType = '$$seq$$';
 
 export const TriggerDataAttribute = '$$triggerData$$';
 export const TriggerTimestampAttribute = '$$triggerTimestamp$$';
+export const TriggerUuidAttribute = '$$triggerUuid$$';
 export const PrimaryKeyAttribute = 'id';
 export const CreateAtAttribute = '$$createAt$$';
 export const UpdateAtAttribute = '$$updateAt$$';
 export const DeleteAtAttribute = '$$deleteAt$$';
 export const SeqAttribute = '$$seq$$';
 
-export type InstinctiveAttributes = PrimaryKeyAttributeType | CreateAtAttributeType | UpdateAtAttributeType| DeleteAtAttributeType | TriggerDataAttributeType | TriggerTimestampAttributeType | SeqAttributeType;
+export type InstinctiveAttributes = PrimaryKeyAttributeType | CreateAtAttributeType | UpdateAtAttributeType| DeleteAtAttributeType | TriggerDataAttributeType | TriggerTimestampAttributeType | SeqAttributeType | TriggerUuidAttributeType;
 export const initinctiveAttributes = [PrimaryKeyAttribute, TriggerDataAttribute, TriggerTimestampAttribute, CreateAtAttribute, UpdateAtAttribute, DeleteAtAttribute, SeqAttribute];
 
 type FilterPart<A extends string, F extends Object | undefined> = {
@@ -41,6 +43,7 @@ export type OperateOption = {
     dontCollect?: boolean;
     dontCreateOper?: boolean;
     dontCreateModi?: boolean;
+    includedDeleted?: true;     // 是否更新已删除行
     allowExists?: boolean;      // 插入时允许已经存在唯一键值的行了，即insert / update逻辑
     modiParentId?: string;      // 如果是延时更新，相关modi要关联到一个父亲上统一应用
     modiParentEntity?: string;  // 如果是延时更新，相关modi要关联到一个父亲上统一应用
