@@ -43,10 +43,11 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     abstract isRoot(): boolean;
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
     abstract toString(): string;
+    abstract initialize(data: any): Promise<void>;
     abstract allowUserUpdate(): boolean;
     abstract openRootMode(): () => void;
 }
-export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> extends RowStore<ED> {
+export interface AsyncRowStore<ED extends EntityDict, Cxt extends AsyncContext<ED>> extends RowStore<ED> {
     operate<T extends keyof ED, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): Promise<OperationResult<ED>>;
     select<T extends keyof ED, OP extends SelectOption>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Promise<Partial<ED[T]['Schema']>[]>;
     aggregate<T extends keyof ED, OP extends SelectOption>(entity: T, aggregation: ED[T]['Aggregation'], context: Cxt, option: OP): Promise<AggregationResult<ED[T]['Schema']>>;

@@ -38,9 +38,9 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     private volatileEntities: Array<keyof ED>;
 
     private logger: Logger;
-    private contextBuilder: (cxtString: string) => Promise<Cxt>;
+    private contextBuilder: (cxtString?: string) => Promise<Cxt>;
 
-    constructor(contextBuilder: (cxtString: string) => Promise<Cxt>, logger: Logger = console) {
+    constructor(contextBuilder: (cxtString?: string) => Promise<Cxt>, logger: Logger = console) {
         this.contextBuilder = contextBuilder;
         this.logger = logger;
         this.triggerMap = {};
@@ -215,7 +215,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                             cxtStr: context.toString(),
                             params: option,
                         },
-                        [TriggerUuidAttribute]: v1(),
+                        [TriggerUuidAttribute]: uuid,
                     });
                 }
             );
@@ -227,7 +227,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     cxtStr,
                     params: option,
                 },
-                [TriggerUuidAttribute]: v1(),
+                [TriggerUuidAttribute]: uuid,
             });
         }
 
@@ -452,48 +452,49 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         }
     }
 
-    async checkpoint(context: Cxt, timestamp: number): Promise<number> {
+    async checkpoint(timestamp: number): Promise<number> {
         let result = 0;
         for (const entity of this.volatileEntities) {
-            const rows = await context.select(entity, {
-                data: {
-                    ...makeProjection(entity, context.getSchema()),
-                    [TriggerDataAttribute]: 1,
-                    [TriggerUuidAttribute]: 1,
-                },
-                filter: {
-                    [TriggerUuidAttribute]: {
-                        $exists: true,
+            const context = await this.contextBuilder();
+            await context.begin();
+            try {
+                const rows = await context.select(entity, {
+                    data: {
+                        ...makeProjection(entity, context.getSchema()),
+                        [TriggerDataAttribute]: 1,
+                        [TriggerUuidAttribute]: 1,
                     },
-                    [UpdateAtAttribute]: {
-                        $gt: timestamp,
-                    }
-                },
-            } as any, {
-                includedDeleted: true,
-                dontCollect: true,
-            });
-
-            const grouped = groupBy(rows, TriggerUuidAttribute);
-
-            for (const uuid in grouped) {
-                const rs = grouped[uuid];
-                const { [TriggerDataAttribute]: triggerData } = rs[0];
-                const { name, cxtStr, params } = triggerData!;
-                const trigger = this.triggerNameMap[name];
-                if (trigger) {
-                    const context2 = await this.contextBuilder(cxtStr);
-
-                    try {
-                        await this.execVolatileTrigger(entity, trigger, context2, params, rs as ED[keyof ED]['OpSchema'][]);
-                        await context2.commit();
-                    }
-                    catch (err) {
-                        await context2.rollback();
-                        this.logger.error(err);
-                    }
+                    filter: {
+                        [TriggerUuidAttribute]: {
+                            $exists: true,
+                        },
+                        [UpdateAtAttribute]: {
+                            $lt: timestamp,
+                        }
+                    },
+                } as any, {
+                    includedDeleted: true,
+                    dontCollect: true,
+                    forUpdate: true,
+                });
+    
+                const grouped = groupBy(rows, TriggerUuidAttribute);
+    
+                for (const uuid in grouped) {
+                    const rs = grouped[uuid];
+                    const { [TriggerDataAttribute]: triggerData } = rs[0];
+                    const { name, cxtStr, params } = triggerData!;
+                    await context.initialize(JSON.parse(cxtStr));
+                    const trigger = this.triggerNameMap[name];
+                    if (trigger) {
+                        await this.execVolatileTrigger(entity, trigger, context, params, rs as ED[keyof ED]['OpSchema'][]);
+                    }    
                 }
-
+                await context.commit();
+            }
+            catch (err) {
+                await context.rollback();
+                this.logger.error(`执行checkpoint时出错，对象是「${entity as string}」，异常是`, err);
             }
         }
         return result;

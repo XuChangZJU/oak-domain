@@ -14,7 +14,7 @@ export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt
     private volatileEntities;
     private logger;
     private contextBuilder;
-    constructor(contextBuilder: (cxtString: string) => Promise<Cxt>, logger?: Logger);
+    constructor(contextBuilder: (cxtString?: string) => Promise<Cxt>, logger?: Logger);
     registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void;
     registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
     unregisterTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
@@ -26,5 +26,5 @@ export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt
     postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
         action: 'select';
     }, context: Cxt, option: OperateOption | SelectOption, result?: Partial<ED[T]['Schema']>[]): Promise<void> | void;
-    checkpoint(context: Cxt, timestamp: number): Promise<number>;
+    checkpoint(timestamp: number): Promise<number>;
 }
