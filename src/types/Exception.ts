@@ -311,11 +311,13 @@ export class OakPreConditionUnsetException<ED extends EntityDict> extends OakUse
 export class OakExternalException<ED extends EntityDict> extends OakUserException<ED> {
     code?: string;
     source: string;
+    data?: any;
 
-    constructor(source: string, code?: string, message?: string) {
+    constructor(source: string, code?: string, message?: string, data?: any) {
         super(message);
         this.code = code;
         this.source = source;
+        this.data = data;
     }
 
     toString(): string {
@@ -323,6 +325,7 @@ export class OakExternalException<ED extends EntityDict> extends OakUserExceptio
             code: this.code,
             message: this.message,
             source: this.source,
+            data: this.data,
         });
     }
 }
@@ -425,7 +428,7 @@ export function makeException<ED extends EntityDict>(data: {
             return e;
         }
         case 'OakExternalException': {
-            const e = new OakExternalException(data.source, data.code, data.message);
+            const e = new OakExternalException(data.source, data.code, data.message, data.data);
             return e;
         }
         case 'OakNetworkException': {

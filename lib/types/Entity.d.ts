@@ -1,7 +1,6 @@
 import { ReadOnlyAction } from '../actions/action';
 import { PrimaryKey, Sequence } from './DataType';
 type TriggerDataAttributeType = '$$triggerData$$';
-type TriggerTimestampAttributeType = '$$triggerTimestamp$$';
 type TriggerUuidAttributeType = '$$triggerUuid$$';
 type PrimaryKeyAttributeType = 'id';
 type CreateAtAttributeType = '$$createAt$$';
@@ -9,14 +8,13 @@ type UpdateAtAttributeType = '$$updateAt$$';
 type DeleteAtAttributeType = '$$deleteAt$$';
 type SeqAttributeType = '$$seq$$';
 export declare const TriggerDataAttribute = "$$triggerData$$";
-export declare const TriggerTimestampAttribute = "$$triggerTimestamp$$";
 export declare const TriggerUuidAttribute = "$$triggerUuid$$";
 export declare const PrimaryKeyAttribute = "id";
 export declare const CreateAtAttribute = "$$createAt$$";
 export declare const UpdateAtAttribute = "$$updateAt$$";
 export declare const DeleteAtAttribute = "$$deleteAt$$";
 export declare const SeqAttribute = "$$seq$$";
-export type InstinctiveAttributes = PrimaryKeyAttributeType | CreateAtAttributeType | UpdateAtAttributeType | DeleteAtAttributeType | TriggerDataAttributeType | TriggerTimestampAttributeType | SeqAttributeType | TriggerUuidAttributeType;
+export type InstinctiveAttributes = PrimaryKeyAttributeType | CreateAtAttributeType | UpdateAtAttributeType | DeleteAtAttributeType | TriggerDataAttributeType | SeqAttributeType | TriggerUuidAttributeType;
 export declare const initinctiveAttributes: string[];
 type FilterPart<A extends string, F extends Object | undefined> = {
     filter?: A extends 'create' ? undefined : F;

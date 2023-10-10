@@ -135,7 +135,8 @@ export declare class OakPreConditionUnsetException<ED extends EntityDict> extend
 export declare class OakExternalException<ED extends EntityDict> extends OakUserException<ED> {
     code?: string;
     source: string;
-    constructor(source: string, code?: string, message?: string);
+    data?: any;
+    constructor(source: string, code?: string, message?: string, data?: any);
     toString(): string;
 }
 export declare function makeException<ED extends EntityDict>(data: {
