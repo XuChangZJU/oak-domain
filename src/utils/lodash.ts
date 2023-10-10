@@ -18,6 +18,7 @@ import union from 'lodash/union';
 import difference from 'lodash/difference';
 import groupBy from 'lodash/groupBy';
 import unionBy from 'lodash/unionBy';
+import pullAll from 'lodash/pullAll';
 
 export {
     unset,
@@ -36,4 +37,5 @@ export {
     difference,
     groupBy,
     unionBy,
+    pullAll,
 };
