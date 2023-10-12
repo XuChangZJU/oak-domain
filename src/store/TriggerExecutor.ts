@@ -248,7 +248,13 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                 }, {
                     includedDeleted: true,
                 }) as ED[T]['OpSchema'][];
-                await this.execVolatileTrigger(entity, trigger, context2, option, rows);
+                if (rows.length  > 0) {
+                    await this.execVolatileTrigger(entity, trigger, context2, option, rows);
+                }
+                else {
+                    // 如果是前台开发模式，debugStore不会保留删除行
+                    assert(process.env.OAK_PLATFORM !== 'server' && operation.action === 'remove');
+                }
 
                 await context2.commit();
             }
