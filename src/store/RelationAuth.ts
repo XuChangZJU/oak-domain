@@ -515,11 +515,12 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         me.userRelations = [];
                         const dealWithUserRelation = (userRelation: ED['userRelation']['CreateSingle']) => {
                             const { action, data } = userRelation;
-                            assert(action === 'create', 'cascade更新中只允许创建userRelation');
-                            const attrs = Object.keys(data);
-                            assert(difference(attrs, Object.keys(this.schema.userRelation.attributes).concat('id')).length === 0);
-                            if (data.userId === userId) {
-                                me.userRelations?.push(data as ED['userRelation']['OpSchema']);
+                            if (action === 'create') {
+                                const attrs = Object.keys(data);
+                                assert(difference(attrs, Object.keys(this.schema.userRelation.attributes).concat('id')).length === 0);
+                                if (data.userId === userId) {
+                                    me.userRelations?.push(data as ED['userRelation']['OpSchema']);
+                                }
                             }
                         };
                         if (otmOperations instanceof Array) {
@@ -531,19 +532,17 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             dealWithUserRelation(otmOperations as any);
                         }
                     }
+                    if (otmOperations instanceof Array) {
+                        otmOperations.forEach(
+                            (otmOperation) => {
+                                const son = destructInner(e, otmOperation, undefined, undefined, true);
+                                addChild(me, attr, son);
+                            }
+                        )
+                    }
                     else {
-                        if (otmOperations instanceof Array) {
-                            otmOperations.forEach(
-                                (otmOperation) => {
-                                    const son = destructInner(e, otmOperation, undefined, undefined, true);
-                                    addChild(me, attr, son);
-                                }
-                            )
-                        }
-                        else {
-                            const son = destructInner(e, otmOperations as any, undefined, undefined, true);
-                            addChild(me, attr, son);
-                        }
+                        const son = destructInner(e, otmOperations as any, undefined, undefined, true);
+                        addChild(me, attr, son);
                     }
                 }
 
@@ -876,8 +875,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
          * @returns 
          */
         const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['OpSchema'][]) => {
-            if (userRelations && userRelations.length > 0) {
-                assert(action === 'create');
+            if (userRelations && userRelations.length > 0) {                
                 const ars = actionAuths.filter(
                     (ar) => !!userRelations.find(
                         (ur) => ur.relationId === ar.relationId
