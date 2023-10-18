@@ -477,7 +477,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             child?: OperationTree<ED>,
             hasParent?: true): OperationTree<ED> => {
             const { action, data, filter } = operation;
-            const filter2 = action === 'create' ? makeCreateFilter(entity, operation as Omit<ED[T]['CreateSingle'], 'id'>) : filter;
+            const filter2 = action === 'create' ? makeCreateFilter(entity, operation as Omit<ED[T]['CreateSingle'], 'id'>) : cloneDeep(filter);
             assert(filter2);
             // const filter3 = extraFilter ? combineFilters(entity, schema, [filter2, extraFilter]) : filter2;
 
@@ -532,17 +532,19 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             dealWithUserRelation(otmOperations as any);
                         }
                     }
-                    if (otmOperations instanceof Array) {
-                        otmOperations.forEach(
-                            (otmOperation) => {
-                                const son = destructInner(e, otmOperation, undefined, undefined, true);
-                                addChild(me, attr, son);
-                            }
-                        )
-                    }
                     else {
-                        const son = destructInner(e, otmOperations as any, undefined, undefined, true);
-                        addChild(me, attr, son);
+                        if (otmOperations instanceof Array) {
+                            otmOperations.forEach(
+                                (otmOperation) => {
+                                    const son = destructInner(e, otmOperation, undefined, undefined, true);
+                                    addChild(me, attr, son);
+                                }
+                            )
+                        }
+                        else {
+                            const son = destructInner(e, otmOperations as any, undefined, undefined, true);
+                            addChild(me, attr, son);
+                        }
                     }
                 }
 

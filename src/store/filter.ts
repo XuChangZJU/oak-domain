@@ -1696,7 +1696,7 @@ export function makeTreeDescendantFilter<ED extends EntityDict & BaseEntityDict,
     return currentLevelInFilter;
 }
 
-export function checkDeduceFilters<ED extends EntityDict & BaseEntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
+function checkDeduceFilters<ED extends EntityDict & BaseEntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
     dfc: DeducedFilterCombination<ED>, context: Cxt
 ): boolean | Promise<boolean> {
     const { $and, $or } = dfc;

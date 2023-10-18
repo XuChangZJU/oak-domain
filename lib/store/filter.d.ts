@@ -108,7 +108,6 @@ export declare function makeTreeAncestorFilter<ED extends EntityDict & BaseEntit
  * @param level
  */
 export declare function makeTreeDescendantFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, parentKey: string, filter: ED[T]['Selection']['filter'], level?: number, includeAll?: boolean, includeSelf?: boolean): ED[T]['Selection']['filter'];
-export declare function checkDeduceFilters<ED extends EntityDict & BaseEntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(dfc: DeducedFilterCombination<ED>, context: Cxt): boolean | Promise<boolean>;
 /**
  * 检查filter是否包含contained（filter查询的数据是contained查询数据的子集）
  * @param entity

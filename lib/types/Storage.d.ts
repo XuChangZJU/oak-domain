@@ -51,6 +51,7 @@ export interface StorageDesc<SH extends EntityShape> {
     actionType: ActionType;
     relation?: string[];
     view?: true;
+    recursiveDepth?: number;
 }
 export type StorageSchema<ED extends EntityDict> = {
     [K in keyof ED]: StorageDesc<ED[K]['OpSchema']>;

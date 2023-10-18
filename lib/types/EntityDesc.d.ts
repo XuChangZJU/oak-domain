@@ -5,4 +5,5 @@ export type EntityDesc<Schema extends EntityShape, Action extends string = '', R
     locales: LocaleDef<Schema, Action, Relation, V>;
     indexes?: Index<Schema>[];
     configuration?: Configuration;
+    recursiveDepth?: number;
 };

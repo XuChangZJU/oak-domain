@@ -10,4 +10,5 @@ export type EntityDesc<
     locales: LocaleDef<Schema, Action, Relation, V>;
     indexes?: Index<Schema>[];
     configuration?: Configuration;
+    recursiveDepth?: number;
 }
