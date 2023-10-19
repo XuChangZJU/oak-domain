@@ -23,6 +23,7 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      */
     private getGrantedRelationIds;
     checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): Promise<void>;
+    private checkUserRelation;
     private checkOperateSpecialEntities2;
     private getDeducedEntityFilters;
     /**
