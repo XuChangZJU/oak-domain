@@ -1,27 +1,18 @@
 import { EntityDict } from "../base-app-domain";
 import { StorageSchema } from "../types";
-import { AuthCascadePath, EntityDict as BaseEntityDict, AuthDeduceRelationMap } from "../types/Entity";
+import { EntityDict as BaseEntityDict, AuthDeduceRelationMap } from "../types/Entity";
 import { AsyncContext } from "./AsyncRowStore";
 import { SyncContext } from "./SyncRowStore";
 export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
-    private actionCascadePathGraph;
-    private relationCascadePathGraph;
     private authDeduceRelationMap;
     private schema;
     static SPECIAL_ENTITIES: string[];
     private selectFreeEntities;
-    private createFreeEntities;
-    private updateFreeEntities;
-    constructor(schema: StorageSchema<ED>, actionCascadePathGraph: AuthCascadePath<ED>[], relationCascadePathGraph: AuthCascadePath<ED>[], authDeduceRelationMap: AuthDeduceRelationMap<ED>, selectFreeEntities?: (keyof ED)[], createFreeEntities?: (keyof ED)[], updateFreeEntities?: (keyof ED)[]);
+    private updateFreeDict;
+    constructor(schema: StorageSchema<ED>, authDeduceRelationMap: AuthDeduceRelationMap<ED>, selectFreeEntities?: (keyof ED)[], updateFreeDict?: {
+        [A in keyof ED]?: string[];
+    });
     checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): void;
-    /**
-     * 查询当前用户在对应entity上可以操作的relationIds
-     * @param entity
-     * @param entityId
-     * @param context
-     * @returns
-     */
-    private getGrantedRelationIds;
     checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): Promise<void>;
     private checkUserRelation;
     private checkOperateSpecialEntities2;

@@ -262,11 +262,13 @@ export type Configuration = {
     static?: boolean;    // 标识是维表（变动较小，相对独立）
 };
 
-export type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, keyof ED, boolean];
 export type AuthDeduceRelationMap<ED extends EntityDict> = {
     [T in keyof ED]?: keyof ED[T]['OpSchema'];
 };
 export type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];
+export type UpdateFreeDict<ED extends EntityDict> = {
+    [A in keyof ED]?: string[];
+};
 // 一对多的键值的扩展
 export type OtmKey<K extends string> = K | `${K}$${number}`;
 

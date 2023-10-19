@@ -185,11 +185,13 @@ export type Configuration = {
     actionType?: ActionType;
     static?: boolean;
 };
-export type AuthCascadePath<ED extends EntityDict> = [keyof ED, string, keyof ED, boolean];
 export type AuthDeduceRelationMap<ED extends EntityDict> = {
     [T in keyof ED]?: keyof ED[T]['OpSchema'];
 };
 export type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];
+export type UpdateFreeDict<ED extends EntityDict> = {
+    [A in keyof ED]?: string[];
+};
 export type OtmKey<K extends string> = K | `${K}$${number}`;
 export interface SubDataDef<ED extends EntityDict, T extends keyof ED> {
     id: string;

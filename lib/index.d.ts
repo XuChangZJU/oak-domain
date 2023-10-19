@@ -1,4 +1,4 @@
-export { storageSchema, selectFreeEntities } from './base-app-domain';
+export { storageSchema } from './base-app-domain';
 export type { EntityDict as BaseEntityDict } from './base-app-domain';
 export * from './store/AsyncRowStore';
 export * from './store/SyncRowStore';

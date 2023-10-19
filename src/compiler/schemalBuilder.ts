@@ -6236,6 +6236,10 @@ function analyzeInModi() {
 }
 
 
+/**
+ * 此部分功能不再使用
+ * @param map 
+ */
 let IGNORED_FOREIGN_KEY_MAP: Record<string, string[]> = {};
 let IGNORED_RELATION_PATH_MAP: Record<string, string[]> = {};
 let DEDUCED_RELATION_MAP: Record<string, string> = {};
@@ -6245,10 +6249,18 @@ let UPDATE_FREE_ENTITIES: string[] = [];
 let FIXED_DESTINATION_PATH_MAP: Record<string, string[]> = {};
 let FIXED_FOR_ALL_DESTINATION_PATH_ENTITIES: string[] = [];
 
+/**
+ * 此函数不再使用
+ * @param map 
+ */
 export function registerIgnoredForeignKeyMap(map: Record<string, string[]>) {
     IGNORED_FOREIGN_KEY_MAP = map;
 }
 
+/**
+ * 此函数不再使用
+ * @param map 
+ */
 export function registerFreeEntities(
     selectFreeEntities: string[] = [],
     createFreeEntities: string[] = [],
@@ -6258,6 +6270,10 @@ export function registerFreeEntities(
     UPDATE_FREE_ENTITIES = updateFreeEntities;
 }
 
+/**
+ * 此函数不再使用
+ * @param map 
+ */
 export function registerIgnoredRelationPathMap(map: Record<string, string[]>) {
     for (const k in map) {
         IGNORED_RELATION_PATH_MAP[firstLetterUpperCase(k)] = map[k];
@@ -6282,6 +6298,10 @@ export function registerFixedDestinationPathMap(map: Record<string, string[]>) {
     }
 }
 
+/**
+ * 此函数不再使用
+ * @param map 
+ */
 export function registerDeducedRelationMap(map: Record<string, string>) {
     for (const k in map) {
         const entity = firstLetterUpperCase(k);
@@ -6303,6 +6323,7 @@ export function registerDeducedRelationMap(map: Record<string, string>) {
 
 /**
  * 输出所有和User相关的对象的后继
+ * 此函数不再使用
  */
 function outputRelation(outputDir: string, printer: ts.Printer) {
     const ExcludedEntities = ['Oper', 'User', 'OperEntity', 'Modi', 'ModiEntity', 'UserRelation', 'Relation', 'RelationAuth', 'ActionAuth'];
@@ -6719,6 +6740,114 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
     writeFileSync(filename, result, { flag: 'w' });
 }
 
+/**
+ * 输出oak-app-domain中的Relation.ts文件
+ * 不再输出actionAuthGraph和relationAuthGraph两个复杂的对象
+ * @param outputDir 
+ * @param printer 
+ */
+function outputRelation2(outputDir: string, printer: ts.Printer) {
+    const entityRelations: [string, string[]][] = [];
+    for (const entity in Schema) {
+        const { hasRelationDef } = Schema[entity];
+        if (hasRelationDef) {
+            const { type } = hasRelationDef;
+            if (ts.isUnionTypeNode(type)) {
+                const { types } = type;
+                const relations = types.map(
+                    ele => {
+                        assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
+                        return ele.literal.text;
+                    }
+                );
+                entityRelations.push([firstLetterLowerCase(entity), relations]);
+            }
+            else {
+                assert(ts.isLiteralTypeNode(type));
+                assert(ts.isStringLiteral(type.literal));
+                const relations = [type.literal.text];
+                entityRelations.push([firstLetterLowerCase(entity), relations]);
+            }
+        }
+    }
+
+    const stmts: ts.Statement[] = [        
+        factory.createImportDeclaration(
+            undefined,
+            factory.createImportClause(
+                false,
+                undefined,
+                factory.createNamedImports([factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("EntityDict")
+                )])
+            ),
+            factory.createStringLiteral("./EntityDict"),
+            undefined
+        ),
+        factory.createImportDeclaration(
+            undefined,
+            factory.createImportClause(
+                false,
+                undefined,
+                factory.createNamedImports([factory.createImportSpecifier(
+                    false,
+                    factory.createIdentifier("CreateOperationData"),
+                    factory.createIdentifier("Relation")
+                )])
+            ),
+            factory.createStringLiteral("./Relation/Schema"),
+            undefined
+        ),
+        factory.createVariableStatement(
+            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+            factory.createVariableDeclarationList(
+                [factory.createVariableDeclaration(
+                    factory.createIdentifier("relations"),
+                    undefined,
+                    factory.createArrayTypeNode(factory.createTypeReferenceNode(
+                        factory.createIdentifier("Relation"),
+                        undefined
+                    )),
+                    factory.createArrayLiteralExpression(
+                        flatten(entityRelations.map(
+                            ([entity, relations]) => relations.map(
+                                (relation) => factory.createObjectLiteralExpression(
+                                    [
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("id"),
+                                            factory.createStringLiteral(formUuid(entity, relation))
+                                        ),
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("entity"),
+                                            factory.createStringLiteral(entity)
+                                        ),
+                                        factory.createPropertyAssignment(
+                                            factory.createIdentifier("name"),
+                                            factory.createStringLiteral(relation)
+                                        )
+                                    ],
+                                    true
+                                )
+                            )
+                        )),
+                        true
+                    )
+                )],
+                ts.NodeFlags.Const
+            )
+        )
+    ];
+
+    const result = printer.printList(
+        ts.ListFormat.SourceFileStatements,
+        factory.createNodeArray(stmts),
+        ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS));
+    const filename = PathLib.join(outputDir, 'Relation.ts');
+    writeFileSync(filename, result, { flag: 'w' });
+}
+
 export function analyzeEntities(inputDir: string, relativePath?: string) {
     const files = readdirSync(inputDir);
     const fullFilenames = files.map(
@@ -6755,7 +6884,7 @@ export function buildSchema(outputDir: string): void {
     outputAction(outputDir, printer);
     outputEntityDict(outputDir, printer);
     outputStorage(outputDir, printer);
-    outputRelation(outputDir, printer);
+    outputRelation2(outputDir, printer);
     outputIndexTs(outputDir);
 
     if (!process.env.COMPLING_AS_LIB) {
