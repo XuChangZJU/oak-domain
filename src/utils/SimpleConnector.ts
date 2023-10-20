@@ -28,18 +28,24 @@ type ServerOption = {
     apiPath?: string;
 };
 
-export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext<ED>> implements Connector<ED, FrontCxt> {
+export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext<ED>>
+    implements Connector<ED, FrontCxt>
+{
     static ASPECT_ROUTER = '/aspect';
     static BRIDGE_ROUTER = '/bridge';
     static SUBSCRIBE_ROUTER = '/subscribe';
     static SUBSCRIBE_POINT_ROUTER = '/subscribePoint';
+    static ENDPOINT_ROUTER = '/endpoint';
     private serverAspectUrl: string;
     private serverBridgeUrl: string;
     private serverSubscribePointUrl: string;
     private option: ServerOption;
     private makeException: (exceptionData: any) => OakException<ED>;
 
-    constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>) {
+    constructor(
+        option: ServerOption,
+        makeException: (exceptionData: any) => OakException<ED>
+    ) {
         this.option = option;
         const { protocol, hostname, port, apiPath } = option;
         let serverUrl = `${protocol}//${hostname}`;
@@ -75,24 +81,23 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
                 ) as RequestInit['headers'],
                 body,
             });
-        }
-        catch (err) {
+        } catch (err) {
             // fetch返回异常一定是网络异常
             throw new OakNetworkException();
         }
         if (response.status > 299) {
-            const err = new OakServerProxyException(`网络请求返回status是${response.status}`);
+            const err = new OakServerProxyException(
+                `网络请求返回status是${response.status}`
+            );
             throw err;
         }
 
         const message = response.headers.get('oak-message');
-        const responseType = response.headers.get('Content-Type') || response.headers.get('content-type');
+        const responseType =
+            response.headers.get('Content-Type') ||
+            response.headers.get('content-type');
         if (responseType?.toLocaleLowerCase().match(/application\/json/i)) {
-            const {
-                exception,
-                result,
-                opRecords,
-            } = await response.json();
+            const { exception, result, opRecords } = await response.json();
 
             if (exception) {
                 throw this.makeException(exception);
@@ -102,15 +107,17 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
                 opRecords,
                 message,
             };
-        }
-        else if (responseType?.toLocaleLowerCase().match(/application\/octet-stream/i)) {
+        } else if (
+            responseType
+                ?.toLocaleLowerCase()
+                .match(/application\/octet-stream/i)
+        ) {
             const result = await response.arrayBuffer();
             return {
                 result,
                 message,
             };
-        }
-        else {
+        } else {
             throw new Error(`尚不支持的content-type类型${responseType}`);
         }
     }
@@ -131,27 +138,26 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         let response: Response;
         try {
             response = await global.fetch(this.serverSubscribePointUrl);
-        }
-        catch (err) {
+        } catch (err) {
             throw new OakNetworkException();
         }
-        
+
         if (response.status > 299) {
-            const err = new OakServerProxyException(`网络请求返回status是${response.status}`);
+            const err = new OakServerProxyException(
+                `网络请求返回status是${response.status}`
+            );
             throw err;
         }
 
         const message = response.headers.get('oak-message');
-        const responseType = response.headers.get('Content-Type') || response.headers.get('content-type');
+        const responseType =
+            response.headers.get('Content-Type') ||
+            response.headers.get('content-type');
         if (responseType?.toLocaleLowerCase().match(/application\/json/i)) {
-            const {
-                url,
-                path,
-                port,
-                namespace,
-            } = await response.json();
+            const { url, path, port, namespace } = await response.json();
 
-            let url2 = url || `${this.option.protocol}//${this.option.hostname}`;
+            let url2 =
+                url || `${this.option.protocol}//${this.option.hostname}`;
             assert(port);
             url2 += `:${port}`;
             if (namespace) {
@@ -162,10 +168,13 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
                 url: url2,
                 path,
             };
-        }
-        else {
+        } else {
             throw new Error(`尚不支持的content-type类型${responseType}`);
         }
+    }
+
+    getEndpointRouter(): string {
+        return SimpleConnector.ENDPOINT_ROUTER;
     }
 
     parseRequestHeaders(headers: IncomingHttpHeaders) {
@@ -175,10 +184,16 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         return {
             contextString: oakCxtStr,
             aspectName,
-        }
+        };
     }
 
-    async serializeResult(result: any, opRecords: OpRecord<ED>[], headers: IncomingHttpHeaders, body: any, message?: string): Promise<{ body: any; headers?: Record<string, any> | undefined; }> {
+    async serializeResult(
+        result: any,
+        opRecords: OpRecord<ED>[],
+        headers: IncomingHttpHeaders,
+        body: any,
+        message?: string
+    ): Promise<{ body: any; headers?: Record<string, any> | undefined }> {
         if (result instanceof Stream || result instanceof Buffer) {
             return {
                 body: result,
@@ -199,7 +214,11 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         };
     }
 
-    serializeException(exception: OakException<ED>, headers: IncomingHttpHeaders, body: any): { body: any; headers?: Record<string, any> | undefined; } {
+    serializeException(
+        exception: OakException<ED>,
+        headers: IncomingHttpHeaders,
+        body: any
+    ): { body: any; headers?: Record<string, any> | undefined } {
         return {
             body: {
                 exception: exception.toString(),
@@ -213,8 +232,8 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
 
     /**
      * 通过本地服务器桥接访问外部资源的url
-     * @param url 
-     * @param headers 
+     * @param url
+     * @param headers
      */
     makeBridgeUrl(url: string, headers?: Record<string, string>) {
         // if (process.env.PROD !== 'true') {
@@ -225,7 +244,11 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
 
         return `${this.serverBridgeUrl}?url=${encodeUrl}`;
     }
-    parseBridgeRequestQuery(urlParams: string): { url: string; headers?: Record<string, string> | undefined; } {
+    
+    parseBridgeRequestQuery(urlParams: string): {
+        url: string;
+        headers?: Record<string, string> | undefined;
+    } {
         const search = new URL.URLSearchParams(urlParams);
         const url = search.get('url') as string;
         const headers = search.get('headers');

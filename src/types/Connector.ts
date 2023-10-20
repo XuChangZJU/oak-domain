@@ -6,7 +6,11 @@ import { EntityDict, OpRecord } from "./Entity";
 import { OakException } from "./Exception";
 
 export interface Connector<ED extends EntityDict, FrontCxt extends SyncContext<ED>> {
-    callAspect: (name: string, params: any, context: FrontCxt) => Promise<{
+    callAspect: (
+        name: string,
+        params: any,
+        context: FrontCxt
+    ) => Promise<{
         result: any;
         opRecords?: OpRecord<ED>[];
         message?: string | null;
@@ -17,14 +21,24 @@ export interface Connector<ED extends EntityDict, FrontCxt extends SyncContext<E
     parseRequestHeaders: (headers: IncomingHttpHeaders) => {
         contextString?: string;
         aspectName: string;
-    }
+    };
 
-    serializeResult: (result: any, opRecords: OpRecord<ED>[], headers: IncomingHttpHeaders, body: any, message?: string) => Promise<{
+    serializeResult: (
+        result: any,
+        opRecords: OpRecord<ED>[],
+        headers: IncomingHttpHeaders,
+        body: any,
+        message?: string
+    ) => Promise<{
         body: any;
         headers?: Record<string, any>;
     }>;
 
-    serializeException: (exception: OakException<ED>, headers: IncomingHttpHeaders, body: any) => {
+    serializeException: (
+        exception: OakException<ED>,
+        headers: IncomingHttpHeaders,
+        body: any
+    ) => {
         body: any;
         headers?: Record<string, any>;
     };
@@ -39,11 +53,13 @@ export interface Connector<ED extends EntityDict, FrontCxt extends SyncContext<E
     }>;
 
     getBridgeRouter: () => string;
-    
+
     makeBridgeUrl: (url: string, headers?: Record<string, string>) => string;
+
+    getEndpointRouter: () => string;
 
     parseBridgeRequestQuery: (urlParams: string) => {
         url: string;
         headers?: Record<string, string>;
-    }
+    };
 }

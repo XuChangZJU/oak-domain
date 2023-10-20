@@ -13,6 +13,7 @@ export declare class SimpleConnector<ED extends EntityDict, FrontCxt extends Syn
     static BRIDGE_ROUTER: string;
     static SUBSCRIBE_ROUTER: string;
     static SUBSCRIBE_POINT_ROUTER: string;
+    static ENDPOINT_ROUTER: string;
     private serverAspectUrl;
     private serverBridgeUrl;
     private serverSubscribePointUrl;
@@ -35,6 +36,7 @@ export declare class SimpleConnector<ED extends EntityDict, FrontCxt extends Syn
         url: any;
         path: any;
     }>;
+    getEndpointRouter(): string;
     parseRequestHeaders(headers: IncomingHttpHeaders): {
         contextString: string | undefined;
         aspectName: string;

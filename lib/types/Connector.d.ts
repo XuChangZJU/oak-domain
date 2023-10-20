@@ -30,6 +30,7 @@ export interface Connector<ED extends EntityDict, FrontCxt extends SyncContext<E
     }>;
     getBridgeRouter: () => string;
     makeBridgeUrl: (url: string, headers?: Record<string, string>) => string;
+    getEndpointRouter: () => string;
     parseBridgeRequestQuery: (urlParams: string) => {
         url: string;
         headers?: Record<string, string>;
