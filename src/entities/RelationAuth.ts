@@ -2,11 +2,12 @@ import { String } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
 import { Schema as Relation } from './Relation';
 import { EntityDesc } from '../types/EntityDesc';
+import { Schema as Path } from './Path';
 
 // destRelation需要有sourceRelation才能授权/除权
 export interface Schema extends EntityShape {
     sourceRelation: Relation;
-    path: String<256>;
+    path: Path;
     destRelation: Relation;
 };
 

@@ -9,7 +9,6 @@ import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
 import { difference, intersection, set, uniq, cloneDeep, groupBy } from '../utils/lodash';
 import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
-import path from "path";
 
 
 type OperationTree<ED extends EntityDict & BaseEntityDict> = {
@@ -99,7 +98,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             }
             else {
                 // 否则为测试“能否”有权限管理的资格，此时只要有一个就可以
-                assert (entity);
+                assert(entity);
                 filter2 = {
                     destRelation: {
                         entity,
@@ -116,7 +115,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         const relationAuths = context.select('relationAuth', {
             data: {
                 id: 1,
-                path: 1,
+                path: {
+                    id: 1,
+                    sourceEntity: 1,
+                    destEntity: 1,
+                    value: 1,
+                    recursive: 1,
+                },
                 sourceRelationId: 1,
                 sourceRelation: {
                     id: 1,
@@ -136,24 +141,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
         const checkRelationAuth = (relationAuth: ED['relationAuth']['Schema']) => {
             const { destRelation, sourceRelationId, path } = relationAuth;
-            const destEntityFilter: ED[keyof ED]['Selection']['filter'] = {};
+            let destEntityFilter = this.makePathFilter(destRelation.entity!, path, this.schema, {
+                userRelation$entity: {
+                    userId,
+                    relationId: sourceRelationId,
+                },
+            })!;
 
-            if (path) {
-                set(destEntityFilter, path, {
-                    userRelation$entity: {
-                        userId,
-                        relationId: sourceRelationId,
-                    },
-                });
-            }
-            else {
-                Object.assign(destEntityFilter, {
-                    userRelation$entity: {
-                        userId,
-                        relationId: sourceRelationId,
-                    },
-                });
-            }
             if (action === 'create') {
                 const { entity, entityId } = filter;
                 assert(entity && entityId);
@@ -163,9 +157,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 });
             }
             else {
-                Object.assign(destEntityFilter, {
+                destEntityFilter = combineFilters(destRelation.entity!, this.schema, [destEntityFilter, {
                     userRelation$entity: filter,
-                });
+                }])!;
             }
 
             return context.count(destRelation.entity, {
@@ -590,6 +584,65 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         return destructInner(entity2, operation2);
     }
 
+    private makePathFilter<T extends keyof ED>(entity: T, path: ED['path']['OpSchema'], schema: StorageSchema<ED>, filter: ED[keyof ED]['Selection']['filter']): ED[keyof ED]['Selection']['filter'] {
+        const { value, recursive } = path;
+
+        if (value === '') {
+            assert(!recursive);
+            return filter;
+        }
+
+        const paths = value.split('.');
+
+        const makeRecursiveFilter = (recursiveDepth: number): ED[keyof ED]['Selection']['filter'] => {
+            if (recursiveDepth > 0) {
+                return {
+                    $or: [
+                        filter,
+                        {
+                            parent: makeRecursiveFilter(recursiveDepth - 1)
+                        }
+                    ]
+                };
+            }
+            return filter;
+        };
+
+        const makeInner = (idx: number, e2: keyof ED): ED[keyof ED]['Selection']['filter'] => {
+            const attr = paths[idx];
+            if (idx === paths.length) {
+                if (!recursive) {
+                    return filter;
+                }
+                else {
+                    // 在最后一个对象上存在递归，用or连接处理
+                    const { recursiveDepth } = schema[e2];
+                    assert(recursiveDepth! > 0);
+                    return makeRecursiveFilter(recursiveDepth!);
+                }
+            }
+            else {
+                const rel = judgeRelation(schema, e2, attr);
+                let e3;
+                if (rel === 2) {
+                    e3 = attr;
+                }
+                else if (typeof rel === 'string') {
+                    e3 = rel;
+                }
+                else {
+                    assert(rel instanceof Array);
+                    e3 = rel[0];
+                }
+                const f = makeInner(idx + 1, e3);
+                return {
+                    [attr]: f,
+                };
+            }
+        };
+        return makeInner(0, entity);
+    }
+
     /**
      * 对所有满足操作要求的actionAuth加以判断，找到可以满足当前用户身份的actionAuth
      * @param entity 
@@ -606,7 +659,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     ) {
         const result = actionAuths.map(
             (ele) => {
-                const { paths, relation, relationId } = ele;
+                const { path, relation, relationId } = ele;
 
                 // 在cache中，可能出现relation外键指向的对象为null的情况，要容错
                 if (relationId) {
@@ -614,26 +667,12 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         const { userRelation$relation: userRelations } = relation;
                         if (userRelations!.length > 0) {
                             const entityIds = uniq(userRelations!.map(ele => ele.entityId));
-                            const idFilter = entityIds.length > 1 ? {
-                                $in: entityIds,
-                            } : entityIds[0];
-                            assert(idFilter);
-                            const pathFilters = paths.map(
-                                (path) => {
-                                    if (path) {
-                                        return set({}, path, {
-                                            id: idFilter,
-                                        });
-                                    }
-                                    return {
-                                        id: idFilter,
-                                    };
-                                }
-                            );
-
-                            // 这里是或关系，只要对象落在任意一条路径上就可以
-                            const contained = combineFilters(entity, context.getSchema(), pathFilters, true);
-                            const contains = checkFilterContains(entity, context, contained, filter, true)
+                            const pathFilter = this.makePathFilter(entity, path, this.schema, {
+                                id: entityIds.length > 0 ? {
+                                    $in: entityIds,
+                                } : entityIds[0],
+                            });
+                            const contains = checkFilterContains(entity, context, pathFilter, filter, true)
                             if (contains instanceof Promise) {
                                 return contains.then(
                                     (c) => {
@@ -654,11 +693,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     return;
                 }
                 // 说明是通过userId关联
-                const pathFilters = paths.map(
-                    (path) => set({}, `${path}.id`, context.getCurrentUserId())
-                );
-                const contained = combineFilters(entity, context.getSchema(), pathFilters, true);
-                const contains = checkFilterContains(entity, context, contained, filter, true)
+                const pathFilter = this.makePathFilter(entity, path, this.schema, {
+                    id: context.getCurrentUserId()!,
+                });
+                const contains = checkFilterContains(entity, context, pathFilter, filter, true);
                 if (contains instanceof Promise) {
                     return contains.then(
                         (c) => {
@@ -704,41 +742,30 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         context: Cxt,
     ) {
         const filters = actionAuths.filter(
-            ele => ele.destEntity === entity
+            ele => ele.path.destEntity === entity
         ).map(
             (ele) => {
-                const { paths, relation, relationId } = ele;
+                const { path, relation, relationId } = ele;
                 if (relationId) {
                     assert(relation);
                     const { userRelation$relation: userRelations } = relation;
                     assert(userRelations!.length > 0);
                     const entityIds = uniq(userRelations!.map(ele => ele.entityId));
-                    const idFilter = entityIds.length > 1 ? {
-                        $in: entityIds,
-                    } : entityIds[0];
-                    assert(idFilter);
-                    const pathFilters = paths.map(
-                        (path) => {
-                            if (path) {
-                                return set({}, path, {
-                                    id: idFilter,
-                                });
-                            }
-                            return {
-                                id: idFilter
-                            };
-                        }
-                    )
-                    return pathFilters;
+                    const pathFilter = this.makePathFilter(entity, path, this.schema, {
+                        id: entityIds.length > 0 ? {
+                            $in: entityIds,
+                        } : entityIds[0],
+                    });
+                    return pathFilter;
                 }
                 // 说明是通过userId关联
-                return paths.map(
-                    (path) => set({}, `${path}.id`, context.getCurrentUserId())
-                );
+                return this.makePathFilter(entity, path, this.schema, {
+                    id: context.getCurrentUserId()!,
+                });
             }
         );
 
-        const groupFilter = combineFilters(entity, this.schema, filters.flat(), true);
+        const groupFilter = combineFilters(entity, this.schema, filters, true);
 
         if (groupFilter) {
             return checkFilterContains(entity, context, groupFilter, filter, true);
@@ -797,8 +824,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             const actionAuths = context.select('actionAuth', {
                 data: {
                     id: 1,
-                    paths: 1,
-                    destEntity: 1,
+                    path: {
+                        id: 1,
+                        value: 1,
+                        sourceEntity: 1,
+                        destEntity: 1,
+                        recursive: 1,
+                    },
                     deActions: 1,
                     relation: {
                         id: 1,
@@ -819,8 +851,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     deActions: {
                         $contains: 'select',
                     },
-                    destEntity: {
-                        $in: allEntities as string[],
+                    path: {
+                        destEntity: {
+                            $in: allEntities as string[],
+                        },
                     },
                     $or: [
                         {
@@ -910,12 +944,12 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
          * @param actionAuths 
          * @returns 
          */
-        const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['OpSchema'][]) => {
+        const findOwnCreateUserRelation = (actionAuths: ED['actionAuth']['Schema'][]) => {
             if (userRelations && userRelations.length > 0) {
                 const ars = actionAuths.filter(
                     (ar) => !!userRelations.find(
                         (ur) => ur.relationId === ar.relationId
-                    ) && ar.paths.includes('') && ar.destEntity === entity
+                    ) && ar.path.value === '' && ar.path.destEntity === entity
                 );
 
                 if (ars.length > 0) {
@@ -954,8 +988,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 const actionAuths2 = context.select('actionAuth', {
                     data: {
                         id: 1,
-                        paths: 1,
-                        destEntity: 1,
+                        path: {
+                            id: 1,
+                            destEntity: 1,
+                            sourceEntity: 1,
+                            value: 1,
+                            recursive: 1,
+                        },
                         deActions: 1,
                         relation: {
                             id: 1,
@@ -973,8 +1012,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         },
                     },
                     filter: {
-                        destEntity: {
-                            $in: allEntities as string[],
+                        path: {
+                            destEntity: {
+                                $in: allEntities as string[],
+                            }
                         },
                         deActions: {
                             $overlaps: allActions,
@@ -992,7 +1033,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                     const result = deducedEntityFilters.map(
                         (ele) => {
                             const ars2 = actionAuths.filter(
-                                ele2 => ele2.destEntity === ele.entity && intersection(ele2.deActions, ele.actions).length > 0     // 这里只要overlap就可以了
+                                ele2 => ele2.path.destEntity === ele.entity && intersection(ele2.deActions, ele.actions).length > 0     // 这里只要overlap就可以了
                             );
 
                             const ars3 = this.filterActionAuths(ele.entity, ele.filter, ars2, context);
@@ -1064,8 +1105,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     }
 
     private checkOperationTree2<Cxt extends AsyncContext<ED> | SyncContext<ED>>(tree: OperationTree<ED>, context: Cxt) {
-        const checkNode = (node: OperationTree<ED>, actionAuths?: ED['actionAuth']['OpSchema'][]): boolean | Promise<boolean> => {
-            const checkChildren = (legalPaths: ED['actionAuth']['OpSchema'][]) => {
+        const checkNode = (node: OperationTree<ED>, actionAuths?: ED['actionAuth']['Schema'][]): boolean | Promise<boolean> => {
+            const checkChildren = (legalPaths: ED['actionAuth']['Schema'][]) => {
                 const { children } = node;
                 const childPath = Object.keys(children);
                 if (childPath.length === 0) {
@@ -1090,19 +1131,17 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             const childActions = child.map(ele => ele.action);
                             const childLegalAuths = legalPaths.map(
                                 (ele) => {
-                                    const { paths, relationId } = ele;
-                                    const paths2 = paths.map(
-                                        (path) => path ? `${pathToParent}.${path}` : pathToParent
-                                    );
+                                    const { path: { value: pv }, relationId } = ele;
+                                    const pv2 = pv ? `${pathToParent}.${pv}` : pathToParent
                                     return context.select('actionAuth', {
                                         data: {
                                             id: 1,
                                         },
                                         filter: {
-                                            paths: {
-                                                $overlaps: paths2,
+                                            path: {
+                                                value: pv2,
+                                                destEntity: childEntity as string,
                                             },
-                                            destEntity: childEntity as string,
                                             deActions: {
                                                 $overlaps: childActions,
                                             },
@@ -1112,7 +1151,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                         }
                                     }, { dontCollect: true })
                                 }
-                            ).flat() as ED['actionAuth']['OpSchema'][] | Promise<ED['actionAuth']['OpSchema']>[];
+                            ).flat() as ED['actionAuth']['Schema'][] | Promise<ED['actionAuth']['Schema']>[];
                             if (childLegalAuths[0] instanceof Promise) {
                                 return Promise.all(childLegalAuths).then(
                                     (clas) => child.map(
@@ -1121,25 +1160,23 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                 )
                             }
                             return child.map(
-                                (c) => checkNode(c, childLegalAuths as ED['actionAuth']['OpSchema'][])
+                                (c) => checkNode(c, childLegalAuths as ED['actionAuth']['Schema'][])
                             );
                         }
 
                         const childLegalAuths = legalPaths.map(
                             (ele) => {
-                                const { paths, relationId } = ele;
-                                const paths2 = paths.map(
-                                    (path) => path ? `${pathToParent}.${path}` : pathToParent
-                                );
+                                const { path: { value: pv }, relationId } = ele;
+                                const pv2 = pv ? `${pathToParent}.${pv}` : pathToParent
                                 return context.select('actionAuth', {
                                     data: {
                                         id: 1,
                                     },
                                     filter: {
-                                        paths: {
-                                            $overlaps: paths2,
+                                        path: {
+                                            value: pv2,
+                                            destEntity: childEntity as string,
                                         },
-                                        destEntity: childEntity as string,
                                         deActions: {
                                             $overlaps: child.action,
                                         },
@@ -1177,7 +1214,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
             // 没有能根据父亲传下来的actionAuth判定，只能自己找
             const result = this.findActionAuthsOnNode(node, context);
 
-            const checkResult = (result2: false | ED['actionAuth']['OpSchema'][]) => {
+            const checkResult = (result2: false | ED['actionAuth']['Schema'][]) => {
                 if (result2 === false) {
                     return false;
                 }
@@ -1185,11 +1222,20 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 if (node.entity === 'user') {
                     result2.push({
                         id: 'temp',
-                        paths: [''],
+                        pathId: 'path_temp',
+                        path: {
+                            id: 'path_temp',
+                            destEntity: 'user',
+                            sourceEntity: 'any',
+                            value: '',
+                            $$createAt$$: 1,
+                            $$updateAt$$: 1,
+                            $$seq$$: 'temp',
+                            recursive: false,
+                        },
                         $$createAt$$: 1,
                         $$updateAt$$: 1,
                         $$seq$$: 'temp',
-                        destEntity: 'user',
                         deActions: [node.action],
                     });
                 }
@@ -1215,7 +1261,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
     ) {
         const { action, filter, data } = operation;
         if (this.updateFreeDict[entity] && this.updateFreeDict[entity]!.includes(action)) {
-            return true;           
+            return true;
         }
         const userId = context.getCurrentUserId();
         if (!userId) {
@@ -1298,7 +1344,9 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
 }, context: Cxt) {
     const { entity, filter, actions, overlap } = params;
     const actionAuthfilter = {
-        destEntity: entity as string,
+        path: {
+            destEntity: entity as string,
+        },
     };
     if (overlap) {
         Object.assign(actionAuthfilter, {
@@ -1318,7 +1366,12 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
     const actionAuths = await context.select('actionAuth', {
         data: {
             id: 1,
-            paths: 1,
+            path: {
+                id: 1,
+                value: 1,
+                destEntity: 1,
+                recursive: 1,
+            },
             relationId: 1,
             relation: {
                 id: 1,
@@ -1329,7 +1382,8 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
     }, { dontCollect: true });
 
     const getUserRelations = async (urAuths: Partial<ED['actionAuth']['Schema']>[]) => {
-        const makeRelationIterator = (path: string, relationIds: string[]) => {
+        const makeRelationIterator = (path: string, relationIds: string[], recursive: boolean) => {
+            assert(!recursive, 'recursive的情况还没处理，等跑出来再说， by Xc');
             if (path === '') {
                 return {
                     projection: {
@@ -1437,27 +1491,26 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
         };
 
         // 相同的path可以groupBy掉
-        const urAuthDict2: Record<string, string[]> = {};
+        const urAuthDict2: Record<string, [string[], boolean]> = {};
         urAuths.forEach(
             (auth) => {
-                const { paths, relationId } = auth;
-                paths!.forEach(
-                    (path) => {
-                        if (!urAuthDict2[path]) {
-                            urAuthDict2[path] = [relationId!];
-                        }
-                        else if (!urAuthDict2[path].includes(relationId!)) {
-                            urAuthDict2[path].push(relationId!);
-                        }
-                    }
-                )
+                const { path, relationId } = auth;
+                const { value, recursive } = path!;
+
+                if (!urAuthDict2[value]) {
+                    urAuthDict2[value] = [[relationId!], recursive!];
+                }
+                else if (!urAuthDict2[value][0].includes(relationId!)) {
+                    assert(urAuthDict2[value][1] === recursive);
+                    urAuthDict2[value][0].push(relationId!);
+                }
             }
         )
 
         const userRelations = await Promise.all(Object.keys(urAuthDict2).map(
             async (path) => {
-                const relationIds = urAuthDict2[path];
-                const { projection, getData } = makeRelationIterator(path, relationIds);
+                const [relationIds, recursive] = urAuthDict2[path];
+                const { projection, getData } = makeRelationIterator(path, relationIds, recursive);
                 const rows = await context.select(entity, {
                     data: projection,
                     filter,
@@ -1560,23 +1613,21 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
         };
         const userEntities = await Promise.all(
             directAuths.map(
-                async ({ paths }) => {
-                    return paths!.map(
-                        async (path) => {
-                            const { getData, projection } = makeRelationIterator(path!);
+                async ({ path }) => {
+                    const { value, recursive } = path!;
+                    assert(!recursive);
+                    const { getData, projection } = makeRelationIterator(value!);
 
-                            const rows = await context.select(entity, {
-                                data: projection,
-                                filter,
-                            }, { dontCollect: true });
-                            const userEntities = rows.map(ele => getData(ele)).flat().filter(ele => !!ele);
-                            return userEntities as {
-                                entity: keyof ED,
-                                entityId: string,
-                                userId: string,
-                            }[];
-                        }
-                    );
+                    const rows = await context.select(entity, {
+                        data: projection,
+                        filter,
+                    }, { dontCollect: true });
+                    const userEntities = rows.map(ele => getData(ele)).flat().filter(ele => !!ele);
+                    return userEntities as {
+                        entity: keyof ED,
+                        entityId: string,
+                        userId: string,
+                    }[];
                 }
             )
         );

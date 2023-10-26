@@ -8,6 +8,7 @@ import { EntityShape } from "../../types/Entity";
 import * as Modi from "../Modi/Schema";
 import * as ActionAuth from "../ActionAuth/Schema";
 import * as I18n from "../I18n/Schema";
+import * as Path from "../Path/Schema";
 import * as Relation from "../Relation/Schema";
 import * as RelationAuth from "../RelationAuth/Schema";
 import * as User from "../User/Schema";
@@ -15,17 +16,18 @@ import * as UserEntityGrant from "../UserEntityGrant/Schema";
 import * as UserRelation from "../UserRelation/Schema";
 export type OpSchema = EntityShape & {
     modiId: ForeignKey<"modi">;
-    entity: "actionAuth" | "i18n" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
+    entity: "actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
     entityId: String<64>;
 };
 export type OpAttr = keyof OpSchema;
 export type Schema = EntityShape & {
     modiId: ForeignKey<"modi">;
-    entity: "actionAuth" | "i18n" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
+    entity: "actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
     entityId: String<64>;
     modi: Modi.Schema;
     actionAuth?: ActionAuth.Schema;
     i18n?: I18n.Schema;
+    path?: Path.Schema;
     relation?: Relation.Schema;
     relationAuth?: RelationAuth.Schema;
     user?: User.Schema;
@@ -41,10 +43,11 @@ type AttrFilter = {
     $$updateAt$$: Q_DateValue;
     modiId: Q_StringValue;
     modi: Modi.Filter;
-    entity: Q_EnumValue<"actionAuth" | "i18n" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string>;
+    entity: Q_EnumValue<"actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string>;
     entityId: Q_StringValue;
     actionAuth: ActionAuth.Filter;
     i18n: I18n.Filter;
+    path: Path.Filter;
     relation: Relation.Filter;
     relationAuth: RelationAuth.Filter;
     user: User.Filter;
@@ -65,6 +68,7 @@ export type Projection = {
     entityId?: number;
     actionAuth?: ActionAuth.Projection;
     i18n?: I18n.Projection;
+    path?: Path.Projection;
     relation?: Relation.Projection;
     relationAuth?: RelationAuth.Projection;
     user?: User.Projection;
@@ -81,6 +85,9 @@ type ActionAuthIdProjection = OneOf<{
     entityId: number;
 }>;
 type I18nIdProjection = OneOf<{
+    entityId: number;
+}>;
+type PathIdProjection = OneOf<{
     entityId: number;
 }>;
 type RelationIdProjection = OneOf<{
@@ -118,6 +125,8 @@ export type SortAttr = {
     actionAuth: ActionAuth.SortAttr;
 } | {
     i18n: I18n.SortAttr;
+} | {
+    path: Path.SortAttr;
 } | {
     relation: Relation.SortAttr;
 } | {
@@ -161,6 +170,17 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity: "i18n";
     entityId: ForeignKey<"I18n">;
+} | {
+    entity?: never;
+    entityId?: never;
+    path: Path.CreateSingleOperation;
+} | {
+    entity: "path";
+    entityId: ForeignKey<"Path">;
+    path: Path.UpdateOperation;
+} | {
+    entity: "path";
+    entityId: ForeignKey<"Path">;
 } | {
     entity?: never;
     entityId?: never;
@@ -241,6 +261,10 @@ export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity" | "enti
     entityId?: never;
     entity?: never;
 } | {
+    path?: Path.CreateSingleOperation | Path.UpdateOperation | Path.RemoveOperation;
+    entityId?: never;
+    entity?: never;
+} | {
     relation?: Relation.CreateSingleOperation | Relation.UpdateOperation | Relation.RemoveOperation;
     entityId?: never;
     entity?: never;
@@ -261,8 +285,8 @@ export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity" | "enti
     entityId?: never;
     entity?: never;
 } | {
-    entity?: ("actionAuth" | "i18n" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string) | null;
-    entityId?: ForeignKey<"ActionAuth" | "I18n" | "Relation" | "RelationAuth" | "User" | "UserEntityGrant" | "UserRelation"> | null;
+    entity?: ("actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string) | null;
+    entityId?: ForeignKey<"ActionAuth" | "I18n" | "Path" | "Relation" | "RelationAuth" | "User" | "UserEntityGrant" | "UserRelation"> | null;
 }) & {
     [k: string]: any;
 };
@@ -271,6 +295,8 @@ export type RemoveOperationData = {} & (({
     modi?: Modi.UpdateOperation | Modi.RemoveOperation;
 })) & ({
     actionAuth?: ActionAuth.UpdateOperation | ActionAuth.RemoveOperation;
+} | {
+    path?: Path.UpdateOperation | Path.RemoveOperation;
 } | {
     relation?: Relation.UpdateOperation | Relation.RemoveOperation;
 } | {
@@ -289,6 +315,7 @@ export type Operation = CreateOperation | UpdateOperation | RemoveOperation;
 export type ModiIdSubQuery = Selection<ModiIdProjection>;
 export type ActionAuthIdSubQuery = Selection<ActionAuthIdProjection>;
 export type I18nIdSubQuery = Selection<I18nIdProjection>;
+export type PathIdSubQuery = Selection<PathIdProjection>;
 export type RelationIdSubQuery = Selection<RelationIdProjection>;
 export type RelationAuthIdSubQuery = Selection<RelationAuthIdProjection>;
 export type UserIdSubQuery = Selection<UserIdProjection>;

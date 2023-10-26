@@ -1,15 +1,13 @@
-import { String } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
 import { Schema as Relation } from './Relation';
 import { EntityDesc } from '../types/EntityDesc';
+import { Schema as Path } from './Path';
 
 type Actions = string[];
-type Paths = string[];
 
 export interface Schema extends EntityShape {
     relation?: Relation;
-    paths: Paths;
-    destEntity: String<32>;
+    path: Path;
     deActions: Actions;
 };
 
@@ -19,23 +17,25 @@ const entityDesc: EntityDesc<Schema> = {
             name: '用户授权',
             attr: {
                 relation: '关系',
-                paths: '路径',
-                destEntity: '目标对象',
+                path: '路径',
                 deActions: '目标对象动作',
             },
         },
     },
     indexes: [
         {
-            name: 'index_entity_relation',
+            name: 'index_relation_path',
             attributes: [
-                {
-                    name: 'destEntity',
-                },
                 {
                     name: 'relation',
                 },
+                {
+                    name: 'path',
+                }
             ],
+            config: {
+                unique: true,
+            },
         },
     ],
 };

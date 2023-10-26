@@ -31,6 +31,7 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      * @param selection
      */
     private destructOperation;
+    private makePathFilter;
     /**
      * 对所有满足操作要求的actionAuth加以判断，找到可以满足当前用户身份的actionAuth
      * @param entity
@@ -87,9 +88,9 @@ export declare function getUserRelationsByActions<ED extends EntityDict & BaseEn
     overlap?: boolean;
 }, context: Cxt): Promise<{
     userRelations: ED["userRelation"]["Schema"][];
-    userEntities: Promise<{
+    userEntities: {
         entity: keyof ED;
         entityId: string;
         userId: string;
-    }[]>[];
+    }[];
 }>;

@@ -3,22 +3,23 @@ import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, 
 import { OneOf } from "../../types/Polyfill";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
-import { String } from "../../types/DataType";
 import { EntityShape } from "../../types/Entity";
 import * as Relation from "../Relation/Schema";
+import * as Path from "../Path/Schema";
 import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 export type OpSchema = EntityShape & {
     sourceRelationId: ForeignKey<"relation">;
-    path: String<256>;
+    pathId: ForeignKey<"path">;
     destRelationId: ForeignKey<"relation">;
 };
 export type OpAttr = keyof OpSchema;
 export type Schema = EntityShape & {
     sourceRelationId: ForeignKey<"relation">;
-    path: String<256>;
+    pathId: ForeignKey<"path">;
     destRelationId: ForeignKey<"relation">;
     sourceRelation: Relation.Schema;
+    path: Path.Schema;
     destRelation: Relation.Schema;
     modiEntity$entity?: Array<ModiEntity.Schema>;
     modiEntity$entity$$aggr?: AggregationResult<ModiEntity.Schema>;
@@ -34,7 +35,8 @@ type AttrFilter = {
     $$updateAt$$: Q_DateValue;
     sourceRelationId: Q_StringValue;
     sourceRelation: Relation.Filter;
-    path: Q_StringValue;
+    pathId: Q_StringValue;
+    path: Path.Filter;
     destRelationId: Q_StringValue;
     destRelation: Relation.Filter;
     modiEntity$entity: ModiEntity.Filter & SubQueryPredicateMetadata;
@@ -50,7 +52,8 @@ export type Projection = {
     $$seq$$?: number;
     sourceRelationId?: number;
     sourceRelation?: Relation.Projection;
-    path?: number;
+    pathId?: number;
+    path?: Path.Projection;
     destRelationId?: number;
     destRelation?: Relation.Projection;
     modiEntity$entity?: ModiEntity.Selection & {
@@ -73,6 +76,9 @@ type RelationIdProjection = OneOf<{
     sourceRelationId: number;
     destRelationId: number;
 }>;
+type PathIdProjection = OneOf<{
+    pathId: number;
+}>;
 export type SortAttr = {
     id: number;
 } | {
@@ -86,7 +92,9 @@ export type SortAttr = {
 } | {
     sourceRelation: Relation.SortAttr;
 } | {
-    path: number;
+    pathId: number;
+} | {
+    path: Path.SortAttr;
 } | {
     destRelationId: number;
 } | {
@@ -102,7 +110,7 @@ export type Sorter = SortNode[];
 export type SelectOperation<P extends Object = Projection> = OakSelection<"select", P, Filter, Sorter>;
 export type Selection<P extends Object = Projection> = SelectOperation<P>;
 export type Aggregation = DeduceAggregation<Projection, Filter, Sorter>;
-export type CreateOperationData = FormCreateData<Omit<OpSchema, "sourceRelationId" | "destRelationId">> & (({
+export type CreateOperationData = FormCreateData<Omit<OpSchema, "sourceRelationId" | "pathId" | "destRelationId">> & (({
     sourceRelationId?: never;
     sourceRelation: Relation.CreateSingleOperation;
 } | {
@@ -110,6 +118,14 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "sourceRelationI
     sourceRelation?: Relation.UpdateOperation;
 } | {
     sourceRelationId: ForeignKey<"sourceRelation">;
+}) & ({
+    pathId?: never;
+    path: Path.CreateSingleOperation;
+} | {
+    pathId: ForeignKey<"path">;
+    path?: Path.UpdateOperation;
+} | {
+    pathId: ForeignKey<"path">;
 }) & ({
     destRelationId?: never;
     destRelation: Relation.CreateSingleOperation;
@@ -125,7 +141,7 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "sourceRelationI
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "sourceRelationId" | "destRelationId">> & (({
+export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "sourceRelationId" | "pathId" | "destRelationId">> & (({
     sourceRelation: Relation.CreateSingleOperation;
     sourceRelationId?: never;
 } | {
@@ -137,6 +153,18 @@ export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "sourceRelationI
 } | {
     sourceRelation?: never;
     sourceRelationId?: ForeignKey<"sourceRelation"> | null;
+}) & ({
+    path: Path.CreateSingleOperation;
+    pathId?: never;
+} | {
+    path: Path.UpdateOperation;
+    pathId?: never;
+} | {
+    path: Path.RemoveOperation;
+    pathId?: never;
+} | {
+    path?: never;
+    pathId?: ForeignKey<"path"> | null;
 }) & ({
     destRelation: Relation.CreateSingleOperation;
     destRelationId?: never;
@@ -158,11 +186,14 @@ export type UpdateOperation = OakOperation<"update" | string, UpdateOperationDat
 export type RemoveOperationData = {} & (({
     sourceRelation?: Relation.UpdateOperation | Relation.RemoveOperation;
 }) & ({
+    path?: Path.UpdateOperation | Path.RemoveOperation;
+}) & ({
     destRelation?: Relation.UpdateOperation | Relation.RemoveOperation;
 }));
 export type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter, Sorter>;
 export type Operation = CreateOperation | UpdateOperation | RemoveOperation;
 export type RelationIdSubQuery = Selection<RelationIdProjection>;
+export type PathIdSubQuery = Selection<PathIdProjection>;
 export type RelationAuthIdSubQuery = Selection<RelationAuthIdProjection>;
 export type EntityDef = {
     Schema: Schema;

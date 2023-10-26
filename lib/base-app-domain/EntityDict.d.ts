@@ -4,6 +4,7 @@ import { EntityDef as Modi } from "./Modi/Schema";
 import { EntityDef as ModiEntity } from "./ModiEntity/Schema";
 import { EntityDef as Oper } from "./Oper/Schema";
 import { EntityDef as OperEntity } from "./OperEntity/Schema";
+import { EntityDef as Path } from "./Path/Schema";
 import { EntityDef as Relation } from "./Relation/Schema";
 import { EntityDef as RelationAuth } from "./RelationAuth/Schema";
 import { EntityDef as User } from "./User/Schema";
@@ -16,6 +17,7 @@ export type EntityDict = {
     modiEntity: ModiEntity;
     oper: Oper;
     operEntity: OperEntity;
+    path: Path;
     relation: Relation;
     relationAuth: RelationAuth;
     user: User;

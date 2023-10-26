@@ -1,8 +1,8 @@
-import { String } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
 import { Schema as Relation } from './Relation';
+import { Schema as Path } from './Path';
 export interface Schema extends EntityShape {
     sourceRelation: Relation;
-    path: String<256>;
+    path: Path;
     destRelation: Relation;
 }

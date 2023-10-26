@@ -4,6 +4,7 @@ import * as Modi from "./Modi/Schema";
 import * as ModiEntity from "./ModiEntity/Schema";
 import * as Oper from "./Oper/Schema";
 import * as OperEntity from "./OperEntity/Schema";
+import * as Path from "./Path/Schema";
 import * as Relation from "./Relation/Schema";
 import * as RelationAuth from "./RelationAuth/Schema";
 import * as User from "./User/Schema";
@@ -49,6 +50,19 @@ export type OperIdSubQuery = {
 export type OperEntityIdSubQuery = {
     [K in "$in" | "$nin"]?: (OperEntity.OperEntityIdSubQuery & {
         entity: "operEntity";
+    }) | any;
+};
+export type PathIdSubQuery = {
+    [K in "$in" | "$nin"]?: (ActionAuth.PathIdSubQuery & {
+        entity: "actionAuth";
+    }) | (RelationAuth.PathIdSubQuery & {
+        entity: "relationAuth";
+    }) | (ModiEntity.PathIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.PathIdSubQuery & {
+        entity: "operEntity";
+    }) | (Path.PathIdSubQuery & {
+        entity: "path";
     }) | any;
 };
 export type RelationIdSubQuery = {
