@@ -7,6 +7,7 @@ import { RelationAction } from "../../actions/action";
 import { String, Text } from "../../types/DataType";
 import { EntityShape } from "../../types/Entity";
 import * as Oper from "../Oper/Schema";
+import * as UserEntityClaim from "../UserEntityClaim/Schema";
 import * as UserRelation from "../UserRelation/Schema";
 import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
@@ -29,6 +30,8 @@ export type Schema = EntityShape & {
     oper$operator$$aggr?: AggregationResult<Oper.Schema>;
     user$ref?: Array<Schema>;
     user$ref$$aggr?: AggregationResult<Schema>;
+    userEntityClaim$user?: Array<UserEntityClaim.Schema>;
+    userEntityClaim$user$$aggr?: AggregationResult<UserEntityClaim.Schema>;
     userRelation$user?: Array<UserRelation.Schema>;
     userRelation$user$$aggr?: AggregationResult<UserRelation.Schema>;
     modiEntity$entity?: Array<ModiEntity.Schema>;
@@ -51,6 +54,7 @@ type AttrFilter = {
     userState: Q_EnumValue<UserState>;
     oper$operator: Oper.Filter & SubQueryPredicateMetadata;
     user$ref: Filter & SubQueryPredicateMetadata;
+    userEntityClaim$user: UserEntityClaim.Filter & SubQueryPredicateMetadata;
     userRelation$user: UserRelation.Filter & SubQueryPredicateMetadata;
     modiEntity$entity: ModiEntity.Filter & SubQueryPredicateMetadata;
     operEntity$entity: OperEntity.Filter & SubQueryPredicateMetadata;
@@ -80,6 +84,12 @@ export type Projection = {
     };
     user$ref$$aggr?: Aggregation & {
         $entity: "user";
+    };
+    userEntityClaim$user?: UserEntityClaim.Selection & {
+        $entity: "userEntityClaim";
+    };
+    userEntityClaim$user$$aggr?: UserEntityClaim.Aggregation & {
+        $entity: "userEntityClaim";
     };
     userRelation$user?: UserRelation.Selection & {
         $entity: "userRelation";
@@ -146,6 +156,7 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "refId">> & (({
 })) & {
     oper$operator?: OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">[]> | Array<OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">>>;
     user$ref?: OakOperation<UpdateOperation["action"], Omit<UpdateOperationData, "ref" | "refId">, Omit<Filter, "ref" | "refId">> | OakOperation<"create", Omit<CreateOperationData, "ref" | "refId">[]> | Array<OakOperation<"create", Omit<CreateOperationData, "ref" | "refId">> | OakOperation<UpdateOperation["action"], Omit<UpdateOperationData, "ref" | "refId">, Omit<Filter, "ref" | "refId">>>;
+    userEntityClaim$user?: OakOperation<UserEntityClaim.UpdateOperation["action"], Omit<UserEntityClaim.UpdateOperationData, "user" | "userId">, Omit<UserEntityClaim.Filter, "user" | "userId">> | OakOperation<"create", Omit<UserEntityClaim.CreateOperationData, "user" | "userId">[]> | Array<OakOperation<"create", Omit<UserEntityClaim.CreateOperationData, "user" | "userId">> | OakOperation<UserEntityClaim.UpdateOperation["action"], Omit<UserEntityClaim.UpdateOperationData, "user" | "userId">, Omit<UserEntityClaim.Filter, "user" | "userId">>>;
     userRelation$user?: OakOperation<UserRelation.UpdateOperation["action"], Omit<UserRelation.UpdateOperationData, "user" | "userId">, Omit<UserRelation.Filter, "user" | "userId">> | OakOperation<"create", Omit<UserRelation.CreateOperationData, "user" | "userId">[]> | Array<OakOperation<"create", Omit<UserRelation.CreateOperationData, "user" | "userId">> | OakOperation<UserRelation.UpdateOperation["action"], Omit<UserRelation.UpdateOperationData, "user" | "userId">, Omit<UserRelation.Filter, "user" | "userId">>>;
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
     operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
@@ -169,6 +180,7 @@ export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "refId">> & (({
     [k: string]: any;
     oper$operator?: OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">[]> | Array<OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">>>;
     user$ref?: OakOperation<UpdateOperation["action"], Omit<UpdateOperationData, "ref" | "refId">, Omit<Filter, "ref" | "refId">> | OakOperation<RemoveOperation["action"], Omit<RemoveOperationData, "ref" | "refId">, Omit<Filter, "ref" | "refId">> | OakOperation<"create", Omit<CreateOperationData, "ref" | "refId">[]> | Array<OakOperation<"create", Omit<CreateOperationData, "ref" | "refId">> | OakOperation<UpdateOperation["action"], Omit<UpdateOperationData, "ref" | "refId">, Omit<Filter, "ref" | "refId">> | OakOperation<RemoveOperation["action"], Omit<RemoveOperationData, "ref" | "refId">, Omit<Filter, "ref" | "refId">>>;
+    userEntityClaim$user?: OakOperation<UserEntityClaim.UpdateOperation["action"], Omit<UserEntityClaim.UpdateOperationData, "user" | "userId">, Omit<UserEntityClaim.Filter, "user" | "userId">> | OakOperation<UserEntityClaim.RemoveOperation["action"], Omit<UserEntityClaim.RemoveOperationData, "user" | "userId">, Omit<UserEntityClaim.Filter, "user" | "userId">> | OakOperation<"create", Omit<UserEntityClaim.CreateOperationData, "user" | "userId">[]> | Array<OakOperation<"create", Omit<UserEntityClaim.CreateOperationData, "user" | "userId">> | OakOperation<UserEntityClaim.UpdateOperation["action"], Omit<UserEntityClaim.UpdateOperationData, "user" | "userId">, Omit<UserEntityClaim.Filter, "user" | "userId">> | OakOperation<UserEntityClaim.RemoveOperation["action"], Omit<UserEntityClaim.RemoveOperationData, "user" | "userId">, Omit<UserEntityClaim.Filter, "user" | "userId">>>;
     userRelation$user?: OakOperation<UserRelation.UpdateOperation["action"], Omit<UserRelation.UpdateOperationData, "user" | "userId">, Omit<UserRelation.Filter, "user" | "userId">> | OakOperation<UserRelation.RemoveOperation["action"], Omit<UserRelation.RemoveOperationData, "user" | "userId">, Omit<UserRelation.Filter, "user" | "userId">> | OakOperation<"create", Omit<UserRelation.CreateOperationData, "user" | "userId">[]> | Array<OakOperation<"create", Omit<UserRelation.CreateOperationData, "user" | "userId">> | OakOperation<UserRelation.UpdateOperation["action"], Omit<UserRelation.UpdateOperationData, "user" | "userId">, Omit<UserRelation.Filter, "user" | "userId">> | OakOperation<UserRelation.RemoveOperation["action"], Omit<UserRelation.RemoveOperationData, "user" | "userId">, Omit<UserRelation.Filter, "user" | "userId">>>;
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
     operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;

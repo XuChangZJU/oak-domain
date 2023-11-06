@@ -1,26 +1,23 @@
 import { String } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
-import { Schema as Relation } from './Relation';
 import { EntityDesc } from '../types/EntityDesc';
 
-export interface Schema extends EntityShape {
-    entity: String<32>;
-    entityId: String<64>;
-    relation: Relation;
-};
-type Action = 'confirm';
+type RelationIds = string[];
 
-const entityDesc: EntityDesc<Schema, Action> = {
+export interface Schema extends EntityShape {
+    relationEntity: String<32>;
+    relationEntityFilter: Object;
+    relationIds: RelationIds;
+};
+
+const entityDesc: EntityDesc<Schema, ''> = {
     locales: {
         zh_CN: {
             name: '用户授权',
             attr: {
-                relation: '关系',
-                entity: '关联对象',
-                entityId: '关联对象id',
-            },
-            action: {
-                confirm: '领取',
+                relationIds: '关系',
+                relationEntity: '关联对象',
+                relationEntityFilter: '对象限定条件',
             },
         },
     },

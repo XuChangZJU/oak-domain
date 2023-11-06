@@ -795,7 +795,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 }
 
                 // 对UserEntityGrant对象，建立相应的反指关系
-                if (ReversePointerRelations['UserEntityGrant']) {
+                // UserEntityGrant结构改变，不再建立，by Xc 20231101
+                /* if (ReversePointerRelations['UserEntityGrant']) {
                     if (!ReversePointerRelations['UserEntityGrant'].includes(moduleName)) {
                         ReversePointerRelations['UserEntityGrant'].push(moduleName);
                     }
@@ -804,7 +805,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     assign(ReversePointerRelations, {
                         ['UserEntityGrant']: [moduleName],
                     });
-                }
+                } */
 
                 // 对Relation对象建立相应的反指关系
                 if (ReversePointerRelations['Relation']) {

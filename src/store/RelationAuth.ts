@@ -81,7 +81,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         await this.checkActions2(entity, operation, context);
     }
 
-    private async checkUserRelation<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, action: ED[keyof ED]['Action'], filter: NonNullable<ED['userRelation']['Selection']['filter']>) {
+    private checkUserRelation<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, action: ED[keyof ED]['Action'], filter: NonNullable<ED['userRelation']['Selection']['filter']>) {
         const userId = context.getCurrentUserId();
         let filter2: ED['relationAuth']['Selection']['filter'] = {
             destRelation: {
@@ -150,11 +150,19 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
             if (action === 'create') {
                 const { entity, entityId } = filter;
-                assert(entity && entityId);
+                assert(entity && typeof entity === 'string');
 
-                Object.assign(destEntityFilter, {
-                    id: entityId,
-                });
+                if (entityId) {
+                    Object.assign(destEntityFilter, {
+                        id: entityId,
+                    });
+                }
+                else {
+                    // userEntityGrant会有这种情况，限定某个对象的范围进行授权
+                    const { [entity]: entityFilter } = filter as any;
+                    assert(entityFilter);
+                    destEntityFilter = combineFilters(entity, this.schema, [destEntityFilter, entityFilter])!;
+                }
             }
             else {
                 destEntityFilter = combineFilters(destRelation.entity!, this.schema, [destEntityFilter, {
@@ -216,7 +224,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 // userEntityGrant的创建相当于授权，领取相当于赋权
                 if (['create', 'update', 'remove'].includes(action)) {
                     if (action === 'create') {
-                        return this.checkOperateSpecialEntities2('userRelation', 'create', filter, context);
+                        const { relationEntity, relationEntityFilter, relationIds } = filter as EntityDict['userEntityGrant']['CreateSingle']['data'];
+                        return this.checkOperateSpecialEntities2('userRelation', 'create', {
+                            entity: relationEntity,
+                            [relationEntity!]: relationEntityFilter,
+                            relationId: {
+                                $in: relationIds,
+                            },
+                        }, context);
                     }
                     return this.checkOperateSpecialEntities2('userRelation', 'action', {
                         relation: {
@@ -224,7 +239,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         },
                     }, context);
                 }
-                // 领取和读取动作公开
                 return true;
             }
             default: {

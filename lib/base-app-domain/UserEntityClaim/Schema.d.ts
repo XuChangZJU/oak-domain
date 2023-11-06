@@ -5,27 +5,30 @@ import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOper
 import { GenericAction } from "../../actions/action";
 import { String } from "../../types/DataType";
 import { EntityShape } from "../../types/Entity";
+import * as UserEntityGrant from "../UserEntityGrant/Schema";
 import * as User from "../User/Schema";
 import * as Relation from "../Relation/Schema";
-import * as UserEntityClaim from "../UserEntityClaim/Schema";
+import * as UserRelation from "../UserRelation/Schema";
 import * as ModiEntity from "../ModiEntity/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 export type OpSchema = EntityShape & {
+    uegId: ForeignKey<"userEntityGrant">;
     userId: ForeignKey<"user">;
     relationId: ForeignKey<"relation">;
-    entity: String<32>;
-    entityId: String<64>;
+    claimEntityId: String<64>;
+    userRelationId: ForeignKey<"userRelation">;
 };
 export type OpAttr = keyof OpSchema;
 export type Schema = EntityShape & {
+    uegId: ForeignKey<"userEntityGrant">;
     userId: ForeignKey<"user">;
     relationId: ForeignKey<"relation">;
-    entity: String<32>;
-    entityId: String<64>;
+    claimEntityId: String<64>;
+    userRelationId: ForeignKey<"userRelation">;
+    ueg: UserEntityGrant.Schema;
     user: User.Schema;
     relation: Relation.Schema;
-    userEntityClaim$userRelation?: Array<UserEntityClaim.Schema>;
-    userEntityClaim$userRelation$$aggr?: AggregationResult<UserEntityClaim.Schema>;
+    userRelation: UserRelation.Schema;
     modiEntity$entity?: Array<ModiEntity.Schema>;
     modiEntity$entity$$aggr?: AggregationResult<ModiEntity.Schema>;
     operEntity$entity?: Array<OperEntity.Schema>;
@@ -38,13 +41,15 @@ type AttrFilter = {
     $$createAt$$: Q_DateValue;
     $$seq$$: Q_StringValue;
     $$updateAt$$: Q_DateValue;
+    uegId: Q_StringValue;
+    ueg: UserEntityGrant.Filter;
     userId: Q_StringValue;
     user: User.Filter;
     relationId: Q_StringValue;
     relation: Relation.Filter;
-    entity: Q_StringValue;
-    entityId: Q_StringValue;
-    userEntityClaim$userRelation: UserEntityClaim.Filter & SubQueryPredicateMetadata;
+    claimEntityId: Q_StringValue;
+    userRelationId: Q_StringValue;
+    userRelation: UserRelation.Filter;
     modiEntity$entity: ModiEntity.Filter & SubQueryPredicateMetadata;
     operEntity$entity: OperEntity.Filter & SubQueryPredicateMetadata;
 };
@@ -56,18 +61,15 @@ export type Projection = {
     $$createAt$$?: number;
     $$updateAt$$?: number;
     $$seq$$?: number;
+    uegId?: number;
+    ueg?: UserEntityGrant.Projection;
     userId?: number;
     user?: User.Projection;
     relationId?: number;
     relation?: Relation.Projection;
-    entity?: number;
-    entityId?: number;
-    userEntityClaim$userRelation?: UserEntityClaim.Selection & {
-        $entity: "userEntityClaim";
-    };
-    userEntityClaim$userRelation$$aggr?: UserEntityClaim.Aggregation & {
-        $entity: "userEntityClaim";
-    };
+    claimEntityId?: number;
+    userRelationId?: number;
+    userRelation?: UserRelation.Projection;
     modiEntity$entity?: ModiEntity.Selection & {
         $entity: "modiEntity";
     };
@@ -81,14 +83,20 @@ export type Projection = {
         $entity: "operEntity";
     };
 } & Partial<ExprOp<OpAttr | string>>;
-type UserRelationIdProjection = OneOf<{
+type UserEntityClaimIdProjection = OneOf<{
     id: number;
+}>;
+type UserEntityGrantIdProjection = OneOf<{
+    uegId: number;
 }>;
 type UserIdProjection = OneOf<{
     userId: number;
 }>;
 type RelationIdProjection = OneOf<{
     relationId: number;
+}>;
+type UserRelationIdProjection = OneOf<{
+    userRelationId: number;
 }>;
 export type SortAttr = {
     id: number;
@@ -99,6 +107,10 @@ export type SortAttr = {
 } | {
     $$updateAt$$: number;
 } | {
+    uegId: number;
+} | {
+    ueg: UserEntityGrant.SortAttr;
+} | {
     userId: number;
 } | {
     user: User.SortAttr;
@@ -107,9 +119,11 @@ export type SortAttr = {
 } | {
     relation: Relation.SortAttr;
 } | {
-    entity: number;
+    claimEntityId: number;
 } | {
-    entityId: number;
+    userRelationId: number;
+} | {
+    userRelation: UserRelation.SortAttr;
 } | {
     [k: string]: any;
 } | OneOf<ExprOp<OpAttr | string>>;
@@ -121,7 +135,15 @@ export type Sorter = SortNode[];
 export type SelectOperation<P extends Object = Projection> = OakSelection<"select", P, Filter, Sorter>;
 export type Selection<P extends Object = Projection> = SelectOperation<P>;
 export type Aggregation = DeduceAggregation<Projection, Filter, Sorter>;
-export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "entityId" | "userId" | "relationId">> & (({
+export type CreateOperationData = FormCreateData<Omit<OpSchema, "uegId" | "userId" | "relationId" | "userRelationId">> & (({
+    uegId?: never;
+    ueg: UserEntityGrant.CreateSingleOperation;
+} | {
+    uegId: ForeignKey<"ueg">;
+    ueg?: UserEntityGrant.UpdateOperation;
+} | {
+    uegId: ForeignKey<"ueg">;
+}) & ({
     userId?: never;
     user: User.CreateSingleOperation;
 } | {
@@ -137,19 +159,34 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
     relation?: Relation.UpdateOperation;
 } | {
     relationId: ForeignKey<"relation">;
-})) & ({
-    entity?: string;
-    entityId?: string;
-    [K: string]: any;
-}) & {
-    userEntityClaim$userRelation?: OakOperation<UserEntityClaim.UpdateOperation["action"], Omit<UserEntityClaim.UpdateOperationData, "userRelation" | "userRelationId">, Omit<UserEntityClaim.Filter, "userRelation" | "userRelationId">> | OakOperation<"create", Omit<UserEntityClaim.CreateOperationData, "userRelation" | "userRelationId">[]> | Array<OakOperation<"create", Omit<UserEntityClaim.CreateOperationData, "userRelation" | "userRelationId">> | OakOperation<UserEntityClaim.UpdateOperation["action"], Omit<UserEntityClaim.UpdateOperationData, "userRelation" | "userRelationId">, Omit<UserEntityClaim.Filter, "userRelation" | "userRelationId">>>;
+}) & ({
+    userRelationId?: never;
+    userRelation: UserRelation.CreateSingleOperation;
+} | {
+    userRelationId: ForeignKey<"userRelation">;
+    userRelation?: UserRelation.UpdateOperation;
+} | {
+    userRelationId: ForeignKey<"userRelation">;
+})) & {
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
     operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
 };
 export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
-export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "userId" | "relationId">> & (({
+export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "uegId" | "userId" | "relationId" | "userRelationId">> & (({
+    ueg: UserEntityGrant.CreateSingleOperation;
+    uegId?: never;
+} | {
+    ueg: UserEntityGrant.UpdateOperation;
+    uegId?: never;
+} | {
+    ueg: UserEntityGrant.RemoveOperation;
+    uegId?: never;
+} | {
+    ueg?: never;
+    uegId?: ForeignKey<"ueg"> | null;
+}) & ({
     user: User.CreateSingleOperation;
     userId?: never;
 } | {
@@ -173,23 +210,40 @@ export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "userId" | "rela
 } | {
     relation?: never;
     relationId?: ForeignKey<"relation"> | null;
+}) & ({
+    userRelation: UserRelation.CreateSingleOperation;
+    userRelationId?: never;
+} | {
+    userRelation: UserRelation.UpdateOperation;
+    userRelationId?: never;
+} | {
+    userRelation: UserRelation.RemoveOperation;
+    userRelationId?: never;
+} | {
+    userRelation?: never;
+    userRelationId?: ForeignKey<"userRelation"> | null;
 })) & {
     [k: string]: any;
-    userEntityClaim$userRelation?: OakOperation<UserEntityClaim.UpdateOperation["action"], Omit<UserEntityClaim.UpdateOperationData, "userRelation" | "userRelationId">, Omit<UserEntityClaim.Filter, "userRelation" | "userRelationId">> | OakOperation<UserEntityClaim.RemoveOperation["action"], Omit<UserEntityClaim.RemoveOperationData, "userRelation" | "userRelationId">, Omit<UserEntityClaim.Filter, "userRelation" | "userRelationId">> | OakOperation<"create", Omit<UserEntityClaim.CreateOperationData, "userRelation" | "userRelationId">[]> | Array<OakOperation<"create", Omit<UserEntityClaim.CreateOperationData, "userRelation" | "userRelationId">> | OakOperation<UserEntityClaim.UpdateOperation["action"], Omit<UserEntityClaim.UpdateOperationData, "userRelation" | "userRelationId">, Omit<UserEntityClaim.Filter, "userRelation" | "userRelationId">> | OakOperation<UserEntityClaim.RemoveOperation["action"], Omit<UserEntityClaim.RemoveOperationData, "userRelation" | "userRelationId">, Omit<UserEntityClaim.Filter, "userRelation" | "userRelationId">>>;
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
     operEntity$entity?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "entity" | "entityId">>>;
 };
 export type UpdateOperation = OakOperation<"update" | string, UpdateOperationData, Filter, Sorter>;
 export type RemoveOperationData = {} & (({
+    ueg?: UserEntityGrant.UpdateOperation | UserEntityGrant.RemoveOperation;
+}) & ({
     user?: User.UpdateOperation | User.RemoveOperation;
 }) & ({
     relation?: Relation.UpdateOperation | Relation.RemoveOperation;
+}) & ({
+    userRelation?: UserRelation.UpdateOperation | UserRelation.RemoveOperation;
 }));
 export type RemoveOperation = OakOperation<"remove", RemoveOperationData, Filter, Sorter>;
 export type Operation = CreateOperation | UpdateOperation | RemoveOperation;
+export type UserEntityGrantIdSubQuery = Selection<UserEntityGrantIdProjection>;
 export type UserIdSubQuery = Selection<UserIdProjection>;
 export type RelationIdSubQuery = Selection<RelationIdProjection>;
 export type UserRelationIdSubQuery = Selection<UserRelationIdProjection>;
+export type UserEntityClaimIdSubQuery = Selection<UserEntityClaimIdProjection>;
 export type EntityDef = {
     Schema: Schema;
     OpSchema: OpSchema;

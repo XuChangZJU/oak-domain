@@ -12,17 +12,18 @@ import * as Path from "../Path/Schema";
 import * as Relation from "../Relation/Schema";
 import * as RelationAuth from "../RelationAuth/Schema";
 import * as User from "../User/Schema";
+import * as UserEntityClaim from "../UserEntityClaim/Schema";
 import * as UserEntityGrant from "../UserEntityGrant/Schema";
 import * as UserRelation from "../UserRelation/Schema";
 export type OpSchema = EntityShape & {
     operId: ForeignKey<"oper">;
-    entity: "actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
+    entity: "actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityClaim" | "userEntityGrant" | "userRelation" | string;
     entityId: String<64>;
 };
 export type OpAttr = keyof OpSchema;
 export type Schema = EntityShape & {
     operId: ForeignKey<"oper">;
-    entity: "actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string;
+    entity: "actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityClaim" | "userEntityGrant" | "userRelation" | string;
     entityId: String<64>;
     oper: Oper.Schema;
     actionAuth?: ActionAuth.Schema;
@@ -31,6 +32,7 @@ export type Schema = EntityShape & {
     relation?: Relation.Schema;
     relationAuth?: RelationAuth.Schema;
     user?: User.Schema;
+    userEntityClaim?: UserEntityClaim.Schema;
     userEntityGrant?: UserEntityGrant.Schema;
     userRelation?: UserRelation.Schema;
 } & {
@@ -43,7 +45,7 @@ type AttrFilter = {
     $$updateAt$$: Q_DateValue;
     operId: Q_StringValue;
     oper: Oper.Filter;
-    entity: Q_EnumValue<"actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string>;
+    entity: Q_EnumValue<"actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityClaim" | "userEntityGrant" | "userRelation" | string>;
     entityId: Q_StringValue;
     actionAuth: ActionAuth.Filter;
     i18n: I18n.Filter;
@@ -51,6 +53,7 @@ type AttrFilter = {
     relation: Relation.Filter;
     relationAuth: RelationAuth.Filter;
     user: User.Filter;
+    userEntityClaim: UserEntityClaim.Filter;
     userEntityGrant: UserEntityGrant.Filter;
     userRelation: UserRelation.Filter;
 };
@@ -72,6 +75,7 @@ export type Projection = {
     relation?: Relation.Projection;
     relationAuth?: RelationAuth.Projection;
     user?: User.Projection;
+    userEntityClaim?: UserEntityClaim.Projection;
     userEntityGrant?: UserEntityGrant.Projection;
     userRelation?: UserRelation.Projection;
 } & Partial<ExprOp<OpAttr | string>>;
@@ -97,6 +101,9 @@ type RelationAuthIdProjection = OneOf<{
     entityId: number;
 }>;
 type UserIdProjection = OneOf<{
+    entityId: number;
+}>;
+type UserEntityClaimIdProjection = OneOf<{
     entityId: number;
 }>;
 type UserEntityGrantIdProjection = OneOf<{
@@ -133,6 +140,8 @@ export type SortAttr = {
     relationAuth: RelationAuth.SortAttr;
 } | {
     user: User.SortAttr;
+} | {
+    userEntityClaim: UserEntityClaim.SortAttr;
 } | {
     userEntityGrant: UserEntityGrant.SortAttr;
 } | {
@@ -214,6 +223,17 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity?: never;
     entityId?: never;
+    userEntityClaim: UserEntityClaim.CreateSingleOperation;
+} | {
+    entity: "userEntityClaim";
+    entityId: ForeignKey<"UserEntityClaim">;
+    userEntityClaim: UserEntityClaim.UpdateOperation;
+} | {
+    entity: "userEntityClaim";
+    entityId: ForeignKey<"UserEntityClaim">;
+} | {
+    entity?: never;
+    entityId?: never;
     userEntityGrant: UserEntityGrant.CreateSingleOperation;
 } | {
     entity: "userEntityGrant";
@@ -268,6 +288,10 @@ export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity" | "enti
     entityId?: never;
     entity?: never;
 } | {
+    userEntityClaim?: UserEntityClaim.CreateSingleOperation | UserEntityClaim.UpdateOperation | UserEntityClaim.RemoveOperation;
+    entityId?: never;
+    entity?: never;
+} | {
     userEntityGrant?: UserEntityGrant.CreateSingleOperation | UserEntityGrant.UpdateOperation | UserEntityGrant.RemoveOperation;
     entityId?: never;
     entity?: never;
@@ -276,8 +300,8 @@ export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity" | "enti
     entityId?: never;
     entity?: never;
 } | {
-    entity?: ("actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityGrant" | "userRelation" | string) | null;
-    entityId?: ForeignKey<"ActionAuth" | "I18n" | "Path" | "Relation" | "RelationAuth" | "User" | "UserEntityGrant" | "UserRelation"> | null;
+    entity?: ("actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityClaim" | "userEntityGrant" | "userRelation" | string) | null;
+    entityId?: ForeignKey<"ActionAuth" | "I18n" | "Path" | "Relation" | "RelationAuth" | "User" | "UserEntityClaim" | "UserEntityGrant" | "UserRelation"> | null;
 }) & {
     [k: string]: any;
 };
@@ -292,6 +316,8 @@ export type RemoveOperationData = {} & ({
     relationAuth?: RelationAuth.UpdateOperation | RelationAuth.RemoveOperation;
 } | {
     user?: User.UpdateOperation | User.RemoveOperation;
+} | {
+    userEntityClaim?: UserEntityClaim.UpdateOperation | UserEntityClaim.RemoveOperation;
 } | {
     userEntityGrant?: UserEntityGrant.UpdateOperation | UserEntityGrant.RemoveOperation;
 } | {
@@ -308,6 +334,7 @@ export type PathIdSubQuery = Selection<PathIdProjection>;
 export type RelationIdSubQuery = Selection<RelationIdProjection>;
 export type RelationAuthIdSubQuery = Selection<RelationAuthIdProjection>;
 export type UserIdSubQuery = Selection<UserIdProjection>;
+export type UserEntityClaimIdSubQuery = Selection<UserEntityClaimIdProjection>;
 export type UserEntityGrantIdSubQuery = Selection<UserEntityGrantIdProjection>;
 export type UserRelationIdSubQuery = Selection<UserRelationIdProjection>;
 export type OperEntityIdSubQuery = Selection<OperEntityIdProjection>;

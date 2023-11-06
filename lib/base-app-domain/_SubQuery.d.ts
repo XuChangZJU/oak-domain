@@ -8,6 +8,7 @@ import * as Path from "./Path/Schema";
 import * as Relation from "./Relation/Schema";
 import * as RelationAuth from "./RelationAuth/Schema";
 import * as User from "./User/Schema";
+import * as UserEntityClaim from "./UserEntityClaim/Schema";
 import * as UserEntityGrant from "./UserEntityGrant/Schema";
 import * as UserRelation from "./UserRelation/Schema";
 export type ActionAuthIdSubQuery = {
@@ -70,8 +71,8 @@ export type RelationIdSubQuery = {
         entity: "actionAuth";
     }) | (RelationAuth.RelationIdSubQuery & {
         entity: "relationAuth";
-    }) | (UserEntityGrant.RelationIdSubQuery & {
-        entity: "userEntityGrant";
+    }) | (UserEntityClaim.RelationIdSubQuery & {
+        entity: "userEntityClaim";
     }) | (UserRelation.RelationIdSubQuery & {
         entity: "userRelation";
     }) | (ModiEntity.RelationIdSubQuery & {
@@ -96,6 +97,8 @@ export type UserIdSubQuery = {
         entity: "oper";
     }) | (User.UserIdSubQuery & {
         entity: "user";
+    }) | (UserEntityClaim.UserIdSubQuery & {
+        entity: "userEntityClaim";
     }) | (UserRelation.UserIdSubQuery & {
         entity: "userRelation";
     }) | (ModiEntity.UserIdSubQuery & {
@@ -106,8 +109,19 @@ export type UserIdSubQuery = {
         entity: "user";
     }) | any;
 };
+export type UserEntityClaimIdSubQuery = {
+    [K in "$in" | "$nin"]?: (ModiEntity.UserEntityClaimIdSubQuery & {
+        entity: "modiEntity";
+    }) | (OperEntity.UserEntityClaimIdSubQuery & {
+        entity: "operEntity";
+    }) | (UserEntityClaim.UserEntityClaimIdSubQuery & {
+        entity: "userEntityClaim";
+    }) | any;
+};
 export type UserEntityGrantIdSubQuery = {
-    [K in "$in" | "$nin"]?: (ModiEntity.UserEntityGrantIdSubQuery & {
+    [K in "$in" | "$nin"]?: (UserEntityClaim.UserEntityGrantIdSubQuery & {
+        entity: "userEntityClaim";
+    }) | (ModiEntity.UserEntityGrantIdSubQuery & {
         entity: "modiEntity";
     }) | (OperEntity.UserEntityGrantIdSubQuery & {
         entity: "operEntity";
@@ -116,7 +130,9 @@ export type UserEntityGrantIdSubQuery = {
     }) | any;
 };
 export type UserRelationIdSubQuery = {
-    [K in "$in" | "$nin"]?: (ModiEntity.UserRelationIdSubQuery & {
+    [K in "$in" | "$nin"]?: (UserEntityClaim.UserRelationIdSubQuery & {
+        entity: "userEntityClaim";
+    }) | (ModiEntity.UserRelationIdSubQuery & {
         entity: "modiEntity";
     }) | (OperEntity.UserRelationIdSubQuery & {
         entity: "operEntity";

@@ -8,6 +8,7 @@ import { EntityDef as Path } from "./Path/Schema";
 import { EntityDef as Relation } from "./Relation/Schema";
 import { EntityDef as RelationAuth } from "./RelationAuth/Schema";
 import { EntityDef as User } from "./User/Schema";
+import { EntityDef as UserEntityClaim } from "./UserEntityClaim/Schema";
 import { EntityDef as UserEntityGrant } from "./UserEntityGrant/Schema";
 import { EntityDef as UserRelation } from "./UserRelation/Schema";
 export type EntityDict = {
@@ -21,6 +22,7 @@ export type EntityDict = {
     relation: Relation;
     relationAuth: RelationAuth;
     user: User;
+    userEntityClaim: UserEntityClaim;
     userEntityGrant: UserEntityGrant;
     userRelation: UserRelation;
 };
