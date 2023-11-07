@@ -1,7 +1,7 @@
 import assert from "assert";
 import {
-    EntityDict,
-    OperateOption, SelectOption, OperationResult, CreateAtAttribute, UpdateAtAttribute, AggregationResult, DeleteAtAttribute
+    EntityDict, OperateOption, SelectOption, OperationResult, CreateAtAttribute, 
+    UpdateAtAttribute, AggregationResult, DeleteAtAttribute
 } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { OperationRewriter, RowStore, SelectionRewriter } from '../types/RowStore';
@@ -169,6 +169,47 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             }
         };
 
+        const checkSorterNode = (
+            entity2: keyof ED,
+            sorterNode: NonNullable<ED[keyof ED]['Selection']['sorter']>,
+            projectionNode: ED[keyof ED]['Selection']['data']) => {
+
+            const checkSortAttr = (e2: keyof ED, sortAttr: Record<string, any>, projNode: ED[keyof ED]['Selection']['data']) => {
+                const necessaryAttrs: string[] = [];
+                for (const attr in sortAttr) {
+                    const rel = this.judgeRelation(e2, attr);
+                    if (typeof rel === 'number' && [0, 1].includes(rel)) {
+                        necessaryAttrs.push(attr);
+                    }
+                    else if (typeof rel === 'string') {
+                        if (!projNode[attr]) {
+                            Object.assign(projNode, {
+                                [attr]: {},
+                            });
+                        }
+                        assert(typeof sortAttr[attr] === 'object');
+                        checkSortAttr(rel, sortAttr[attr], projNode[attr]);
+                    }
+                    else {
+                        assert(rel === 2);
+                        if (!projNode[attr]) {
+                            Object.assign(projNode, {
+                                [attr]: {},
+                            });
+                        }
+                        assert(typeof sortAttr[attr] === 'object');
+                        checkSortAttr(attr, sortAttr[attr], projNode[attr]);
+                    }
+                }
+            }
+            sorterNode.forEach(
+                (node) => {
+                    const { $attr } = node;
+                    checkSortAttr(entity2, $attr, projectionNode);
+                }
+            );
+        };
+
         let relevantIds: string[] = [];
         if (filter) {
             const toBeAssignNode: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
@@ -179,8 +220,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             relevantIds = getRelevantIds(filter);
         }
 
-        // sorter感觉现在取不取影响不大，前端的list直接获取返回的ids了，先不管之
+        // sorter也得取了，前端需要处理排序
         if (sorter) {
+            checkSorterNode(entity, sorter, data);
         }
 
         const toBeAssignNode2: Record<string, string[]> = {};        // 用来记录在表达式中涉及到的结点
@@ -617,7 +659,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     );
                 }
             }
-            else {                
+            else {
                 assert(relation instanceof Array);
                 const { data: subProjection, filter: subFilter, indexFrom, count, sorter: subSorter } = projection2[attr];
                 const [entity2, foreignKey] = relation;
@@ -640,7 +682,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 indexFrom,
                                 count
                             }, context, option);
-                            assert (aggrResult instanceof Promise);
+                            assert(aggrResult instanceof Promise);
                             const aggrResultResult = await aggrResult;
                             return Object.assign(row, {
                                 [attr]: aggrResultResult,
@@ -714,8 +756,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 };
 
                 /** 若一对多子查询有indexFrom和count，只能单行去连接 */
-                const otmSingleFn =  (result: Partial<ED[T]['Schema']>[]) => {
-                    const dealWithSubRows2 = (row: Partial<ED[T]['Schema']>, subRows: Partial<ED[T]['Schema']>[]) => {                        
+                const otmSingleFn = (result: Partial<ED[T]['Schema']>[]) => {
+                    const dealWithSubRows2 = (row: Partial<ED[T]['Schema']>, subRows: Partial<ED[T]['Schema']>[]) => {
                         Object.assign(row, {
                             [attr]: subRows,
                         });
