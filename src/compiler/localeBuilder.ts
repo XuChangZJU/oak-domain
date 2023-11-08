@@ -234,9 +234,14 @@ export default class LocaleBuilder {
         const packageJson = join(root, 'package.json');
         const { name } = require(packageJson);
         const pagePath = join(src ? 'src' : 'lib', 'pages');
-        this.traverse(name, 'p', pagePath, join(root, pagePath), false, 'locales', watch);
+        if (fs.existsSync(pagePath)) {
+            this.traverse(name, 'p', pagePath, join(root, pagePath), false, 'locales', watch);
+        }
+        
         const componentPath = join(src ? 'src' : 'lib', 'components');
-        this.traverse(name, 'c', componentPath, join(root, componentPath), false, 'locales', watch);
+        if (fs.existsSync(componentPath)) {
+            this.traverse(name, 'c', componentPath, join(root, componentPath), false, 'locales', watch);           
+        }
 
         const localePath = join(root, src ? 'src' : 'lib', 'locales');
         if (fs.existsSync(localePath)) {
