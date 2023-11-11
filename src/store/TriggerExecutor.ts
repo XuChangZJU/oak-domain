@@ -1,4 +1,3 @@
-import { v1 } from 'uuid';
 import assert from 'assert';
 import { pull, unset, groupBy } from "../utils/lodash";
 import { checkFilterRepel, combineFilters } from "../store/filter";
@@ -166,7 +165,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     ) {
         assert(trigger.action !== 'select');
         assert(trigger.when === 'commit');
-        const uuid = v1();
+        const uuid = await generateNewIdAsync();
         const cxtStr = context.toString();
         const { data } = operation;
         switch (operation.action) {
