@@ -126,7 +126,8 @@ export function translateCheckerInAsyncContext<
             };
         }
         case 'logical':
-        case 'logicalRelation': {
+        case 'logicalRelation':
+        case 'logicalData': {
             const { checker: checkerFn } = checker;
             const fn = (async ({ operation }, context, option) => {
                 if (context.isRoot() && type === 'logicalRelation') {
@@ -212,7 +213,8 @@ export function translateCheckerInSyncContext<
             };
         }
         case 'logical':
-        case 'logicalRelation': {
+        case 'logicalRelation':
+        case 'logicalData': {
             const { checker: checkerFn } = checker;
             const fn = (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => {
                 if (context.isRoot() && type === 'logicalRelation') {

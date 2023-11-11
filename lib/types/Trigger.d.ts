@@ -4,6 +4,7 @@ import { AsyncContext } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OperateOption } from "../types/Entity";
 import { EntityShape } from "../types/Entity";
+export type ModiTurn = 'create' | 'apply' | 'both';
 /**
  * 优先级越小，越早执行。定义在1～99之间
  */
@@ -11,6 +12,9 @@ export declare const TRIGGER_MIN_PRIORITY = 1;
 export declare const TRIGGER_DEFAULT_PRIORITY = 25;
 export declare const TRIGGER_MAX_PRIORITY = 50;
 export declare const CHECKER_MAX_PRIORITY = 99;
+/**
+ * logical可能会更改row和data的值，应当最先执行，data和row不能修改相关的值，如果要修改，手动置priority小一点以确保安全
+ */
 export declare const CHECKER_PRIORITY_MAP: Record<CheckerType, number>;
 interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
     checkerType?: CheckerType;
@@ -20,6 +24,7 @@ interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
 }
 export interface CreateTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends TriggerBase<ED, T> {
     action: 'create';
+    mt?: ModiTurn;
     check?: (operation: ED[T]['Create']) => boolean;
 }
 export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt> {
@@ -44,6 +49,7 @@ export type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends
 export interface UpdateTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends TriggerBase<ED, T> {
     action: Exclude<ED[T]['Action'], GenericAction> | 'update' | Array<Exclude<ED[T]['Action'], GenericAction> | 'update'>;
     attributes?: keyof ED[T]['OpSchema'] | Array<keyof ED[T]['OpSchema']>;
+    mt?: ModiTurn;
     check?: (operation: ED[T]['Update']) => boolean;
     filter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Update'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Update']['filter']>);
 }
@@ -68,6 +74,7 @@ export type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends
  */
 export interface RemoveTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends TriggerBase<ED, T> {
     action: 'remove';
+    mt?: ModiTurn;
     check?: (operation: ED[T]['Remove']) => boolean;
     filter?: ED[T]['Remove']['filter'] | ((operation: ED[T]['Remove'], context: Cxt, option: OperateOption) => ED[T]['Remove']['filter'] | Promise<ED[T]['Remove']['filter']>);
 }

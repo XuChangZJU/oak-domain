@@ -167,7 +167,7 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
                     action: 'create' as any,
                     type: 'data',
                     entity,
-                    priority: 10,       // 优先级要高
+                    priority: 10,       // 优先级要高，先于真正的data检查进行
                     checker: (data) => {
                         if (data instanceof Array) {
                             data.forEach(
@@ -204,7 +204,7 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
                     checkers.push({
                         entity,
                         action: 'create',
-                        type: 'logical',
+                        type: 'logicalData',
                         priority: CHECKER_MAX_PRIORITY,       // 优先级要放在最低，所有前置的checker/trigger将数据完整之后再在这里检测
                         checker: (operation, context) => {
                             const { data } = operation;
@@ -227,7 +227,7 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
                     }, {
                         entity,
                         action: 'update',       // 只检查update，其它状态转换的action应该不会涉及unique约束的属性
-                        type: 'logical',
+                        type: 'logicalData',
                         priority: CHECKER_MAX_PRIORITY,       // 优先级要放在最低，所有前置的checker/trigger将数据完整之后再在这里检测
                         checker: (operation, context) => {
                             const { data, filter: operationFilter } = operation as ED[keyof ED]['Update'];

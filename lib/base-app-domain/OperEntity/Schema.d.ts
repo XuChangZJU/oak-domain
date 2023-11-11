@@ -161,6 +161,7 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
     operId?: never;
     oper: Oper.CreateSingleOperation;
 } | {
+    oper?: never;
     operId: ForeignKey<"oper">;
 })) & ({
     entity?: never;
@@ -169,13 +170,15 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity: "actionAuth";
     entityId: ForeignKey<"ActionAuth">;
-    actionAuth: ActionAuth.UpdateOperation;
+    actionAuth?: ActionAuth.UpdateOperation;
 } | {
     entity: "actionAuth";
     entityId: ForeignKey<"ActionAuth">;
+    actionAuth?: never;
 } | {
     entity: "i18n";
     entityId: ForeignKey<"I18n">;
+    i18n?: never;
 } | {
     entity?: never;
     entityId?: never;
@@ -183,10 +186,11 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity: "path";
     entityId: ForeignKey<"Path">;
-    path: Path.UpdateOperation;
+    path?: Path.UpdateOperation;
 } | {
     entity: "path";
     entityId: ForeignKey<"Path">;
+    path?: never;
 } | {
     entity?: never;
     entityId?: never;
@@ -194,10 +198,11 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity: "relation";
     entityId: ForeignKey<"Relation">;
-    relation: Relation.UpdateOperation;
+    relation?: Relation.UpdateOperation;
 } | {
     entity: "relation";
     entityId: ForeignKey<"Relation">;
+    relation?: never;
 } | {
     entity?: never;
     entityId?: never;
@@ -205,10 +210,11 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity: "relationAuth";
     entityId: ForeignKey<"RelationAuth">;
-    relationAuth: RelationAuth.UpdateOperation;
+    relationAuth?: RelationAuth.UpdateOperation;
 } | {
     entity: "relationAuth";
     entityId: ForeignKey<"RelationAuth">;
+    relationAuth?: never;
 } | {
     entity?: never;
     entityId?: never;
@@ -216,10 +222,11 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity: "user";
     entityId: ForeignKey<"User">;
-    user: User.UpdateOperation;
+    user?: User.UpdateOperation;
 } | {
     entity: "user";
     entityId: ForeignKey<"User">;
+    user?: never;
 } | {
     entity?: never;
     entityId?: never;
@@ -227,10 +234,11 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity: "userEntityClaim";
     entityId: ForeignKey<"UserEntityClaim">;
-    userEntityClaim: UserEntityClaim.UpdateOperation;
+    userEntityClaim?: UserEntityClaim.UpdateOperation;
 } | {
     entity: "userEntityClaim";
     entityId: ForeignKey<"UserEntityClaim">;
+    userEntityClaim?: never;
 } | {
     entity?: never;
     entityId?: never;
@@ -238,10 +246,11 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity: "userEntityGrant";
     entityId: ForeignKey<"UserEntityGrant">;
-    userEntityGrant: UserEntityGrant.UpdateOperation;
+    userEntityGrant?: UserEntityGrant.UpdateOperation;
 } | {
     entity: "userEntityGrant";
     entityId: ForeignKey<"UserEntityGrant">;
+    userEntityGrant?: never;
 } | {
     entity?: never;
     entityId?: never;
@@ -249,10 +258,11 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity: "userRelation";
     entityId: ForeignKey<"UserRelation">;
-    userRelation: UserRelation.UpdateOperation;
+    userRelation?: UserRelation.UpdateOperation;
 } | {
     entity: "userRelation";
     entityId: ForeignKey<"UserRelation">;
+    userRelation?: never;
 } | {
     entity?: string;
     entityId?: string;
@@ -262,11 +272,11 @@ export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
 export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity" | "entityId" | "operId">> & (({
-    oper: Oper.CreateSingleOperation;
+    oper?: Oper.CreateSingleOperation;
     operId?: never;
 } | {
     oper?: never;
-    operId?: ForeignKey<"oper"> | null;
+    operId?: ForeignKey<"oper">;
 })) & ({
     actionAuth?: ActionAuth.CreateSingleOperation | ActionAuth.UpdateOperation | ActionAuth.RemoveOperation;
     entityId?: never;
@@ -302,6 +312,15 @@ export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "entity" | "enti
 } | {
     entity?: ("actionAuth" | "i18n" | "path" | "relation" | "relationAuth" | "user" | "userEntityClaim" | "userEntityGrant" | "userRelation" | string) | null;
     entityId?: ForeignKey<"ActionAuth" | "I18n" | "Path" | "Relation" | "RelationAuth" | "User" | "UserEntityClaim" | "UserEntityGrant" | "UserRelation"> | null;
+    actionAuth?: never;
+    i18n?: never;
+    path?: never;
+    relation?: never;
+    relationAuth?: never;
+    user?: never;
+    userEntityClaim?: never;
+    userEntityGrant?: never;
+    userRelation?: never;
 }) & {
     [k: string]: any;
 };

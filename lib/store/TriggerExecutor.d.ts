@@ -23,6 +23,14 @@ export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt
         action: 'select';
     }, context: Cxt, option: OperateOption | SelectOption): Promise<void> | void;
     private execVolatileTrigger;
+    /**
+     * 判断一个trigger和当前modi上下文是否符合
+     * trigger的默认行为是：如果是commit时机的trigger，不显式声明则只能在modi apply时执行（create时不执行）；非commit时机的trigger，不显式声明则只在modi create时执行
+     * @param option
+     * @param trigger
+     * @returns
+     */
+    private judgeModiTurn;
     postOperation<T extends keyof ED>(entity: T, operation: ED[T]['Operation'] | ED[T]['Selection'] & {
         action: 'select';
     }, context: Cxt, option: OperateOption | SelectOption, result?: Partial<ED[T]['Schema']>[]): Promise<void> | void;

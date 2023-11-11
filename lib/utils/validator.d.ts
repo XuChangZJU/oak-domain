@@ -20,6 +20,7 @@ export declare const isTel: ValidatorFunction;
 export declare const isNumber: ValidatorFunction;
 export declare const isMoney: ValidatorMoneyFunction;
 export declare const isVehicleNumber: ValidatorFunction;
+export declare const isEmail: ValidatorFunction;
 export declare function checkAttributesNotNull<ED extends EntityDict, T extends keyof EntityDict>(entity: T, data: Partial<ED[T]['CreateSingle']['data']>, attributes: Array<keyof ED[T]['CreateSingle']['data']>, allowEmpty?: true): void;
 export declare function checkAttributesScope<ED extends EntityDict, T extends keyof EntityDict>(entity: T, data: Partial<ED[T]['CreateSingle']['data']>, attributes: Array<keyof ED[T]['CreateSingle']['data']>): void;
 export {};

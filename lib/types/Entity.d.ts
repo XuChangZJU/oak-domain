@@ -40,12 +40,13 @@ export type OperateOption = {
     modiParentId?: string;
     modiParentEntity?: string;
     deletePhysically?: boolean;
+    applyingModi?: boolean;
     dummy?: 1;
 };
 export type FormUpdateData<SH extends GeneralEntityShape> = Partial<{
-    [K in keyof Omit<SH, InstinctiveAttributes>]: SH[K] | null;
+    [K in keyof Omit<SH, "id" | "$$createAt$$" | "$$seq$$">]: SH[K] | null;
 }>;
-export type FormCreateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>> & {
+export type FormCreateData<SH extends GeneralEntityShape> = Partial<SH> & {
     id: string;
 };
 export type Operation<A extends string, D extends Projection, F extends Filter | undefined = undefined, S extends Sorter | undefined = undefined> = {

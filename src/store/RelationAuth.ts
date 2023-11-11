@@ -213,8 +213,19 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 }
             }
             case 'modi': {
-                // modi的操作权限都是由触发器触发，不用再检测了
-                return true;
+                /**  正常情况下对modi的生成是在触发器下openRootMode，不会走到这里
+                 * 但是有些例外，如extraFile如果在modi中创建，上传成功之后需要显式生成一条modi，这时对modi的
+                 * 检查可以转化为对其父entity的update权限检查
+                */
+                assert(action === 'create');
+                const { entity, entityId } = filter as EntityDict['modi']['CreateSingle']['data'];
+                return this.checkOperation(entity as keyof ED, {
+                    action: 'update',
+                    data: {},
+                    filter: {
+                        id: entityId!,
+                    },
+                } as Omit<ED['modi']['Update'], 'id'>, context);
             }
             case 'relation': {
                 // 创建relation目前不支持，以后再说
@@ -520,6 +531,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
 
             // 如果当前对象是一个toModi的，意味着它的cascadeUpdate会全部被变为modi去缓存，因此不需要再向下检查了
             // modi被apply时，这些modi产生的更新才会被实际检查
+            // 这里可能有问题，再思考思考 by Xc 20231111
             const isModiUpdate = this.schema[entity].toModi && action !== 'remove';
 
             if (child) {

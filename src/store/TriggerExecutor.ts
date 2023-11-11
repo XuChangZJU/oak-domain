@@ -49,7 +49,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     }
 
     registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void {
-        const { entity, action, type, conditionalFilter } = checker;
+        const { entity, action, type, conditionalFilter, mt } = checker;
         const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
         const { fn, when } = translateCheckerInAsyncContext(checker);
 
@@ -61,6 +61,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
             action: action as 'update',
             fn,
             when,
+            mt,
             filter: conditionalFilter,
         } as UpdateTrigger<ED, T, Cxt>;
         this.registerTrigger(trigger);
@@ -247,7 +248,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                 }, {
                     includedDeleted: true,
                 }) as ED[T]['OpSchema'][];
-                if (rows.length  > 0) {
+                if (rows.length > 0) {
                     await this.execVolatileTrigger(entity, trigger, context2, option, rows);
                 }
                 else {
@@ -272,14 +273,19 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     ): Promise<void> | void {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
-            trigger => typeof trigger.action === 'string' && trigger.action === operation.action || (trigger.action).includes(operation.action as any)
+            trigger => (typeof trigger.action === 'string' && trigger.action === operation.action
+                || trigger.action instanceof Array && (trigger.action as string[]).includes(operation.action))
+                // 加上modi的过滤条件
+                && this.judgeModiTurn(option, trigger)
+
         );
         if (triggers) {
             const preTriggers = triggers.filter(
                 ele => ele.when === 'before' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as ED[T]['Create']))
             );
             const commitTriggers = triggers.filter(
-                ele => ele.when === 'commit' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as ED[T]['Create']))
+                ele => ele.when === 'commit' &&
+                    (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as ED[T]['Create']))
             );
 
             if (context instanceof SyncContext) {
@@ -409,6 +415,26 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         }
     }
 
+    /**
+     * 判断一个trigger和当前modi上下文是否符合
+     * trigger的默认行为是：如果是commit时机的trigger，不显式声明则只能在modi apply时执行（create时不执行）；非commit时机的trigger，不显式声明则只在modi create时执行
+     * @param option 
+     * @param trigger 
+     * @returns 
+     */
+    private judgeModiTurn<T extends keyof ED>(option: OperateOption, trigger: Trigger<ED, T, Cxt>) {
+        const { mt, when } = trigger as CreateTrigger<ED, T, Cxt>;
+        if (option.modiParentEntity) {
+            // 在创建modi过程中，标识为apply或者未标识但为commit时执行的trigger默认不能执行
+            return mt && ['both', 'create'].includes(mt) || !mt && when !== 'commit';
+        }
+        else if (option.applyingModi) {
+            // 在应用modi过程中，标识为create或者未标识但不为commit时执行的trigger默认不能执行
+            return mt && ['both', 'apply'].includes(mt) || !mt && when === 'commit';
+        }
+        return true;
+    }
+
     postOperation<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
@@ -418,7 +444,10 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     ): Promise<void> | void {
         const { action } = operation;
         const triggers = this.triggerMap[entity] && this.triggerMap[entity]![action]?.filter(
-            trigger => typeof trigger.action === 'string' && trigger.action === operation.action || (trigger.action).includes(operation.action as any)
+            trigger => (typeof trigger.action === 'string' && trigger.action === operation.action
+                || trigger.action instanceof Array && (trigger.action as string[]).includes(operation.action))
+                // 加上modi的过滤条件
+                && this.judgeModiTurn(option, trigger)
         );
         if (triggers) {
             const postTriggers = triggers.filter(
@@ -482,9 +511,9 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     dontCollect: true,
                     forUpdate: true,
                 });
-    
+
                 const grouped = groupBy(rows, TriggerUuidAttribute);
-    
+
                 for (const uuid in grouped) {
                     const rs = grouped[uuid];
                     const { [TriggerDataAttribute]: triggerData } = rs[0];
@@ -493,7 +522,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     const trigger = this.triggerNameMap[name];
                     if (trigger) {
                         await this.execVolatileTrigger(entity, trigger, context, params, rs as ED[keyof ED]['OpSchema'][]);
-                    }    
+                    }
                 }
                 await context.commit();
             }

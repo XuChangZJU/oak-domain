@@ -46,14 +46,15 @@ export type OperateOption = {
     modiParentId?: string;      // 如果是延时更新，相关modi要关联到一个父亲上统一应用
     modiParentEntity?: string;  // 如果是延时更新，相关modi要关联到一个父亲上统一应用
     deletePhysically?: boolean;
+    applyingModi?: boolean;     // 标识是在执行延时更新
     dummy?: 1;          // 无用，为了继承Option通过编译
 };
 
 export type FormUpdateData<SH extends GeneralEntityShape> = Partial<{
-    [K in keyof Omit<SH, InstinctiveAttributes>]: SH[K] | null;
+    [K in keyof Omit<SH, "id" | "$$createAt$$" | "$$seq$$">]: SH[K] | null;
 }>;
 
-export type FormCreateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>> & { id: string };
+export type FormCreateData<SH extends GeneralEntityShape> = Partial<SH> & { id: string }/* Partial<Omit<SH, InstinctiveAttributes>> & { id: string } */;
 
 export type Operation<A extends string,
     D extends Projection,

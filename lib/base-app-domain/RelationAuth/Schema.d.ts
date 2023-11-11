@@ -117,6 +117,7 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "sourceRelationI
     sourceRelationId: ForeignKey<"sourceRelation">;
     sourceRelation?: Relation.UpdateOperation;
 } | {
+    sourceRelation?: never;
     sourceRelationId: ForeignKey<"sourceRelation">;
 }) & ({
     pathId?: never;
@@ -125,6 +126,7 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "sourceRelationI
     pathId: ForeignKey<"path">;
     path?: Path.UpdateOperation;
 } | {
+    path?: never;
     pathId: ForeignKey<"path">;
 }) & ({
     destRelationId?: never;
@@ -133,6 +135,7 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "sourceRelationI
     destRelationId: ForeignKey<"destRelation">;
     destRelation?: Relation.UpdateOperation;
 } | {
+    destRelation?: never;
     destRelationId: ForeignKey<"destRelation">;
 })) & {
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;
@@ -142,41 +145,41 @@ export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
 export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "sourceRelationId" | "pathId" | "destRelationId">> & (({
-    sourceRelation: Relation.CreateSingleOperation;
+    sourceRelation?: Relation.CreateSingleOperation;
     sourceRelationId?: never;
 } | {
-    sourceRelation: Relation.UpdateOperation;
+    sourceRelation?: Relation.UpdateOperation;
     sourceRelationId?: never;
 } | {
-    sourceRelation: Relation.RemoveOperation;
+    sourceRelation?: Relation.RemoveOperation;
     sourceRelationId?: never;
 } | {
     sourceRelation?: never;
-    sourceRelationId?: ForeignKey<"sourceRelation"> | null;
+    sourceRelationId?: ForeignKey<"sourceRelation">;
 }) & ({
-    path: Path.CreateSingleOperation;
+    path?: Path.CreateSingleOperation;
     pathId?: never;
 } | {
-    path: Path.UpdateOperation;
+    path?: Path.UpdateOperation;
     pathId?: never;
 } | {
-    path: Path.RemoveOperation;
+    path?: Path.RemoveOperation;
     pathId?: never;
 } | {
     path?: never;
-    pathId?: ForeignKey<"path"> | null;
+    pathId?: ForeignKey<"path">;
 }) & ({
-    destRelation: Relation.CreateSingleOperation;
+    destRelation?: Relation.CreateSingleOperation;
     destRelationId?: never;
 } | {
-    destRelation: Relation.UpdateOperation;
+    destRelation?: Relation.UpdateOperation;
     destRelationId?: never;
 } | {
-    destRelation: Relation.RemoveOperation;
+    destRelation?: Relation.RemoveOperation;
     destRelationId?: never;
 } | {
     destRelation?: never;
-    destRelationId?: ForeignKey<"destRelation"> | null;
+    destRelationId?: ForeignKey<"destRelation">;
 })) & {
     [k: string]: any;
     modiEntity$entity?: OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">[]> | Array<OakOperation<"create", Omit<ModiEntity.CreateOperationData, "entity" | "entityId">>>;

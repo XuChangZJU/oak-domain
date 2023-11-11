@@ -3155,6 +3155,12 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                     [
                         factory.createPropertySignature(
                             undefined,
+                            factory.createIdentifier(one[1]),
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
+                            factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+                        ),
+                        factory.createPropertySignature(
+                            undefined,
                             factory.createIdentifier(`${one[1]}Id`),
                             one[2] ? factory.createToken(ts.SyntaxKind.QuestionToken) : undefined,
                             factory.createTypeReferenceNode(
@@ -3237,7 +3243,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier(firstLetterLowerCase(one)),
-                            undefined,          // 反向指针好像不能为空，以后或许会有特例  by Xc
+                            entityQuestionToken || entityIdQuestionToken,
                             factory.createTypeReferenceNode(
                                 createForeignRef(entity, one, 'CreateSingleOperation')
                             )
@@ -3249,14 +3255,14 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier('entity'),
-                            undefined,          // 反向指针好像不能为空，以后或许会有特例  by Xc
+                            entityQuestionToken,
                             factory.createLiteralTypeNode(factory.createStringLiteral(`${firstLetterLowerCase(one)}`)
                             )
                         ),
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier('entityId'),
-                            undefined,           // 反向指针好像不能为空，以后或许会有特例  by Xc
+                            entityIdQuestionToken,
                             factory.createTypeReferenceNode(
                                 factory.createIdentifier("ForeignKey"),
                                 [factory.createLiteralTypeNode(factory.createStringLiteral(one))]
@@ -3265,7 +3271,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier(firstLetterLowerCase(one)),
-                            undefined,
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
                             factory.createTypeReferenceNode(
                                 createForeignRef(entity, one, 'UpdateOperation')
                             )
@@ -3289,6 +3295,12 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                                 factory.createIdentifier("ForeignKey"),
                                 [factory.createLiteralTypeNode(factory.createStringLiteral(one))]
                             )
+                        ),
+                        factory.createPropertySignature(
+                            undefined,
+                            factory.createIdentifier(firstLetterLowerCase(one)),
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
+                            factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
                         )
                     ]
                 );
@@ -3614,7 +3626,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier(one[1]),
-                            undefined,
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
                             factory.createTypeReferenceNode(
                                 createForeignRef(entity, one[0], 'CreateSingleOperation')
                             )
@@ -3632,7 +3644,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier(one[1]),
-                            undefined,
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
                             factory.createTypeReferenceNode(
                                 createForeignRef(entity, one[0], 'UpdateOperation')
                             ),
@@ -3650,7 +3662,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier(one[1]),
-                            undefined,
+                            factory.createToken(ts.SyntaxKind.QuestionToken),
                             factory.createTypeReferenceNode(
                                 createForeignRef(entity, one[0], 'RemoveOperation')
                             )
@@ -3675,7 +3687,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                             undefined,
                             factory.createIdentifier(`${one[1]}Id`),
                             factory.createToken(ts.SyntaxKind.QuestionToken),
-                            factory.createUnionTypeNode(
+                            one[2] ? factory.createUnionTypeNode(
                                 [
                                     factory.createTypeReferenceNode(
                                         factory.createIdentifier("ForeignKey"),
@@ -3683,7 +3695,10 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                                     ),
                                     factory.createLiteralTypeNode(factory.createNull())
                                 ]
-                            )
+                            ): factory.createTypeReferenceNode(
+                                factory.createIdentifier("ForeignKey"),
+                                [factory.createLiteralTypeNode(factory.createStringLiteral(one[1]))]
+                            ),
                         ),
                     ]
                 );
@@ -3826,13 +3841,20 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                     );
                 }
             }
-            if (process.env.COMPLING_AS_LIB) {
-                // 如果是base，要包容更多可能的反指
-                refEntityLitrals.push(
-                    factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-                );
-            }
 
+            const { schemaAttrs } = Schema[entity];
+            const { questionToken: entityQuestionToken } = schemaAttrs.find(
+                ele => {
+                    const { name } = ele;
+                    return (<ts.Identifier>name).text === 'entity'
+                }
+            )!;
+            const { questionToken: entityIdQuestionToken } = schemaAttrs.find(
+                ele => {
+                    const { name } = ele;
+                    return (<ts.Identifier>name).text === 'entityId'
+                }
+            )!;
             reverseOneNodes.push(
                 factory.createTypeLiteralNode(
                     [
@@ -3840,18 +3862,19 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                             undefined,
                             factory.createIdentifier('entity'),
                             factory.createToken(ts.SyntaxKind.QuestionToken),
-                            factory.createUnionTypeNode(
+                            !entityQuestionToken ? factory.createUnionTypeNode(
                                 [
-                                    factory.createUnionTypeNode(refEntityLitrals),
+                                    // 如果是作为lib，要包容更多可能的反指
+                                    factory.createUnionTypeNode(process.env.COMPLING_AS_LIB ? refEntityLitrals.concat(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)): refEntityLitrals),
                                     factory.createLiteralTypeNode(factory.createNull())
                                 ]
-                            )
+                            ) : factory.createUnionTypeNode(process.env.COMPLING_AS_LIB ? refEntityLitrals.concat(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)): refEntityLitrals)
                         ),
                         factory.createPropertySignature(
                             undefined,
                             factory.createIdentifier('entityId'),
                             factory.createToken(ts.SyntaxKind.QuestionToken),
-                            factory.createUnionTypeNode(
+                            !entityIdQuestionToken ? factory.createUnionTypeNode(
                                 [
                                     factory.createTypeReferenceNode(
                                         factory.createIdentifier("ForeignKey"),
@@ -3865,9 +3888,27 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                                     ),
                                     factory.createLiteralTypeNode(factory.createNull())
                                 ]
+                            ) : factory.createTypeReferenceNode(
+                                factory.createIdentifier("ForeignKey"),
+                                [factory.createUnionTypeNode(
+                                    ReversePointerRelations[entity].map(
+                                        ele => factory.createLiteralTypeNode(
+                                            factory.createStringLiteral(ele)
+                                        )
+                                    )
+                                )]
                             )
                         )
-                    ]
+                    ].concat(
+                        ReversePointerRelations[entity].map(
+                            (one) => factory.createPropertySignature(
+                                undefined,
+                                factory.createIdentifier(firstLetterLowerCase(one)),
+                                factory.createToken(ts.SyntaxKind.QuestionToken),
+                                factory.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+                            )
+                        )
+                    )
                 )
             );
         }

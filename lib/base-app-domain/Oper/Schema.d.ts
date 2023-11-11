@@ -105,6 +105,7 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "operatorId">> &
     operatorId: ForeignKey<"operator">;
     operator?: User.UpdateOperation;
 } | {
+    operator?: never;
     operatorId?: ForeignKey<"operator">;
 })) & {
     operEntity$oper?: OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">[]> | Array<OakOperation<"create", Omit<OperEntity.CreateOperationData, "oper" | "operId">>>;
@@ -113,13 +114,13 @@ export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
 export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "operatorId">> & (({
-    operator: User.CreateSingleOperation;
+    operator?: User.CreateSingleOperation;
     operatorId?: never;
 } | {
-    operator: User.UpdateOperation;
+    operator?: User.UpdateOperation;
     operatorId?: never;
 } | {
-    operator: User.RemoveOperation;
+    operator?: User.RemoveOperation;
     operatorId?: never;
 } | {
     operator?: never;

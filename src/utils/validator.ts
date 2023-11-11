@@ -119,6 +119,10 @@ export const isVehicleNumber: ValidatorFunction = (str) => {
     return reg.test(str);
 }
 
+export const isEmail: ValidatorFunction = (str) => {
+    const reg = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return reg.test(str);
+}
 
 export function checkAttributesNotNull<ED extends EntityDict, T extends keyof EntityDict>(entity: T, data: Partial<ED[T]['CreateSingle']['data']>, attributes: Array<keyof ED[T]['CreateSingle']['data']>, allowEmpty?: true) {
     const attrs = attributes.filter(

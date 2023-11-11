@@ -247,7 +247,10 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
                     action: action as EntityDict[keyof EntityDict]['Action'],
                     data: data as EntityDict[keyof EntityDict]['Update']['data'],
                     filter: filter as EntityDict[keyof EntityDict]['Update']['filter'],
-                }, option);
+                }, {
+                    ...option,
+                    applyingModi: true,
+                });
             }
 
             return modies.length;

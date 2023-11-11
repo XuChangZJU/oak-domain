@@ -152,6 +152,7 @@ export type CreateOperationData = FormCreateData<Omit<OpSchema, "refId">> & (({
     refId: ForeignKey<"ref">;
     ref?: UpdateOperation;
 } | {
+    ref?: never;
     refId?: ForeignKey<"ref">;
 })) & {
     oper$operator?: OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">[]> | Array<OakOperation<"create", Omit<Oper.CreateOperationData, "operator" | "operatorId">>>;
@@ -165,13 +166,13 @@ export type CreateSingleOperation = OakOperation<"create", CreateOperationData>;
 export type CreateMultipleOperation = OakOperation<"create", Array<CreateOperationData>>;
 export type CreateOperation = CreateSingleOperation | CreateMultipleOperation;
 export type UpdateOperationData = FormUpdateData<Omit<OpSchema, "refId">> & (({
-    ref: CreateSingleOperation;
+    ref?: CreateSingleOperation;
     refId?: never;
 } | {
-    ref: UpdateOperation;
+    ref?: UpdateOperation;
     refId?: never;
 } | {
-    ref: RemoveOperation;
+    ref?: RemoveOperation;
     refId?: never;
 } | {
     ref?: never;
