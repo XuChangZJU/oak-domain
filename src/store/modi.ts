@@ -50,7 +50,8 @@ export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt ext
 }
 
 export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
-    return context.operate('modi', {
+    const closeMode = context.openRootMode();
+    const result = context.operate('modi', {
         id: await generateNewIdAsync(),
         action: 'abandon',
         data: {},
@@ -66,6 +67,8 @@ export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt e
     }, Object.assign({}, option, {
         blockTrigger: false,
     }));
+    closeMode();
+    return result;
 }
 
 export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
