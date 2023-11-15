@@ -22,7 +22,7 @@ const CentToString: (value: number) => string | undefined = (value) => {
     }
 };
 
-const ThousandCont: (value: number) => string | undefined = (value) => {
+const ThousandCont: (value: number, decimalPlaces?: number) => string | undefined = (value, decimalPlaces) => {
     let value1 = `${value}`;
     const numArr = value1.split('.');
     value1 = numArr[0];
@@ -34,7 +34,16 @@ const ThousandCont: (value: number) => string | undefined = (value) => {
     if (value1) {
         result = value1 + result;
     }
-    result = numArr[1] ? result + '.' + numArr[1] : result;
+    if (decimalPlaces && decimalPlaces > 0) {
+        if (numArr[1]) {
+            const decimalPart = numArr[1].padEnd(decimalPlaces, '0').slice(0, decimalPlaces);
+            result = result + '.' + decimalPart;     
+        } else {
+            result = result + '.' + '0'.repeat(decimalPlaces);
+        }
+    } else {
+        result = numArr[1] ? result + '.' + numArr[1] : result;
+    }
     return result;
 };
 
