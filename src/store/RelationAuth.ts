@@ -363,7 +363,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         return entityFilters;
                     }
                     const result = getRecursiveDeducedFilters(deducedEntity, {
-                        id: deduceEntityId,
+                        id: deducedEntityId,
                     });
 
                     if (result instanceof Promise) {
