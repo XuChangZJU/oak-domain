@@ -62,6 +62,7 @@ export type Selection<A extends ReadOnlyAction, D extends Projection, F extends 
     sorter?: S;
 } & FilterPart<A, F> & {
     randomRange?: number;
+    total?: number;
 };
 export interface EntityShape {
     id: PrimaryKey;

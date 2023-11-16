@@ -1,6 +1,6 @@
 import assert from "assert";
 import {
-    EntityDict, OperateOption, SelectOption, OperationResult, CreateAtAttribute, 
+    EntityDict, OperateOption, SelectOption, OperationResult, CreateAtAttribute,
     UpdateAtAttribute, AggregationResult, DeleteAtAttribute
 } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
@@ -171,7 +171,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
         const checkSorterNode = (
             entity2: keyof ED,
-            sorterNode: NonNullable<ED[keyof ED]['Selection']['sorter']>,
+            sorterNode: ED[keyof ED]['Selection']['sorter'],
             projectionNode: ED[keyof ED]['Selection']['data']) => {
 
             const checkSortAttr = (e2: keyof ED, sortAttr: Record<string, any>, projNode: ED[keyof ED]['Selection']['data']) => {
@@ -202,7 +202,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     }
                 }
             }
-            sorterNode.forEach(
+            sorterNode!.forEach(
                 (node) => {
                     const { $attr } = node;
                     checkSortAttr(entity2, $attr, projectionNode);
@@ -397,6 +397,13 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]>;
+
+    protected abstract countAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
+        context: Cxt, 
+        option: OP
+    ): Promise<number>;
 
     protected abstract updateAbjointRowAsync<T extends keyof ED, OP extends OperateOption, Cxt extends AsyncContext<ED>>(
         entity: T,
@@ -661,7 +668,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             }
             else {
                 assert(relation instanceof Array);
-                const { data: subProjection, filter: subFilter, indexFrom, count, sorter: subSorter } = projection2[attr];
+                const { data: subProjection, filter: subFilter, indexFrom, count, sorter: subSorter, total, randomRange } = projection2[attr];
                 const [entity2, foreignKey] = relation;
                 const isAggr = attr.endsWith('$$aggr');
 
@@ -745,6 +752,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             data: subProjection,
                             filter: filter2,
                             sorter: subSorter,
+                            total,
                         }, context, option);
                         if (subRows instanceof Promise) {
                             return subRows.then(
@@ -777,7 +785,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     filter: filter2,
                                     sorter: subSorter,
                                     indexFrom,
-                                    count
+                                    count,
+                                    total,
+                                    randomRange,
                                 }, context, option);
                                 if (subRows instanceof Promise) {
                                     return subRows.then(
@@ -1966,7 +1976,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]> {
-        const { data, filter, indexFrom, count, sorter } = selection;
+        const { data, filter, indexFrom, count, sorter, total, randomRange } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
             data,
@@ -1975,14 +1985,30 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             this.aggregateAsync,
             option);
 
-        const rows = await this.selectAbjointRowAsync(entity, {
+        const rows2 = await this.selectAbjointRowAsync(entity, {
             data: projection,
             filter,
             indexFrom,
-            count,
+            count: randomRange || count,
             sorter
         }, context, option);
 
+        // 处理随机取值
+        let rows = !randomRange ? rows2 : [];
+        if (randomRange) {
+            const possibility = count! / rows2.length;
+            let reduced = rows2.length - count!;
+            rows = rows2.filter(
+                () => {
+                    const rand = Math.random();
+                    if (rand > possibility && reduced) {
+                        reduced--;
+                        return false;
+                    }
+                    return true;
+                }
+            );
+        }
 
         if (!option.dontCollect) {
             this.addToResultSelections(entity, rows, context);
@@ -2017,6 +2043,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             }
         }
 
+        if (total) {
+            const total2 = await this.countAsync(entity, selection, context, option);
+            Object.assign(rows, {
+                '#total': total2,
+            });
+        }
         return rows;
     }
 

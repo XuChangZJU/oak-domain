@@ -76,6 +76,7 @@ export type Selection<A extends ReadOnlyAction,
         sorter?: S;
     } & FilterPart<A, F> & {
         randomRange?: number;
+        total?: number;
     };
 
 export interface EntityShape {
