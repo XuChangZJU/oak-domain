@@ -9,14 +9,20 @@ export declare function firstLetterUpperCase(s: string): string;
 export declare const template: (strings: TemplateStringsArray, ...keys: Array<any>) => (...values: Array<any>) => string;
 /**
  * 随机生成字符串
- * @param randomLength
+ * @param length
  * @returns
  */
-export declare const random: (randomLength?: number) => string;
+export declare const random: (length?: number) => string;
 /**
  * 随机生成带前缀的字符串
  * @param prefix 第一个参数为你想生成的固定的文字开头比如: 微信用户xxxxx
- * @param randomLength 第二个为你想生成出固定开头文字外的随机长度
+ * @param length 第二个为你想生成出固定开头文字外的随机长度
  * @returns
  */
-export declare const randomName: (prefix?: string, randomLength?: number) => string;
+export declare const randomPrefixedString: (prefix?: string, length?: number) => string;
+/**
+ * 将字符串中的u16编码转换回汉字
+ * @param str
+ * @returns
+ */
+export declare function unescapeUnicode(str: string): string;

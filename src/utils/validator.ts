@@ -3,10 +3,17 @@
  */
 'use strict';
 
-import { EntityDict, OakAttrNotNullException, OakInputIllegalException } from "../types";
+import {
+    EntityDict,
+    OakAttrNotNullException,
+    OakInputIllegalException,
+} from '../types';
 
-type ValidatorFunction = (text: string, size?:number) => string|boolean;
-type ValidatorMoneyFunction = (text: string, zero?:boolean) => string|boolean;
+type ValidatorFunction = (text: string, size?: number) => string | boolean;
+type ValidatorMoneyFunction = (
+    text: string,
+    disableZero?: boolean
+) => string | boolean;
 
 
 export const isMobile: ValidatorFunction = (text) => {
@@ -97,24 +104,25 @@ export const isNumber: ValidatorFunction = (str) => {
     return /^[0-9]*$/.test(str);
 }
 
-export const isMoney: ValidatorMoneyFunction = (str, zero) => {
-    // 金额，最多可以有两位小数 zero为true包含零
-    if (zero) {
-        return /(^[1-9]([0-9]+)?(\.[0-9]{1,2})?$)|(^(0){1}$)|(^[0-9]\.[0-9]([0-9])?$)/.test(
-            str
-        );
+export const isMoney: ValidatorMoneyFunction = (str, disableZero) => {
+    // 金额，最多可以有两位小数 默认包含零
+    if (disableZero) {
+        return /(^[1-9](\d+)?(\.\d{1,2})?$)|(^\d\.\d{1,2}$)/.test(str);
     }
-    return /(^[1-9](\d+)?(\.\d{1,2})?$)|(^\d\.\d{1,2}$)/.test(str);
-}
+    return /(^[1-9]([0-9]+)?(\.[0-9]{1,2})?$)|(^(0){1}$)|(^[0-9]\.[0-9]([0-9])?$)/.test(
+        str
+    );
+};
 
 export const isVehicleNumber: ValidatorFunction = (str) => {
-    // const xreg=/^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领A-Z]{1}[A-Z]{1}(([0-9]{5}[DF]$)|([DF][A-HJ-NP-Z0-9][0-9]{4}$))/;
-    // const creg=/^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领A-Z]{1}[A-Z]{1}[A-HJ-NP-Z0-9]{4}[A-HJ-NP-Z0-9挂学警港澳]{1}$/;
-
     const reg = /^(([京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z](([0-9]{5}[DF])|([DF]([A-HJ-NP-Z0-9])[0-9]{4})))|([京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{4}[A-HJ-NP-Z0-9挂学警港澳使领]))$/;
     return reg.test(str);
 }
 
+export const isEmail: ValidatorFunction = (str) => {
+    const reg = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return reg.test(str);
+}
 
 export function checkAttributesNotNull<ED extends EntityDict, T extends keyof EntityDict>(entity: T, data: Partial<ED[T]['CreateSingle']['data']>, attributes: Array<keyof ED[T]['CreateSingle']['data']>, allowEmpty?: true) {
     const attrs = attributes.filter(

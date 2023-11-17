@@ -23,6 +23,12 @@ export declare class OakImportDataParseException<ED extends EntityDict> extends 
     header?: string;
     constructor(message: string, line: number, header?: string);
 }
+export declare class OakNoRelationDefException<ED extends EntityDict, T extends keyof ED> extends OakDataException<ED> {
+    entity: T;
+    actions: ED[T]['Action'][];
+    constructor(entity: T, actions: ED[T]['Action'][], msg?: string);
+    toString(): string;
+}
 export declare class OakOperExistedException<ED extends EntityDict> extends OakDataException<ED> {
 }
 export declare class OakRowUnexistedException<ED extends EntityDict> extends OakDataException<ED> {
@@ -37,9 +43,17 @@ export declare class OakRowUnexistedException<ED extends EntityDict> extends Oak
         selection: any;
     }[];
 }
-export declare class OakExternalException extends Error {
-}
+/**
+ * 可接受的、由用户操作造成的异常
+ */
 export declare class OakUserException<ED extends EntityDict> extends OakException<ED> {
+}
+/**
+ * 网络中断异常
+ */
+export declare class OakNetworkException<ED extends EntityDict> extends OakException<ED> {
+}
+export declare class OakServerProxyException<ED extends EntityDict> extends OakException<ED> {
 }
 /**
  * 数据不一致异常，系统认为现有的数据不允许相应的动作时抛此异常
@@ -61,6 +75,9 @@ export declare class OakInputIllegalException<ED extends EntityDict> extends Oak
     addAttributesPrefix(prefix: string): void;
     toString(): string;
 }
+/**
+ * 属性为空时抛的异常
+ */
 export declare class OakAttrNotNullException<ED extends EntityDict> extends OakInputIllegalException<ED> {
     constructor(entity: keyof ED, attributes: string[], message?: string);
 }
@@ -68,6 +85,11 @@ export declare class OakAttrNotNullException<ED extends EntityDict> extends OakI
  * 用户权限不够时抛的异常
  */
 export declare class OakUserUnpermittedException<ED extends EntityDict> extends OakUserException<ED> {
+}
+/**
+ * 用户查询权限不够抛出异常
+ */
+export declare class OakUserInvisibleException<ED extends EntityDict> extends OakUserException<ED> {
 }
 /**
  * 用户未登录抛的异常
@@ -92,13 +114,29 @@ export declare class OakCongruentRowExists<ED extends EntityDict, T extends keyo
     getEntity(): T;
     toString(): string;
 }
+/**
+ * 死锁抛的异常
+ */
 export declare class OakDeadlock<ED extends EntityDict> extends OakUserException<ED> {
     constructor(message?: string | undefined);
 }
+/**
+ * 前置条件不满足抛的异常
+ */
 export declare class OakPreConditionUnsetException<ED extends EntityDict> extends OakUserException<ED> {
     entity?: keyof ED;
     code?: string;
     constructor(message?: string | undefined, entity?: keyof ED | undefined, code?: string | undefined);
+    toString(): string;
+}
+/**
+ * 调用外部接口抛出的异常
+ */
+export declare class OakExternalException<ED extends EntityDict> extends OakUserException<ED> {
+    code?: string;
+    source: string;
+    data?: any;
+    constructor(source: string, code?: string, message?: string, data?: any);
     toString(): string;
 }
 export declare function makeException<ED extends EntityDict>(data: {

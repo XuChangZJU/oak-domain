@@ -1,4 +1,4 @@
-import { EntityDict } from "./Entity";
+import { EntityDict, SubDataDef } from "./Entity";
 import { OpRecord } from "./Entity";
 import { AsyncContext } from "../store/AsyncRowStore";
 

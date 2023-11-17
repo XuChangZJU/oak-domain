@@ -1,5 +1,6 @@
+import { IncomingHttpHeaders } from "http";
 import { AsyncContext, AsyncRowStore } from "../store/AsyncRowStore";
-import { EntityDict } from "./Entity";
+import { EntityDict, OpRecord } from "./Entity";
 
 export abstract class AppLoader<ED extends EntityDict, Cxt extends AsyncContext<ED>> {
     protected path: string;
@@ -7,7 +8,11 @@ export abstract class AppLoader<ED extends EntityDict, Cxt extends AsyncContext<
         this.path = path;
     }
     
-    abstract execAspect(name: string, context: Cxt, params?: any): Promise<any>;
+    abstract execAspect(name: string, header?: IncomingHttpHeaders, contextString?: string, params?: any): Promise<{
+        opRecords?: OpRecord<ED>[];
+        message?: string;
+        result: any;
+    }>;
 
     abstract initialize(dropIfExists?: boolean): Promise<void>;
 

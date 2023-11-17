@@ -1,22 +1,28 @@
 import { EntityDef as ActionAuth } from "./ActionAuth/Schema";
+import { EntityDef as I18n } from "./I18n/Schema";
 import { EntityDef as Modi } from "./Modi/Schema";
 import { EntityDef as ModiEntity } from "./ModiEntity/Schema";
 import { EntityDef as Oper } from "./Oper/Schema";
 import { EntityDef as OperEntity } from "./OperEntity/Schema";
+import { EntityDef as Path } from "./Path/Schema";
 import { EntityDef as Relation } from "./Relation/Schema";
 import { EntityDef as RelationAuth } from "./RelationAuth/Schema";
 import { EntityDef as User } from "./User/Schema";
+import { EntityDef as UserEntityClaim } from "./UserEntityClaim/Schema";
 import { EntityDef as UserEntityGrant } from "./UserEntityGrant/Schema";
 import { EntityDef as UserRelation } from "./UserRelation/Schema";
-export declare type EntityDict = {
+export type EntityDict = {
     actionAuth: ActionAuth;
+    i18n: I18n;
     modi: Modi;
     modiEntity: ModiEntity;
     oper: Oper;
     operEntity: OperEntity;
+    path: Path;
     relation: Relation;
     relationAuth: RelationAuth;
     user: User;
+    userEntityClaim: UserEntityClaim;
     userEntityGrant: UserEntityGrant;
     userRelation: UserRelation;
 };

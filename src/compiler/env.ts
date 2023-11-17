@@ -1,3 +1,4 @@
+import Path from 'path';
 export const LIB_OAK_DOMAIN = 'oak-domain';
 const LIB_OAK_GENERAL_BUSINESS = 'oak-general-business';
 export const LIB_PATH = () => 'lib';
@@ -27,10 +28,19 @@ export const ACTION_CONSTANT_IN_OAK_DOMAIN = (level = 2) => {
 
 // export const OUTPUT_PATH = 'app-domain/entities';
 
-export const RESERVED_ENTITIES = ['Schema', 'Filter', 'Query', 'SubQuery', 'Entity', 'Selection', 'Operation', 'File', 'Common', 
+export const RESERVED_ENTITY_NAMES = ['Schema', 'Filter', 'Query', 'SubQuery', 'Entity', 'Selection', 'Operation', 'File', 'Common', 'Config', 'Configuration',
 'Locale', 'Projection', 'Data'];
 export const ENTITY_NAME_MAX_LENGTH = 32;
 export const STRING_LITERAL_MAX_LENGTH = 24;
 export const NUMERICAL_LITERL_DEFAULT_PRECISION = 8;
 export const NUMERICAL_LITERL_DEFAULT_SCALE = 2;
 export const INT_LITERL_DEFAULT_WIDTH = 4;
+
+// 暂放在这儿
+export const SYSTEM_RESERVE_ENTITIES = ['user', 'relation', 'oper', 'operEntity', 'modi', 'modiEntity',
+    'userRelation', 'actionAuth', 'relationAuth', 'relation', 'userEntityGrant', 'i18n'];
+
+// 项目依赖的第三方oak lib配置文件所在的固定路径
+export const OAK_EXTERNAL_LIBS_FILEPATH = (path: string) => {
+    return Path.join(path, 'config/oakExternalLib.json');
+}

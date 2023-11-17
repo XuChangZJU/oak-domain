@@ -65,6 +65,7 @@ export interface StorageDesc<SH extends EntityShape> {
     relation?: string[];
     // view 相关
     view?: true;
+    recursiveDepth?: number;
 }
 
 

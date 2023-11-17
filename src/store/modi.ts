@@ -1,6 +1,6 @@
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { OpSchema as Modi } from '../base-app-domain/Modi/Schema';
-import { Operation, StorageSchema, RowChecker, EntityDict, OperateOption, Trigger, RemoveTrigger, REMOVE_CASCADE_PRIORITY } from '../types';
+import { Operation, StorageSchema, RowChecker, EntityDict, OperateOption, Trigger, RemoveTrigger, TRIGGER_DEFAULT_PRIORITY } from '../types';
 import { appendOnlyActions } from '../actions/action';
 import { difference } from '../utils/lodash';
 import { AsyncContext } from './AsyncRowStore';
@@ -28,7 +28,8 @@ export function createOperationsFromModies(modies: Modi[]): Array<{
 }
 
 export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
-    return context.operate('modi', {
+    const closeMode = context.openRootMode();
+    const result = await context.operate('modi', {
         id: await generateNewIdAsync(),
         action: 'apply',
         data: {},
@@ -44,10 +45,13 @@ export async function applyModis<ED extends EntityDict & BaseEntityDict, Cxt ext
     }, Object.assign({}, option, {
         blockTrigger: false,
     }));
+    closeMode();
+    return result;
 }
 
 export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, Op extends OperateOption>(filter: ED['modi']['Selection']['filter'], context: Cxt, option: Op) {
-    return context.operate('modi', {
+    const closeMode = context.openRootMode();
+    const result = context.operate('modi', {
         id: await generateNewIdAsync(),
         action: 'abandon',
         data: {},
@@ -63,6 +67,8 @@ export async function abandonModis<ED extends EntityDict & BaseEntityDict, Cxt e
     }, Object.assign({}, option, {
         blockTrigger: false,
     }));
+    closeMode();
+    return result;
 }
 
 export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
@@ -92,7 +98,26 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
                     assert(modiParentEntity);
                     assert(modiParentId);
                     return {
-                        id: {
+                        modiEntity$entity: {
+                            '#sqp': 'not in',
+                            entity,
+                            modi: {
+                                iState: 'active',
+                                $or: [
+                                    {
+                                        entity: {
+                                            $ne: modiParentEntity,
+                                        },
+                                    },
+                                    {
+                                        entityId: {
+                                            $ne: modiParentId,
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                        /* id: {
                             $nin: {
                                 entity: 'modiEntity',
                                 data: {
@@ -117,11 +142,18 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
                                     },
                                 },
                             },
-                        }
+                        } */
                     }
                 }
                 return {
-                    id: {
+                    modiEntity$entity: {
+                        '#sqp': 'not in',
+                        entity,
+                        modi: {
+                            iState: 'active',
+                        }
+                    },
+                    /* id: {
                         $nin: {
                             entity: 'modiEntity',
                             data: {
@@ -134,7 +166,7 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
                                 }
                             },
                         },
-                    }
+                    } */
                 };
             },
             errMsg: '您请求的更新对象上还有正在申请的更新，请等该更新结束后再试',
@@ -145,7 +177,7 @@ export function createModiRelatedCheckers<ED extends EntityDict & BaseEntityDict
 }
 
 
-export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>>(schema: StorageSchema<ED>) {
+export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
     const triggers: Trigger<ED, keyof ED, Cxt>[] = [];
 
     for (const entity in schema) {
@@ -157,8 +189,8 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
                 name: `当删除${entity}对象时，删除相关联的modi的modiEntity`,
                 action: 'remove',
                 entity,
-                when: 'after',
-                priority: REMOVE_CASCADE_PRIORITY,
+                when: 'before',
+                priority: TRIGGER_DEFAULT_PRIORITY,
                 fn: async ({ operation }, context, option) => {
                     const { filter } = operation;
                     await context.operate('modiEntity', {
@@ -187,6 +219,50 @@ export function createModiRelatedTriggers<ED extends EntityDict & BaseEntityDict
         }
     }
 
-    return triggers;
+    // modi被应用时的效用，搬到这里了
+    const applyTrigger: Trigger<EntityDict, 'modi', AsyncContext<EntityDict>> = {
+        name: '当modi被应用时，将相应的operate完成',
+        entity: 'modi',
+        action: 'apply',
+        when: 'after',
+        fn: async ({ operation }, context, option) => {
+            const { filter } = operation;
+            const modies = await context.select('modi', {
+                data: {
+                    id: 1,
+                    action: 1,
+                    data: 1,
+                    filter: 1,
+                    targetEntity: 1,
+                },
+                filter,
+                sorter: [
+                    {
+                        $attr: {
+                            $$createAt$$: 1,
+                        },
+                        $direction: 'asc',
+                    },
+                ],
+            }, option);
+
+            for (const modi of modies) {
+                const { targetEntity, id, action, data, filter } = modi;
+                await context.operate(targetEntity as keyof EntityDict, {
+                    id: id!,
+                    action: action as EntityDict[keyof EntityDict]['Action'],
+                    data: data as EntityDict[keyof EntityDict]['Update']['data'],
+                    filter: filter as EntityDict[keyof EntityDict]['Update']['filter'],
+                }, {
+                    ...option,
+                    applyingModi: true,
+                });
+            }
+
+            return modies.length;
+        }
+    };
+
+    return triggers.concat([applyTrigger as Trigger<ED, keyof ED, Cxt>]);
 }
 

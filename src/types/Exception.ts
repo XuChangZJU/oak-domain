@@ -82,6 +82,25 @@ export class OakImportDataParseException<ED extends EntityDict> extends OakExcep
     }
 }
 
+export class OakNoRelationDefException<ED extends EntityDict, T extends keyof ED> extends OakDataException<ED> {
+    entity: T;
+    actions: ED[T]['Action'][];
+    constructor(entity: T, actions: ED[T]['Action'][], msg?: string) {
+        super(msg || `对象${entity as string}的操作${actions.join(',')}找不到有效的relation定义`);
+        this.entity = entity;
+        this.actions = actions;
+    }
+    
+    toString(): string {
+        return JSON.stringify({
+            name: this.constructor.name,
+            message: this.message,
+            entity: this.entity,
+            action: this.actions,
+        });
+    }
+}
+
 export class OakOperExistedException<ED extends EntityDict> extends OakDataException<ED> {
     // 进行操作时发现同样id的Oper对象已经存在
 }
@@ -106,13 +125,25 @@ export class OakRowUnexistedException<ED extends EntityDict> extends OakDataExce
     }
 }
 
-export class OakExternalException extends Error {
-    // 表示由oak生态外部造成的异常，比如网络中断
-}
-
+/**
+ * 可接受的、由用户操作造成的异常
+ */
 export class OakUserException<ED extends EntityDict> extends OakException<ED> {
     // 继承了这个类的异常统一视为“可接受的、由用户操作造成的异常”
 };
+
+/**
+ * 网络中断异常
+ */
+export class OakNetworkException<ED extends EntityDict> extends OakException<ED> {
+    // 网络访问异常
+}
+
+// 
+export class OakServerProxyException<ED extends EntityDict> extends OakException<ED> {
+    // 服务器反射异常（请求未能到达应用服务程序）
+}
+
 
 // 在系统更新数据时，以下三个异常应按规范依次抛出。
 /**
@@ -169,7 +200,9 @@ export class OakInputIllegalException<ED extends EntityDict> extends OakUserExce
     }
 };
 
-// 属性为空
+/**
+ * 属性为空时抛的异常
+ */
 export class OakAttrNotNullException<ED extends EntityDict> extends OakInputIllegalException<ED> {
     constructor(entity: keyof ED, attributes: string[], message?: string) {
         super(entity, attributes, message || '属性不允许为空');
@@ -182,6 +215,14 @@ export class OakAttrNotNullException<ED extends EntityDict> extends OakInputIlle
 export class OakUserUnpermittedException<ED extends EntityDict> extends OakUserException<ED> {
 
 };
+
+/**
+ * 用户查询权限不够抛出异常
+ */
+export class OakUserInvisibleException<ED extends EntityDict> extends OakUserException<ED> {
+
+};
+
 
 /**
  * 用户未登录抛的异常
@@ -231,12 +272,18 @@ export class OakCongruentRowExists<ED extends EntityDict, T extends keyof ED> ex
     }
 }
 
+/**
+ * 死锁抛的异常
+ */
 export class OakDeadlock<ED extends EntityDict> extends OakUserException<ED> {
     constructor(message?: string | undefined) {
         super(message || '发现死锁');
     }
 };
 
+/**
+ * 前置条件不满足抛的异常
+ */
 export class OakPreConditionUnsetException<ED extends EntityDict> extends OakUserException<ED> {
     entity?: keyof ED;
     code?: string;
@@ -254,6 +301,31 @@ export class OakPreConditionUnsetException<ED extends EntityDict> extends OakUse
             message: this.message,
             code: this.code,
             entity: this.entity,
+        });
+    }
+}
+
+/**
+ * 调用外部接口抛出的异常
+ */
+export class OakExternalException<ED extends EntityDict> extends OakUserException<ED> {
+    code?: string;
+    source: string;
+    data?: any;
+
+    constructor(source: string, code?: string, message?: string, data?: any) {
+        super(message);
+        this.code = code;
+        this.source = source;
+        this.data = data;
+    }
+
+    toString(): string {
+        return JSON.stringify({
+            code: this.code,
+            message: this.message,
+            source: this.source,
+            data: this.data,
         });
     }
 }
@@ -291,6 +363,11 @@ export function makeException<ED extends EntityDict>(data: {
             e.setOpRecords(data.opRecords);
             return e;
         }
+        case 'OakUserInvisibleException': {
+            const e = new OakUserInvisibleException(data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
+        }
         case 'OakUnloggedInException': {
             const e = new OakUnloggedInException(data.message);
             e.setOpRecords(data.opRecords);
@@ -321,6 +398,11 @@ export function makeException<ED extends EntityDict>(data: {
             e.setOpRecords(data.opRecords);
             return e;
         }
+        case 'OakNoRelationDefException': {
+            const e = new OakNoRelationDefException(data.entity, data.action, data.message);
+            e.setOpRecords(data.opRecords);
+            return e;
+        }
         case 'OakUniqueViolationException': {
             const e = new OakUniqueViolationException(data.rows, data.message);
             e.setOpRecords(data.opRecords);
@@ -343,6 +425,18 @@ export function makeException<ED extends EntityDict>(data: {
                 data.message
             );
             e.setOpRecords(data.opRecords);
+            return e;
+        }
+        case 'OakExternalException': {
+            const e = new OakExternalException(data.source, data.code, data.message, data.data);
+            return e;
+        }
+        case 'OakNetworkException': {
+            const e = new OakNetworkException(data.message);
+            return e;
+        }
+        case 'OakServerProxyException': {
+            const e = new OakServerProxyException(data.message);
             return e;
         }
         default:
