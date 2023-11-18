@@ -2044,7 +2044,10 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         }
 
         if (total) {
-            const total2 = await this.countAsync(entity, selection, context, option);
+            const total2 = await this.countAsync(entity, {
+                filter: selection.filter,
+                count: total,
+            }, context, option);
             Object.assign(rows, {
                 '#total': total2,
             });
