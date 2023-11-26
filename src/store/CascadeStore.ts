@@ -16,7 +16,7 @@ import { getRelevantIds } from "./filter";
 import { CreateSingleOperation as CreateSingleOperOperation } from '../base-app-domain/Oper/Schema';
 import { CreateOperation as CreateModiOperation, UpdateOperation as UpdateModiOperation } from '../base-app-domain/Modi/Schema';
 import { generateNewIdAsync } from "../utils/uuid";
-import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
+import { SYSTEM_RESERVE_ENTITIES } from "../compiler/entities";
 
 /**这个用来处理级联的select和update，对不同能力的 */
 export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> extends RowStore<ED> {

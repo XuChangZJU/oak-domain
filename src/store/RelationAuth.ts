@@ -8,7 +8,7 @@ import { judgeRelation } from "./relation";
 import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
 import { difference, intersection, set, uniq, cloneDeep, groupBy } from '../utils/lodash';
-import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
+import { SYSTEM_RESERVE_ENTITIES } from "../compiler/entities";
 
 
 type OperationTree<ED extends EntityDict & BaseEntityDict> = {

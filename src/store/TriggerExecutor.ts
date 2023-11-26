@@ -10,7 +10,7 @@ import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
 import { translateCheckerInAsyncContext } from './checker';
 import { makeProjection } from '../utils/projection';
-import { generateNewIdAsync } from '..';
+import { generateNewIdAsync } from '../utils/uuid';
 
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
