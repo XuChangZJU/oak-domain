@@ -916,8 +916,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         if (process.env.NODE_ENV === 'development') {
                             console.warn('对象的select权限被否决，请检查', dlSelections[idx]);
                         }
+                        idx++;
                         return false;
                     }
+                    idx++;
                 }
                 return true;
             };
