@@ -40,7 +40,6 @@ const entityDesc: EntityDesc<Schema> = {
         }
     ],
     configuration: {
-        actionType: 'readOnly',
         static: true,
-    }
+    },
 };
