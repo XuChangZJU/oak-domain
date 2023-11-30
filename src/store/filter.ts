@@ -1832,6 +1832,31 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
     return false;
 }
 
+/**
+ * 有的场景下将filter当成非结构化属性存储，又想支持对其查询，此时必须将查询的filter进行转换，处理其中$开头的escape
+ * 只要filter是查询数据的标准子集，查询应当能返回true
+ * @param filter 
+ */
+export function translateFilterToObjectPredicate(filter: Record<string, any>) {
+    const copyInner = (orig: Record<string, any>, dest: Record<string, any>) => {
+        for (const key in orig) {
+            const value = orig[key];
+            const key2 = key.startsWith('$') ? `.${key}` : key;
+            
+            if (typeof value === 'object' && !(value instanceof Array)) {
+                dest[key2] = {};
+                copyInner(value, dest[key2]);
+            }
+            else {
+                dest[key2] = value;
+            }
+        }
+    }
+    const translated = {};
+    copyInner(filter, translated);
+    return translated;
+}
+
 /* export function getCascadeEntityFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     filter: NonNullable<ED[T]['Selection']['filter']>,
     attr: keyof NonNullable<ED[T]['Selection']['filter']>

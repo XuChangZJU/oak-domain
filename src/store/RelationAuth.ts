@@ -1262,12 +1262,12 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             value: '',
                             $$createAt$$: 1,
                             $$updateAt$$: 1,
-                            $$seq$$: 'temp',
+                            $$seq$$: 123,
                             recursive: false,
                         },
                         $$createAt$$: 1,
                         $$updateAt$$: 1,
-                        $$seq$$: 'temp',
+                        $$seq$$: 123,
                         deActions: [node.action],
                     });
                 }

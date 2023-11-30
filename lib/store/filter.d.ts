@@ -77,3 +77,9 @@ export declare function makeTreeDescendantFilter<ED extends EntityDict & BaseEnt
  */
 export declare function checkFilterContains<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, contained: ED[T]['Selection']['filter'], filter?: ED[T]['Selection']['filter'], dataCompare?: true, warningOnDataCompare?: true): boolean | Promise<boolean>;
 export declare function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter'], dataCompare?: true, warningOnDataCompare?: true): boolean | Promise<boolean>;
+/**
+ * 有的场景下将filter当成非结构化属性存储，又想支持对其查询，此时必须将查询的filter进行转换，处理其中$开头的escape
+ * 只要filter是查询数据的标准子集，查询应当能返回true
+ * @param filter
+ */
+export declare function translateFilterToObjectPredicate(filter: Record<string, any>): {};

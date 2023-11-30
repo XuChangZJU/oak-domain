@@ -16,7 +16,7 @@ export type Boolean = boolean;
 export type Price = number;
 export type PrimaryKey = string;
 export type ForeignKey<E extends string> = string;
-export type Sequence = string;      // 自增长序列，为了让人阅读方便，为了支持分布式这里用string，底层实现可自定义
+export type Sequence = number;          // 自增长序列，单个结点上能保证递增就行了
 export { Geo, SingleGeo } from './Geo';
 
 export type DataTypes = number | string | Datetime | Day | Time | Geo | Object | SingleGeo;
