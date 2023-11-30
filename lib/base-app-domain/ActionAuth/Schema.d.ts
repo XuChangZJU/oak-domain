@@ -1,5 +1,5 @@
 import { ForeignKey, JsonProjection } from "../../types/DataType";
-import { Q_DateValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, JsonFilter, SubQueryPredicateMetadata } from "../../types/Demand";
+import { Q_DateValue, Q_NumberValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, JsonFilter, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
@@ -31,7 +31,7 @@ export type Schema = EntityShape & {
 type AttrFilter = {
     id: Q_StringValue;
     $$createAt$$: Q_DateValue;
-    $$seq$$: Q_StringValue;
+    $$seq$$: Q_NumberValue;
     $$updateAt$$: Q_DateValue;
     relationId: Q_StringValue;
     relation: Relation.Filter;

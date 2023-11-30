@@ -1614,7 +1614,7 @@ function constructFilter(statements: Array<ts.Statement>, entity: string) {
             factory.createIdentifier('$$seq$$'),
             undefined,
             factory.createTypeReferenceNode(
-                factory.createIdentifier('Q_StringValue'),
+                factory.createIdentifier('Q_NumberValue'),
             )
         ),
         // $$updateAt$$: Q_DateValue
