@@ -20,7 +20,7 @@ export * from './actions/relation';
 
 export { SimpleConnector } from './utils/SimpleConnector';
 export { assert } from './utils/assert';
-export { composeUrl } from './utils/url';
+export { composeUrl } from './utils/domain';
 export {
     checkAttributesNotNull,
     checkAttributesScope,
