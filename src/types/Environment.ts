@@ -88,3 +88,11 @@ export type NativeEnv = {
 }
 
 export type Environment = WechatMpEnv | WebEnv | ServerEnv | NativeEnv;
+
+export type BriefEnv = {
+    system: string;
+    brand?: string;
+    model?: string;
+    wechat?: string;
+    explorer?: string;
+};
