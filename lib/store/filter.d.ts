@@ -3,14 +3,6 @@ import { EntityDict } from "../base-app-domain";
 import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
 export declare function combineFilters<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filters: Array<ED[T]['Selection']['filter']>, union?: true): ED[T]["Selection"]["filter"] | undefined;
-type DeducedFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED> = {
-    entity: T;
-    filter: ED[T]['Selection']['filter'];
-};
-type DeducedFilterCombination<ED extends EntityDict & BaseEntityDict> = {
-    $or?: (DeducedFilterCombination<ED> | DeducedFilter<ED, keyof ED>)[];
-    $and?: (DeducedFilterCombination<ED> | DeducedFilter<ED, keyof ED>)[];
-};
 /**
  * 在以下判断相容或相斥的过程中，相容/相斥的事实标准是：满足两个条件的查询集合是否被包容/互斥，但如果两个filter在逻辑上相容或者相斥，在事实上不一定相容或者相斥
  * 例如：{ a: 1 } 和 { a: { $ne: 1 } } 是明显不相容的查询，但如果数据为空集，则这两个查询并不能否定其相容
@@ -42,40 +34,6 @@ type DeducedFilterCombination<ED extends EntityDict & BaseEntityDict> = {
  * @attention: 1)这里的测试不够充分，有些算子之间的相容或相斥可能有遗漏, 2)有新的算子加入需要修改代码
  */
 export declare function judgeValueRelation(value1: any, value2: any, contained: boolean): boolean | undefined;
-/**
- *
- * 判断filter是否包含contained中的查询条件，即filter查询的结果一定是contained查询结果的子集
- * filter = {
- *      a: 1
- *      b: 2,
- *      c: 3,
- * },
- * conditionalFilter = {
- *      a: 1
- * }
- * 则包含
- * @param entity
- * @param schema
- * @param filter
- * @param contained
- * @returns
- */
-export declare function contains<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filter: ED[T]['Selection']['filter'], contained: ED[T]['Selection']['filter']): boolean | DeducedFilterCombination<ED>;
-/**
- * 判断filter1和filter2是否相斥，即filter1和filter2查询的结果一定没有交集
- * filter1 = {
- *      a: 2
- * },
- * filter2 = {
- *      a: 1
- * }
- * 则包含
- * @param entity
- * @param schema
- * @param filter
- * @param conditionalFilter
- */
-export declare function repel<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter']): boolean | DeducedFilterCombination<ED>;
 /**
  * 从filter中判断是否有确定的id对象，如果有则返回这些id，没有返回空数组
  * @param filter
@@ -117,6 +75,5 @@ export declare function makeTreeDescendantFilter<ED extends EntityDict & BaseEnt
  * @param dataCompare
  * @returns
  */
-export declare function checkFilterContains<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, contained: ED[T]['Selection']['filter'], filter?: ED[T]['Selection']['filter'], dataCompare?: true): boolean | Promise<boolean>;
-export declare function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter'], dataCompare?: true): boolean | Promise<boolean>;
-export {};
+export declare function checkFilterContains<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, contained: ED[T]['Selection']['filter'], filter?: ED[T]['Selection']['filter'], dataCompare?: true, warningOnDataCompare?: true): boolean | Promise<boolean>;
+export declare function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends SyncContext<ED> | AsyncContext<ED>>(entity: T, context: Cxt, filter1: ED[T]['Selection']['filter'], filter2: ED[T]['Selection']['filter'], dataCompare?: true, warningOnDataCompare?: true): boolean | Promise<boolean>;

@@ -27,10 +27,10 @@ interface Floor<A> {
 interface Ceil<A> {
     $ceil: MathType<A>;
 }
-interface Pow<A> {
-    $pow: [MathType<A>, MathType<A>];
+interface Mod<A> {
+    $mod: [MathType<A>, MathType<A>];
 }
-type MathExpression<A> = Add<A> | Subtract<A> | Multiply<A> | Divide<A> | Abs<A> | Round<A> | Floor<A> | Ceil<A> | Pow<A>;
+type MathExpression<A> = Add<A> | Subtract<A> | Multiply<A> | Divide<A> | Abs<A> | Round<A> | Floor<A> | Ceil<A> | Mod<A>;
 type CmpType<A> = RefOrExpression<A> | string | number;
 interface Gt<A> {
     $gt: [CmpType<A>, CmpType<A>];

@@ -1459,7 +1459,7 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
  * @param contained 
  * @returns 
  */
-export function contains<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+function contains<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     filter: ED[T]['Selection']['filter'],
@@ -1484,7 +1484,7 @@ export function contains<ED extends EntityDict & BaseEntityDict, T extends keyof
  * @param filter 
  * @param conditionalFilter 
  */
-export function repel<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+function repel<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     filter1: ED[T]['Selection']['filter'],
@@ -1786,7 +1786,8 @@ export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T ex
     context: Cxt,
     contained: ED[T]['Selection']['filter'],
     filter?: ED[T]['Selection']['filter'],
-    dataCompare?: true): boolean | Promise<boolean> {
+    dataCompare?: true,
+    warningOnDataCompare?: true): boolean | Promise<boolean> {
     if (!filter) {
         throw new OakRowInconsistencyException();
     }
@@ -1797,6 +1798,9 @@ export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T ex
         return result;
     }
     if (dataCompare) {
+        if (warningOnDataCompare) {
+            console.warn(`data compare on ${entity as string}, please optimize`);
+        }
         return checkDeduceFilters(result, context);
     }
     return false;
@@ -1807,7 +1811,8 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
     context: Cxt,
     filter1: ED[T]['Selection']['filter'],
     filter2: ED[T]['Selection']['filter'],
-    dataCompare?: true
+    dataCompare?: true,
+    warningOnDataCompare?: true
 ): boolean | Promise<boolean> {
     if (!filter2) {
         throw new OakRowInconsistencyException();
@@ -1819,6 +1824,9 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
         return result;
     }
     if (dataCompare) {
+        if (warningOnDataCompare) {
+            console.warn(`data compare on ${entity as string}, please optimize`);
+        }
         return checkDeduceFilters(result, context);
     }
     return false;
