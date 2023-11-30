@@ -9,6 +9,7 @@ import uniq from 'lodash/uniq';
 import get from 'lodash/get';
 import set from 'lodash/set';
 import intersection from 'lodash/intersection';
+import intersectionBy from 'lodash/intersectionBy';
 import omit from 'lodash/omit';
 import merge from 'lodash/merge';
 import cloneDeep from 'lodash/cloneDeep';
@@ -16,6 +17,7 @@ import pick from 'lodash/pick';
 import isEqual from 'lodash/isEqual';
 import union from 'lodash/union';
 import difference from 'lodash/difference';
+import differenceBy from 'lodash/differenceBy';
 import groupBy from 'lodash/groupBy';
 import unionBy from 'lodash/unionBy';
 import pullAll from 'lodash/pullAll';
@@ -28,6 +30,7 @@ export {
     get,
     set,
     intersection,
+    intersectionBy,
     omit,
     merge,
     cloneDeep,
@@ -35,6 +38,7 @@ export {
     isEqual,
     union,
     difference,
+    differenceBy,
     groupBy,
     unionBy,
     pullAll,
