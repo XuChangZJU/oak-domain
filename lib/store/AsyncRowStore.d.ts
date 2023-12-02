@@ -1,8 +1,9 @@
 /// <reference types="node" />
-import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult } from "../types";
+import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult, ClusterInfo } from "../types";
 import { IncomingHttpHeaders } from "http";
 export declare abstract class AsyncContext<ED extends EntityDict> implements Context {
     rowStore: AsyncRowStore<ED, this>;
+    clusterInfo?: ClusterInfo;
     private uuid?;
     opRecords: OpRecord<ED>[];
     private scene?;
@@ -16,7 +17,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
      * 在返回结果前调用，对数据行进行一些预处理，比如将一些敏感的列隐藏
      */
     abstract refineOpRecords(): Promise<void>;
-    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders);
+    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders, clusterInfo?: ClusterInfo);
     setHeaders(headers: IncomingHttpHeaders): void;
     getHeader(key: string): string | string[] | undefined;
     getScene(): string | undefined;

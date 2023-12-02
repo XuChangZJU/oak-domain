@@ -1,10 +1,11 @@
 
-import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult } from "../types";
+import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult, ClusterInfo } from "../types";
 import assert from "assert";
 import { IncomingHttpHeaders } from "http";
 
 export abstract class AsyncContext<ED extends EntityDict> implements Context {
     rowStore: AsyncRowStore<ED, this>;
+    clusterInfo?: ClusterInfo;
     private uuid?: string;
     opRecords: OpRecord<ED>[];
     private scene?: string;
@@ -20,8 +21,9 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
      */
     abstract refineOpRecords(): Promise<void>;
 
-    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders) {
+    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders, clusterInfo?: ClusterInfo) {
         this.rowStore = store;
+        this.clusterInfo = clusterInfo;
         this.opRecords = [];
         this.events = {
             commit: [],
