@@ -1,10 +1,14 @@
-import { ActionDictOfEntityDict, BBWatcher, Checker, EntityDict, StorageSchema, Trigger, RowChecker, OakDataException, OakUniqueViolationException } from "../types";
+import { ActionDictOfEntityDict, BBWatcher, Checker, EntityDict, StorageSchema, Trigger, RowChecker, OakDataException, OakUniqueViolationException, UpdateTrigger, CHECKER_MAX_PRIORITY } from "../types";
 import { SyncContext } from "./SyncRowStore";
 import { AsyncContext } from "./AsyncRowStore";
 import { uniqBy, pick, intersection } from '../utils/lodash';
-import { addFilterSegment } from "./filter";
+import { combineFilters } from "./filter";
+import { createDynamicCheckers } from '../checkers';
+import { createDynamicTriggers } from '../triggers';
+import { EntityDict as BaseEntityDict } from '../base-app-domain/EntityDict';
+import { triggers as ActionAuthTriggers } from './actionAuth';
 
-export function getFullProjection<ED extends EntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>) {
+export function getFullProjection<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>) {
     const { attributes } = schema[entity];
     const projection: ED[T]['Selection']['data'] = {
         id: 1,
@@ -21,7 +25,7 @@ export function getFullProjection<ED extends EntityDict, T extends keyof ED>(ent
     return projection;
 }
 
-function makeIntrinsicWatchers<ED extends EntityDict>(schema: StorageSchema<ED>) {
+function makeIntrinsicWatchers<ED extends EntityDict & BaseEntityDict>(schema: StorageSchema<ED>) {
     const watchers: BBWatcher<ED, keyof ED>[] = [];
     for (const entity in schema) {
         const { attributes } = schema[entity];
@@ -97,7 +101,7 @@ function checkCountLessThan(count: number | Promise<number>, uniqAttrs: string[]
     }
 }
 
-function checkUnique<ED extends EntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
+function checkUnique<ED extends EntityDict& BaseEntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
     entity: keyof ED,
     row: Record<string, any>,
     context: Cxt,
@@ -114,14 +118,14 @@ function checkUnique<ED extends EntityDict, Cxt extends SyncContext<ED> | AsyncC
         // 说明有null值，不需要检查约束
         return;
     }
-    const filter2 = extraFilter ? addFilterSegment(filter, extraFilter) : filter;
+    const filter2 = extraFilter ? combineFilters(entity, context.getSchema(), [filter, extraFilter]) : filter;
     const count = context.count(entity, { filter: filter2 }, { dontCollect: true });
     return checkCountLessThan(count, uniqAttrs, 0, row.id)
 }
 
-export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(schema: StorageSchema<ED>, actionDefDict: ActionDictOfEntityDict<ED>) {
-    const checkers: Array<Checker<ED, keyof ED, Cxt>> = [];
-    const triggers: Array<Trigger<ED, keyof ED, Cxt>> = [];
+export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>>(schema: StorageSchema<ED>, actionDefDict: ActionDictOfEntityDict<ED>) {
+    const checkers: Array<Checker<ED, keyof ED, Cxt | FrontCxt>> = createDynamicCheckers<ED, Cxt | FrontCxt>(schema);
+    const triggers: Array<Trigger<ED, keyof ED, Cxt>> = createDynamicTriggers<ED, Cxt>(schema);
 
     // action状态转换矩阵相应的checker
     for (const entity in actionDefDict) {
@@ -144,11 +148,12 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                     filter: conditionalFilter,
                     errMsg: '',
                 } as RowChecker<ED, keyof ED, Cxt>);
+
+                // 这里用data类型的checker改数据了不太好，先这样
                 checkers.push({
                     action: action as any,
                     type: 'data',
                     entity,
-                    priority: 10,       // 优先级要高
                     checker: (data) => {
                         Object.assign(data, {
                             [attr]: stm[action][1],
@@ -162,7 +167,7 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                     action: 'create' as any,
                     type: 'data',
                     entity,
-                    priority: 10,       // 优先级要高
+                    priority: 10,       // 优先级要高，先于真正的data检查进行
                     checker: (data) => {
                         if (data instanceof Array) {
                             data.forEach(
@@ -199,15 +204,15 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                     checkers.push({
                         entity,
                         action: 'create',
-                        type: 'logical',
-                        priority: 20,       // 优先级要放在最高，所有前置的checker/trigger将数据完整之后再在这里检测
+                        type: 'logicalData',
+                        priority: CHECKER_MAX_PRIORITY,       // 优先级要放在最低，所有前置的checker/trigger将数据完整之后再在这里检测
                         checker: (operation, context) => {
                             const { data } = operation;
 
                             if (data instanceof Array) {
                                 checkUniqueBetweenRows(data, uniqAttrs);
                                 const checkResult = data.map(
-                                    ele => checkUnique<ED, Cxt>(entity, ele, context, uniqAttrs)
+                                    ele => checkUnique<ED, Cxt | FrontCxt>(entity, ele, context, uniqAttrs)
                                 );
                                 if (checkResult[0] instanceof Promise) {
                                     return Promise.all(checkResult).then(
@@ -215,91 +220,93 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
                                     );
                                 }
                             }
-                            else {
-                                return checkUnique<ED, Cxt>(entity, data, context, uniqAttrs);
+                            else if (data) {
+                                return checkUnique<ED, Cxt | FrontCxt>(entity, data, context, uniqAttrs);
                             }
                         }
                     }, {
                         entity,
                         action: 'update',       // 只检查update，其它状态转换的action应该不会涉及unique约束的属性
-                        type: 'logical',
-                        priority: 20,       // 优先级要放在最高，所有前置的checker/trigger将数据完整之后再在这里检测
+                        type: 'logicalData',
+                        priority: CHECKER_MAX_PRIORITY,       // 优先级要放在最低，所有前置的checker/trigger将数据完整之后再在这里检测
                         checker: (operation, context) => {
                             const { data, filter: operationFilter } = operation as ED[keyof ED]['Update'];
-                            const attrs = Object.keys(data);
-
-                            const refAttrs = intersection(attrs, uniqAttrs);
-                            if (refAttrs.length === 0) {
-                                // 如果本次更新和unique约束的属性之间没有交集则直接返回
-                                return;
-                            }
-                            for (const attr of refAttrs) {
-                                // 如果有更新为null值，不用再检查约束
-                                if (data[attr as string] === null || data[attr as string] === undefined) {
+                            if (data) {
+                                const attrs = Object.keys(data);
+    
+                                const refAttrs = intersection(attrs, uniqAttrs);
+                                if (refAttrs.length === 0) {
+                                    // 如果本次更新和unique约束的属性之间没有交集则直接返回
                                     return;
                                 }
-                            }
-                            if (refAttrs.length === uniqAttrs.length) {
-                                // 如果更新了全部属性，直接检查
-                                const filter = pick(data, refAttrs);
-
-                                // 在这些行以外的行不和更新后的键值冲突
-                                const count = context.count(entity, {
-                                    filter: addFilterSegment([filter, {
-                                        $not: operationFilter,
-                                    }]),
-                                }, { dontCollect: true });
-                                const checkCount = checkCountLessThan(count, uniqAttrs, 0, operationFilter?.id);
-
-                                // 更新的行只能有一行
-                                const rowCount = context.count(entity, {
+                                for (const attr of refAttrs) {
+                                    // 如果有更新为null值，不用再检查约束
+                                    if (data[attr as string] === null || data[attr as string] === undefined) {
+                                        return;
+                                    }
+                                }
+                                if (refAttrs.length === uniqAttrs.length) {
+                                    // 如果更新了全部属性，直接检查
+                                    const filter = pick(data, refAttrs);
+    
+                                    // 在这些行以外的行不和更新后的键值冲突
+                                    const count = context.count(entity, {
+                                        filter: combineFilters(entity, context.getSchema(), [filter, {
+                                            $not: operationFilter,
+                                        }]),
+                                    }, { dontCollect: true });
+                                    const checkCount = checkCountLessThan(count, uniqAttrs, 0, operationFilter?.id);
+    
+                                    // 更新的行只能有一行
+                                    const rowCount = context.count(entity, {
+                                        filter: operationFilter,
+                                    }, { dontCollect: true });
+                                    const checkRowCount = checkCountLessThan(rowCount, uniqAttrs, 1, operationFilter?.id);
+    
+                                    // 如果更新的行数为零似乎也可以，但这应该不可能出现吧，by Xc 20230131
+                                    if (checkRowCount instanceof Promise) {
+                                        return Promise.all([checkCount, checkRowCount]).then(
+                                            () => undefined
+                                        );
+                                    }
+                                }
+                                // 否则需要结合本行现有的属性来进行检查
+                                const projection = { id: 1 };
+                                for (const attr of uniqAttrs) {
+                                    Object.assign(projection, {
+                                        [attr]: 1,
+                                    });
+                                }
+    
+                                const checkWithRows = (rows2: ED[keyof ED]['Schema'][]) => {
+                                    const rows22 = rows2.map(
+                                        ele => Object.assign(ele, data)
+                                    );
+                                    // 先检查这些行本身之间是否冲突
+                                    checkUniqueBetweenRows(rows22, uniqAttrs);
+                                    const checkResults = rows22.map(
+                                        (row) => checkUnique<ED, Cxt | FrontCxt>(entity, row, context, uniqAttrs, {
+                                            $not: operationFilter
+                                        })
+                                    );
+                                    if (checkResults[0] instanceof Promise) {
+                                        return Promise.all(checkResults).then(
+                                            () => undefined
+                                        );
+                                    }
+                                };
+    
+                                const currentRows = context.select(entity, {
+                                    data: projection,
                                     filter: operationFilter,
                                 }, { dontCollect: true });
-                                const checkRowCount = checkCountLessThan(rowCount, uniqAttrs, 1, operationFilter?.id);
-
-                                // 如果更新的行数为零似乎也可以，但这应该不可能出现吧，by Xc 20230131
-                                if (checkRowCount instanceof Promise) {
-                                    return Promise.all([checkCount, checkRowCount]).then(
-                                        () => undefined
+                                if (currentRows instanceof Promise) {
+                                    return currentRows.then(
+                                        (row2) => checkWithRows(row2 as ED[keyof ED]['Schema'][])
                                     );
                                 }
+                                return checkWithRows(currentRows as ED[keyof ED]['Schema'][]);
                             }
-                            // 否则需要结合本行现有的属性来进行检查
-                            const projection = { id: 1 };
-                            for (const attr of uniqAttrs) {
-                                Object.assign(projection, {
-                                    [attr]: 1,
-                                });
-                            }
-
-                            const checkWithRows = (rows2: ED[keyof ED]['Schema'][]) => {
-                                const rows22 = rows2.map(
-                                    ele => Object.assign(ele, data)
-                                );
-                                // 先检查这些行本身之间是否冲突
-                                checkUniqueBetweenRows(rows22, uniqAttrs);
-                                const checkResults = rows22.map(
-                                    (row) => checkUnique<ED, Cxt>(entity, row, context, uniqAttrs, {
-                                        $not: operationFilter
-                                    })
-                                );
-                                if (checkResults[0] instanceof Promise) {
-                                    return Promise.all(checkResults).then(
-                                        () => undefined
-                                    );
-                                }
-                            };
-
-                            const currentRows = context.select(entity, {
-                                data: projection,
-                                filter: operationFilter,
-                            }, { dontCollect: true });
-                            if (currentRows instanceof Promise) {
-                                return currentRows.then(
-                                    (row2) => checkWithRows(row2 as ED[keyof ED]['Schema'][])
-                                );
-                            }
-                            return checkWithRows(currentRows as ED[keyof ED]['Schema'][]);
                         }
                     });
                 }
@@ -307,6 +314,7 @@ export function analyzeActionDefDict<ED extends EntityDict, Cxt extends SyncCont
         }
     }
 
+    triggers.push(...(ActionAuthTriggers as Array<Trigger<ED, keyof ED, Cxt>>));
     return {
         triggers,
         checkers,

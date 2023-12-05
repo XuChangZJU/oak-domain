@@ -51,7 +51,7 @@ export async function vaccumOper<ED extends EntityDict & BaseEntityDict, Cxt ext
             entity: 'operEntity',
             aliveLine: aliveLine + 10000,
             filter: {
-                oper: combineFilters([operFilter, {
+                oper: combineFilters('operEntity', context.getSchema(), [operFilter, {
                     $$createAt$$: {
                         $lt: aliveLine,
                     }

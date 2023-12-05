@@ -1,6 +1,6 @@
-import { EntityDict } from "../types";
-declare type ValidatorFunction = (text: string, size?: number) => string | boolean;
-declare type ValidatorMoneyFunction = (text: string, zero?: boolean) => string | boolean;
+import { EntityDict } from '../types';
+type ValidatorFunction = (text: string, size?: number) => string | boolean;
+type ValidatorMoneyFunction = (text: string, disableZero?: boolean) => string | boolean;
 export declare const isMobile: ValidatorFunction;
 export declare const isPassword: ValidatorFunction;
 export declare const isCaptcha: ValidatorFunction;
@@ -20,6 +20,7 @@ export declare const isTel: ValidatorFunction;
 export declare const isNumber: ValidatorFunction;
 export declare const isMoney: ValidatorMoneyFunction;
 export declare const isVehicleNumber: ValidatorFunction;
+export declare const isEmail: ValidatorFunction;
 export declare function checkAttributesNotNull<ED extends EntityDict, T extends keyof EntityDict>(entity: T, data: Partial<ED[T]['CreateSingle']['data']>, attributes: Array<keyof ED[T]['CreateSingle']['data']>, allowEmpty?: true): void;
 export declare function checkAttributesScope<ED extends EntityDict, T extends keyof EntityDict>(entity: T, data: Partial<ED[T]['CreateSingle']['data']>, attributes: Array<keyof ED[T]['CreateSingle']['data']>): void;
 export {};

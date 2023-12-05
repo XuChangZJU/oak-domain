@@ -2,7 +2,7 @@ import { ReadOnlyAction } from '../actions/action';
 import { PrimaryKey, Sequence } from './DataType';
 
 type TriggerDataAttributeType = '$$triggerData$$';
-type TriggerTimestampAttributeType = '$$triggerTimestamp$$';
+type TriggerUuidAttributeType = '$$triggerUuid$$';
 type PrimaryKeyAttributeType = 'id';
 type CreateAtAttributeType = '$$createAt$$';
 type UpdateAtAttributeType = '$$updateAt$$';
@@ -10,15 +10,15 @@ type DeleteAtAttributeType = '$$deleteAt$$';
 type SeqAttributeType = '$$seq$$';
 
 export const TriggerDataAttribute = '$$triggerData$$';
-export const TriggerTimestampAttribute = '$$triggerTimestamp$$';
+export const TriggerUuidAttribute = '$$triggerUuid$$';
 export const PrimaryKeyAttribute = 'id';
 export const CreateAtAttribute = '$$createAt$$';
 export const UpdateAtAttribute = '$$updateAt$$';
 export const DeleteAtAttribute = '$$deleteAt$$';
 export const SeqAttribute = '$$seq$$';
 
-export type InstinctiveAttributes = PrimaryKeyAttributeType | CreateAtAttributeType | UpdateAtAttributeType| DeleteAtAttributeType | TriggerDataAttributeType | TriggerTimestampAttributeType | SeqAttributeType;
-export const initinctiveAttributes = [PrimaryKeyAttribute, TriggerDataAttribute, TriggerTimestampAttribute, CreateAtAttribute, UpdateAtAttribute, DeleteAtAttribute, SeqAttribute];
+export type InstinctiveAttributes = PrimaryKeyAttributeType | CreateAtAttributeType | UpdateAtAttributeType| DeleteAtAttributeType | TriggerDataAttributeType | SeqAttributeType | TriggerUuidAttributeType;
+export const initinctiveAttributes = [PrimaryKeyAttribute, TriggerDataAttribute, TriggerUuidAttribute, CreateAtAttribute, UpdateAtAttribute, DeleteAtAttribute, SeqAttribute];
 
 type FilterPart<A extends string, F extends Object | undefined> = {
     filter?: A extends 'create' ? undefined : F;
@@ -29,10 +29,11 @@ type FilterPart<A extends string, F extends Object | undefined> = {
 export type SelectOption = {
     dontCollect?: boolean;
     blockTrigger?: true;
-    obscure?: boolean;      // 如果为置为true，则在filter过程中因数据不完整而不能判断为真的时候都假设为真（前端缓存专用）
+    obscure?: boolean;              // 如果为置为true，则在filter过程中因数据不完整而不能判断为真的时候都假设为真（前端缓存专用）
     forUpdate?: true;
-    includedDeleted?: true; // 是否包含删除行的信息
-    dummy?: 1;           // 无用，为了继承Option通过编译
+    includedDeleted?: true;         // 是否包含删除行的信息
+    ignoreAttrMiss?: true;        // 作为cache时是否允许属性缺失
+    dummy?: 1;                      // 无用，为了继承Option通过编译
 };
 
 export type OperateOption = {
@@ -40,18 +41,20 @@ export type OperateOption = {
     dontCollect?: boolean;
     dontCreateOper?: boolean;
     dontCreateModi?: boolean;
+    includedDeleted?: true;     // 是否更新已删除行
     allowExists?: boolean;      // 插入时允许已经存在唯一键值的行了，即insert / update逻辑
     modiParentId?: string;      // 如果是延时更新，相关modi要关联到一个父亲上统一应用
     modiParentEntity?: string;  // 如果是延时更新，相关modi要关联到一个父亲上统一应用
     deletePhysically?: boolean;
+    applyingModi?: boolean;     // 标识是在执行延时更新
     dummy?: 1;          // 无用，为了继承Option通过编译
 };
 
 export type FormUpdateData<SH extends GeneralEntityShape> = Partial<{
-    [K in keyof Omit<SH, InstinctiveAttributes>]: SH[K] | null;
+    [K in keyof Omit<SH, "id" | "$$createAt$$" | "$$seq$$">]: SH[K] | null;
 }>;
 
-export type FormCreateData<SH extends GeneralEntityShape> = Partial<Omit<SH, InstinctiveAttributes>> & { id: string };
+export type FormCreateData<SH extends GeneralEntityShape> = Partial<SH> & { id: string }/* Partial<Omit<SH, InstinctiveAttributes>> & { id: string } */;
 
 export type Operation<A extends string,
     D extends Projection,
@@ -68,10 +71,13 @@ export type Selection<A extends ReadOnlyAction,
     F extends Filter | undefined = undefined,
     S extends Sorter | undefined = undefined> = {
         id?: string;     // selection的id可传可不传，如果传意味着该select会记录在oper中
-        action: A;
+        action?: A;
         data: D;
         sorter?: S;
-    } & FilterPart<A, F>;
+    } & FilterPart<A, F> & {
+        randomRange?: number;
+        total?: number;
+    };
 
 export interface EntityShape {
     id: PrimaryKey;
@@ -93,7 +99,7 @@ export interface EntityDef {
     OpSchema: GeneralEntityShape;
     Action: string;
     ParticularAction?: string;
-    Selection: Omit<Selection<'select', Projection, Filter, Sorter>, 'action'>;
+    Selection: Selection<'select', Projection, Filter, Sorter>;
     Aggregation: DeduceAggregation<Projection, Filter, Sorter>;
     Operation: CUDOperation;
     Create: CreateOperation;
@@ -258,5 +264,18 @@ export type Configuration = {
     static?: boolean;    // 标识是维表（变动较小，相对独立）
 };
 
+export type AuthDeduceRelationMap<ED extends EntityDict> = {
+    [T in keyof ED]?: keyof ED[T]['OpSchema'];
+};
+export type SelectFreeEntities<ED extends EntityDict> = (keyof ED)[];
+export type UpdateFreeDict<ED extends EntityDict> = {
+    [A in keyof ED]?: string[];
+};
 // 一对多的键值的扩展
 export type OtmKey<K extends string> = K | `${K}$${number}`;
+
+export interface SubDataDef<ED extends EntityDict, T extends keyof ED> {
+    id: string;    
+    entity: T,
+    filter: ED[T]['Selection']['filter'],
+};

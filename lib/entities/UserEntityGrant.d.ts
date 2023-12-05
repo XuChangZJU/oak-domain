@@ -1,7 +1,9 @@
 import { String } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
+type RelationIds = string[];
 export interface Schema extends EntityShape {
-    entity: String<32>;
-    entityId: String<64>;
-    relation: String<32>;
+    relationEntity: String<32>;
+    relationEntityFilter: Object;
+    relationIds: RelationIds;
 }
+export {};

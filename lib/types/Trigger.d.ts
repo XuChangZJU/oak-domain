@@ -4,15 +4,18 @@ import { AsyncContext } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OperateOption } from "../types/Entity";
 import { EntityShape } from "../types/Entity";
+export type ModiTurn = 'create' | 'apply' | 'both';
 /**
  * 优先级越小，越早执行。定义在1～99之间
  */
-export declare const TRIGGER_DEFAULT_PRIORITY = 50;
 export declare const TRIGGER_MIN_PRIORITY = 1;
-export declare const TRIGGER_MAX_PRIORITY = 99;
-export declare const DATA_CHECKER_DEFAULT_PRIORITY = 60;
-export declare const CHECKER_DEFAULT_PRIORITY = 99;
-export declare const REMOVE_CASCADE_PRIORITY = 70;
+export declare const TRIGGER_DEFAULT_PRIORITY = 25;
+export declare const TRIGGER_MAX_PRIORITY = 50;
+export declare const CHECKER_MAX_PRIORITY = 99;
+/**
+ * logical可能会更改row和data的值，应当最先执行，data和row不能修改相关的值，如果要修改，手动置priority小一点以确保安全
+ */
+export declare const CHECKER_PRIORITY_MAP: Record<CheckerType, number>;
 interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
     checkerType?: CheckerType;
     entity: T;
@@ -21,19 +24,23 @@ interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
 }
 export interface CreateTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends TriggerBase<ED, T> {
     action: 'create';
+    mt?: ModiTurn;
     check?: (operation: ED[T]['Create']) => boolean;
+}
+export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt> {
+    when: 'before' | 'after';
     fn: (event: {
         operation: ED[T]['Create'];
     }, context: Cxt, option: OperateOption) => Promise<number> | number;
 }
-export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt> {
-    when: 'before' | 'after';
-}
 export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt> {
     when: 'commit';
     strict?: 'takeEasy' | 'makeSure';
+    fn: (event: {
+        rows: ED[T]['OpSchema'][];
+    }, context: Cxt, option: OperateOption) => Promise<number> | number;
 }
-export declare type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTriggerInTxn<ED, T, Cxt> | CreateTriggerCrossTxn<ED, T, Cxt>;
+export type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTriggerInTxn<ED, T, Cxt> | CreateTriggerCrossTxn<ED, T, Cxt>;
 /**
  * update trigger如果带有filter，说明只对存在限定条件的行起作用。此时系统在进行相应动作时，
  * 会判定当前动作的filter条件和trigger所定义的filter是否有交集（即有同时满足两个条件的行）
@@ -42,20 +49,24 @@ export declare type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt
 export interface UpdateTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends TriggerBase<ED, T> {
     action: Exclude<ED[T]['Action'], GenericAction> | 'update' | Array<Exclude<ED[T]['Action'], GenericAction> | 'update'>;
     attributes?: keyof ED[T]['OpSchema'] | Array<keyof ED[T]['OpSchema']>;
+    mt?: ModiTurn;
     check?: (operation: ED[T]['Update']) => boolean;
-    fn: (event: {
-        operation: ED[T]['Update'];
-    }, context: Cxt, option: OperateOption) => Promise<number> | number;
     filter?: ED[T]['Update']['filter'] | ((operation: ED[T]['Update'], context: Cxt, option: OperateOption) => ED[T]['Update']['filter'] | Promise<ED[T]['Update']['filter']>);
 }
 export interface UpdateTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
+    fn: (event: {
+        operation: ED[T]['Update'];
+    }, context: Cxt, option: OperateOption) => Promise<number> | number;
 }
 export interface UpdateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
     when: 'commit';
     strict?: 'takeEasy' | 'makeSure';
+    fn: (event: {
+        rows: ED[T]['OpSchema'][];
+    }, context: Cxt, option: OperateOption) => Promise<number> | number;
 }
-export declare type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = UpdateTriggerInTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt>;
+export type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = UpdateTriggerInTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt>;
 /**
  * 同update trigger一样，remove trigger如果带有filter，说明只对存在限定条件的行起作用。此时系统在进行相应动作时，
  * 会判定当前动作的filter条件和trigger所定义的filter是否有交集（即有同时满足两个条件的行）
@@ -63,20 +74,24 @@ export declare type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt
  */
 export interface RemoveTriggerBase<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends TriggerBase<ED, T> {
     action: 'remove';
+    mt?: ModiTurn;
     check?: (operation: ED[T]['Remove']) => boolean;
-    fn: (event: {
-        operation: ED[T]['Remove'];
-    }, context: Cxt, option: OperateOption) => Promise<number> | number;
     filter?: ED[T]['Remove']['filter'] | ((operation: ED[T]['Remove'], context: Cxt, option: OperateOption) => ED[T]['Remove']['filter'] | Promise<ED[T]['Remove']['filter']>);
 }
 export interface RemoveTriggerInTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends RemoveTriggerBase<ED, T, Cxt> {
     when: 'before' | 'after';
+    fn: (event: {
+        operation: ED[T]['Remove'];
+    }, context: Cxt, option: OperateOption) => Promise<number> | number;
 }
 export interface RemoveTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends RemoveTriggerBase<ED, T, Cxt> {
     when: 'commit';
     strict?: 'takeEasy' | 'makeSure';
+    fn: (event: {
+        rows: ED[T]['OpSchema'][];
+    }, context: Cxt, option: OperateOption) => Promise<number> | number;
 }
-export declare type RemoveTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = RemoveTriggerInTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;
+export type RemoveTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = RemoveTriggerInTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;
 export interface SelectTriggerBase<ED extends EntityDict, T extends keyof ED> extends TriggerBase<ED, T> {
     action: 'select';
 }
@@ -97,8 +112,8 @@ export interface SelectTriggerAfter<ED extends EntityDict, T extends keyof ED, C
         result: Partial<ED[T]['Schema']>[];
     }, context: Cxt, params?: SelectOption) => Promise<number> | number;
 }
-export declare type SelectTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = SelectTriggerBefore<ED, T, Cxt> | SelectTriggerAfter<ED, T, Cxt>;
-export declare type Trigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTrigger<ED, T, Cxt> | UpdateTrigger<ED, T, Cxt> | RemoveTrigger<ED, T, Cxt> | SelectTrigger<ED, T, Cxt>;
+export type SelectTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = SelectTriggerBefore<ED, T, Cxt> | SelectTriggerAfter<ED, T, Cxt>;
+export type Trigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTrigger<ED, T, Cxt> | UpdateTrigger<ED, T, Cxt> | RemoveTrigger<ED, T, Cxt> | SelectTrigger<ED, T, Cxt>;
 export interface TriggerEntityShape extends EntityShape {
     $$triggerData$$?: {
         name: string;

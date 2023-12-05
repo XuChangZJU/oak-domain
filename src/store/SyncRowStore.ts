@@ -13,6 +13,7 @@ export abstract class SyncContext<ED extends EntityDict> implements Context {
     abstract toString(): string;
     
     begin(option?: TxnOption) {
+        assert(!this.uuid, '事务不允许嵌套');
         this.uuid = this.rowStore.begin(option);
     }
     commit() {
@@ -67,7 +68,7 @@ export abstract class SyncContext<ED extends EntityDict> implements Context {
 };
 
 
-export interface SyncRowStore<ED extends EntityDict, Cxt extends Context> extends RowStore<ED> {
+export interface SyncRowStore<ED extends EntityDict, Cxt extends SyncContext<ED>> extends RowStore<ED> {
     // store实现CRUD动作的统一入口定义
     operate<T extends keyof ED, OP extends OperateOption>(
         entity: T,

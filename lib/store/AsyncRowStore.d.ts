@@ -1,8 +1,9 @@
 /// <reference types="node" />
-import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult } from "../types";
+import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult, ClusterInfo } from "../types";
 import { IncomingHttpHeaders } from "http";
 export declare abstract class AsyncContext<ED extends EntityDict> implements Context {
     rowStore: AsyncRowStore<ED, this>;
+    clusterInfo?: ClusterInfo;
     private uuid?;
     opRecords: OpRecord<ED>[];
     private scene?;
@@ -16,7 +17,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
      * 在返回结果前调用，对数据行进行一些预处理，比如将一些敏感的列隐藏
      */
     abstract refineOpRecords(): Promise<void>;
-    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders);
+    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders, clusterInfo?: ClusterInfo);
     setHeaders(headers: IncomingHttpHeaders): void;
     getHeader(key: string): string | string[] | undefined;
     getScene(): string | undefined;
@@ -34,6 +35,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     select<T extends keyof ED, OP extends SelectOption>(entity: T, selection: ED[T]['Selection'], option: OP): Promise<Partial<ED[T]["Schema"]>[]>;
     aggregate<T extends keyof ED, OP extends SelectOption>(entity: T, aggregation: ED[T]['Aggregation'], option: OP): Promise<AggregationResult<ED[T]["Schema"]>>;
     count<T extends keyof ED, OP extends SelectOption>(entity: T, selection: Pick<ED[T]['Selection'], 'filter' | 'count'>, option: OP): Promise<number>;
+    exec(script: string, txnId?: string): Promise<void>;
     mergeMultipleResults(toBeMerged: OperationResult<ED>[]): OperationResult<ED>;
     getCurrentTxnId(): string | undefined;
     getSchema(): import("../types").StorageSchema<ED>;
@@ -42,9 +44,11 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     abstract isRoot(): boolean;
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
     abstract toString(): string;
+    abstract initialize(data: any): Promise<void>;
     abstract allowUserUpdate(): boolean;
+    abstract openRootMode(): () => void;
 }
-export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> extends RowStore<ED> {
+export interface AsyncRowStore<ED extends EntityDict, Cxt extends AsyncContext<ED>> extends RowStore<ED> {
     operate<T extends keyof ED, OP extends OperateOption>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): Promise<OperationResult<ED>>;
     select<T extends keyof ED, OP extends SelectOption>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Promise<Partial<ED[T]['Schema']>[]>;
     aggregate<T extends keyof ED, OP extends SelectOption>(entity: T, aggregation: ED[T]['Aggregation'], context: Cxt, option: OP): Promise<AggregationResult<ED[T]['Schema']>>;
@@ -52,4 +56,5 @@ export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> exten
     begin(option?: TxnOption): Promise<string>;
     commit(txnId: string): Promise<void>;
     rollback(txnId: string): Promise<void>;
+    exec(script: string, txnId?: string): Promise<void>;
 }

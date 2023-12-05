@@ -1,7 +1,7 @@
 import { EntityDict } from '../types/Entity';
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from '../store/AsyncRowStore';
-export declare type VaccumOperOption<ED extends EntityDict & BaseEntityDict> = {
+export type VaccumOperOption<ED extends EntityDict & BaseEntityDict> = {
     aliveLine: number;
     excludeOpers?: {
         [T in keyof ED]?: ED[T]['Action'][];

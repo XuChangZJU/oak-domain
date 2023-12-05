@@ -1,10 +1,11 @@
 
-import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult } from "../types";
+import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult, ClusterInfo } from "../types";
 import assert from "assert";
 import { IncomingHttpHeaders } from "http";
 
 export abstract class AsyncContext<ED extends EntityDict> implements Context {
     rowStore: AsyncRowStore<ED, this>;
+    clusterInfo?: ClusterInfo;
     private uuid?: string;
     opRecords: OpRecord<ED>[];
     private scene?: string;
@@ -20,8 +21,9 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
      */
     abstract refineOpRecords(): Promise<void>;
 
-    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders) {
+    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders, clusterInfo?: ClusterInfo) {
         this.rowStore = store;
+        this.clusterInfo = clusterInfo;
         this.opRecords = [];
         this.events = {
             commit: [],
@@ -124,6 +126,10 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
         return this.rowStore.count(entity, selection, this, option);
     }
 
+    exec(script: string, txnId?: string) {
+        return this.rowStore.exec(script, txnId);
+    }
+
     mergeMultipleResults(toBeMerged: OperationResult<ED>[]) {
         return this.rowStore.mergeMultipleResults(toBeMerged);
     }
@@ -148,12 +154,18 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
 
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
 
+    // 此接口将上下文变成可以serialized的字符串
     abstract toString(): string;
 
+    // 此接口将字符串parse成对象再进行初始化
+    abstract initialize(data: any): Promise<void>;
+
     abstract allowUserUpdate(): boolean;
+
+    abstract openRootMode(): () => void;
 };
 
-export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> extends RowStore<ED> {
+export interface AsyncRowStore<ED extends EntityDict, Cxt extends AsyncContext<ED>> extends RowStore<ED> {
     operate<T extends keyof ED, OP extends OperateOption>(
         entity: T,
         operation: ED[T]['Operation'],
@@ -188,4 +200,6 @@ export interface AsyncRowStore<ED extends EntityDict, Cxt extends Context> exten
     commit(txnId: string): Promise<void>;
 
     rollback(txnId: string): Promise<void>;
+
+    exec(script: string, txnId?: string): Promise<void>;
 };

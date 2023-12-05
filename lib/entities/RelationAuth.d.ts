@@ -1,11 +1,8 @@
-import { String } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
 import { Schema as Relation } from './Relation';
-declare type Relations = string[];
+import { Schema as Path } from './Path';
 export interface Schema extends EntityShape {
-    relation: Relation;
-    path: String<256>;
-    destEntity: String<32>;
-    deRelations: Relations;
+    sourceRelation: Relation;
+    path: Path;
+    destRelation: Relation;
 }
-export {};

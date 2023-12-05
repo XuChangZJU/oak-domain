@@ -35,7 +35,7 @@ export async function vaccumEntities<ED extends EntityDict & BaseEntityDict, Cxt
             },
         };
         if (filter) {
-            filter2 = combineFilters([filter2, filter]);
+            filter2 = combineFilters(entity, context.getSchema(), [filter2, filter]);
         }
         if (backupDir && process.env.OAK_PLATFORM === 'server') {
             // 使用mysqldump将待删除的数据备份出来
@@ -65,7 +65,7 @@ export async function vaccumEntities<ED extends EntityDict & BaseEntityDict, Cxt
 
             let count = 0;
             const appendData = async (minCreateAt: number): Promise<void> => {
-                const filter3 = combineFilters([filter2, {
+                const filter3 = combineFilters(entity, context.getSchema(), [filter2, {
                     $$createAt$$: {
                         $gt: minCreateAt,
                     },

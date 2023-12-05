@@ -27,15 +27,15 @@ export const template = (strings: TemplateStringsArray, ...keys: Array<any>): (.
 
 /**
  * 随机生成字符串
- * @param randomLength 
+ * @param length 
  * @returns 
  */
-export const random = (randomLength: number = 16): string => {
+export const random = (length: number = 16): string => {
     // 默认去掉了容易混淆的字符oOLl,9gq,Vv,Uu,I1
     const DICT = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678';
     const maxPos = DICT.length;
     let pwd = '';
-    for (let i = 0; i < randomLength; i++) {
+    for (let i = 0; i < length; i++) {
         pwd += DICT.charAt(Math.floor(Math.random() * maxPos));
     }
     return pwd;
@@ -44,14 +44,22 @@ export const random = (randomLength: number = 16): string => {
 /**
  * 随机生成带前缀的字符串
  * @param prefix 第一个参数为你想生成的固定的文字开头比如: 微信用户xxxxx
- * @param randomLength 第二个为你想生成出固定开头文字外的随机长度
+ * @param length 第二个为你想生成出固定开头文字外的随机长度
  * @returns 
  */
-export const randomName = (prefix?: string, randomLength: number = 8): string => {
-    // 默认去掉了容易混淆的字符oOLl,9gq,Vv,Uu,I1
-    const DICT = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678';
-    const maxPos = DICT.length;
+export const randomPrefixedString = (prefix?: string, length: number = 8): string => {
     let name = prefix === undefined ? '' : prefix;
-    name += random(randomLength);
+    name += random(length);
     return name;
+};
+
+/**
+ * 将字符串中的u16编码转换回汉字
+ * @param str 
+ * @returns 
+ */
+export function unescapeUnicode(str: string) {
+    return str.replace(/\\u[\dA-F]{4}/gi, (match) => {
+        return String.fromCharCode(parseInt(match.replace(/\\u/g, ''), 16));
+    });
 };

@@ -1,17 +1,17 @@
 import { EntityShape } from "./Entity";
-declare type Language = 'zh_CN' | 'en_US';
-declare type LocaleOfSchema<S extends Record<string, any>> = {
+type Language = 'zh_CN' | 'en_US';
+type LocaleOfSchema<S extends Record<string, any>> = {
     [A in keyof Required<Omit<S, keyof EntityShape>>]: string;
 };
-declare type LocaleOfStringEnum<A extends string> = {
+type LocaleOfStringEnum<A extends string> = {
     [K in A]: string;
 };
-declare type LocaleOfValue<V extends Record<string, string>> = {
+type LocaleOfValue<V extends Record<string, string>> = {
     [K in keyof V]: {
         [K2 in V[K]]: string;
     };
 };
-export declare type LocaleDef<Sc extends Record<string, any>, Ac extends string, R extends string, V extends Record<string, string>> = {
+export type LocaleDef<Sc extends Record<string, any>, Ac extends string, R extends string, V extends Record<string, string>> = {
     [L in Language]?: {
         name: string;
         attr: LocaleOfSchema<Sc> & {

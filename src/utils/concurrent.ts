@@ -1,5 +1,4 @@
 import assert from 'assert';
-import { isConstructorDeclaration } from "typescript";
 
 type Mode = 'S' | 'X';
 
