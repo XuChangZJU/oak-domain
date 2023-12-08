@@ -1,6 +1,5 @@
 
-
-import { URL, URLSearchParams } from 'whatwg-url';
+import { URL, URLSearchParams } from './whatwg-url';
 
 const url = URL;
 const urlSearchParams = URLSearchParams;

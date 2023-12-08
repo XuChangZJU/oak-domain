@@ -1,4 +1,3 @@
-import { URL, URLSearchParams } from 'whatwg-url';
-declare const url: typeof URL;
-declare const urlSearchParams: typeof URLSearchParams;
+declare const url: URL;
+declare const urlSearchParams: URLSearchParams;
 export { url, urlSearchParams };
