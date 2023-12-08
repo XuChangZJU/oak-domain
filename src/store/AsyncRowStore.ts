@@ -1,15 +1,16 @@
 
 import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult, ClusterInfo } from "../types";
+import { readOnlyActions } from '../actions/action';
 import assert from "assert";
 import { IncomingHttpHeaders } from "http";
 
 export abstract class AsyncContext<ED extends EntityDict> implements Context {
     rowStore: AsyncRowStore<ED, this>;
-    clusterInfo?: ClusterInfo;
     private uuid?: string;
     opRecords: OpRecord<ED>[];
     private scene?: string;
-    private headers?: IncomingHttpHeaders;
+    headers?: IncomingHttpHeaders;
+    clusterInfo?: ClusterInfo;
     private message?: string;
     events: {
         commit: Array<() => Promise<void>>;
@@ -34,10 +35,6 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
         }
     }
 
-    setHeaders(headers: IncomingHttpHeaders) {
-        this.headers = headers;
-    }
-
     getHeader(key: string): string | string[] | undefined {
         if (this.headers) {
             return this.headers[key];
@@ -59,6 +56,40 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
 
     on(event: 'commit' | 'rollback', callback: () => Promise<void>): void {
         this.uuid && this.events[event].push(callback);
+    }
+
+    saveOpRecord<T extends keyof ED>(entity: T, operation: ED[T]['Operation']) {
+        const { action, data, filter, id } = operation;
+        switch (action) {
+            case 'create': {
+                this.opRecords.push({
+                    id,
+                    a: 'c',
+                    e: entity,
+                    d: data as ED[T]['OpSchema']
+                });
+                break;
+            }
+            case 'remove': {
+                this.opRecords.push({
+                    id,
+                    a: 'r',
+                    e: entity,
+                    f: filter,
+                });
+                break;
+            }
+            default: {
+                assert(!readOnlyActions.includes(action));
+                this.opRecords.push({
+                    id,
+                    a: 'u',
+                    e: entity,
+                    d: data as ED[T]['Update']['data'],
+                    f: filter,
+                });
+            }
+        }
     }
 
     /**

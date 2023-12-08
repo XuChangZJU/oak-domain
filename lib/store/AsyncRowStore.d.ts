@@ -3,11 +3,11 @@ import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Con
 import { IncomingHttpHeaders } from "http";
 export declare abstract class AsyncContext<ED extends EntityDict> implements Context {
     rowStore: AsyncRowStore<ED, this>;
-    clusterInfo?: ClusterInfo;
     private uuid?;
     opRecords: OpRecord<ED>[];
     private scene?;
-    private headers?;
+    headers?: IncomingHttpHeaders;
+    clusterInfo?: ClusterInfo;
     private message?;
     events: {
         commit: Array<() => Promise<void>>;
@@ -18,12 +18,12 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
      */
     abstract refineOpRecords(): Promise<void>;
     constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders, clusterInfo?: ClusterInfo);
-    setHeaders(headers: IncomingHttpHeaders): void;
     getHeader(key: string): string | string[] | undefined;
     getScene(): string | undefined;
     setScene(scene?: string): void;
     private resetEvents;
     on(event: 'commit' | 'rollback', callback: () => Promise<void>): void;
+    saveOpRecord<T extends keyof ED>(entity: T, operation: ED[T]['Operation']): void;
     /**
      * 一个context中不应该有并发的事务，这里将事务串行化，使用的时候千万要注意不要自己等自己
      * @param options

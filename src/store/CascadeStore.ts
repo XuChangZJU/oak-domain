@@ -1382,11 +1382,12 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     }
 
                     if (!option.dontCollect) {
-                        context.opRecords.push({
+                        context.saveOpRecord(entity, operation);
+                        /* context.opRecords.push({
                             a: 'c',
                             e: entity,
                             d: data as ED[T]['OpSchema'] | ED[T]['OpSchema'][],
-                        });
+                        }); */
                     }
                     if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
                         // 按照框架要求生成Oper和OperEntity这两个内置的对象
@@ -1581,7 +1582,17 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     };
                     if (action === 'remove') {
                         if (!option.dontCollect) {
-                            context.opRecords.push({
+                            context.saveOpRecord(entity, {
+                                id: operId,
+                                action,
+                                data: {},
+                                filter: {
+                                    id: {
+                                        $in: ids,
+                                    }
+                                }
+                            });
+                            /* context.opRecords.push({
                                 a: 'r',
                                 e: entity,
                                 f: {
@@ -1589,7 +1600,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         $in: ids,
                                     }
                                 },
-                            });
+                            }); */
                         }
                     }
                     else {
@@ -1600,7 +1611,17 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 $$updateAt$$: now,
                             });
                             if (!option.dontCollect) {
-                                context.opRecords.push({
+                                context.saveOpRecord(entity, {
+                                    id: operId,
+                                    action,
+                                    data: data as ED[T]['Update']['data'],
+                                    filter: {
+                                        id: {
+                                            $in: ids,
+                                        }
+                                    },
+                                });
+                                /* context.opRecords.push({
                                     a: 'u',
                                     e: entity,
                                     d: data as ED[T]['Update']['data'],
@@ -1609,7 +1630,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             $in: ids,
                                         }
                                     },
-                                });
+                                }); */
                             }
                         }
                         else if (action !== 'update') {
