@@ -26,20 +26,21 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     protected abstract supportManyToOneJoin(): boolean;
     protected abstract supportMultipleCreate(): boolean;
 
-    private selectionRewriters: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
-    private operationRewriters: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
+    private selectionRewriters: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>, SelectOption>[] = [];
+    private operationRewriters: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>, OperateOption>[] = [];
 
-    private async reinforceSelectionAsync<Cxt extends AsyncContext<ED>, OP extends SelectOption>(
+    private async reinforceSelectionAsync<Cxt extends AsyncContext<ED>, Op extends SelectOption>(
         entity: keyof ED,
         selection: ED[keyof ED]['Selection'] | ED[keyof ED]['Aggregation'],
         context: Cxt,
-        option: OP) {
+        option: Op,
+        isAggr?: true) {
 
 
         this.reinforceSelectionInner(entity, selection, context);
 
         const rewriterPromises = this.selectionRewriters.map(
-            ele => ele(this.getSchema(), entity, selection, context)
+            ele => ele(this.getSchema(), entity, selection, context, option, isAggr)
         );
 
         if (rewriterPromises.length > 0) {
@@ -47,21 +48,28 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         }
     }
 
-    private reinforceSelectionSync<Cxt extends SyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {
-        this.reinforceSelectionInner(entity, selection, context);
+    private reinforceSelectionSync<Cxt extends SyncContext<ED>, Op extends SelectOption>(
+        entity: keyof ED, 
+        selection: ED[keyof ED]['Selection'], 
+        context: Cxt, 
+        option: Op,
+        isAggr?: true
+    ) {
+        this.reinforceSelectionInner(entity, selection, context, isAggr);
 
         this.selectionRewriters.forEach(
             ele => {
-                const result = ele(this.getSchema(), entity, selection, context);
+                const result = ele(this.getSchema(), entity, selection, context, option);
                 assert(!(result instanceof Promise));
             }
         );
     }
 
-    private reinforceSelectionInner<Cxt extends AsyncContext<ED> | SyncContext<ED>, OP extends SelectOption>(
+    private reinforceSelectionInner<Cxt extends AsyncContext<ED> | SyncContext<ED>>(
         entity: keyof ED,
         selection: ED[keyof ED]['Selection'] | ED[keyof ED]['Aggregation'],
-        context: Cxt
+        context: Cxt,
+        isAggr?: true,
     ) {
         const { filter, data, sorter } = selection;
 
@@ -349,7 +357,10 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
             }
         };
-        checkProjectionNode(entity, data);
+        if (!isAggr) {
+            // aggr的projetion不能改动
+            checkProjectionNode(entity, data);
+        }
 
         if (!sorter && relevantIds.length === 0) {
             // 如果没有sorter，就给予一个按createAt逆序的sorter
@@ -370,17 +381,21 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
     }
 
-    private async reinforceOperation<Cxt extends AsyncContext<ED>>(entity: keyof ED, operation: ED[keyof ED]['Operation'], context: Cxt) {
+    private async reinforceOperation<Cxt extends AsyncContext<ED>, Op extends OperateOption>(
+        entity: keyof ED, 
+        operation: ED[keyof ED]['Operation'], 
+        context: Cxt,
+        option: Op) {
         await Promise.all(this.operationRewriters.map(
-            ele => ele(this.getSchema(), entity, operation, context)
+            ele => ele(this.getSchema(), entity, operation, context, option)
         ));
     }
 
-    public registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>) {
+    public registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>, OperateOption>) {
         this.operationRewriters.push(rewriter);
     }
 
-    public registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>) {
+    public registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>, SelectOption>) {
         this.selectionRewriters.push(rewriter);
     }
 
@@ -2102,7 +2117,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         context: Cxt,
         option: OP
     ): Promise<AggregationResult<ED[T]['Schema']>> {
-        await this.reinforceSelectionAsync(entity, aggregation, context, option);
+        await this.reinforceSelectionAsync(entity, aggregation, context, option, true);
         return this.aggregateAbjointRowAsync(entity, aggregation, context, option);
     }
 
@@ -2112,7 +2127,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         context: Cxt,
         option: OP
     ): AggregationResult<ED[T]['Schema']> {
-        this.reinforceSelectionSync(entity, aggregation, context, option);
+        this.reinforceSelectionSync(entity, aggregation, context, option, true);
         return this.aggregateAbjointRowSync(entity, aggregation, context, option);
     }
 
@@ -2149,7 +2164,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): Promise<OperationResult<ED>> {
-        await this.reinforceOperation(entity, operation, context);
+        await this.reinforceOperation(entity, operation, context, option);
         return this.cascadeUpdateAsync(entity, operation, context, option);
     }
 }

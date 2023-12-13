@@ -15,8 +15,8 @@ export declare abstract class CascadeStore<ED extends EntityDict & BaseEntityDic
     private reinforceSelectionSync;
     private reinforceSelectionInner;
     private reinforceOperation;
-    registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>): void;
-    registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>): void;
+    registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>, OperateOption>): void;
+    registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>, SelectOption>): void;
     protected abstract selectAbjointRow<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Partial<ED[T]['Schema']>[];
     protected abstract updateAbjointRow<T extends keyof ED, OP extends OperateOption, Cxt extends SyncContext<ED>>(entity: T, operation: ED[T]['Operation'], context: Cxt, option: OP): number;
     protected abstract selectAbjointRowAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(entity: T, selection: ED[T]['Selection'], context: Cxt, option: OP): Promise<Partial<ED[T]['Schema']>[]>;
