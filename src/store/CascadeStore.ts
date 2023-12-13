@@ -37,7 +37,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         isAggr?: true) {
 
 
-        this.reinforceSelectionInner(entity, selection, context);
+        this.reinforceSelectionInner(entity, selection, context, isAggr);
 
         const rewriterPromises = this.selectionRewriters.map(
             ele => ele(this.getSchema(), entity, selection, context, option, isAggr)
