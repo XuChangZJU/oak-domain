@@ -36,8 +36,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         option: Op,
         isAggr?: true) {
 
-
-        this.reinforceSelectionInner(entity, selection, context, isAggr);
+        if (!isAggr) {
+            this.reinforceSelectionInner(entity, selection, context);
+        }
 
         const rewriterPromises = this.selectionRewriters.map(
             ele => ele(this.getSchema(), entity, selection, context, option, isAggr)
@@ -49,13 +50,15 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     }
 
     private reinforceSelectionSync<Cxt extends SyncContext<ED>, Op extends SelectOption>(
-        entity: keyof ED, 
-        selection: ED[keyof ED]['Selection'], 
-        context: Cxt, 
+        entity: keyof ED,
+        selection: ED[keyof ED]['Selection'],
+        context: Cxt,
         option: Op,
         isAggr?: true
     ) {
-        this.reinforceSelectionInner(entity, selection, context, isAggr);
+        if (!isAggr) {
+            this.reinforceSelectionInner(entity, selection, context);
+        }
 
         this.selectionRewriters.forEach(
             ele => {
@@ -69,7 +72,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         entity: keyof ED,
         selection: ED[keyof ED]['Selection'] | ED[keyof ED]['Aggregation'],
         context: Cxt,
-        isAggr?: true,
     ) {
         const { filter, data, sorter } = selection;
 
@@ -357,10 +359,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
             }
         };
-        if (!isAggr) {
-            // aggr的projetion不能改动
-            checkProjectionNode(entity, data);
-        }
+        checkProjectionNode(entity, data);
 
         if (!sorter && relevantIds.length === 0) {
             // 如果没有sorter，就给予一个按createAt逆序的sorter
@@ -382,8 +381,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     }
 
     private async reinforceOperation<Cxt extends AsyncContext<ED>, Op extends OperateOption>(
-        entity: keyof ED, 
-        operation: ED[keyof ED]['Operation'], 
+        entity: keyof ED,
+        operation: ED[keyof ED]['Operation'],
         context: Cxt,
         option: Op) {
         await Promise.all(this.operationRewriters.map(
@@ -420,7 +419,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     protected abstract countAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
         entity: T,
         selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
-        context: Cxt, 
+        context: Cxt,
         option: OP
     ): Promise<number>;
 
