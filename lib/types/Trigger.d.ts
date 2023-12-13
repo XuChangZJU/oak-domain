@@ -33,12 +33,15 @@ export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, C
         operation: ED[T]['Create'];
     }, context: Cxt, option: OperateOption) => Promise<number> | number;
 }
-export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt> {
+interface TriggerCrossTxn<ED extends EntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>> {
     when: 'commit';
     strict?: 'takeEasy' | 'makeSure';
+    cs?: true;
     fn: (event: {
-        rows: ED[T]['OpSchema'][];
+        ids: string[];
     }, context: Cxt, option: OperateOption) => Promise<number> | number;
+}
+export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt>, TriggerCrossTxn<ED, Cxt> {
 }
 export type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTriggerInTxn<ED, T, Cxt> | CreateTriggerCrossTxn<ED, T, Cxt>;
 /**
@@ -59,12 +62,7 @@ export interface UpdateTriggerInTxn<ED extends EntityDict, T extends keyof ED, C
         operation: ED[T]['Update'];
     }, context: Cxt, option: OperateOption) => Promise<number> | number;
 }
-export interface UpdateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
-    when: 'commit';
-    strict?: 'takeEasy' | 'makeSure';
-    fn: (event: {
-        rows: ED[T]['OpSchema'][];
-    }, context: Cxt, option: OperateOption) => Promise<number> | number;
+export interface UpdateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends UpdateTriggerBase<ED, T, Cxt>, TriggerCrossTxn<ED, Cxt> {
 }
 export type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = UpdateTriggerInTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt>;
 /**
@@ -84,12 +82,7 @@ export interface RemoveTriggerInTxn<ED extends EntityDict, T extends keyof ED, C
         operation: ED[T]['Remove'];
     }, context: Cxt, option: OperateOption) => Promise<number> | number;
 }
-export interface RemoveTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends RemoveTriggerBase<ED, T, Cxt> {
-    when: 'commit';
-    strict?: 'takeEasy' | 'makeSure';
-    fn: (event: {
-        rows: ED[T]['OpSchema'][];
-    }, context: Cxt, option: OperateOption) => Promise<number> | number;
+export interface RemoveTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends RemoveTriggerBase<ED, T, Cxt>, TriggerCrossTxn<ED, Cxt> {
 }
 export type RemoveTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = RemoveTriggerInTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;
 export interface SelectTriggerBase<ED extends EntityDict, T extends keyof ED> extends TriggerBase<ED, T> {
@@ -121,4 +114,5 @@ export interface TriggerEntityShape extends EntityShape {
     };
     $$triggerTimestamp$$?: number;
 }
+export type VolatileTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTriggerCrossTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;
 export {};

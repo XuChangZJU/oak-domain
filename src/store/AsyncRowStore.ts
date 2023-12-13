@@ -4,6 +4,9 @@ import { readOnlyActions } from '../actions/action';
 import assert from "assert";
 import { IncomingHttpHeaders } from "http";
 
+/**
+ * 服务器端执行的异步环境的底层抽象
+ */
 export abstract class AsyncContext<ED extends EntityDict> implements Context {
     rowStore: AsyncRowStore<ED, this>;
     private uuid?: string;
@@ -22,17 +25,13 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
      */
     abstract refineOpRecords(): Promise<void>;
 
-    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders, clusterInfo?: ClusterInfo) {
+    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>) {
         this.rowStore = store;
-        this.clusterInfo = clusterInfo;
         this.opRecords = [];
         this.events = {
             commit: [],
             rollback: [],
         };
-        if (headers) {
-            this.headers = headers;
-        }
     }
 
     getHeader(key: string): string | string[] | undefined {

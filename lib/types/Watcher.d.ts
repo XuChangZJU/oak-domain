@@ -6,7 +6,7 @@ export interface BBWatcher<ED extends EntityDict, T extends keyof ED> {
     entity: T;
     filter: ED[T]['Selection']['filter'] | (() => ED[T]['Selection']['filter']);
     action: ED[T]['Operation']['action'];
-    actionData: ActionData<ED, T> | (() => ActionData<ED, T>);
+    actionData: ActionData<ED, T> | (() => Promise<ActionData<ED, T>>);
 }
 export interface WBWatcher<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>> {
     name: string;

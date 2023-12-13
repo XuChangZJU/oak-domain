@@ -1,6 +1,9 @@
 /// <reference types="node" />
 import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult, ClusterInfo } from "../types";
 import { IncomingHttpHeaders } from "http";
+/**
+ * 服务器端执行的异步环境的底层抽象
+ */
 export declare abstract class AsyncContext<ED extends EntityDict> implements Context {
     rowStore: AsyncRowStore<ED, this>;
     private uuid?;
@@ -17,7 +20,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
      * 在返回结果前调用，对数据行进行一些预处理，比如将一些敏感的列隐藏
      */
     abstract refineOpRecords(): Promise<void>;
-    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders, clusterInfo?: ClusterInfo);
+    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>);
     getHeader(key: string): string | string[] | undefined;
     getScene(): string | undefined;
     setScene(scene?: string): void;

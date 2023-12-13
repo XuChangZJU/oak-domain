@@ -11,7 +11,7 @@ export type TxnOption = {
 export type SelectionRewriter<ED extends EntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>> = (
     schema: StorageSchema<ED>,
     entity: keyof ED,
-    selection: ED[keyof ED]['Selection'],
+    selection: ED[keyof ED]['Selection'] | ED[keyof ED]['Aggregation'],
     context: Cxt,
 ) => void | Promise<void>;
 export type OperationRewriter<ED extends EntityDict, Cxt extends AsyncContext<ED>| SyncContext<ED>> = (
