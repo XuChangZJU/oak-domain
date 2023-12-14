@@ -77,6 +77,8 @@ export type NativeEnv = {
     OS: 'android' | 'ios';
     Version: number | string;
     language: string;
+    visitorId: string;
+    type: 'native';
 };
 export type Environment = WechatMpEnv | WebEnv | ServerEnv | NativeEnv;
 export type BriefEnv = {
