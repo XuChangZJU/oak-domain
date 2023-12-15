@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * 防止assert打包体积过大，从这里引用
  */
