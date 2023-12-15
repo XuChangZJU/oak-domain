@@ -14,6 +14,7 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     private scene?: string;
     headers?: IncomingHttpHeaders;
     clusterInfo?: ClusterInfo;
+    opResult: OperationResult<ED>;
     private message?: string;
     events: {
         commit: Array<() => Promise<void>>;
@@ -32,6 +33,7 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
             commit: [],
             rollback: [],
         };
+        this.opResult = {};
     }
 
     getHeader(key: string): string | string[] | undefined {
@@ -127,12 +129,14 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
         }
     }
 
-    operate<T extends keyof ED, OP extends OperateOption>(
+    async operate<T extends keyof ED, OP extends OperateOption>(
         entity: T,
         operation: ED[T]['Operation'],
         option: OP
     ) {
-        return this.rowStore.operate(entity, operation, this, option);
+        const result = await this.rowStore.operate(entity, operation, this, option);
+        this.opResult = this.mergeMultipleResults([this.opResult, result]);
+        return result;
     }
     select<T extends keyof ED, OP extends SelectOption>(
         entity: T,

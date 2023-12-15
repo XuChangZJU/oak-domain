@@ -11,6 +11,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     private scene?;
     headers?: IncomingHttpHeaders;
     clusterInfo?: ClusterInfo;
+    opResult: OperationResult<ED>;
     private message?;
     events: {
         commit: Array<() => Promise<void>>;
