@@ -36,7 +36,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         option: Op,
         isAggr?: true) {
 
-        if (!isAggr) {
+        if (!isAggr && !selection.distinct) {
             this.reinforceSelectionInner(entity, selection, context);
         }
 
@@ -56,7 +56,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         option: Op,
         isAggr?: true
     ) {
-        if (!isAggr) {
+        if (!isAggr && !selection.distinct) {
             this.reinforceSelectionInner(entity, selection, context);
         }
 
@@ -1889,7 +1889,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Partial<ED[T]['Schema']>[] {
-        const { data, filter, indexFrom, count, sorter } = selection;
+        const { data, filter, indexFrom, count, sorter, distinct } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
             data,
@@ -1903,7 +1903,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             filter,
             indexFrom,
             count,
-            sorter
+            sorter,
+            distinct
         }, context, option);
 
 
@@ -1987,8 +1988,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             if (entityBranch) {
                 rows.forEach(
                     (row) => {
-                        if (row) {
-                            assert(row.id);
+                        if (row && row.id) {    // 如果没有row.id就不加入结果集了
                             const { id } = row;
                             if (!entityBranch![id!]) {
                                 Object.assign(entityBranch!, {
@@ -2033,7 +2033,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]> {
-        const { data, filter, indexFrom, count, sorter, total, randomRange } = selection;
+        const { data, filter, indexFrom, count, sorter, total, randomRange, distinct } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
             data,
@@ -2046,6 +2046,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             data: projection,
             filter,
             indexFrom,
+            distinct,
             count: randomRange || count,
             sorter
         }, context, option);

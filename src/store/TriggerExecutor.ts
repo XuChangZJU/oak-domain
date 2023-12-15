@@ -539,7 +539,21 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     async checkpoint(timestamp: number): Promise<number> {
         let result = 0;
         for (const entity of this.volatileEntities) {
+            const filter: ED[keyof ED]['Selection']['filter'] = {
+                [TriggerUuidAttribute]: {
+                    $exists: true,
+                },
+                [UpdateAtAttribute]: {
+                    $lt: timestamp,
+                }
+            };
             const context = await this.contextBuilder();
+            if (context.clusterInfo?.usingCluster) {
+                const { instanceCount, instanceId } = context.clusterInfo!;
+                filter.$$seq$$ = {
+                    $mod: [instanceCount!, instanceId!],
+                };
+            }
             await context.begin();
             try {
                 const rows = await context.select(entity, {
@@ -548,14 +562,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                         [TriggerDataAttribute]: 1,
                         [TriggerUuidAttribute]: 1,
                     },
-                    filter: {
-                        [TriggerUuidAttribute]: {
-                            $exists: true,
-                        },
-                        [UpdateAtAttribute]: {
-                            $lt: timestamp,
-                        }
-                    },
+                    filter,
                 } as any, {
                     includedDeleted: true,
                     dontCollect: true,
