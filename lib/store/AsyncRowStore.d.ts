@@ -22,6 +22,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
      */
     abstract refineOpRecords(): Promise<void>;
     constructor(store: AsyncRowStore<ED, AsyncContext<ED>>);
+    restartToExecute(routine: (context: this) => Promise<any>): Promise<void>;
     getHeader(key: string): string | string[] | undefined;
     getScene(): string | undefined;
     setScene(scene?: string): void;

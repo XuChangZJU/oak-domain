@@ -36,6 +36,33 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
         this.opResult = {};
     }
 
+    // 使一个上下文重新开始事务执行，清除历史数据（定时器中使用）
+    async restartToExecute(routine: (context: this) => Promise<any>) {
+        const newContext = !this.uuid ? this : {
+            ...this,
+        };  // 这里可能有问题，继承的context对象中如果有对象属性会变成指针公用，但是估计目前是跑不到的。by Xc 20231215
+        if (newContext !== this) {
+            console.warn('restartToExecute跑出了非重用当前context的情况，请仔细调试');
+        }
+        
+        newContext.opRecords = [];
+        newContext.events = {
+            commit: [],
+            rollback: [],
+        };
+        newContext.opResult = {};
+
+        await newContext.begin();
+        try {
+            await routine(newContext);
+            await newContext.commit();
+        }
+        catch (err) {
+            await newContext.rollback();
+            throw err;
+        }
+    }
+    
     getHeader(key: string): string | string[] | undefined {
         if (this.headers) {
             return this.headers[key];
