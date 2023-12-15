@@ -1,3 +1,4 @@
+import { OneOf } from '.';
 import { ReadOnlyAction } from '../actions/action';
 import { PrimaryKey, Sequence } from './DataType';
 type TriggerDataAttributeType = '$$triggerData$$';
@@ -63,6 +64,7 @@ export type Selection<A extends ReadOnlyAction, D extends Projection, F extends 
 } & FilterPart<A, F> & {
     randomRange?: number;
     total?: number;
+    distinct?: true;
 };
 export interface EntityShape {
     id: PrimaryKey;
@@ -99,9 +101,10 @@ export interface OtmSubProjection extends Omit<Operation<'select', any, any, any
 export type AggregationOp = `#max-${number}` | `#min-${number}` | `#avg-${number}` | `#count-${number}` | `#sum-${number}`;
 export type DeduceAggregationData<P extends Projection> = {
     [A in AggregationOp]?: P;
-} & {
+} & OneOf<{
+    distinct?: true;
     '#aggr'?: P;
-};
+}>;
 export type AggregationResult<SH extends GeneralEntityShape> = Array<{
     [A in AggregationOp]?: number | string;
 } & {

@@ -905,12 +905,14 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             assert(!option2.modiParentId && !option2.modiParentEntity);
             if (action === 'create') {
                 option2.modiParentId = data.id;
+                option2.modiParentEntity = entity as string;
             }
-            else {
-                assert(filter?.id && typeof filter.id === 'string');
+            else if (filter?.id && typeof filter.id === 'string'){
+                // 如果是对toModi对象进行cascadeUpdate操作，必然带有id，如果没有则认为不是modi相关的操作
+                // 批量通过或者拒绝applyment应该就会出现
                 option2.modiParentId = filter.id;
+                option2.modiParentEntity = entity as string;
             }
-            option2.modiParentEntity = entity as string;
         }
         for (const attr in data) {
             const relation = judgeRelation(this.storageSchema, entity, attr);

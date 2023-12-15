@@ -1,3 +1,4 @@
+import { OneOf } from '.';
 import { ReadOnlyAction } from '../actions/action';
 import { PrimaryKey, Sequence } from './DataType';
 
@@ -77,6 +78,7 @@ export type Selection<A extends ReadOnlyAction,
     } & FilterPart<A, F> & {
         randomRange?: number;
         total?: number;
+        distinct?: true;
     };
 
 export interface EntityShape {
@@ -122,9 +124,10 @@ export type AggregationOp = `#max-${number}` | `#min-${number}` | `#avg-${number
 
 export type DeduceAggregationData<P extends Projection> = {
     [A in AggregationOp]?: P;
-} & {
+} & OneOf<{
+    distinct?: true;
     '#aggr'?: P;
-};
+}>;
 
 export type AggregationResult<SH extends GeneralEntityShape> = Array<{
     [A in AggregationOp]?: number | string;

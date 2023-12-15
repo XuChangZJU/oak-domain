@@ -418,20 +418,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                         $in: ids,
                     }
                 }
-            }, { includedDeleted: true });
-            await context.operate(entity, {
-                id: await generateNewIdAsync(),
-                action: 'update',
-                data: {
-                    [TriggerDataAttribute]: null,
-                    [TriggerUuidAttribute]: null,
-                },
-                filter: {
-                    id: {
-                        $in: ids,
-                    }
-                }
-            }, { includedDeleted: true });
+            }, { includedDeleted: true, blockTrigger: true });
         }
         catch (err) {
             if (trigger.strict === 'takeEasy') {
