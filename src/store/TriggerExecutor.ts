@@ -204,69 +204,71 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     ) {
         assert(trigger.action !== 'select');
         assert(trigger.when === 'commit');
-        const uuid = await generateNewIdAsync();
-        const cxtStr = context.toString();
-        const { data } = operation;
-        switch (operation.action) {
-            case 'create': {
-                if (data instanceof Array) {
-                    data.forEach(
-                        (d) => {
-                            if (d.hasOwnProperty(TriggerDataAttribute) || d.hasOwnProperty(TriggerUuidAttribute)) {
-                                throw new Error('同一行数据上不能同时存在两个跨事务约束');
+        if (trigger.strict === 'makeSure') {
+            const uuid = await generateNewIdAsync();
+            const cxtStr = context.toString();
+            const { data } = operation;
+            switch (operation.action) {
+                case 'create': {
+                    if (data instanceof Array) {
+                        data.forEach(
+                            (d) => {
+                                if (d.hasOwnProperty(TriggerDataAttribute) || d.hasOwnProperty(TriggerUuidAttribute)) {
+                                    throw new Error('同一行数据上不能同时存在两个跨事务约束');
+                                }
                             }
-                        }
-                    )
-                }
-                else {
-                    if (data.hasOwnProperty(TriggerDataAttribute) || data.hasOwnProperty(TriggerUuidAttribute)) {
-                        throw new Error('同一行数据上不能存在两个跨事务约束');
+                        )
                     }
-
+                    else {
+                        if (data.hasOwnProperty(TriggerDataAttribute) || data.hasOwnProperty(TriggerUuidAttribute)) {
+                            throw new Error('同一行数据上不能存在两个跨事务约束');
+                        }
+    
+                    }
+                    break;
                 }
-                break;
-            }
-            default: {
-                const { filter } = operation;
-                // 此时要保证更新或者删除的行上没有跨事务约束
-                const filter2 = combineFilters(entity, context.getSchema(), [{
-                    [TriggerUuidAttribute]: {
-                        $exists: true,
-                    },
-                }, filter]);
-                const count = await context.count(entity, {
-                    filter: filter2
-                } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, {});
-                if (count > 0) {
-                    throw new Error(`对象${String(entity)}的行「${JSON.stringify(operation)}」上已经存在未完成的跨事务约束`);
-                }
-                break;
-            }
-        }
-
-        if (data instanceof Array) {
-            data.forEach(
-                (d) => {
-                    Object.assign(d, {
-                        [TriggerDataAttribute]: {
-                            name: trigger.name,
-                            cxtStr: context.toString(),
-                            option,
+                default: {
+                    const { filter } = operation;
+                    // 此时要保证更新或者删除的行上没有跨事务约束
+                    const filter2 = combineFilters(entity, context.getSchema(), [{
+                        [TriggerUuidAttribute]: {
+                            $exists: true,
                         },
-                        [TriggerUuidAttribute]: uuid,
-                    });
+                    }, filter]);
+                    const count = await context.count(entity, {
+                        filter: filter2
+                    } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, {});
+                    if (count > 0) {
+                        throw new Error(`对象${String(entity)}的行「${JSON.stringify(operation)}」上已经存在未完成的跨事务约束`);
+                    }
+                    break;
                 }
-            );
-        }
-        else {
-            Object.assign(data, {
-                [TriggerDataAttribute]: {
-                    name: trigger.name,
-                    cxtStr,
-                    option,
-                },
-                [TriggerUuidAttribute]: uuid,
-            });
+            }
+    
+            if (data instanceof Array) {
+                data.forEach(
+                    (d) => {
+                        Object.assign(d, {
+                            [TriggerDataAttribute]: {
+                                name: trigger.name,
+                                cxtStr: context.toString(),
+                                option,
+                            },
+                            [TriggerUuidAttribute]: uuid,
+                        });
+                    }
+                );
+            }
+            else {
+                Object.assign(data, {
+                    [TriggerDataAttribute]: {
+                        name: trigger.name,
+                        cxtStr,
+                        option,
+                    },
+                    [TriggerUuidAttribute]: uuid,
+                });
+            }
         }
     }
 
@@ -405,24 +407,8 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         assert(ids.length > 0);
         const { fn } = trigger as VolatileTrigger<ED, T, Cxt>;
         await fn({ ids }, context, option);
-        try {
-            await context.operate(entity, {
-                id: await generateNewIdAsync(),
-                action: 'update',
-                data: {
-                    [TriggerDataAttribute]: null,
-                    [TriggerUuidAttribute]: null,
-                },
-                filter: {
-                    id: {
-                        $in: ids,
-                    }
-                }
-            }, { includedDeleted: true, blockTrigger: true });
-        }
-        catch (err) {
-            if (trigger.strict === 'takeEasy') {
-                // 如果不是makeSure的就直接清空
+        if (trigger.strict === 'makeSure') {
+            try {            
                 await context.operate(entity, {
                     id: await generateNewIdAsync(),
                     action: 'update',
@@ -435,9 +421,11 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                             $in: ids,
                         }
                     }
-                }, { includedDeleted: true });
+                }, { includedDeleted: true, blockTrigger: true });
             }
-            throw err;
+            catch (err) {
+                throw err;
+            }
         }
     }
 
