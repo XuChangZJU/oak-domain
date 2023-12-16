@@ -33,7 +33,7 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
 {
     static ASPECT_ROUTER = '/aspect';
     static BRIDGE_ROUTER = '/bridge';
-    static SUBSCRIBE_ROUTER = '/subscribe';
+    static SUBSCRIBE_ROUTER = process.env.OAK_SUBSCRIBE_ROUTER || '/subscribe';
     static SUBSCRIBE_POINT_ROUTER = '/subscribePoint';
     static ENDPOINT_ROUTER = '/endpoint';
     private serverAspectUrl: string;

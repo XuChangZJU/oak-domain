@@ -1,15 +1,14 @@
 import assert from 'assert';
 import { pull, unset, groupBy } from "../utils/lodash";
 import { checkFilterRepel, combineFilters } from "../store/filter";
-import { EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerUuidAttribute, UpdateAtAttribute } from "../types/Entity";
+import { CreateOpResult, EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerUuidAttribute, UpdateAtAttribute, UpdateOpResult } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
 import { Checker, CheckerType, LogicalChecker, RelationChecker } from '../types/Auth';
-import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTrigger, TRIGGER_DEFAULT_PRIORITY, CHECKER_PRIORITY_MAP, CHECKER_MAX_PRIORITY, TRIGGER_MIN_PRIORITY } from "../types/Trigger";
+import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTrigger, TRIGGER_DEFAULT_PRIORITY, CHECKER_PRIORITY_MAP, CHECKER_MAX_PRIORITY, TRIGGER_MIN_PRIORITY, VolatileTrigger } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
 import { translateCheckerInAsyncContext } from './checker';
-import { makeProjection } from '../utils/projection';
 import { generateNewIdAsync } from '../utils/uuid';
 
 /**
@@ -38,14 +37,53 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
 
     private logger: Logger;
     private contextBuilder: (cxtString?: string) => Promise<Cxt>;
+    private onVolatileTrigger: <T extends keyof ED>(
+        entity: T, 
+        trigger: VolatileTrigger<ED, T, Cxt>, 
+        ids: string[],
+        cxtStr: string,
+        option: OperateOption
+    ) => Promise<void>;
 
-    constructor(contextBuilder: (cxtString?: string) => Promise<Cxt>, logger: Logger = console) {
+    constructor(
+        contextBuilder: (cxtString?: string) => Promise<Cxt>,
+        logger: Logger = console,
+        onVolatileTrigger?: <T extends keyof ED>(
+            entity: T,
+            trigger: VolatileTrigger<ED, T, Cxt>, 
+            ids: string[], 
+            cxtStr: string,
+            option: OperateOption) => Promise<void>
+    ) {
         this.contextBuilder = contextBuilder;
         this.logger = logger;
         this.triggerMap = {};
         this.triggerNameMap = {};
         this.volatileEntities = [];
         this.counter = 0;
+        this.onVolatileTrigger = onVolatileTrigger || (async (entity, trigger, ids, cxtStr, option) => {
+            const context = await this.contextBuilder(cxtStr);
+            await context.begin();
+            try {
+                await this.execVolatileTrigger(entity, trigger.name, ids, context, option);
+                await context.commit();
+            }
+            catch (err) {
+                await context.rollback();
+                this.logger.error('error on volatile trigger', entity, trigger.name, ids.join(','), err);
+            }
+        });
+    }
+
+    setOnVolatileTrigger(
+        onVolatileTrigger: <T extends keyof ED>(
+            entity: T,
+            trigger: VolatileTrigger<ED, T, Cxt>, 
+            ids: string[], 
+            cxtStr: string,
+            option: OperateOption) => Promise<void>
+    ) {
+        this.onVolatileTrigger = onVolatileTrigger;
     }
 
     registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void {
@@ -166,102 +204,104 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     ) {
         assert(trigger.action !== 'select');
         assert(trigger.when === 'commit');
-        const uuid = await generateNewIdAsync();
-        const cxtStr = context.toString();
-        const { data } = operation;
-        switch (operation.action) {
-            case 'create': {
-                if (data instanceof Array) {
-                    data.forEach(
-                        (d) => {
-                            if (d.hasOwnProperty(TriggerDataAttribute) || d.hasOwnProperty(TriggerUuidAttribute)) {
-                                throw new Error('同一行数据上不能同时存在两个跨事务约束');
+        if (trigger.strict === 'makeSure') {
+            const uuid = await generateNewIdAsync();
+            const cxtStr = context.toString();
+            const { data } = operation;
+            switch (operation.action) {
+                case 'create': {
+                    if (data instanceof Array) {
+                        data.forEach(
+                            (d) => {
+                                if (d.hasOwnProperty(TriggerDataAttribute) || d.hasOwnProperty(TriggerUuidAttribute)) {
+                                    throw new Error('同一行数据上不能同时存在两个跨事务约束');
+                                }
                             }
-                        }
-                    )
-                }
-                else {
-                    if (data.hasOwnProperty(TriggerDataAttribute) || data.hasOwnProperty(TriggerUuidAttribute)) {
-                        throw new Error('同一行数据上不能存在两个跨事务约束');
+                        )
                     }
-
+                    else {
+                        if (data.hasOwnProperty(TriggerDataAttribute) || data.hasOwnProperty(TriggerUuidAttribute)) {
+                            throw new Error('同一行数据上不能存在两个跨事务约束');
+                        }
+    
+                    }
+                    break;
                 }
-                break;
-            }
-            default: {
-                const { filter } = operation;
-                // 此时要保证更新或者删除的行上没有跨事务约束
-                const filter2 = combineFilters(entity, context.getSchema(), [{
-                    [TriggerUuidAttribute]: {
-                        $exists: true,
-                    },
-                }, filter]);
-                const count = await context.count(entity, {
-                    filter: filter2
-                } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, {});
-                if (count > 0) {
-                    throw new Error(`对象${String(entity)}的行「${JSON.stringify(operation)}」上已经存在未完成的跨事务约束`);
-                }
-                break;
-            }
-        }
-
-        if (data instanceof Array) {
-            data.forEach(
-                (d) => {
-                    Object.assign(d, {
-                        [TriggerDataAttribute]: {
-                            name: trigger.name,
-                            cxtStr: context.toString(),
-                            params: option,
+                default: {
+                    const { filter } = operation;
+                    // 此时要保证更新或者删除的行上没有跨事务约束
+                    const filter2 = combineFilters(entity, context.getSchema(), [{
+                        [TriggerUuidAttribute]: {
+                            $exists: true,
                         },
-                        [TriggerUuidAttribute]: uuid,
-                    });
+                    }, filter]);
+                    const count = await context.count(entity, {
+                        filter: filter2
+                    } as Omit<ED[T]['Selection'], 'action' | 'sorter' | 'data'>, {});
+                    if (count > 0) {
+                        throw new Error(`对象${String(entity)}的行「${JSON.stringify(operation)}」上已经存在未完成的跨事务约束`);
+                    }
+                    break;
                 }
-            );
+            }
+    
+            if (data instanceof Array) {
+                data.forEach(
+                    (d) => {
+                        Object.assign(d, {
+                            [TriggerDataAttribute]: {
+                                name: trigger.name,
+                                cxtStr: context.toString(),
+                                option,
+                            },
+                            [TriggerUuidAttribute]: uuid,
+                        });
+                    }
+                );
+            }
+            else {
+                Object.assign(data, {
+                    [TriggerDataAttribute]: {
+                        name: trigger.name,
+                        cxtStr,
+                        option,
+                    },
+                    [TriggerUuidAttribute]: uuid,
+                });
+            }
         }
-        else {
-            Object.assign(data, {
-                [TriggerDataAttribute]: {
-                    name: trigger.name,
-                    cxtStr,
-                    params: option,
-                },
-                [TriggerUuidAttribute]: uuid,
-            });
-        }
+    }
 
+    private postCommitTrigger<T extends keyof ED>(
+        entity: T,
+        operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
+        trigger: VolatileTrigger<ED, T, Cxt>,
+        context: Cxt,
+        option: OperateOption
+    ) {        
         context.on('commit', async () => {
-            const context2 = await this.contextBuilder(cxtStr);
-            await context2.begin();
-
-            try {
-                const rows = await context2.select(entity, {
-                    data: {
-                        ...makeProjection(entity, context.getSchema()),
-                        [TriggerDataAttribute]: 1,
-                        [TriggerUuidAttribute]: 1,
-                    },
-                    filter: {
-                        [TriggerUuidAttribute]: uuid,
-                    },
-                }, {
-                    includedDeleted: true,
-                }) as ED[T]['OpSchema'][];
-                if (rows.length > 0) {
-                    await this.execVolatileTrigger(entity, trigger, context2, option, rows);
+            let ids = [] as string[];
+            const { opRecords } = context;
+            if (operation.action === 'create') {
+                const { data } = operation;
+                if (data instanceof Array) {
+                    ids = data.map(ele => ele.id!);
                 }
                 else {
-                    // 如果是前台开发模式，debugStore不会保留删除行
-                    assert(process.env.OAK_PLATFORM !== 'server' && operation.action === 'remove');
+                    ids = [data.id!];
                 }
-
-                await context2.commit();
             }
-            catch (err) {
-                await context2.rollback();
-                this.logger.error(err);
+            else {
+                const record = opRecords.find(
+                    ele => (ele as CreateOpResult<ED, keyof ED>).id === operation.id,
+                );
+                // 目前框架在operation时，一定会将ids记录在operation当中（见CascadeStore中的doUpdateSingleRowAsync函数
+                assert(record && record.a !== 'c');
+                const { f } = record as UpdateOpResult<ED, keyof ED>;
+                ids = f!.id!.$in;
             }
+            const cxtStr = context.toString();
+            this.onVolatileTrigger(entity, trigger, ids, cxtStr, option);
         });
     }
 
@@ -355,48 +395,20 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         }
     }
 
-    private async execVolatileTrigger<T extends keyof ED>(
+    async execVolatileTrigger<T extends keyof ED>(
         entity: T,
-        trigger: Trigger<ED, T, Cxt>,
+        name: string,
+        ids: string[],
         context: Cxt,
-        option: OperateOption,
-        rows: ED[T]['OpSchema'][]
+        option: OperateOption
     ) {
-        assert(trigger.when === 'commit');
-        assert(rows.length > 0);
-        const { fn } = trigger as CreateTriggerCrossTxn<ED, T, Cxt>;
-        await fn({ rows }, context, option);
-        try {
-            await context.operate(entity, {
-                id: await generateNewIdAsync(),
-                action: 'update',
-                data: {
-                    [TriggerDataAttribute]: null,
-                    [TriggerUuidAttribute]: null,
-                },
-                filter: {
-                    id: {
-                        $in: rows.map(ele => ele.id!)
-                    }
-                }
-            }, { includedDeleted: true });
-            await context.operate(entity, {
-                id: await generateNewIdAsync(),
-                action: 'update',
-                data: {
-                    [TriggerDataAttribute]: null,
-                    [TriggerUuidAttribute]: null,
-                },
-                filter: {
-                    id: {
-                        $in: rows.map(ele => ele.id!)
-                    }
-                }
-            }, { includedDeleted: true });
-        }
-        catch (err) {
-            if (trigger.strict === 'takeEasy') {
-                // 如果不是makeSure的就直接清空
+        const trigger = this.triggerNameMap[name];
+        assert(trigger && trigger.when === 'commit');
+        assert(ids.length > 0);
+        const { fn } = trigger as VolatileTrigger<ED, T, Cxt>;
+        await fn({ ids }, context, option);
+        if (trigger.strict === 'makeSure') {
+            try {            
                 await context.operate(entity, {
                     id: await generateNewIdAsync(),
                     action: 'update',
@@ -406,12 +418,14 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     },
                     filter: {
                         id: {
-                            $in: rows.map(ele => ele.id!)
+                            $in: ids,
                         }
                     }
-                }, { includedDeleted: true });
+                }, { includedDeleted: true, blockTrigger: true });
             }
-            throw err;
+            catch (err) {
+                throw err;
+            }
         }
     }
 
@@ -434,7 +448,6 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         }
         return true;
     }
-
     postOperation<T extends keyof ED>(
         entity: T,
         operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
@@ -453,6 +466,11 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
             const postTriggers = triggers.filter(
                 ele => ele.when === 'after' && (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as ED[T]['Create']))
             );
+
+            const commitTriggers = triggers.filter(
+                ele => ele.when === 'commit' &&
+                    (!(ele as CreateTrigger<ED, T, Cxt>).check || (ele as CreateTrigger<ED, T, Cxt>).check!(operation as ED[T]['Create']))
+            ) as VolatileTrigger<ED, T, Cxt>[];
 
             if (context instanceof SyncContext) {
                 for (const trigger of postTriggers) {
@@ -481,7 +499,27 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     }
                     return execPostTrigger(idx + 1);
                 };
-                return execPostTrigger(0);
+                const execCommitTrigger = async (idx: number): Promise<void> => {
+                    if (idx >= commitTriggers.length) {
+                        return;
+                    }
+                    const trigger = commitTriggers[idx];
+                    if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
+                        assert(operation.action !== 'create');
+                        const { filter } = trigger as UpdateTrigger<ED, T, Cxt>;
+                        const filterr = typeof filter === 'function' ? await filter(operation as ED[T]['Update'], context, option) : filter;
+                        const filterRepelled = await (checkFilterRepel<ED, T, Cxt>(entity, context, filterr, operation.filter) as Promise<boolean>);
+                        if (filterRepelled) {
+                            return execCommitTrigger(idx + 1);
+                        }
+                    }
+                    this.postCommitTrigger(entity, operation, trigger, context, option as OperateOption);
+                    return execCommitTrigger(idx + 1);
+                };
+                return execPostTrigger(0)
+                    .then(
+                        () => execCommitTrigger(0)
+                    );
             }
         }
     }
@@ -489,23 +527,30 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
     async checkpoint(timestamp: number): Promise<number> {
         let result = 0;
         for (const entity of this.volatileEntities) {
+            const filter: ED[keyof ED]['Selection']['filter'] = {
+                [TriggerUuidAttribute]: {
+                    $exists: true,
+                },
+                [UpdateAtAttribute]: {
+                    $lt: timestamp,
+                }
+            };
             const context = await this.contextBuilder();
+            if (context.clusterInfo?.usingCluster) {
+                const { instanceCount, instanceId } = context.clusterInfo!;
+                filter.$$seq$$ = {
+                    $mod: [instanceCount!, instanceId!],
+                };
+            }
             await context.begin();
             try {
                 const rows = await context.select(entity, {
                     data: {
-                        ...makeProjection(entity, context.getSchema()),
+                        id: 1,
                         [TriggerDataAttribute]: 1,
                         [TriggerUuidAttribute]: 1,
                     },
-                    filter: {
-                        [TriggerUuidAttribute]: {
-                            $exists: true,
-                        },
-                        [UpdateAtAttribute]: {
-                            $lt: timestamp,
-                        }
-                    },
+                    filter,
                 } as any, {
                     includedDeleted: true,
                     dontCollect: true,
@@ -517,12 +562,9 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                 for (const uuid in grouped) {
                     const rs = grouped[uuid];
                     const { [TriggerDataAttribute]: triggerData } = rs[0];
-                    const { name, cxtStr, params } = triggerData!;
+                    const { name, cxtStr, option } = triggerData!;
                     await context.initialize(JSON.parse(cxtStr));
-                    const trigger = this.triggerNameMap[name];
-                    if (trigger) {
-                        await this.execVolatileTrigger(entity, trigger, context, params, rs as ED[keyof ED]['OpSchema'][]);
-                    }
+                    await this.execVolatileTrigger(entity, name, rs.map(ele => ele.id!), context, option);
                 }
                 await context.commit();
             }
