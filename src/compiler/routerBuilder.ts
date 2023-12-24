@@ -162,9 +162,15 @@ function makeWebAllRouters(namespaceDir: string, projectDir: string, routerFileD
                 let notFound2 = '', first2 = '';
                 if (existsSync(nsIndexJsonFile)) {
                     const { path, notFound, first } = require(nsIndexJsonFile);
-                    path2 = path.replace(/\\/g, '/');
-                    notFound2 = notFound.replace(/\\/g, '/');
-                    first2 = first.replace(/\\/g, '/');
+                    if (path) {
+                        path2 = path.replace(/\\/g, '/');
+                    }
+                    if (notFound) {
+                        notFound2 = notFound.replace(/\\/g, '/');
+                    }
+                    if (first) {
+                        first2 = first.replace(/\\/g, '/');
+                    }
                 }
                 const children = Object.values(pages).filter(
                     (ele) => ele.hasWeb
