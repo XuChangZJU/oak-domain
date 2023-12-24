@@ -9,4 +9,4 @@ while (iter > 0) {
 import { join } from 'path';
 import { buildRouter } from '../src/compiler/routerBuilder';
 
-buildRouter(join(process.cwd(), '..', 'taicang'));
+buildRouter(join(process.cwd(), '..', 'taicang'), 'web', true);
