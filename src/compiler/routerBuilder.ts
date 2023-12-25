@@ -165,6 +165,9 @@ function makeWebAllRouters(namespaceDir: string, projectDir: string, routerFileD
                     path2 = path.replace(/\\/g, '/');
                     notFound2 = notFound.replace(/\\/g, '/');
                     first2 = first.replace(/\\/g, '/');
+                    if (first2.startsWith('/')) {
+                        first2 = first2.slice(1);
+                    }
                 }
                 const children = Object.values(pages).filter(
                     (ele) => ele.hasWeb
