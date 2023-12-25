@@ -563,7 +563,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     const rs = grouped[uuid];
                     const { [TriggerDataAttribute]: triggerData } = rs[0];
                     const { name, cxtStr, option } = triggerData!;
-                    await context.initialize(JSON.parse(cxtStr));
+                    // await context.initialize(JSON.parse(cxtStr));        // 这里token有可能过期（用户注销），先用root态模拟吧
                     await this.execVolatileTrigger(entity, name, rs.map(ele => ele.id!), context, option);
                 }
                 await context.commit();

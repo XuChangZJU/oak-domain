@@ -62,7 +62,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
         this.selectionRewriters.forEach(
             ele => {
-                const result = ele(this.getSchema(), entity, selection, context, option);
+                const result = ele(this.getSchema(), entity, selection, context, option, isAggr);
                 assert(!(result instanceof Promise));
             }
         );
@@ -377,7 +377,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 $$createAt$$: 1,
             });
         }
-
     }
 
     private async reinforceOperation<Cxt extends AsyncContext<ED>, Op extends OperateOption>(
@@ -403,6 +402,19 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Partial<ED[T]['Schema']>[];
+    
+    protected abstract countAbjointRow<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
+        entity: T,
+        selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
+        context: Cxt,
+        option: OP): number;
+    
+        
+    protected abstract countAbjointRowAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
+        context: Cxt,
+        option: OP): Promise<number>;
 
     protected abstract updateAbjointRow<T extends keyof ED, OP extends OperateOption, Cxt extends SyncContext<ED>>(
         entity: T,
@@ -415,13 +427,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]>;
-
-    protected abstract countAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
-        entity: T,
-        selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
-        context: Cxt,
-        option: OP
-    ): Promise<number>;
 
     protected abstract updateAbjointRowAsync<T extends keyof ED, OP extends OperateOption, Cxt extends AsyncContext<ED>>(
         entity: T,
@@ -2168,5 +2173,23 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         option: OP): Promise<OperationResult<ED>> {
         await this.reinforceOperation(entity, operation, context, option);
         return this.cascadeUpdateAsync(entity, operation, context, option);
+    }
+
+    protected countSync<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
+        entity: T,
+        selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
+        context: Cxt,
+        option: OP) {
+        this.reinforceSelectionSync(entity, selection as ED[T]['Selection'], context, option, true);    // 这样写可能有问题的，虽然能跳过本地的projection补全，但如果有更多的selectionRewriter注入可能会出问题。by Xc 20231220
+        return this.countAbjointRow(entity, selection as ED[T]['Selection'], context, option);
+    }
+
+    protected countAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
+        context: Cxt,
+        option: OP) {
+        this.reinforceSelectionAsync(entity, selection as ED[T]['Selection'], context, option, true);    // 这样写可能有问题的，虽然能跳过本地的projection补全，但如果有更多的selectionRewriter注入可能会出问题。by Xc 20231220
+        return this.countAbjointRowAsync(entity, selection as ED[T]['Selection'], context, option);
     }
 }

@@ -80,7 +80,8 @@ export default class LocaleBuilder {
             )
         ];
 
-        if (this.dependencies) {
+        // 改为在初始化时合并
+       /*  if (this.dependencies) {
             this.dependencies.forEach(
                 (ele, idx) => statements.push(
                     factory.createImportDeclaration(
@@ -95,7 +96,7 @@ export default class LocaleBuilder {
                     )
                 )
             )
-        }
+        } */
 
         statements.push(
             factory.createVariableStatement(
@@ -159,7 +160,7 @@ export default class LocaleBuilder {
             ),
         );
 
-        if (this.dependencies.length > 0) {
+        /* if (this.dependencies.length > 0) {
             statements.push(
                 factory.createExportAssignment(
                     undefined,
@@ -177,7 +178,7 @@ export default class LocaleBuilder {
                 )
             );
         }
-        else {
+        else { */
             statements.push(
                 factory.createExportAssignment(
                     undefined,
@@ -185,7 +186,7 @@ export default class LocaleBuilder {
                     factory.createIdentifier("i18ns")
                 )
             );
-        }
+        /* } */
 
         const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
         const result = printer.printList(
