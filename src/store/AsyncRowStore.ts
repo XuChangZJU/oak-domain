@@ -138,6 +138,8 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
             this.uuid = undefined;
             const { commit: commitEvents } = this.events;
             this.resetEvents();
+            this.opRecords = [];
+            this.opResult = {};
             for (const e of commitEvents) {
                 await e();
             }
@@ -149,6 +151,8 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
             // console.log('rollback', this.uuid);
             this.uuid = undefined;
             const { rollback: rollbackEvents } = this.events;
+            this.opRecords = [];
+            this.opResult = {};
             this.resetEvents();
             for (const e of rollbackEvents) {
                 await e();
