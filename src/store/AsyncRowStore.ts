@@ -140,6 +140,7 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
             this.resetEvents();
             this.opRecords = [];
             this.opResult = {};
+            this.message = '';
             for (const e of commitEvents) {
                 await e();
             }
