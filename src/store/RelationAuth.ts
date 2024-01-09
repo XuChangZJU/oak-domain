@@ -1335,13 +1335,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 return result.then(
                     (r) => {
                         if (!r) {
-                            throw new OakUserInvisibleException();
+                            throw new OakUserInvisibleException<ED, T>(entity, operation as ED[T]['Operation']);
                         }
                     }
                 );
             }
             if (!result) {
-                throw new OakUserInvisibleException();
+                throw new OakUserInvisibleException<ED, T>(entity, operation as ED[T]['Operation']);
             }
         }
         else {
@@ -1350,13 +1350,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                 return result.then(
                     (r) => {
                         if (!r) {
-                            throw new OakUserUnpermittedException();
+                            throw new OakUserUnpermittedException<ED, T>(entity, operation as ED[T]['Operation']);
                         }
                     }
                 );
             }
             if (!result) {
-                throw new OakUserUnpermittedException();
+                throw new OakUserUnpermittedException<ED, T>(entity, operation as ED[T]['Operation']);
             }
         }
     }

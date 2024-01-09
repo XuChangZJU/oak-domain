@@ -116,7 +116,7 @@ export function translateCheckerInAsyncContext<
                         return;
                     }
                     const errMsg2 = typeof errMsg === 'function' ? errMsg(operation, context, option) : errMsg;
-                    throw new OakUserUnpermittedException(errMsg2);
+                    throw new OakUserUnpermittedException<ED, T>(entity, operation, errMsg2);
                 }
                 return 0;
             }) as UpdateTriggerInTxn<ED, T, Cxt>['fn'];
@@ -204,7 +204,7 @@ export function translateCheckerInSyncContext<
                         return;
                     }
                     const errMsg2 = typeof errMsg === 'function' ? errMsg(operation, context, option) : errMsg;
-                    throw new OakUserUnpermittedException(errMsg2);
+                    throw new OakUserUnpermittedException<ED, T>(entity, operation, errMsg2);
                 }
             };
             return {

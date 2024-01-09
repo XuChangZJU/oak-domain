@@ -212,15 +212,49 @@ export class OakAttrNotNullException<ED extends EntityDict> extends OakInputIlle
 /**
  * 用户权限不够时抛的异常
  */
-export class OakUserUnpermittedException<ED extends EntityDict> extends OakUserException<ED> {
+export class OakUserUnpermittedException<ED extends EntityDict, T extends keyof ED> extends OakUserException<ED> {
+    private entity: T;
+    private operation: ED[T]['Selection'] | ED[T]['Operation'];
 
+    constructor(entity: T, operation: ED[T]['Selection'] | ED[T]['Operation'], message?: string) {
+        super(message || '用户权限不足');
+        this.entity = entity;
+        this.operation = operation;
+    }
+
+
+    toString(): string {
+        return JSON.stringify({
+            entity: this.entity,
+            name: this.constructor.name,
+            message: this.message,
+            operation: this.operation,
+        });
+    }
 };
 
 /**
  * 用户查询权限不够抛出异常
  */
-export class OakUserInvisibleException<ED extends EntityDict> extends OakUserException<ED> {
+export class OakUserInvisibleException<ED extends EntityDict, T extends keyof ED> extends OakUserException<ED> {
+    private entity: T;
+    private operation: ED[T]['Selection'] | ED[T]['Operation'];
 
+    constructor(entity: T, operation: ED[T]['Selection'] | ED[T]['Operation'], message?: string) {
+        super(message || '用户权限不足');
+        this.entity = entity;
+        this.operation = operation;
+    }
+
+
+    toString(): string {
+        return JSON.stringify({
+            entity: this.entity,
+            name: this.constructor.name,
+            message: this.message,
+            operation: this.operation,
+        });
+    }
 };
 
 
@@ -359,12 +393,12 @@ export function makeException<ED extends EntityDict>(data: {
             return e;
         }
         case 'OakUserUnpermittedException': {
-            const e = new OakUserUnpermittedException(data.message);
+            const e = new OakUserUnpermittedException(data.entity, data.operation, data.message);
             e.setOpRecords(data.opRecords);
             return e;
         }
         case 'OakUserInvisibleException': {
-            const e = new OakUserInvisibleException(data.message);
+            const e = new OakUserInvisibleException(data.entity, data.operation, data.message);
             e.setOpRecords(data.opRecords);
             return e;
         }
