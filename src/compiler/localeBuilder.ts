@@ -248,12 +248,12 @@ export default class LocaleBuilder {
         const { name } = require(packageJson);
         const pagePath = join(root, src ? 'src' : 'lib', 'pages');//编译i18时font中的componentPath缺少根目录导致编译不出
         if (fs.existsSync(pagePath)) {
-            this.traverse(name, 'p', pagePath, join(root, pagePath), false, 'locales', watch);
+            this.traverse(name, 'p', pagePath, pagePath, false, 'locales', watch);
         }
 
         const componentPath = join(root, src ? 'src' : 'lib', 'components');
         if (fs.existsSync(componentPath)) {
-            this.traverse(name, 'c', componentPath, join(root, componentPath), false, 'locales', watch);
+            this.traverse(name, 'c', componentPath, componentPath, false, 'locales', watch);
         }
 
         const localePath = join(root, src ? 'src' : 'lib', 'locales');
