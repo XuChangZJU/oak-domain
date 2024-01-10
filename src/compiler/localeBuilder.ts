@@ -246,14 +246,32 @@ export default class LocaleBuilder {
     private buildproject(root: string, src?: boolean, watch?: boolean) {
         const packageJson = join(root, 'package.json');
         const { name } = require(packageJson);
-        const pagePath = join(root, src ? 'src' : 'lib', 'pages');//编译i18时font中的componentPath缺少根目录导致编译不出
-        if (fs.existsSync(pagePath)) {
-            this.traverse(name, 'p', pagePath, pagePath, false, 'locales', watch);
+        const pagePath = join(src ? 'src' : 'lib', 'pages');
+        const pageAbsolutePath = join(root, pagePath);//编译i18时font中的componentPath缺少根目录导致编译不出
+        if (fs.existsSync(pageAbsolutePath)) {
+            this.traverse(
+                name,
+                'p',
+                pagePath,
+                pageAbsolutePath,
+                false,
+                'locales',
+                watch
+            );
         }
 
-        const componentPath = join(root, src ? 'src' : 'lib', 'components');
-        if (fs.existsSync(componentPath)) {
-            this.traverse(name, 'c', componentPath, componentPath, false, 'locales', watch);
+        const componentPath = join(src ? 'src' : 'lib', 'components');
+        const componentAbsolutePath = join(root, componentPath);
+        if (fs.existsSync(componentAbsolutePath)) {
+            this.traverse(
+                name,
+                'c',
+                componentPath,
+                componentAbsolutePath,
+                false,
+                'locales',
+                watch
+            );
         }
 
         const localePath = join(root, src ? 'src' : 'lib', 'locales');
