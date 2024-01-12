@@ -81,6 +81,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         await this.checkActions2(entity, operation, context);
     }
 
+    /**
+     * 检查当前用户有无权限对filter约束的userRelation进行action操作
+     * @param context 
+     * @param action 
+     * @param filter 
+     * @returns 
+     */
     private checkUserRelation<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, action: ED[keyof ED]['Action'], filter: NonNullable<ED['userRelation']['Selection']['filter']>) {
         const userId = context.getCurrentUserId();
         let filter2: ED['relationAuth']['Selection']['filter'] = {
