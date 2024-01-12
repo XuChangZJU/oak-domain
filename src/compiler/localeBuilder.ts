@@ -243,20 +243,38 @@ export default class LocaleBuilder {
         );
     }
 
-    private buildproject(root: string, src?: boolean, watch?: boolean) {
+    private buildProject(root: string, src?: boolean, watch?: boolean) {
         const packageJson = join(root, 'package.json');
         const { name } = require(packageJson);
-        const pagePath = join(root, src ? 'src' : 'lib', 'pages');//编译i18时font中的componentPath缺少根目录导致编译不出
-        if (fs.existsSync(pagePath)) {
-            this.traverse(name, 'p', pagePath, pagePath, false, 'locales', watch);
+        const pagePath = join(src ? 'src' : 'es', 'pages');
+        const pageAbsolutePath = join(root, pagePath);//编译i18时font中的componentPath缺少根目录导致编译不出
+        if (fs.existsSync(pageAbsolutePath)) {
+            this.traverse(
+                name,
+                'p',
+                pagePath,
+                pageAbsolutePath,
+                false,
+                'locales',
+                watch
+            );
         }
 
-        const componentPath = join(root, src ? 'src' : 'lib', 'components');
-        if (fs.existsSync(componentPath)) {
-            this.traverse(name, 'c', componentPath, componentPath, false, 'locales', watch);
+        const componentPath = join(src ? 'src' : 'es', 'components');
+        const componentAbsolutePath = join(root, componentPath);
+        if (fs.existsSync(componentAbsolutePath)) {
+            this.traverse(
+                name,
+                'c',
+                componentPath,
+                componentAbsolutePath,
+                false,
+                'locales',
+                watch
+            );
         }
 
-        const localePath = join(root, src ? 'src' : 'lib', 'locales');
+        const localePath = join(root, src ? 'src' : 'es', 'locales');
         if (fs.existsSync(localePath)) {
             const files = fs.readdirSync(localePath);
             files.forEach(
@@ -300,11 +318,11 @@ export default class LocaleBuilder {
     }
 
     build(watch?: boolean) {
-        this.buildproject(this.pwd, true, watch);
+        this.buildProject(this.pwd, true, watch);
         if (!this.asLib) {
             // 如果不是lib，把front里的数据也处理掉
             const fbPath = join(this.pwd, 'node_modules', 'oak-frontend-base');
-            this.buildproject(fbPath, false, watch)
+            this.buildProject(fbPath, false, watch);
         }
         this.outputDataFile();
     }
