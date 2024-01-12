@@ -217,7 +217,7 @@ export class OakUserUnpermittedException<ED extends EntityDict, T extends keyof 
     private operation: ED[T]['Selection'] | ED[T]['Operation'];
 
     constructor(entity: T, operation: ED[T]['Selection'] | ED[T]['Operation'], message?: string) {
-        super(message || '用户权限不足');
+        super(message || '用户操作权限不足');
         this.entity = entity;
         this.operation = operation;
     }
@@ -241,7 +241,7 @@ export class OakUserInvisibleException<ED extends EntityDict, T extends keyof ED
     private operation: ED[T]['Selection'] | ED[T]['Operation'];
 
     constructor(entity: T, operation: ED[T]['Selection'] | ED[T]['Operation'], message?: string) {
-        super(message || '用户权限不足');
+        super(message || '用户查询权限不足');
         this.entity = entity;
         this.operation = operation;
     }

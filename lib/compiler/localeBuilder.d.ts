@@ -22,6 +22,6 @@ export default class LocaleBuilder {
     private readLocaleFileContent;
     private parseFile;
     private traverse;
-    private buildproject;
+    private buildProject;
     build(watch?: boolean): void;
 }

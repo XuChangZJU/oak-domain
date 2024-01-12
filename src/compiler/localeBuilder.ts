@@ -243,10 +243,10 @@ export default class LocaleBuilder {
         );
     }
 
-    private buildproject(root: string, src?: boolean, watch?: boolean) {
+    private buildProject(root: string, src?: boolean, watch?: boolean) {
         const packageJson = join(root, 'package.json');
         const { name } = require(packageJson);
-        const pagePath = join(src ? 'src' : 'lib', 'pages');
+        const pagePath = join(src ? 'src' : 'es', 'pages');
         const pageAbsolutePath = join(root, pagePath);//编译i18时font中的componentPath缺少根目录导致编译不出
         if (fs.existsSync(pageAbsolutePath)) {
             this.traverse(
@@ -260,7 +260,7 @@ export default class LocaleBuilder {
             );
         }
 
-        const componentPath = join(src ? 'src' : 'lib', 'components');
+        const componentPath = join(src ? 'src' : 'es', 'components');
         const componentAbsolutePath = join(root, componentPath);
         if (fs.existsSync(componentAbsolutePath)) {
             this.traverse(
@@ -274,7 +274,7 @@ export default class LocaleBuilder {
             );
         }
 
-        const localePath = join(root, src ? 'src' : 'lib', 'locales');
+        const localePath = join(root, src ? 'src' : 'es', 'locales');
         if (fs.existsSync(localePath)) {
             const files = fs.readdirSync(localePath);
             files.forEach(
@@ -318,11 +318,11 @@ export default class LocaleBuilder {
     }
 
     build(watch?: boolean) {
-        this.buildproject(this.pwd, true, watch);
+        this.buildProject(this.pwd, true, watch);
         if (!this.asLib) {
             // 如果不是lib，把front里的数据也处理掉
             const fbPath = join(this.pwd, 'node_modules', 'oak-frontend-base');
-            this.buildproject(fbPath, false, watch)
+            this.buildProject(fbPath, false, watch);
         }
         this.outputDataFile();
     }
