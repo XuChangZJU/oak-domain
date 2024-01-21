@@ -15,7 +15,7 @@ export type Boolean = boolean;
 export type Price = number;
 export type PrimaryKey = string;
 export type ForeignKey<E extends string> = string;
-export type Sequence = string;
+export type Sequence = number;
 export { Geo, SingleGeo } from './Geo';
 export type DataTypes = number | string | Datetime | Day | Time | Geo | Object | SingleGeo;
 export declare const types: string[];

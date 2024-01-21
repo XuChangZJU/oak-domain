@@ -197,15 +197,27 @@ export default class LocaleBuilder {
         fs.writeFileSync(filename, result2, { flag: 'w' });
     }
 
+    /**
+     * 这里不能直接用require, webpack貌似有缓存
+     * @param filepath 
+     */
+    private readLocaleFileContent(filepath: string) {
+        assert(filepath.endsWith('.json'));
+        const content = fs.readFileSync(filepath, {
+            encoding: 'utf-8',
+        });
+        return JSON.parse(content);
+    }
+
     private parseFile(module: string, namespace: string, position: string, filename: string, filepath: string, watch?: boolean) {
         const language = (filename.split('.')[0]).replace('_', '-');            // 历史原因，会命名成zh_CN.json
-        const data = require(filepath);
+        const data = this.readLocaleFileContent(filepath);
         const ns = module ? `${module}-${namespace}` : firstLetterLowerCase(namespace);
         this.locales[ns] = [module, position.replace(/\\/g, '/'), language, data];
 
         if (watch) {
             fs.watch(filepath, () => {
-                const data = require(filepath);
+                const data = this.readLocaleFileContent(filepath);
                 this.locales[ns] = [module, position.replace(/\\/g, '/'), language, data];
                 this.outputDataFile();
             });

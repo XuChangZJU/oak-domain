@@ -23,6 +23,7 @@ export type Q_NumberComparisonValue = number | OneOf<{
     $ne: number;
     $in: number[];
     $nin: number[];
+    $mod: [number, number];
     $between: [number, number];
 }>;
 

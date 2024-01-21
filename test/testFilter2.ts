@@ -79,3 +79,18 @@ r = combineFilters<EntityDict, 'user'>('user', storageSchema, [
 ], true);
 
 console.log(JSON.stringify(r));
+
+r = combineFilters<EntityDict, 'user'>('user', storageSchema, [
+    {
+        user$ref: {
+            id: 'bbb',
+        },
+    },
+    {
+        user$ref: {
+            id: 'ccc',
+        },
+    }
+]);
+
+console.log(JSON.stringify(r));

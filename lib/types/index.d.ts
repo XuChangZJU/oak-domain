@@ -23,3 +23,4 @@ export * from './Style';
 export * from './EntityDesc';
 export * from './Environment';
 export * from './Locale';
+export * from './Cluster';

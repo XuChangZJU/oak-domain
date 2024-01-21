@@ -1,0 +1,24 @@
+declare function serializeHost(host: any): any;
+declare function cannotHaveAUsernamePasswordPort(url: any): any;
+declare function serializeURL(url: any, excludeFragment: any): string;
+export declare const serializeURL: typeof serializeURL;
+export declare const serializeURLOrigin: (url: any) => any;
+export declare const basicURLParse: (input: any, options: any) => any;
+export declare const setTheUsername: (url: any, username: any) => void;
+export declare const setThePassword: (url: any, password: any) => void;
+export declare const serializeHost: typeof serializeHost;
+export declare const cannotHaveAUsernamePasswordPort: typeof cannotHaveAUsernamePasswordPort;
+export declare const serializeInteger: (integer: any) => string;
+export declare const parseURL: (input: any, options: any) => any;
+declare const _default: {
+    parseURL: (input: any, options: any) => any;
+    serializeInteger: (integer: any) => string;
+    serializeHost: typeof serializeHost;
+    cannotHaveAUsernamePasswordPort: typeof cannotHaveAUsernamePasswordPort;
+    setThePassword: (url: any, password: any) => void;
+    setTheUsername: (url: any, username: any) => void;
+    basicURLParse: (input: any, options: any) => any;
+    serializeURLOrigin: (url: any) => any;
+    serializeURL: typeof serializeURL;
+};
+export default _default;

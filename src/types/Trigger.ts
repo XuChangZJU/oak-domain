@@ -47,11 +47,15 @@ export interface CreateTriggerInTxn<ED extends EntityDict, T extends keyof ED, C
     fn: (event: { operation: ED[T]['Create']; }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
-export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt> {
+interface TriggerCrossTxn<ED extends EntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>> {
     when: 'commit',
     strict?: 'takeEasy' | 'makeSure';
-    fn: (event: { rows: ED[T]['OpSchema'][] }, context: Cxt, option: OperateOption) => Promise<number> | number;
-};
+    cs?: true;        // cluster sensative，集群敏感的，需要由对应的集群进程统一处理
+    fn: (event: { ids: string[] }, context: Cxt, option: OperateOption) => Promise<number> | number;
+}
+
+export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> 
+    extends CreateTriggerBase<ED, T, Cxt>, TriggerCrossTxn<ED, Cxt> {};
 
 export type CreateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTriggerInTxn<ED, T, Cxt> | CreateTriggerCrossTxn<ED, T, Cxt>;
 
@@ -73,14 +77,10 @@ export interface UpdateTriggerInTxn<ED extends EntityDict, T extends keyof ED, C
     fn: (event: { operation: ED[T]['Update'] }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
-export interface UpdateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends UpdateTriggerBase<ED, T, Cxt> {
-    when: 'commit',
-    strict?: 'takeEasy' | 'makeSure';
-    fn: (event: { rows: ED[T]['OpSchema'][] }, context: Cxt, option: OperateOption) => Promise<number> | number;
-};
+export interface UpdateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> 
+    extends UpdateTriggerBase<ED, T, Cxt>, TriggerCrossTxn<ED, Cxt> {};
 
 export type UpdateTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = UpdateTriggerInTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt>;
-
 
 /**
  * 同update trigger一样，remove trigger如果带有filter，说明只对存在限定条件的行起作用。此时系统在进行相应动作时，
@@ -99,11 +99,8 @@ export interface RemoveTriggerInTxn<ED extends EntityDict, T extends keyof ED, C
     fn: (event: { operation: ED[T]['Remove'] }, context: Cxt, option: OperateOption) => Promise<number> | number;
 };
 
-export interface RemoveTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends RemoveTriggerBase<ED, T, Cxt> {
-    when: 'commit',
-    strict?: 'takeEasy' | 'makeSure';
-    fn: (event: { rows: ED[T]['OpSchema'][] }, context: Cxt, option: OperateOption) => Promise<number> | number;
-};
+export interface RemoveTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>>
+    extends RemoveTriggerBase<ED, T, Cxt>, TriggerCrossTxn<ED, Cxt> {};
 
 export type RemoveTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = RemoveTriggerInTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;
 
@@ -142,27 +139,4 @@ export interface TriggerEntityShape extends EntityShape {
     $$triggerTimestamp$$?: number;
 };
 
-
-/* export abstract class Executor<ED extends EntityDict, Cxt extends AsyncContext<ED>> {
-    static dataAttr: TriggerDataAttribute = '$$triggerData$$';
-    static timestampAttr: TriggerTimestampAttribute = '$$triggerTimestamp$$';
-
-    abstract registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T>): void;
-
-    abstract preOperation<T extends keyof ED>(
-        entity: T,
-        operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
-        context: Cxt,
-        option: OperateOption | SelectOption
-    ): Promise<void>;
-
-    abstract postOperation<T extends keyof ED>(
-        entity: T,
-        operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
-        context: Cxt,
-        option: OperateOption | SelectOption,
-        result?: SelectRowShape<ED[T]['Schema'], ED[T]['Selection']['data']>[]
-    ): Promise<void>;
-
-    abstract checkpoint(context: Cxt, timestamp: number): Promise<number>;    // 将所有在timestamp之前存在不一致的数据进行恢复
-} */
+export type VolatileTrigger<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = CreateTriggerCrossTxn<ED, T, Cxt> | UpdateTriggerCrossTxn<ED, T, Cxt> | RemoveTriggerCrossTxn<ED, T, Cxt>;

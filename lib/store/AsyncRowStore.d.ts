@@ -1,12 +1,17 @@
 /// <reference types="node" />
-import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult } from "../types";
+import { EntityDict, RowStore, OperateOption, OperationResult, SelectOption, Context, TxnOption, OpRecord, AggregationResult, ClusterInfo } from "../types";
 import { IncomingHttpHeaders } from "http";
+/**
+ * 服务器端执行的异步环境的底层抽象
+ */
 export declare abstract class AsyncContext<ED extends EntityDict> implements Context {
     rowStore: AsyncRowStore<ED, this>;
     private uuid?;
     opRecords: OpRecord<ED>[];
     private scene?;
-    private headers?;
+    headers?: IncomingHttpHeaders;
+    clusterInfo?: ClusterInfo;
+    opResult: OperationResult<ED>;
     private message?;
     events: {
         commit: Array<() => Promise<void>>;
@@ -16,13 +21,14 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
      * 在返回结果前调用，对数据行进行一些预处理，比如将一些敏感的列隐藏
      */
     abstract refineOpRecords(): Promise<void>;
-    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>, headers?: IncomingHttpHeaders);
-    setHeaders(headers: IncomingHttpHeaders): void;
+    constructor(store: AsyncRowStore<ED, AsyncContext<ED>>);
+    restartToExecute(routine: (context: this) => Promise<any>): Promise<void>;
     getHeader(key: string): string | string[] | undefined;
     getScene(): string | undefined;
     setScene(scene?: string): void;
     private resetEvents;
     on(event: 'commit' | 'rollback', callback: () => Promise<void>): void;
+    saveOpRecord<T extends keyof ED>(entity: T, operation: ED[T]['Operation']): void;
     /**
      * 一个context中不应该有并发的事务，这里将事务串行化，使用的时候千万要注意不要自己等自己
      * @param options

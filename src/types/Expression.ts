@@ -42,7 +42,12 @@ interface Ceil<A> {
 interface Pow<A> {
     $pow: [MathType<A>, MathType<A>];
 };
-type MathExpression<A> = Add<A> | Subtract<A> | Multiply<A> | Divide<A> | Abs<A> | Round<A> | Floor<A> | Ceil<A> | Pow<A>;
+interface Mod<A> {
+    $mod: [MathType<A>, MathType<A>];
+}
+
+// 声明再多一个，oak-memory-tree-store的TS编译就过不去了，只能先把可能使用的最少的Pow封掉。by Xc 202300130
+type MathExpression<A> = Add<A> | Subtract<A> | Multiply<A> | Divide<A> | Abs<A> | Round<A> | Floor<A> | Ceil<A> /* | Pow<A> */ | Mod<A>;
 
 // Compare
 type CmpType<A> = RefOrExpression<A> | string | number;
@@ -239,7 +244,7 @@ export function isMathExpression<A>(expression: any): expression is MathExpressi
     if (Object.keys(expression).length == 1) {
         const op = Object.keys(expression)[0];
         if (['$add', '$subtract', '$multiply', '$divide', '$abs', '$pow',
-            '$round', '$floor', '$ceil'].includes(op)) {
+            '$round', '$floor', '$ceil', '$mod'].includes(op)) {
             return true;
         }
     }
@@ -346,6 +351,9 @@ export function execOp(op: string, params: any, obscure?: boolean): ExpressionCo
         }
         case '$ceil': {
             return Math.ceil(params);
+        }
+        case '$mod': {
+            return params[0] % params[1];
         }
         case '$floor': {
             return Math.floor(params);

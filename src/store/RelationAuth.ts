@@ -8,7 +8,7 @@ import { judgeRelation } from "./relation";
 import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
 import { difference, intersection, set, uniq, cloneDeep, groupBy } from '../utils/lodash';
-import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
+import { SYSTEM_RESERVE_ENTITIES } from "../compiler/entities";
 
 
 type OperationTree<ED extends EntityDict & BaseEntityDict> = {
@@ -916,8 +916,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                         if (process.env.NODE_ENV === 'development') {
                             console.warn('对象的select权限被否决，请检查', dlSelections[idx]);
                         }
+                        idx++;
                         return false;
                     }
+                    idx++;
                 }
                 return true;
             };
@@ -1260,12 +1262,12 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                             value: '',
                             $$createAt$$: 1,
                             $$updateAt$$: 1,
-                            $$seq$$: 'temp',
+                            $$seq$$: 123,
                             recursive: false,
                         },
                         $$createAt$$: 1,
                         $$updateAt$$: 1,
-                        $$seq$$: 'temp',
+                        $$seq$$: 123,
                         deActions: [node.action],
                     });
                 }

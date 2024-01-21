@@ -147,7 +147,7 @@ function addFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyo
     for (const attr in oneToManyFilters) {
         const filters2 = oneToManyFilters[attr].map(ele => ele[1]);
         const sqpOps = filters2.map(ele => ele['#sqp'] || 'in');
-        // 只有全部是同一个子查询算子才能实施合并
+        // 只有全部是同一个子查询算子才能实施合并，这里有进一步优化的余地，但是貌似没必要
         if (uniq(sqpOps).length > 1) {
             filters2.forEach(
                 ele => {
@@ -159,19 +159,22 @@ function addFilterSegment<ED extends EntityDict & BaseEntityDict, T extends keyo
         }
         else {
             const sqpOp = sqpOps[0];
-            if (sqpOp === 'not in') {
-                // not in 在此变成or查询
+            if (['not in', 'all'].includes(sqpOp)) {
+                // not in/all 在此可以变成or查询
                 const unioned = unionFilterSegment(oneToManyFilters[attr][0][0], schema, ...filters2);
                 addSingleAttr(attr, Object.assign(unioned!, {
                     ['#sqp']: sqpOp,
                 }));
             }
             else {
-                assert (sqpOp === 'in');        // all 和 not all暂时不会出现
-                const combined = addFilterSegment(oneToManyFilters[attr][0][0], schema, ...filters2);
-                addSingleAttr(attr, Object.assign(combined!, {
-                    ['#sqp']: sqpOp,
-                }));
+                // in/not all是不能合并的，in condition1 and in condition2不等于in (condition1 and condition2)，也不等于in (condition1 or condition2)
+                filters2.forEach(
+                    ele => {
+                        addIntoAnd({
+                            [attr]: ele,
+                        });
+                    }
+                );
             }
         }
     }
@@ -206,7 +209,7 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
             }
             else {
                 pca1s.push(a);
-            } 
+            }
         }
 
         for (const a of attributes2) {
@@ -218,7 +221,7 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
             }
             else {
                 pca2s.push(a);
-            } 
+            }
 
         }
         if (pca1s.length > 1 || pca2s.length > 1) {
@@ -296,13 +299,13 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
      * @param f2 
      * @returns 
      */
-    const tryMergeFilters = (f1: NonNullable<ED[T]['Selection']['filter']>, f2: NonNullable<ED[T]['Selection']['filter']>, justTry?: boolean): boolean => {        
+    const tryMergeFilters = (f1: NonNullable<ED[T]['Selection']['filter']>, f2: NonNullable<ED[T]['Selection']['filter']>, justTry?: boolean): boolean => {
         const pcaResult = possibleCombiningAttrs(f1!, f2!);
-        
+
         if (!pcaResult) {
             return false;
         }
-        const [ pca1, pca2 ] = pcaResult;
+        const [pca1, pca2] = pcaResult;
         if (pca1 === '$or' && pca2 === '$or') {
             // 如果双方都是or，有可能可以交叉合并，如：
             /**
@@ -337,7 +340,7 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
                     if (tryMergeFilters(f11, f21, true)) {
                         success = true;
                         break;
-                    } 
+                    }
                 }
                 if (!success) {
                     return false;
@@ -351,7 +354,7 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
                 for (const f11 of f1[pca2]) {
                     if (tryMergeFilters(f11, f21)) {
                         break;
-                    } 
+                    }
                 }
             }
             return true;
@@ -408,7 +411,7 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
                     Object.assign(f1, {
                         [pca1]: unionFilterSegment(pca1, schema, f1[pca1], f2[pca2]),
                     });
-                    return true;                        
+                    return true;
                 }
                 else if (typeof rel === 'string') {
                     if (justTry) {
@@ -436,7 +439,7 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
                             [pca1]: Object.assign(unionFilterSegment(rel[0], schema, f1[pca1], f2[pca2])!, {
                                 ['#sqp']: sqpOp1,
                             })
-                        });                        
+                        });
 
                     }
                     else {
@@ -459,7 +462,7 @@ function unionFilterSegment<ED extends EntityDict & BaseEntityDict, T extends ke
         if (Object.keys(filter).length === 0) {
             Object.assign(filter, f);
         }
-        else if (filter.$or){
+        else if (filter.$or) {
             filter.$or.push(f);
         }
         else {
@@ -1459,7 +1462,7 @@ function judgeFilterRelation<ED extends EntityDict & BaseEntityDict, T extends k
  * @param contained 
  * @returns 
  */
-export function contains<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+function contains<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     filter: ED[T]['Selection']['filter'],
@@ -1484,7 +1487,7 @@ export function contains<ED extends EntityDict & BaseEntityDict, T extends keyof
  * @param filter 
  * @param conditionalFilter 
  */
-export function repel<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+function repel<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     entity: T,
     schema: StorageSchema<ED>,
     filter1: ED[T]['Selection']['filter'],
@@ -1786,7 +1789,8 @@ export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T ex
     context: Cxt,
     contained: ED[T]['Selection']['filter'],
     filter?: ED[T]['Selection']['filter'],
-    dataCompare?: true): boolean | Promise<boolean> {
+    dataCompare?: true,
+    warningOnDataCompare?: true): boolean | Promise<boolean> {
     if (!filter) {
         throw new OakRowInconsistencyException();
     }
@@ -1797,6 +1801,9 @@ export function checkFilterContains<ED extends EntityDict & BaseEntityDict, T ex
         return result;
     }
     if (dataCompare) {
+        if (warningOnDataCompare) {
+            console.warn(`data compare on ${entity as string}, please optimize`);
+        }
         return checkDeduceFilters(result, context);
     }
     return false;
@@ -1807,7 +1814,8 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
     context: Cxt,
     filter1: ED[T]['Selection']['filter'],
     filter2: ED[T]['Selection']['filter'],
-    dataCompare?: true
+    dataCompare?: true,
+    warningOnDataCompare?: true
 ): boolean | Promise<boolean> {
     if (!filter2) {
         throw new OakRowInconsistencyException();
@@ -1819,9 +1827,37 @@ export function checkFilterRepel<ED extends EntityDict & BaseEntityDict, T exten
         return result;
     }
     if (dataCompare) {
+        if (warningOnDataCompare) {
+            console.warn(`data compare on ${entity as string}, please optimize`);
+        }
         return checkDeduceFilters(result, context);
     }
     return false;
+}
+
+/**
+ * 有的场景下将filter当成非结构化属性存储，又想支持对其查询，此时必须将查询的filter进行转换，处理其中$开头的escape
+ * 只要filter是查询数据的标准子集，查询应当能返回true
+ * @param filter 
+ */
+export function translateFilterToObjectPredicate(filter: Record<string, any>) {
+    const copyInner = (orig: Record<string, any>, dest: Record<string, any>) => {
+        for (const key in orig) {
+            const value = orig[key];
+            const key2 = key.startsWith('$') ? `.${key}` : key;
+
+            if (typeof value === 'object' && !(value instanceof Array)) {
+                dest[key2] = {};
+                copyInner(value, dest[key2]);
+            }
+            else {
+                dest[key2] = value;
+            }
+        }
+    }
+    const translated = {};
+    copyInner(filter, translated);
+    return translated;
 }
 
 /* export function getCascadeEntityFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(

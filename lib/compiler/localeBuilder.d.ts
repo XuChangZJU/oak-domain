@@ -15,6 +15,11 @@ export default class LocaleBuilder {
      * 如果有Dependency需要引出来
      */
     private outputDataFile;
+    /**
+     * 这里不能直接用require, webpack貌似有缓存
+     * @param filepath
+     */
+    private readLocaleFileContent;
     private parseFile;
     private traverse;
     private buildproject;

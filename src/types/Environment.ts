@@ -60,4 +60,41 @@ export type ServerEnv = {
     type: 'server',
 }
 
-export type Environment = WechatMpEnv | WebEnv | ServerEnv;
+// https://reactnative.dev/docs/platform
+// 利用react-native-locale获得languange，和web/mp保持同构
+export type NativeEnv = {
+    constants: {
+        isTesting: boolean;
+        reactNativeVersion: object;
+        Version?: number;
+        Release?: string;
+        Serial?: string;
+        Fingerprint?: string;
+        Model?: string;
+        Brand?: string;
+        Manufacture?: string;
+        ServerHost?: string;
+        uiMode?: 'car' | 'desk' | 'normal' | 'tv' | 'watch' | 'unknown';
+        forceTouchAvailable?: boolean;
+        interfaceIdiom?: string;
+        osVersion?: string;
+        systemName?: string;
+    };
+    isPad: boolean;
+    isTesting: boolean;
+    OS: 'android' | 'ios';
+    Version: number | string;
+    language: string;
+    visitorId: string;
+    type: 'native';
+};
+
+export type Environment = WechatMpEnv | WebEnv | ServerEnv | NativeEnv;
+
+export type BriefEnv = {
+    system: string;
+    brand?: string;
+    model?: string;
+    wechat?: string;
+    explorer?: string;
+};

@@ -1,6 +1,6 @@
 import assert from "assert";
 import {
-    EntityDict, OperateOption, SelectOption, OperationResult, CreateAtAttribute, 
+    EntityDict, OperateOption, SelectOption, OperationResult, CreateAtAttribute,
     UpdateAtAttribute, AggregationResult, DeleteAtAttribute
 } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
@@ -16,7 +16,7 @@ import { getRelevantIds } from "./filter";
 import { CreateSingleOperation as CreateSingleOperOperation } from '../base-app-domain/Oper/Schema';
 import { CreateOperation as CreateModiOperation, UpdateOperation as UpdateModiOperation } from '../base-app-domain/Modi/Schema';
 import { generateNewIdAsync } from "../utils/uuid";
-import { SYSTEM_RESERVE_ENTITIES } from "../compiler/env";
+import { SYSTEM_RESERVE_ENTITIES } from "../compiler/entities";
 
 /**这个用来处理级联的select和update，对不同能力的 */
 export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> extends RowStore<ED> {
@@ -26,16 +26,22 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
     protected abstract supportManyToOneJoin(): boolean;
     protected abstract supportMultipleCreate(): boolean;
 
-    private selectionRewriters: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
-    private operationRewriters: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>[] = [];
+    private selectionRewriters: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>, SelectOption>[] = [];
+    private operationRewriters: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>, OperateOption>[] = [];
 
-    private async reinforceSelectionAsync<Cxt extends AsyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {
+    private async reinforceSelectionAsync<Cxt extends AsyncContext<ED>, Op extends SelectOption>(
+        entity: keyof ED,
+        selection: ED[keyof ED]['Selection'] | ED[keyof ED]['Aggregation'],
+        context: Cxt,
+        option: Op,
+        isAggr?: true) {
 
-
-        this.reinforceSelectionInner(entity, selection, context);
+        if (!isAggr && !selection.distinct) {
+            this.reinforceSelectionInner(entity, selection, context);
+        }
 
         const rewriterPromises = this.selectionRewriters.map(
-            ele => ele(this.getSchema(), entity, selection, context)
+            ele => ele(this.getSchema(), entity, selection, context, option, isAggr)
         );
 
         if (rewriterPromises.length > 0) {
@@ -43,21 +49,29 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         }
     }
 
-    private reinforceSelectionSync<Cxt extends SyncContext<ED>, OP extends SelectOption>(entity: keyof ED, selection: ED[keyof ED]['Selection'], context: Cxt, option: OP) {
-        this.reinforceSelectionInner(entity, selection, context);
+    private reinforceSelectionSync<Cxt extends SyncContext<ED>, Op extends SelectOption>(
+        entity: keyof ED,
+        selection: ED[keyof ED]['Selection'],
+        context: Cxt,
+        option: Op,
+        isAggr?: true
+    ) {
+        if (!isAggr && !selection.distinct) {
+            this.reinforceSelectionInner(entity, selection, context);
+        }
 
         this.selectionRewriters.forEach(
             ele => {
-                const result = ele(this.getSchema(), entity, selection, context);
+                const result = ele(this.getSchema(), entity, selection, context, option);
                 assert(!(result instanceof Promise));
             }
         );
     }
 
-    private reinforceSelectionInner<Cxt extends AsyncContext<ED> | SyncContext<ED>, OP extends SelectOption>(
+    private reinforceSelectionInner<Cxt extends AsyncContext<ED> | SyncContext<ED>>(
         entity: keyof ED,
-        selection: ED[keyof ED]['Selection'],
-        context: Cxt
+        selection: ED[keyof ED]['Selection'] | ED[keyof ED]['Aggregation'],
+        context: Cxt,
     ) {
         const { filter, data, sorter } = selection;
 
@@ -171,7 +185,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
         const checkSorterNode = (
             entity2: keyof ED,
-            sorterNode: NonNullable<ED[keyof ED]['Selection']['sorter']>,
+            sorterNode: ED[keyof ED]['Selection']['sorter'],
             projectionNode: ED[keyof ED]['Selection']['data']) => {
 
             const checkSortAttr = (e2: keyof ED, sortAttr: Record<string, any>, projNode: ED[keyof ED]['Selection']['data']) => {
@@ -202,7 +216,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     }
                 }
             }
-            sorterNode.forEach(
+            sorterNode!.forEach(
                 (node) => {
                     const { $attr } = node;
                     checkSortAttr(entity2, $attr, projectionNode);
@@ -366,17 +380,21 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
     }
 
-    private async reinforceOperation<Cxt extends AsyncContext<ED>>(entity: keyof ED, operation: ED[keyof ED]['Operation'], context: Cxt) {
+    private async reinforceOperation<Cxt extends AsyncContext<ED>, Op extends OperateOption>(
+        entity: keyof ED,
+        operation: ED[keyof ED]['Operation'],
+        context: Cxt,
+        option: Op) {
         await Promise.all(this.operationRewriters.map(
-            ele => ele(this.getSchema(), entity, operation, context)
+            ele => ele(this.getSchema(), entity, operation, context, option)
         ));
     }
 
-    public registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>>) {
+    public registerOperationRewriter(rewriter: OperationRewriter<ED, AsyncContext<ED> | SyncContext<ED>, OperateOption>) {
         this.operationRewriters.push(rewriter);
     }
 
-    public registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>>) {
+    public registerSelectionRewriter(rewriter: SelectionRewriter<ED, AsyncContext<ED> | SyncContext<ED>, SelectOption>) {
         this.selectionRewriters.push(rewriter);
     }
 
@@ -398,19 +416,26 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]>;
 
+    protected abstract countAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        selection: Pick<ED[T]['Selection'], 'filter' | 'count'>,
+        context: Cxt,
+        option: OP
+    ): Promise<number>;
+
     protected abstract updateAbjointRowAsync<T extends keyof ED, OP extends OperateOption, Cxt extends AsyncContext<ED>>(
         entity: T,
         operation: ED[T]['Create'] | ED[T]['Update'] | ED[T]['Remove'],
         context: Cxt,
         option: OP): Promise<number>;
 
-    protected abstract aggregateSync<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
+    protected abstract aggregateAbjointRowSync<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
         entity: T,
         aggregation: ED[T]['Aggregation'],
         context: Cxt,
         option: OP): AggregationResult<ED[T]['Schema']>;
 
-    protected abstract aggregateAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+    protected abstract aggregateAbjointRowAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
         entity: T,
         aggregation: ED[T]['Aggregation'],
         context: Cxt,
@@ -661,7 +686,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             }
             else {
                 assert(relation instanceof Array);
-                const { data: subProjection, filter: subFilter, indexFrom, count, sorter: subSorter } = projection2[attr];
+                const { data: subProjection, filter: subFilter, indexFrom, count, sorter: subSorter, total, randomRange } = projection2[attr];
                 const [entity2, foreignKey] = relation;
                 const isAggr = attr.endsWith('$$aggr');
 
@@ -745,6 +770,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             data: subProjection,
                             filter: filter2,
                             sorter: subSorter,
+                            total,
                         }, context, option);
                         if (subRows instanceof Promise) {
                             return subRows.then(
@@ -777,7 +803,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     filter: filter2,
                                     sorter: subSorter,
                                     indexFrom,
-                                    count
+                                    count,
+                                    total,
+                                    randomRange,
                                 }, context, option);
                                 if (subRows instanceof Promise) {
                                     return subRows.then(
@@ -877,12 +905,14 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             assert(!option2.modiParentId && !option2.modiParentEntity);
             if (action === 'create') {
                 option2.modiParentId = data.id;
+                option2.modiParentEntity = entity as string;
             }
-            else {
-                assert(filter?.id && typeof filter.id === 'string');
+            else if (filter?.id && typeof filter.id === 'string'){
+                // 如果是对toModi对象进行cascadeUpdate操作，必然带有id，如果没有则认为不是modi相关的操作
+                // 批量通过或者拒绝applyment应该就会出现
                 option2.modiParentId = filter.id;
+                option2.modiParentEntity = entity as string;
             }
-            option2.modiParentEntity = entity as string;
         }
         for (const attr in data) {
             const relation = judgeRelation(this.storageSchema, entity, attr);
@@ -1241,7 +1271,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['CreateSingle'] | ED[T]['Update'] | ED[T]['Remove'],
         context: Cxt,
         option: OP
-    ) {
+    ): Promise<OperationResult<ED>> {
         const { data, action, id: operId, filter } = operation;
         const now = Date.now();
 
@@ -1269,14 +1299,18 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     const closeRootMode = context.openRootMode();
                     await this.cascadeUpdateAsync('modi', modiCreate, context, option);
                     closeRootMode();
-                    return 1;
+                    return {
+                        'modi': {
+                            create: 1,
+                        }
+                    } as OperationResult<ED>;
                 }
                 else {
                     this.preProcessDataCreated(entity, data as ED[T]['Create']['data']);
                     let result = 0;
                     const createInner = async (operation2: ED[T]['Create']) => {
                         try {
-                            result += await this.updateAbjointRowAsync(
+                            await this.updateAbjointRowAsync(
                                 entity,
                                 operation2,
                                 context,
@@ -1352,6 +1386,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     };
 
                     if (data instanceof Array) {
+                        result = data.length;
                         const multipleCreate = this.supportMultipleCreate();
                         if (multipleCreate) {
                             await createInner(operation as ED[T]['Create']);
@@ -1368,15 +1403,17 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         }
                     }
                     else {
+                        result = 1;
                         await createInner(operation as ED[T]['Create']);
                     }
 
                     if (!option.dontCollect) {
-                        context.opRecords.push({
+                        context.saveOpRecord(entity, operation);
+                        /* context.opRecords.push({
                             a: 'c',
                             e: entity,
                             d: data as ED[T]['OpSchema'] | ED[T]['OpSchema'][],
-                        });
+                        }); */
                     }
                     if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
                         // 按照框架要求生成Oper和OperEntity这两个内置的对象
@@ -1423,7 +1460,11 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             closeRootMode();
                         }
                     }
-                    return result!;
+                    return {
+                        [entity]: {
+                            ['create' as ED[T]['Action']]: result,
+                        }
+                    } as OperationResult<ED>;
                 }
             }
             default: {
@@ -1531,7 +1572,11 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     const closeRootMode = context.openRootMode();
                     await this.cascadeUpdateAsync('modi', modiUpsert!, context, option);
                     closeRootMode();
-                    return 1;
+                    return {
+                        modi: {
+                            ['create' as ED['modi']['Action']]: 1,
+                        },
+                    };
                 }
                 else {
                     const createOper = async () => {
@@ -1571,7 +1616,17 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     };
                     if (action === 'remove') {
                         if (!option.dontCollect) {
-                            context.opRecords.push({
+                            context.saveOpRecord(entity, {
+                                id: operId,
+                                action,
+                                data: {},
+                                filter: {
+                                    id: {
+                                        $in: ids,
+                                    }
+                                }
+                            });
+                            /* context.opRecords.push({
                                 a: 'r',
                                 e: entity,
                                 f: {
@@ -1579,7 +1634,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         $in: ids,
                                     }
                                 },
-                            });
+                            }); */
                         }
                     }
                     else {
@@ -1590,7 +1645,17 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                 $$updateAt$$: now,
                             });
                             if (!option.dontCollect) {
-                                context.opRecords.push({
+                                context.saveOpRecord(entity, {
+                                    id: operId,
+                                    action,
+                                    data: data as ED[T]['Update']['data'],
+                                    filter: {
+                                        id: {
+                                            $in: ids,
+                                        }
+                                    },
+                                });
+                                /* context.opRecords.push({
                                     a: 'u',
                                     e: entity,
                                     d: data as ED[T]['Update']['data'],
@@ -1599,23 +1664,27 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             $in: ids,
                                         }
                                     },
-                                });
+                                }); */
                             }
                         }
                         else if (action !== 'update') {
                             // 如果不是update动作而是用户自定义的动作，这里还是要记录oper
                             await createOper();
-                            return 0;
+                            return {};
                         }
                         else {
-                            return 0;
+                            return {};
                         }
                     }
 
-                    const result = await this.updateAbjointRowAsync(entity, operation, context, option);
+                    await this.updateAbjointRowAsync(entity, operation, context, option);
                     await createOper();
 
-                    return result;
+                    return {
+                        [entity]: {
+                            [action as ED[T]['Action']]: ids.length,
+                        }
+                    } as OperationResult<ED>;
                 }
             }
         }
@@ -1762,9 +1831,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         option: OP): Promise<OperationResult<ED>> {
         const { action, data, filter, id } = operation;
         let opData: any;
-        const wholeBeforeFns: Array<() => Promise<any>> = [];
-        const wholeAfterFns: Array<() => Promise<any>> = [];
-        const result: OperationResult<ED> = {};
+        const wholeBeforeFns: Array<() => Promise<OperationResult<ED>>> = [];
+        const wholeAfterFns: Array<() => Promise<OperationResult<ED>>> = [];
 
         if (['create', 'create-l'].includes(action) && data instanceof Array) {
             opData = [];
@@ -1802,17 +1870,16 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 data: opData as ED[T]['OpSchema'],
             });
 
+        let result: OperationResult<ED> = {};
         for (const before of wholeBeforeFns) {
-            await before();
+            const result2 = await before();
+            result = this.mergeMultipleResults([result, result2]);
         }
-        const count = await this.doUpdateSingleRowAsync(entity, operation2, context, option);
-        this.mergeOperationResult(result, {
-            [entity]: {
-                [operation2.action]: count,
-            }
-        } as OperationResult<ED>);
+        const resultMe = await this.doUpdateSingleRowAsync(entity, operation2, context, option);
+        result = this.mergeMultipleResults([result, resultMe]);
         for (const after of wholeAfterFns) {
-            await after();
+            const result2 = await after();
+            result = this.mergeMultipleResults([result, result2]);
         }
         return result;
     }
@@ -1822,7 +1889,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Partial<ED[T]['Schema']>[] {
-        const { data, filter, indexFrom, count, sorter } = selection;
+        const { data, filter, indexFrom, count, sorter, distinct } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
             data,
@@ -1836,7 +1903,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             filter,
             indexFrom,
             count,
-            sorter
+            sorter,
+            distinct
         }, context, option);
 
 
@@ -1920,8 +1988,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             if (entityBranch) {
                 rows.forEach(
                     (row) => {
-                        if (row) {
-                            assert(row.id);
+                        if (row && row.id) {    // 如果没有row.id就不加入结果集了
                             const { id } = row;
                             if (!entityBranch![id!]) {
                                 Object.assign(entityBranch!, {
@@ -1966,7 +2033,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         selection: ED[T]['Selection'],
         context: Cxt,
         option: OP): Promise<Partial<ED[T]['Schema']>[]> {
-        const { data, filter, indexFrom, count, sorter } = selection;
+        const { data, filter, indexFrom, count, sorter, total, randomRange, distinct } = selection;
         const { projection, cascadeSelectionFns } = this.destructCascadeSelect(
             entity,
             data,
@@ -1975,14 +2042,31 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             this.aggregateAsync,
             option);
 
-        const rows = await this.selectAbjointRowAsync(entity, {
+        const rows2 = await this.selectAbjointRowAsync(entity, {
             data: projection,
             filter,
             indexFrom,
-            count,
+            distinct,
+            count: randomRange || count,
             sorter
         }, context, option);
 
+        // 处理随机取值
+        let rows = !randomRange ? rows2 : [];
+        if (randomRange) {
+            const possibility = count! / rows2.length;
+            let reduced = rows2.length - count!;
+            rows = rows2.filter(
+                () => {
+                    const rand = Math.random();
+                    if (rand > possibility && reduced) {
+                        reduced--;
+                        return false;
+                    }
+                    return true;
+                }
+            );
+        }
 
         if (!option.dontCollect) {
             this.addToResultSelections(entity, rows, context);
@@ -2017,7 +2101,36 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             }
         }
 
+        if (total) {
+            const total2 = await this.countAsync(entity, {
+                filter: selection.filter,
+                count: total,
+            }, context, option);
+            Object.assign(rows, {
+                '#total': total2,
+            });
+        }
         return rows;
+    }
+
+    protected async aggregateAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
+        entity: T,
+        aggregation: ED[T]['Aggregation'],
+        context: Cxt,
+        option: OP
+    ): Promise<AggregationResult<ED[T]['Schema']>> {
+        await this.reinforceSelectionAsync(entity, aggregation, context, option, true);
+        return this.aggregateAbjointRowAsync(entity, aggregation, context, option);
+    }
+
+    protected aggregateSync<T extends keyof ED, OP extends SelectOption, Cxt extends SyncContext<ED>>(
+        entity: T,
+        aggregation: ED[T]['Aggregation'],
+        context: Cxt,
+        option: OP
+    ): AggregationResult<ED[T]['Schema']> {
+        this.reinforceSelectionSync(entity, aggregation, context, option, true);
+        return this.aggregateAbjointRowSync(entity, aggregation, context, option);
     }
 
     protected async selectAsync<T extends keyof ED, OP extends SelectOption, Cxt extends AsyncContext<ED>>(
@@ -2053,7 +2166,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): Promise<OperationResult<ED>> {
-        await this.reinforceOperation(entity, operation, context);
+        await this.reinforceOperation(entity, operation, context, option);
         return this.cascadeUpdateAsync(entity, operation, context, option);
     }
 }

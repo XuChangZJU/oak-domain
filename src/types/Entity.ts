@@ -1,3 +1,4 @@
+import { OneOf } from '.';
 import { ReadOnlyAction } from '../actions/action';
 import { PrimaryKey, Sequence } from './DataType';
 
@@ -76,6 +77,8 @@ export type Selection<A extends ReadOnlyAction,
         sorter?: S;
     } & FilterPart<A, F> & {
         randomRange?: number;
+        total?: number;
+        distinct?: true;
     };
 
 export interface EntityShape {
@@ -121,9 +124,10 @@ export type AggregationOp = `#max-${number}` | `#min-${number}` | `#avg-${number
 
 export type DeduceAggregationData<P extends Projection> = {
     [A in AggregationOp]?: P;
-} & {
+} & OneOf<{
+    distinct?: true;
     '#aggr'?: P;
-};
+}>;
 
 export type AggregationResult<SH extends GeneralEntityShape> = Array<{
     [A in AggregationOp]?: number | string;
@@ -186,12 +190,14 @@ export type RemoveOperation = Operation<'remove', RemoveOperationData, Filter, S
 export type CUDOperation = CreateOperation | UpdateOperation | RemoveOperation;
 
 export type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
+    id?: string;
     a: 'c';
     e: T;
     d: ED[T]['OpSchema'] | ED[T]['OpSchema'][];
 };
 
 export type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
+    id?: string;
     a: 'u',
     e: T;
     d: UpdateOperationData;
@@ -199,6 +205,7 @@ export type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
 };
 
 export type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
+    id?: string;
     a: 'r',
     e: T;
     f?: Filter;
