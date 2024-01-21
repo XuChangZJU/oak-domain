@@ -135,24 +135,28 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     async commit(): Promise<void> {
         if (this.uuid) {
             await this.rowStore.commit(this.uuid!);
-            this.uuid = undefined;
             const { commit: commitEvents } = this.events;
-            this.resetEvents();
             for (const e of commitEvents) {
                 await e();
             }
+            this.uuid = undefined;
+            this.resetEvents();
+            this.opRecords = [];
+            this.opResult = {};
+            this.message = '';
         }
     }
     async rollback(): Promise<void> {
         if (this.uuid) {
             await this.rowStore.rollback(this.uuid!);
-            // console.log('rollback', this.uuid);
-            this.uuid = undefined;
             const { rollback: rollbackEvents } = this.events;
-            this.resetEvents();
             for (const e of rollbackEvents) {
                 await e();
             }
+            this.uuid = undefined;
+            this.opRecords = [];
+            this.opResult = {};
+            this.resetEvents();
         }
     }
 

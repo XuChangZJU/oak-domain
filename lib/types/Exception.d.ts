@@ -84,12 +84,20 @@ export declare class OakAttrNotNullException<ED extends EntityDict> extends OakI
 /**
  * 用户权限不够时抛的异常
  */
-export declare class OakUserUnpermittedException<ED extends EntityDict> extends OakUserException<ED> {
+export declare class OakUserUnpermittedException<ED extends EntityDict, T extends keyof ED> extends OakUserException<ED> {
+    private entity;
+    private operation;
+    constructor(entity: T, operation: ED[T]['Selection'] | ED[T]['Operation'], message?: string);
+    toString(): string;
 }
 /**
  * 用户查询权限不够抛出异常
  */
-export declare class OakUserInvisibleException<ED extends EntityDict> extends OakUserException<ED> {
+export declare class OakUserInvisibleException<ED extends EntityDict, T extends keyof ED> extends OakUserException<ED> {
+    private entity;
+    private operation;
+    constructor(entity: T, operation: ED[T]['Selection'] | ED[T]['Operation'], message?: string);
+    toString(): string;
 }
 /**
  * 用户未登录抛的异常

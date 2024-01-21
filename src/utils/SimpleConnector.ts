@@ -83,7 +83,7 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
             });
         } catch (err) {
             // fetch返回异常一定是网络异常
-            throw new OakNetworkException();
+            throw new OakNetworkException(`请求[${this.serverAspectUrl}]，发生网络异常`);
         }
         if (response.status > 299) {
             const err = new OakServerProxyException(
