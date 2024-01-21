@@ -81,22 +81,22 @@ export default class LocaleBuilder {
         ];
 
         // 改为在初始化时合并
-       /*  if (this.dependencies) {
-            this.dependencies.forEach(
-                (ele, idx) => statements.push(
-                    factory.createImportDeclaration(
-                        undefined,
-                        factory.createImportClause(
-                            false,
-                            factory.createIdentifier(`i18ns${idx}`),
-                            undefined
-                        ),
-                        factory.createStringLiteral(`${ele}/lib/data/i18n`),
-                        undefined
-                    )
-                )
-            )
-        } */
+        /*  if (this.dependencies) {
+             this.dependencies.forEach(
+                 (ele, idx) => statements.push(
+                     factory.createImportDeclaration(
+                         undefined,
+                         factory.createImportClause(
+                             false,
+                             factory.createIdentifier(`i18ns${idx}`),
+                             undefined
+                         ),
+                         factory.createStringLiteral(`${ele}/lib/data/i18n`),
+                         undefined
+                     )
+                 )
+             )
+         } */
 
         statements.push(
             factory.createVariableStatement(
@@ -179,13 +179,13 @@ export default class LocaleBuilder {
             );
         }
         else { */
-            statements.push(
-                factory.createExportAssignment(
-                    undefined,
-                    undefined,
-                    factory.createIdentifier("i18ns")
-                )
-            );
+        statements.push(
+            factory.createExportAssignment(
+                undefined,
+                undefined,
+                factory.createIdentifier("i18ns")
+            )
+        );
         /* } */
 
         const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
@@ -243,20 +243,38 @@ export default class LocaleBuilder {
         );
     }
 
-    private buildproject(root: string, src?: boolean, watch?: boolean) {
+    private buildProject(root: string, src?: boolean, watch?: boolean) {
         const packageJson = join(root, 'package.json');
         const { name } = require(packageJson);
-        const pagePath = join(src ? 'src' : 'lib', 'pages');
-        if (fs.existsSync(pagePath)) {
-            this.traverse(name, 'p', pagePath, join(root, pagePath), false, 'locales', watch);
-        }
-        
-        const componentPath = join(src ? 'src' : 'lib', 'components');
-        if (fs.existsSync(componentPath)) {
-            this.traverse(name, 'c', componentPath, join(root, componentPath), false, 'locales', watch);           
+        const pagePath = join(src ? 'src' : 'es', 'pages');
+        const pageAbsolutePath = join(root, pagePath);//编译i18时font中的componentPath缺少根目录导致编译不出
+        if (fs.existsSync(pageAbsolutePath)) {
+            this.traverse(
+                name,
+                'p',
+                pagePath,
+                pageAbsolutePath,
+                false,
+                'locales',
+                watch
+            );
         }
 
-        const localePath = join(root, src ? 'src' : 'lib', 'locales');
+        const componentPath = join(src ? 'src' : 'es', 'components');
+        const componentAbsolutePath = join(root, componentPath);
+        if (fs.existsSync(componentAbsolutePath)) {
+            this.traverse(
+                name,
+                'c',
+                componentPath,
+                componentAbsolutePath,
+                false,
+                'locales',
+                watch
+            );
+        }
+
+        const localePath = join(root, src ? 'src' : 'es', 'locales');
         if (fs.existsSync(localePath)) {
             const files = fs.readdirSync(localePath);
             files.forEach(
@@ -300,11 +318,11 @@ export default class LocaleBuilder {
     }
 
     build(watch?: boolean) {
-        this.buildproject(this.pwd, true, watch);
+        this.buildProject(this.pwd, true, watch);
         if (!this.asLib) {
             // 如果不是lib，把front里的数据也处理掉
             const fbPath = join(this.pwd, 'node_modules', 'oak-frontend-base');
-            this.buildproject(fbPath, false, watch)
+            this.buildProject(fbPath, false, watch);
         }
         this.outputDataFile();
     }

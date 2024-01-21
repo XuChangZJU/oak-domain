@@ -14,6 +14,13 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
     });
     checkRelationSync<T extends keyof ED, Cxt extends SyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): void;
     checkRelationAsync<T extends keyof ED, Cxt extends AsyncContext<ED>>(entity: T, operation: Omit<ED[T]['Operation'] | ED[T]['Selection'], 'id'>, context: Cxt): Promise<void>;
+    /**
+     * 检查当前用户有无权限对filter约束的userRelation进行action操作
+     * @param context
+     * @param action
+     * @param filter
+     * @returns
+     */
     private checkUserRelation;
     private checkOperateSpecialEntities2;
     private getDeducedEntityFilters;

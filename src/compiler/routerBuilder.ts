@@ -175,6 +175,7 @@ function makeWebAllRouters(namespaceDir: string, projectDir: string, routerFileD
                         }
                     }
                 }
+                let firstPage;
                 const children = Object.values(pages).filter(
                     (ele) => ele.hasWeb
                 ).map(
@@ -227,12 +228,17 @@ function makeWebAllRouters(namespaceDir: string, projectDir: string, routerFileD
                             )
                         ];
                         if (first2 === path) {
-                            properties.push(
+                            const firstProperties = [...properties];
+                            firstProperties.push(
                                 factory.createPropertyAssignment(
                                     'isFirst',
                                     factory.createTrue()
                                 )
-                            )
+                            );
+                            firstPage = factory.createObjectLiteralExpression(
+                                firstProperties,
+                                true
+                            );
                         }
                         return factory.createObjectLiteralExpression(
                             properties,
@@ -240,6 +246,9 @@ function makeWebAllRouters(namespaceDir: string, projectDir: string, routerFileD
                         );
                     }
                 );
+                if (firstPage) {
+                    children.push(firstPage);
+                }
 
                 if (notFound2) {
                     children.push(
