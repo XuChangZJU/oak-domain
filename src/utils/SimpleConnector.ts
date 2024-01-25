@@ -62,8 +62,8 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         this.makeException = makeException;
     }
 
-    async callAspect(name: string, params: any, context: FrontCxt) {
-        const cxtStr = context.toString();
+    async callAspect(name: string, params: any, context?: FrontCxt) {
+        const cxtStr = context ? await context.toString() : '{}';
 
         const { contentType, body } = makeContentTypeAndBody(params);
         let response: Response;

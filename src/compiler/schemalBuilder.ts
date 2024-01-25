@@ -1,8 +1,8 @@
 import PathLib from 'path';
 import assert from 'assert';
-import { writeFileSync, readdirSync, mkdirSync, fstat } from 'fs';
+import { writeFileSync, readdirSync, mkdirSync, existsSync } from 'fs';
 import { emptydirSync } from 'fs-extra';
-import { assign, cloneDeep, difference, identity, intersection, keys, pull, uniq, uniqBy, flatten } from 'lodash';
+import { assign, cloneDeep, difference, identity, intersection, keys, pull, uniq, uniqBy, flatten, result } from 'lodash';
 import * as ts from 'typescript';
 const { factory } = ts;
 import {
@@ -31,8 +31,9 @@ const Schema: Record<string, {
     actionType: string;
     static: boolean;
     inModi: boolean;
-    hasRelationDef: false | ts.TypeAliasDeclaration;
-    additionalImports: ts.ImportDeclaration[],
+    relations: false | string[];
+    extendsFrom: string[];
+    importAttrFrom: Record<string, [string, string | undefined]>;
 }> = {};
 const OneToMany: Record<string, Array<[string, string, boolean]>> = {};
 const ManyToOne: Record<string, Array<[string, string, boolean]>> = {};
@@ -101,7 +102,10 @@ const ActionAsts: {
     [module: string]: {
         statements: Array<ts.Statement>;
         sourceFile: ts.SourceFile;
-        importedFrom: Record<string, ts.ImportDeclaration | 'local'>;
+        // importedFrom: Record<string, ts.ImportDeclaration | 'local'>;
+        importStateFrom: Record<string, [string, string | undefined]>;        // key为importSpecifier.name, value为[moduleSpecifier, importSpecifier.propertyName]
+        importActionFrom: Record<string, [string, string | undefined]>;
+        importActionDefFrom: Record<string, [string, string | undefined]>;
         // actionNames: string[];
         actionDefNames: string[];
     };
@@ -216,7 +220,9 @@ function pushStatementIntoActionAst(
             [moduleName]: {
                 statements: [...ActionImportStatements(), node],
                 sourceFile,
-                importedFrom: {},
+                importActionFrom: {},
+                importStateFrom: {},
+                importActionDefFrom: {},
                 // actionNames,
                 actionDefNames: actionDefName ? [actionDefName] : [],
             }
@@ -224,9 +230,12 @@ function pushStatementIntoActionAst(
     }
 }
 
-function pushStatementIntoSchemaAst(moduleName: string, statement: ts.Statement, sourceFile: ts.SourceFile) {
+function pushStatementIntoSchemaAst(moduleName: string, statement: ts.Statement, sourceFile?: ts.SourceFile) {
     if (SchemaAsts[moduleName]) {
         SchemaAsts[moduleName].statements.push(statement);
+        if (!SchemaAsts[moduleName].sourceFile && sourceFile) {
+            SchemaAsts[moduleName].sourceFile = sourceFile;
+        }
     }
     else {
         assign(SchemaAsts, {
@@ -272,62 +281,168 @@ function checkStringLiteralLegal(filename: string, obj: string, text: string, el
     return ele.literal.text;
 }
 
-function addActionSource(moduleName: string, name: ts.Identifier, node: ts.ImportDeclaration) {
+function addImportedFrom(moduleName: string, name: string, node: ts.ImportDeclaration | './') {
     const ast = ActionAsts[moduleName];
-    const { moduleSpecifier } = node;
 
-    // todo 目前应该只会引用oak-domain/src/actions/action里的公共action，未来如果有交叉引用这里代码要修正（如果domain中也有引用action_constants这里应该也会错）
-    assert(ts.isStringLiteral(moduleSpecifier) && moduleSpecifier.text === ACTION_CONSTANT_IN_OAK_DOMAIN());
-    assign(ast.importedFrom, {
-        [name.text]: node,
-    });
+    let importFrom = typeof node === 'string' ? node : '';
+    let propertyName: string | undefined;
+    if (typeof node === 'object') {
+        const { moduleSpecifier, importClause } = node;
+        assert(ts.isStringLiteral(moduleSpecifier));
+        assert(importClause);
+        const { namedBindings } = importClause;
+        assert(namedBindings);
+        assert(ts.isNamedImports(namedBindings));
+        const importSpecifier = namedBindings.elements.find(
+            (ele) => ele.name.text === name
+        );
+        assert(importSpecifier);
+        propertyName = importSpecifier.propertyName && importSpecifier.propertyName.text;
+
+        importFrom = moduleSpecifier.text;
+    }
+
+
+    if (name.endsWith('Action')) {
+        assign(ast.importActionFrom, {
+            [name]: [importFrom, propertyName],
+        });
+    }
+    else if (name.endsWith('ActionDef')) {
+        assign(ast.importActionDefFrom, {
+            [name]: [importFrom, propertyName],
+        });
+    }
+    else {
+        assert(name.endsWith("State"));
+        assign(ast.importStateFrom, {
+            [name]: [importFrom, propertyName],
+        });
+    }
 }
 
-function getStringTextFromUnionStringLiterals(moduleName: string, filename: string, node: ts.TypeReferenceNode, program: ts.Program) {
+
+function analyzeExternalAttrImport(
+    node: ts.TypeReferenceNode,
+    program: ts.Program,
+    importAttrFrom: Record<string, [string, string | undefined]>,
+    relativePath?: string
+) {
     const checker = program.getTypeChecker();
     const symbol = checker.getSymbolAtLocation(node.typeName);
     let declaration = symbol?.getDeclarations()![0]!;
-    let isImport = false;
+    /* const typee = checker.getDeclaredTypeOfSymbol(symbol!);
+ 
+    const declaration = typee.aliasSymbol!.getDeclarations()![0]; */
+    if (ts.isImportSpecifier(declaration)) {
+        const name = declaration.name.text;
+        const importDeclartion = declaration.parent.parent.parent;
+        assert(ts.isImportDeclaration(importDeclartion));
+        const { moduleSpecifier, importClause } = importDeclartion;
+        assert(ts.isStringLiteral(moduleSpecifier));
+        assert(importClause);
+        const { namedBindings } = importClause;
+        assert(namedBindings);
+        assert(ts.isNamedImports(namedBindings));
+        const importSpecifier = namedBindings.elements.find(
+            (ele) => ele.name.text === name
+        );
+        assert(importSpecifier);
+        const propertyName = importSpecifier.propertyName && importSpecifier.propertyName.text;
+
+        const importFrom = moduleSpecifier.text;
+        const importFromRelatively = importFrom.startsWith('.') ? (relativePath
+            ? PathLib.join(
+                relativePath,
+                importFrom
+            ).replace(/\\/g, '/')
+            : PathLib.join(
+                '..',
+                importFrom
+            ).replace(/\\/g, '/')) : importFrom;
+
+        assign(importAttrFrom, {
+            [name]: [importFromRelatively, propertyName],
+        });
+    }
+    else if (ts.isTypeAliasDeclaration(declaration)) {
+        const traverseTsAst = (node: ts.Node) => {
+            // 递归遍历每个节点
+            ts.forEachChild(node, (child) => {
+                if (ts.isTypeReferenceNode(child)) {
+                    analyzeExternalAttrImport(child, program, importAttrFrom, relativePath);
+                }
+                else {
+                    traverseTsAst(child);
+                }
+            });
+        };
+        traverseTsAst(declaration);
+    }
+}
+
+function tryGetStringLiteralValues(
+    moduleName: string,
+    filename: string,
+    obj: string,
+    node: ts.TypeReferenceNode,
+    program: ts.Program
+) {
+    const checker = program.getTypeChecker();
+    const symbol = checker.getSymbolAtLocation(node.typeName);
+    let declaration = symbol?.getDeclarations()![0]!;
     /* const typee = checker.getDeclaredTypeOfSymbol(symbol!);
 
     const declaration = typee.aliasSymbol!.getDeclarations()![0]; */
+    const values = [] as string[];
     if (ts.isImportSpecifier(declaration)) {
-        isImport = true;
         const typee = checker.getDeclaredTypeOfSymbol(symbol!);
-        declaration = typee.aliasSymbol!.getDeclarations()![0];
+        if (typee.isStringLiteral()) {
+            values.push(typee.value);
+        }
+        else if (typee.isUnion()) {
+            values.push(
+                ...(typee.types.map(
+                    ele => {
+                        if (ele.isStringLiteral()) {
+                            return ele.value;
+                        }
+                    }
+                ).filter(
+                    ele => !!ele
+                ) as string[])
+            );
+        }
+
+        if (['state', 'action'].includes(obj)) {
+            assert(values.length > 0);
+            const importDeclartion = declaration.parent.parent.parent;
+
+            assert(ts.isImportDeclaration(importDeclartion));
+            addImportedFrom(moduleName, declaration.name.text, importDeclartion);
+        }
+    }
+    else if (ts.isTypeAliasDeclaration(declaration)) {
+        // 本地定义的type
+        const { name, type } = declaration;
+
+        if (ts.isUnionTypeNode(type)) {
+            values.push(...type.types!.map(
+                ele => checkStringLiteralLegal(filename, obj, (<ts.Identifier>name).text, ele)
+            ));
+        }
+        else if (ts.isLiteralTypeNode(type!)) {
+            const action = checkStringLiteralLegal(filename, obj, (<ts.Identifier>name).text, type);
+            values.push(action);
+        }
+        if (['state', 'action'].includes(obj)) {
+            assert(values.length > 0);
+            const ast = ActionAsts[moduleName];
+            addImportedFrom(moduleName, declaration.name.text, './');
+        }
     }
 
-    assert(ts.isTypeAliasDeclaration(declaration));
-    const { type, name } = declaration;
-    // assert(ts.isUnionTypeNode(type!) || ts.isLiteralTypeNode(type!), `${filename}中引用的action「${(<ts.Identifier>name).text}」的定义不是union和stringLiteral类型`);
-
-    // 如果这个action是从外部导入的，在这里要记下来此entity和这个导入之间的关系
-    if (isImport) {
-        const importDeclartion = symbol!.getDeclarations()![0]!.parent.parent.parent;
-
-        assert(ts.isImportDeclaration(importDeclartion));
-        addActionSource(moduleName, name, importDeclartion);
-    }
-    else {
-        const ast = ActionAsts[moduleName];
-        assign(ast.importedFrom, {
-            [name.text]: 'local',
-        });
-    }
-
-
-    if (ts.isUnionTypeNode(type)) {
-        const actions = type.types!.map(
-            ele => checkStringLiteralLegal(filename, 'action', (<ts.Identifier>name).text, ele)
-        );
-
-        return actions;
-    }
-    else {
-        assert(ts.isLiteralTypeNode(type!), `${filename}中引用的action「${(<ts.Identifier>name).text}」的定义不是union和stringLiteral类型`);
-        const action = checkStringLiteralLegal(filename, 'action', (<ts.Identifier>name).text, type);
-        return [action];
-    }
+    return values;
 }
 
 const RESERVED_ACTION_NAMES = ['GenericAction', 'ParticularAction', 'ExcludeRemoveAction', 'ExcludeUpdateAction', 'ReadOnlyAction', 'AppendOnlyAction', 'RelationAction'];
@@ -343,15 +458,17 @@ const OriginActionDict = {
     'appendOnly': 'AppendOnlyAction',
     'readOnly': 'ReadOnlyAction',
 };
-function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode, program: ts.Program, sourceFile: ts.SourceFile) {
+
+
+function dealWithActionTypeNode(moduleName: string, filename: string, actionTypeNode: ts.TypeNode, program: ts.Program, sourceFile: ts.SourceFile) {
     const actionTexts = genericActions.map(
         ele => ele
     );
     if (moduleName === 'User') {
         actionTexts.push(...relationActions);
     }
-    if (ts.isUnionTypeNode(node)) {
-        const actionNames = node.types.map(
+    if (ts.isUnionTypeNode(actionTypeNode)) {
+        const actionNames = actionTypeNode.types.map(
             ele => {
                 if (ts.isTypeReferenceNode(ele) && ts.isIdentifier(ele.typeName)) {
                     return ele.typeName.text;
@@ -363,10 +480,12 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
         assert(intersection(actionNames, RESERVED_ACTION_NAMES).length === 0,
             `${filename}中的Action命名不能是「${RESERVED_ACTION_NAMES.join(',')}」之一`);
 
-        node.types.forEach(
+        actionTypeNode.types.forEach(
             ele => {
                 if (ts.isTypeReferenceNode(ele)) {
-                    actionTexts.push(...getStringTextFromUnionStringLiterals(moduleName, filename, ele, program));
+                    const actionStrings = tryGetStringLiteralValues(moduleName, filename, 'action', ele, program);
+                    assert(actionStrings.length > 0);
+                    actionTexts.push(...actionStrings);
                 }
                 else {
                     assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `【${moduleName}】action的定义既非Type也不是string`);
@@ -375,16 +494,18 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
             }
         );
     }
-    else if (ts.isTypeReferenceNode(node)) {
-        if (ts.isIdentifier(node.typeName)) {
-            assert(!RESERVED_ACTION_NAMES.includes(node.typeName.text),
+    else if (ts.isTypeReferenceNode(actionTypeNode)) {
+        if (ts.isIdentifier(actionTypeNode.typeName)) {
+            assert(!RESERVED_ACTION_NAMES.includes(actionTypeNode.typeName.text),
                 `${filename}中的Action命名不能是「${RESERVED_ACTION_NAMES.join(',')}」之一`);
         }
-        actionTexts.push(...getStringTextFromUnionStringLiterals(moduleName, filename, node, program));
+        const actionStrings = tryGetStringLiteralValues(moduleName, filename, 'action', actionTypeNode, program);
+        assert(actionStrings.length > 0);
+        actionTexts.push(...actionStrings);
     }
     else {
-        assert(ts.isLiteralTypeNode(node) && ts.isStringLiteral(node.literal), `【${moduleName}】action的定义既非Type也不是string`);
-        actionTexts.push(node.literal.text);
+        assert(ts.isLiteralTypeNode(actionTypeNode) && ts.isStringLiteral(actionTypeNode.literal), `【${moduleName}】action的定义既非Type也不是string`);
+        actionTexts.push(actionTypeNode.literal.text);
     }
 
     // 所有的action定义不能有重名
@@ -424,6 +545,26 @@ function dealWithActions(moduleName: string, filename: string, node: ts.TypeNode
         ),
         sourceFile
     );
+}
+
+function dealWithActionDefInitializer(moduleName: string, initializer: ts.Expression, program: ts.Program) {
+    if (ts.isIdentifier(initializer) || ts.isCallExpression(initializer)) {
+        // 是从别处的引用，注入到mportActionDefFrom
+        const checker = program.getTypeChecker();
+        const identifier = ts.isIdentifier(initializer) ? initializer : initializer.expression;
+        assert(ts.isIdentifier(identifier));
+        const symbol = checker.getSymbolAtLocation(identifier);
+        const declaration = symbol?.getDeclarations()![0]!;
+        assert(ts.isImportSpecifier(declaration));
+
+        const importDeclartion = declaration.parent.parent.parent;
+
+        addImportedFrom(moduleName, identifier.text, importDeclartion);
+    }
+    else {
+        // 本地定义的actionDef，不用处理
+        assert(ts.isObjectLiteralExpression(initializer), moduleName);
+    }
 }
 
 /**
@@ -488,7 +629,7 @@ function checkLocaleExpressionPropertyExists(root: ts.ObjectLiteralExpression, a
     )
 }
 
-function getStringEnumValues(filename: string, program: ts.Program, obj: string, node: ts.TypeReferenceNode) {
+/* function getStringEnumValues(filename: string, program: ts.Program, obj: string, node: ts.TypeReferenceNode) {
     const checker = program.getTypeChecker();
     const symbol = checker.getSymbolAtLocation(node.typeName);
     let declaration = symbol?.getDeclarations()![0]!;
@@ -508,7 +649,7 @@ function getStringEnumValues(filename: string, program: ts.Program, obj: string,
             return [value];
         }
     }
-}
+} */
 
 function checkNameLegal(filename: string, attrName: string, upperCase?: boolean) {
     assert(attrName.length <= ENTITY_NAME_MAX_LENGTH, `文件「${filename}」：「${attrName}」的名称定义过长，不能超过「${ENTITY_NAME_MAX_LENGTH}」长度`);
@@ -523,9 +664,428 @@ function checkNameLegal(filename: string, attrName: string, upperCase?: boolean)
     }
 }
 
+/**
+ * 分析import语句，这里注意要去重
+ * @param node 
+ * @param referencedSchemas 
+ * @param additionalImports 
+ * @param relativePath 
+ */
+function analyzeImportDeclaration(
+    node: ts.ImportDeclaration,
+    referencedSchemas: string[],
+    additionalImports: ts.ImportDeclaration[],
+    filename: string,
+    relativePath?: string
+) {
+    const entityImported = getEntityImported(node);
+    if (entityImported) {
+        referencedSchemas.push(entityImported);
+    }
+    else {
+        /* const { moduleSpecifier, importClause } = node;
+        assert(ts.isStringLiteral(moduleSpecifier), `${filename}中的import出现了非stringLiteral类型的import module specifier，无法处理`);
+
+        const { text } = moduleSpecifier;
+        // 和数据类型相关的会自动引入，这里忽略（见initialStatements）
+        // 如果是相对路径，编译后的路径默认要深一层
+        const moduleSpecifier2Text = text.startsWith('.') ? (relativePath
+            ? PathLib.join(
+                relativePath,
+                text
+            ).replace(/\\/g, '/')
+            : PathLib.join(
+                '..',
+                text
+            ).replace(/\\/g, '/')) : text;
+
+        // 去重
+        if (importClause) {
+            const { name, namedBindings } = importClause;
+            assert(namedBindings && ts.isNamedImports(namedBindings));
+            assert(!name, `「${filename}」schema定义中出现了import NAME from，请避免`);
+
+            const unrepeatedSpecifiers: ts.ImportSpecifier[] = [];
+            for (const ele2 of namedBindings.elements) {
+                let repeated = false;
+                for (const imports of additionalImports) {
+                    const { moduleSpecifier: ms, importClause: ic } = imports;
+                    assert(ts.isStringLiteral(ms));
+                    if (ic && ic.namedBindings) {
+                        assert(ts.isNamedImports(ic.namedBindings));
+                        const { elements } = ic.namedBindings;
+
+                        for (const ele of elements) {
+                            const { name: n, propertyName: pn } = ele;
+                            if (n.text === ele2.name.text || (pn?.text && pn?.text === ele2.propertyName?.text)) {
+                                assert(n.text === ele2.name.text && pn?.text === ele2.propertyName?.text, `解析「${filename}」时发现了name和propertyName不全等的import语句。${[n.text, pn?.text, ele2.name.text, ele2.propertyName?.text].filter(ele => !!ele).join(',')}，可能是在Schema的继承链上出现，请修正`);
+                                assert(moduleSpecifier.text === ms.text, `解析「${filename}」时发现了name和propertyName完全相等的import语句，但它们的from目标不完全相同。${[moduleSpecifier.text, ms.text].join(',')}，可能是在Schema的继承链上出现，请修正`);
+                                repeated = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (repeated) {
+                        break;
+                    }
+                }
+                if (!repeated) {
+                    unrepeatedSpecifiers.push(ele2);
+                }
+            }
+            if (unrepeatedSpecifiers.length > 0) {
+                additionalImports.push(
+                    factory.updateImportDeclaration(
+                        node,
+                        undefined,
+                        factory.createImportClause(false, undefined, factory.createNamedImports(unrepeatedSpecifiers)),
+                        factory.createStringLiteral(moduleSpecifier2Text),
+                        undefined
+                    )
+                );
+            }
+        }
+        else {
+            additionalImports.push(
+                factory.updateImportDeclaration(
+                    node,
+                    undefined,
+                    undefined,
+                    factory.createStringLiteral(moduleSpecifier2Text),
+                    undefined
+                )
+            );
+        } */
+    }
+}
+
+/**
+ * 在path下的filename文件中import了fileSpecifierPath，要找到其对应的引用路径
+ * 这里关键是要处理形如file:的依赖声明
+ * @param path 
+ * @param fileSpecifierPath 
+ * @param filename 
+ * @returns 
+ */
+function searchImportedPath(path: string, fileSpecifierPath: string, filename: string) {
+    const cwd = process.cwd();
+
+    const fileSpecifierPaths = fileSpecifierPath.split('/');
+    const moduleName = fileSpecifierPaths[0] || fileSpecifierPaths[1];
+    assert(moduleName);
+    // 找到path路径对应的最近package.json
+    const paths = path.split('/');
+    for (let iter = paths.length; iter >= 0; iter--) {
+        const paths2 = paths.slice(0, iter);
+        const pkgJsonPath = PathLib.join(cwd, ...paths2, 'package.json');
+        if (existsSync(pkgJsonPath)) {
+            const pkgJson = require(pkgJsonPath);
+            if (pkgJson.dependencies?.hasOwnProperty(moduleName)) {
+                const dependentPath = pkgJson.dependencies[moduleName] as string;
+                if (dependentPath.trimStart().startsWith('file:')) {
+                    const dependentFilePath = dependentPath.trimStart().slice(5);
+                    return PathLib.join(pkgJsonPath, '..', dependentFilePath, ...(fileSpecifierPaths[0] ? fileSpecifierPaths.slice(1) : (fileSpecifierPaths.slice(2))));
+                }
+                else {
+                    return PathLib.join(pkgJsonPath, 'node_modules', fileSpecifierPath);
+                }
+            }
+        }
+    }
+    assert(false, `「${filename}」中import路径${fileSpecifierPath}找不到对应的声明`);
+}
+
+/**
+ * 获得import的某个文件的绝对路径
+ * @param path 
+ * @param fileSpecifierPath 
+ * @returns 
+ */
+function getImportedFilePath(path: string, fileSpecifierPath: string, filename: string) {
+    let importedFilename = fileSpecifierPath.startsWith('.') ? PathLib.join(process.cwd(), path, fileSpecifierPath) : searchImportedPath(path, fileSpecifierPath, filename);
+
+    if (existsSync(`${importedFilename}.ts`)) {
+        return `${importedFilename}.ts`;
+    }
+    else if (existsSync(`${importedFilename}.d.ts`)) {
+        return `${importedFilename}.d.ts`;
+    }
+    else {
+        // 目前不可能引用js文件
+        assert(false, `「${filename}」import路径${fileSpecifierPath}找不到对应的文件`);
+    }
+}
+
+function analyzeSchemaDefinition(
+    node: ts.InterfaceDeclaration,
+    moduleName: string,
+    filename: string,
+    path: string,
+    program: ts.Program,
+    referencedSchemas: string[],
+    schemaAttrs: ts.TypeElement[],
+    enumAttributes: Record<string, string[]>,
+    importAttrFrom: Record<string, [string, string | undefined]>,
+    relativePath?: string
+) {
+    let hasEntityAttr = false;
+    let hasEntityIdAttr = false;
+    let toModi = false;
+    const extendsFrom: string[] = [];
+    const { members, heritageClauses } = node;
+    assert(heritageClauses);
+
+    const heritagedResult = heritageClauses.map(
+        (clause) => {
+            const { expression } = clause.types[0];
+            assert(ts.isIdentifier(expression));
+            if (expression.text === 'EntityShape') {
+                // import { EntityShape }  from 'oak-domain/lib/types/Entities; 所有schema的公共祖先类型，不用处理
+                return;
+            }
+
+            // 从其它文件的Schema类继承，这里需要将所继承的对象的属性进行访问并展开
+            assert(referencedSchemas.includes(expression.text));
+            const checker = program.getTypeChecker();
+            const symbol = checker.getSymbolAtLocation(expression);
+            let declaration = symbol?.getDeclarations()![0]!;
+            assert(ts.isImportSpecifier(declaration));
+            const importDeclaration = declaration.parent.parent.parent;
+            assert(ts.isImportDeclaration(importDeclaration));
+            const { moduleSpecifier } = importDeclaration;
+            assert(ts.isStringLiteral(moduleSpecifier));
+
+            const { text: from } = moduleSpecifier;
+            extendsFrom.push(from);
+            const importedFilename = getImportedFilePath(path, from, filename);
+            const sourceFile = program.getSourceFile(importedFilename);
+            assert(sourceFile, `「${filename}」找不到相应的sourceFile：${importedFilename}`);
+            const relativeFilename = PathLib.relative(process.cwd(), importedFilename);
+
+            const result = analyzeReferenceSchemaFile(
+                moduleName,
+                PathLib.basename(relativeFilename),
+                PathLib.dirname(relativeFilename),
+                sourceFile,
+                program,
+                referencedSchemas,
+                schemaAttrs,
+                enumAttributes,
+                importAttrFrom,
+                PathLib.join(from, '..')
+            );
+            return result;
+        }
+    ).filter(
+        ele => !!ele
+    );
+
+    // assert(['EntityShape'].includes((<ts.Identifier>heritageClauses![0].types![0].expression).text), moduleName);
+    members.forEach(
+        (attrNode) => {
+            const { type, name, questionToken } = <ts.PropertySignature>attrNode;
+            const attrName = (<ts.Identifier>name).text;
+            checkNameLegal(filename, attrName, false);
+            if (ts.isTypeReferenceNode(type!)
+                && ts.isIdentifier(type.typeName)) {
+                if ((referencedSchemas.includes(type.typeName.text) || type.typeName.text === 'Schema')) {
+                    addRelationship(moduleName, type.typeName.text, attrName, !!questionToken);
+                    schemaAttrs.push(attrNode);
+                }
+                else if (type.typeName.text === 'Array') {
+                    // 这是一对多的反向指针的引用，需要特殊处理
+                    const { typeArguments } = type;
+                    assert(typeArguments!.length === 1
+                        && ts.isTypeReferenceNode(typeArguments![0])
+                        && ts.isIdentifier(typeArguments![0].typeName)
+                        && referencedSchemas.includes(typeArguments![0].typeName.text),
+                        `「${filename}」非法的属性定义「${attrName}」`);
+                    const reverseEntity = typeArguments![0].typeName.text;
+                    if (ReversePointerRelations[reverseEntity]) {
+                        if (!ReversePointerRelations[reverseEntity].includes(moduleName)) {
+                            ReversePointerRelations[reverseEntity].push(moduleName);
+                        }
+                    }
+                    else {
+                        assign(ReversePointerRelations, {
+                            [reverseEntity]: [moduleName],
+                        });
+                    }
+
+                    if (reverseEntity === 'Modi') {
+                        toModi = true;
+                    }
+                }
+                else {
+                    schemaAttrs.push(attrNode);
+                    const enumStringValues = tryGetStringLiteralValues(moduleName, filename, `attr-${attrName}`, type, program);
+                    if (enumStringValues.length > 0) {
+                        enumAttributes[attrName] = enumStringValues;
+                    }
+                    analyzeExternalAttrImport(type, program, importAttrFrom, relativePath);
+                }
+            }
+            else if (ts.isArrayTypeNode(type!) && ts.isTypeReferenceNode(type.elementType) && ts.isIdentifier(type.elementType.typeName)) {
+                const { typeName } = type.elementType;
+
+                if (referencedSchemas.includes(typeName.text)) {
+                    // 这也是一对多的反指定义 
+                    const reverseEntity = typeName.text;
+                    if (ReversePointerRelations[reverseEntity]) {
+                        ReversePointerRelations[reverseEntity].push(moduleName);
+                    }
+                    else {
+                        assign(ReversePointerRelations, {
+                            [reverseEntity]: [moduleName],
+                        });
+                    }
+
+                    if (reverseEntity === 'Modi') {
+                        toModi = true;
+                    }
+                }
+                else {
+                    throw new Error(`对象${moduleName}中定义的属性${attrName}是不可识别的数组类别`);
+                }
+            }
+            else {
+                schemaAttrs.push(attrNode);
+                if (ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) && ts.isStringLiteral(type.types[0].literal)) {
+                    assert(ts.isIdentifier(name));
+                    const { types } = type;
+                    const enumValues = types.map(
+                        (ele) => checkStringLiteralLegal(filename, '属性', name.text, ele)
+                    );
+                    enumAttributes[name.text] = enumValues;
+                }
+                else if (ts.isLiteralTypeNode(type!) && ts.isStringLiteral(type.literal)) {
+                    // 单个字符串的情形，目前应该没有，没测试过，先写着 by Xc 20230221
+                    assert(ts.isIdentifier(name));
+                    const enumValues = [
+                        checkStringLiteralLegal(filename, '属性', name.text, type)
+                    ];
+                    enumAttributes[name.text] = enumValues;
+                }
+            }
+
+            if (attrName === 'entity') {
+                assert(ts.isTypeReferenceNode(type!) && ts.isIdentifier(type.typeName), `「${moduleName}」中entity属性的定义不是String<32>类型，entity是系统用于表示反指指针的保留属性，请勿他用`);
+                const { typeArguments } = type;
+                assert(type.typeName.text === 'String'
+                    && typeArguments
+                    && typeArguments.length === 1, `「${moduleName}」中entity属性的定义不是String<32>类型，entity是系统用于表示反指指针的保留属性，请勿他用`);
+                const [node] = typeArguments;
+                if (ts.isLiteralTypeNode(node) && ts.isNumericLiteral(node.literal)) {
+                    if (parseInt(node.literal.text) > 32) {
+                        assert(false, `「${moduleName}」中entity属性的定义不是String<32>类型，entity是系统用于表示反指指针的保留属性，请勿他用`);
+                    }
+                    else {
+                        hasEntityAttr = true;
+                    }
+                }
+            }
+
+            if (attrName === 'entityId') {
+                assert(ts.isTypeReferenceNode(type!) && ts.isIdentifier(type.typeName), `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
+                const { typeArguments } = type;
+                assert(type.typeName.text === 'String' && typeArguments && typeArguments.length === 1, `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
+
+                const [node] = typeArguments;
+                if (ts.isLiteralTypeNode(node) && ts.isNumericLiteral(node.literal)) {
+                    if (parseInt(node.literal.text) !== 64) {
+                        assert(false, `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
+                    }
+                    else {
+                        hasEntityIdAttr = true;
+                    }
+                }
+            }
+        }
+    );
+
+    // 如果继承的对象属性中有相应的定义，一样起效
+    heritagedResult.forEach(
+        ele => {
+            if (ele?.hasEntityAttr) {
+                assert(!hasEntityAttr && !hasEntityIdAttr, `「${filename}」继承的对象中已经声明了entity和entityId，不可重复声明`);
+                assert(ele!.hasEntityIdAttr);
+                hasEntityAttr = true;
+                hasEntityIdAttr = true;
+            }
+            else if (ele?.hasEntityIdAttr) {
+                assert(false, `「${filename}」所继承的对象中的entity和entityId没有成对出现`);
+            }
+
+            if (ele?.toModi) {
+                assert(!hasEntityAttr && !hasEntityIdAttr, `「${filename}」继承的对象中已经声明了modi，不可重复声明`);
+                toModi = true;
+            }
+        }
+    )
+
+    return {
+        hasEntityAttr,
+        hasEntityIdAttr,
+        toModi,
+        extendsFrom,
+    };
+}
+
+function analyzeReferenceSchemaFile(
+    moduleName: string,
+    filename: string,
+    path: string,
+    sourceFile: ts.SourceFile,
+    program: ts.Program,
+    referencedSchemas: string[],
+    schemaAttrs: ts.TypeElement[],
+    enumAttributes: Record<string, string[]>,
+    importAttrFrom: Record<string, [string, string | undefined]>,
+    relativePath: string) {
+    let result: ReturnType<typeof analyzeSchemaDefinition> | undefined;
+    ts.forEachChild(sourceFile!, (node) => {
+        if (ts.isImportDeclaration(node)) {
+            analyzeImportDeclaration(node, referencedSchemas, [], filename, relativePath);
+        }
+
+        if (ts.isInterfaceDeclaration(node)) {
+            // schema 定义
+            if (node.name.text === 'Schema') {
+                result = analyzeSchemaDefinition(
+                    node,
+                    moduleName,
+                    filename,
+                    path,
+                    program,
+                    referencedSchemas,
+                    schemaAttrs,
+                    enumAttributes,
+                    importAttrFrom,
+                    relativePath
+                );
+            }
+            else if (!node.name.text.endsWith('Relation') && !node.name.text.endsWith('Action') && !node.name.text.endsWith('State')) {
+                // 本地规定的一些形状定义，直接使用
+                pushStatementIntoSchemaAst(moduleName, node);
+            }
+        }
+
+        if (ts.isTypeAliasDeclaration(node)) {
+            if (!node.name.text.endsWith('Relation') && !node.name.text.endsWith('Action') && !node.name.text.endsWith('State')) {
+                // 本地规定的一些形状定义，直接使用
+                pushStatementIntoSchemaAst(moduleName, node);
+            }
+        }
+    });
+
+    assert(result);
+    return result;
+}
+
 function analyzeEntity(filename: string, path: string, program: ts.Program, relativePath?: string) {
     const fullPath = `${path}/${filename}`;
     const sourceFile = program.getSourceFile(fullPath);
+    assert(sourceFile);
     const moduleName = filename.split('.')[0];
 
     if (Schema.hasOwnProperty(moduleName)) {
@@ -542,190 +1102,50 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
     let indexes: ts.ArrayLiteralExpression;
     let beforeSchema = true;
     let hasActionDef = false;
-    let hasRelationDef: boolean | ts.TypeAliasDeclaration = false;
+    let relations: boolean | string[] = false;
     let hasActionOrStateDef = false;
-    let toModi = false;
     let actionType = 'crud';
     let _static = false;
     const enumAttributes: Record<string, string[]> = {};
-    const additionalImports: ts.ImportDeclaration[] = [];
+    const importAttrFrom: Record<string, [string, string | undefined]> = {};
     let localeDef: ts.ObjectLiteralExpression | undefined = undefined;
+    let extendsFrom: string[] | undefined;
     // let relationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
     // let reverseCascadeRelationHierarchy: ts.ObjectLiteralExpression | undefined = undefined;
+
+    let toModi = false;
     ts.forEachChild(sourceFile!, (node) => {
         if (ts.isImportDeclaration(node)) {
-            const entityImported = getEntityImported(node);
-            if (entityImported) {
-                referencedSchemas.push(entityImported);
-            }
-            else {
-                const { moduleSpecifier, importClause } = node;
-                if (ts.isStringLiteral(moduleSpecifier)) {
-                    const { text } = moduleSpecifier;
-                    // 和数据类型相关的会自动引入，这里忽略（见initialStatements）
-                    // 如果是相对路径，编译后的路径默认要深一层
-                    const moduleSpecifier2Text = text.startsWith('.') ? (relativePath
-                        ? PathLib.join(
-                            relativePath,
-                            text
-                        ).replace(/\\/g, '/')
-                        : PathLib.join(
-                            '..',
-                            text
-                        ).replace(/\\/g, '/')) : text;
-                    additionalImports.push(
-                        factory.updateImportDeclaration(
-                            node,
-                            undefined,
-                            importClause,
-                            factory.createStringLiteral(moduleSpecifier2Text),
-                            undefined
-                        )
-                    );
-                }
-                else {
-                    assert(false, '未处理的import方式');
-                }
-            }
+            analyzeImportDeclaration(node, referencedSchemas, [], filename, relativePath);
         }
 
         if (ts.isInterfaceDeclaration(node)) {
             // schema 定义
             if (node.name.text === 'Schema') {
-                assert(!localeDef, `【${filename}】locale定义须在Schema之后`);
-                let hasEntityAttr = false;
-                let hasEntityIdAttr = false;
-                const { members, heritageClauses } = node;
-                assert(['EntityShape'].includes((<ts.Identifier>heritageClauses![0].types![0].expression).text), moduleName);
-                members.forEach(
-                    (attrNode) => {
-                        const { type, name, questionToken } = <ts.PropertySignature>attrNode;
-                        const attrName = (<ts.Identifier>name).text;
-                        checkNameLegal(filename, attrName, false);
-                        if (ts.isTypeReferenceNode(type!)
-                            && ts.isIdentifier(type.typeName)) {
-                            if ((referencedSchemas.includes(type.typeName.text) || type.typeName.text === 'Schema')) {
-                                addRelationship(moduleName, type.typeName.text, attrName, !!questionToken);
-                                schemaAttrs.push(attrNode);
-                            }
-                            else if (type.typeName.text === 'Array') {
-                                // 这是一对多的反向指针的引用，需要特殊处理
-                                const { typeArguments } = type;
-                                assert(typeArguments!.length === 1
-                                    && ts.isTypeReferenceNode(typeArguments![0])
-                                    && ts.isIdentifier(typeArguments![0].typeName)
-                                    && referencedSchemas.includes(typeArguments![0].typeName.text),
-                                    `「${filename}」非法的属性定义「${attrName}」`);
-                                const reverseEntity = typeArguments![0].typeName.text;
-                                if (ReversePointerRelations[reverseEntity]) {
-                                    if (!ReversePointerRelations[reverseEntity].includes(moduleName)) {
-                                        ReversePointerRelations[reverseEntity].push(moduleName);
-                                    }
-                                }
-                                else {
-                                    assign(ReversePointerRelations, {
-                                        [reverseEntity]: [moduleName],
-                                    });
-                                }
-
-                                if (reverseEntity === 'Modi') {
-                                    toModi = true;
-                                }
-                            }
-                            else {
-                                schemaAttrs.push(attrNode);
-                                const enumStringValues = getStringEnumValues(filename, program, '属性', type);
-                                if (enumStringValues) {
-                                    enumAttributes[attrName] = enumStringValues;
-                                }
-                            }
-                        }
-                        else if (ts.isArrayTypeNode(type!) && ts.isTypeReferenceNode(type.elementType) && ts.isIdentifier(type.elementType.typeName)) {
-                            const { typeName } = type.elementType;
-
-                            if (referencedSchemas.includes(typeName.text)) {
-                                // 这也是一对多的反指定义 
-                                const reverseEntity = typeName.text;
-                                if (ReversePointerRelations[reverseEntity]) {
-                                    ReversePointerRelations[reverseEntity].push(moduleName);
-                                }
-                                else {
-                                    assign(ReversePointerRelations, {
-                                        [reverseEntity]: [moduleName],
-                                    });
-                                }
-
-                                if (reverseEntity === 'Modi') {
-                                    toModi = true;
-                                }
-                            }
-                            else {
-                                throw new Error(`对象${moduleName}中定义的属性${attrName}是不可识别的数组类别`);
-                            }
-                        }
-                        else {
-                            schemaAttrs.push(attrNode);
-                            if (ts.isUnionTypeNode(type!) && ts.isLiteralTypeNode(type.types[0]) && ts.isStringLiteral(type.types[0].literal)) {
-                                assert(ts.isIdentifier(name));
-                                const { types } = type;
-                                const enumValues = types.map(
-                                    (ele) => checkStringLiteralLegal(filename, '属性', name.text, ele)
-                                );
-                                enumAttributes[name.text] = enumValues;
-                            }
-                            else if (ts.isLiteralTypeNode(type!) && ts.isStringLiteral(type.literal)) {
-                                // 单个字符串的情形，目前应该没有，没测试过，先写着 by Xc 20230221
-                                assert(ts.isIdentifier(name));
-                                const enumValues = [
-                                    checkStringLiteralLegal(filename, '属性', name.text, type)
-                                ];
-                                enumAttributes[name.text] = enumValues;
-                            }
-                        }
-
-                        if (attrName === 'entity') {
-                            assert(ts.isTypeReferenceNode(type!) && ts.isIdentifier(type.typeName), `「${moduleName}」中entity属性的定义不是String<32>类型，entity是系统用于表示反指指针的保留属性，请勿他用`);
-                            const { typeArguments } = type;
-                            assert(type.typeName.text === 'String'
-                                && typeArguments
-                                && typeArguments.length === 1, `「${moduleName}」中entity属性的定义不是String<32>类型，entity是系统用于表示反指指针的保留属性，请勿他用`);
-                            const [node] = typeArguments;
-                            if (ts.isLiteralTypeNode(node) && ts.isNumericLiteral(node.literal)) {
-                                if (parseInt(node.literal.text) > 32) {
-                                    assert(false, `「${moduleName}」中entity属性的定义不是String<32>类型，entity是系统用于表示反指指针的保留属性，请勿他用`);
-                                }
-                                else {
-                                    hasEntityAttr = true;
-                                }
-                            }
-                        }
-
-                        if (attrName === 'entityId') {
-                            assert(ts.isTypeReferenceNode(type!) && ts.isIdentifier(type.typeName), `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
-                            const { typeArguments } = type;
-                            assert(type.typeName.text === 'String' && typeArguments && typeArguments.length === 1, `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
-
-                            const [node] = typeArguments;
-                            if (ts.isLiteralTypeNode(node) && ts.isNumericLiteral(node.literal)) {
-                                if (parseInt(node.literal.text) !== 64) {
-                                    assert(false, `「${moduleName}」中entityId属性的定义不是String<64>类型，entityId是系统用于表示反指指针的保留属性，请勿他用`);
-                                }
-                                else {
-                                    hasEntityIdAttr = true;
-                                }
-                            }
-                        }
-                    }
+                beforeSchema = false;
+                const result = analyzeSchemaDefinition(
+                    node,
+                    moduleName,
+                    filename,
+                    path,
+                    program,
+                    referencedSchemas,
+                    schemaAttrs,
+                    enumAttributes,
+                    importAttrFrom,
+                    relativePath
                 );
-                if (hasEntityAttr && hasEntityIdAttr) {
+                if (result.hasEntityAttr && result.hasEntityIdAttr) {
                     assign(ReversePointerEntities, {
                         [moduleName]: 1,
                     });
                 }
-                else if (hasEntityAttr || hasEntityIdAttr) {
-                    throw new Error(`文件「${filename}」：属性 定义中只包含${hasEntityAttr ? 'entity' : 'entityId'}，不符合定义规范。entity/entityId必须联合出现，代表不定对象的反向指针`);
+                else if (result.hasEntityAttr || result.hasEntityIdAttr) {
+                    throw new Error(`文件「${filename}」：属性 定义中只包含${result.hasEntityAttr ? 'entity' : 'entityId'}，不符合定义规范。entity/entityId必须联合出现，代表不定对象的反向指针`);
                 }
                 beforeSchema = false;
+                toModi = result.toModi;
+                extendsFrom = result.extendsFrom;
 
                 // 对于不是Modi和Oper的对象，全部建立和ModiEntity的反指关系
                 if (!['Modi', 'Oper', 'OperEntity', 'ModiEntity'].includes(moduleName) && !toModi) {
@@ -751,7 +1171,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
             }
             else if (beforeSchema) {
                 // 本地规定的一些形状定义，直接使用
-                pushStatementIntoSchemaAst(moduleName, node, sourceFile!);
+                pushStatementIntoSchemaAst(moduleName, node, sourceFile);
             }
         }
 
@@ -773,7 +1193,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     sourceFile!
                 );
 
-                dealWithActions(moduleName, filename, node.type, program, sourceFile!);
+                dealWithActionTypeNode(moduleName, filename, node.type, program, sourceFile!);
             }
             else if (node.name.text === 'Relation') {
                 assert(!localeDef, `【${filename}】locale定义须在Relation之后`);
@@ -783,7 +1203,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     assert(node.type.literal.text.length < STRING_LITERAL_MAX_LENGTH, `Relation定义的字符串长度不长于${STRING_LITERAL_MAX_LENGTH}（${filename}，${node.type.literal.text}）`);
                     relationValues.push(node.type.literal.text);
                 }
-                else {
+                else if (ts.isUnionTypeNode(node.type)) {
                     assert(ts.isUnionTypeNode(node.type), `Relation的定义只能是string类型（${filename}）`);
                     relationValues.push(...node.type.types.map(
                         (ele) => {
@@ -792,6 +1212,12 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                             return ele.literal.text;
                         }
                     ));
+                }
+                else {
+                    assert(ts.isTypeReferenceNode(node.type));
+                    const relationStrings = tryGetStringLiteralValues(moduleName, filename, 'relation', node.type, program);
+                    assert(relationStrings.length > 0);
+                    relationValues.push(...relationStrings);
                 }
 
                 // 对UserEntityGrant对象，建立相应的反指关系
@@ -831,7 +1257,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     });
                 }
 
-                hasRelationDef = node;
+                relations = relationValues;
             }
             else if (node.name.text.endsWith('Action') || node.name.text.endsWith('State')) {
                 assert(!localeDef, `【${filename}】locale定义须在Action/State之后`);
@@ -883,11 +1309,11 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
 
                 assert(ts.isTypeReferenceNode(actionNode));
                 assert(ts.isTypeReferenceNode(stateNode));
-                assert(getStringEnumValues(filename, program, 'action', (<ts.TypeReferenceNode>actionNode)), `文件${filename}中的action${(<ts.Identifier>actionNode.typeName).text}定义不是字符串类型`);
-                const enumStateValues = getStringEnumValues(filename, program, 'state', stateNode);
-                assert(enumStateValues, `文件${filename}中的state${(<ts.Identifier>stateNode.typeName).text}定义不是字符串类型`)
+                const enumStateValues = tryGetStringLiteralValues(moduleName, filename, 'state', stateNode, program);
+                assert(enumStateValues.length > 0, `文件${filename}中的state${(<ts.Identifier>stateNode.typeName).text}定义不是字符串类型`)
 
                 pushStatementIntoActionAst(moduleName, node, sourceFile!);
+                dealWithActionDefInitializer(moduleName, declaration.initializer!, program);
 
                 assert(ts.isIdentifier(declaration.name));
                 const adName = declaration.name.text.slice(0, declaration.name.text.length - 9);
@@ -1043,7 +1469,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     checkLocaleExpressionPropertyExists(declaration, 'action', false, filename);
                 }
 
-                if (hasRelationDef) {
+                if (relations) {
                     // 检查每种locale定义中都应该有'r'域
                     checkLocaleExpressionPropertyExists(declaration, 'r', true, filename);
                 }
@@ -1076,6 +1502,47 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 }
                 if (staticProperty) {
                     _static = true;     // static如果有值只能为true
+                }
+            };
+            const dealWithEntityDesc = (declaration: ts.Expression) => {
+                if (ts.isObjectLiteralExpression(declaration)) {
+                    const { properties } = declaration;
+
+                    const localesProperty = properties.find(
+                        ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'locales'
+                    );
+                    assert(ts.isPropertyAssignment(localesProperty!));
+                    dealWithLocales(localesProperty.initializer as ts.ObjectLiteralExpression);
+
+                    const indexesProperty = properties.find(
+                        ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'indexes'
+                    );
+                    if (indexesProperty) {
+                        assert(ts.isPropertyAssignment(indexesProperty));
+                        dealWithIndexes(indexesProperty.initializer as ts.ArrayLiteralExpression);
+                    }
+
+                    const configurationProperty = properties.find(
+                        ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'configuration'
+                    );
+                    if (configurationProperty) {
+                        assert(ts.isPropertyAssignment(configurationProperty));
+                        dealWithConfiguration(configurationProperty.initializer as ts.ObjectLiteralExpression);
+                    }
+                }
+                else if (ts.isIdentifier(declaration)) {
+                    const checker = program.getTypeChecker();
+                    const symbol = checker.getSymbolAtLocation(declaration);
+                    const original = checker.getAliasedSymbol(symbol!);
+                    /**
+                     * 目前只研究出来怎么得到originSymbol，但只能拿到其类型定义（在d.ts中）
+                     * 拿不到数据定义(在js中)(original.declaration.initializer是undefined)
+                     */
+
+                    assert(false, '用变量赋值给entityDesc暂时还解析不了');
+
+                    
+                    console.log(original);
                 }
             };
             declarations.forEach(
@@ -1122,7 +1589,7 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                                 && ts.isStringLiteral(typeArguments[1].literal), `${filename}中locale类型定义的第二个参数不是字符串`);
                         }
 
-                        if (hasRelationDef) {
+                        if (relations) {
                             assert(ts.isTypeReferenceNode(typeArguments[2])
                                 && ts.isIdentifier(typeArguments[2].typeName)
                                 && typeArguments[2].typeName.text === 'Relation', `${filename}中的locale类型定义的第三个参数不是Relation`);
@@ -1148,30 +1615,9 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                         dealWithConfiguration(declaration.initializer);
                     }
                     else if (declaration.type && ts.isTypeReferenceNode(declaration.type!) && ts.isIdentifier(declaration.type.typeName) && declaration.type.typeName.text === 'EntityDesc') {
-                        assert(ts.isObjectLiteralExpression(declaration.initializer!));
-                        const { properties } = declaration.initializer;
-
-                        const localesProperty = properties.find(
-                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'locales'
-                        );
-                        assert(ts.isPropertyAssignment(localesProperty!));
-                        dealWithLocales(localesProperty.initializer as ts.ObjectLiteralExpression);
-
-                        const indexesProperty = properties.find(
-                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'indexes'
-                        );
-                        if (indexesProperty) {
-                            assert(ts.isPropertyAssignment(indexesProperty));
-                            dealWithIndexes(indexesProperty.initializer as ts.ArrayLiteralExpression);
-                        }
-
-                        const configurationProperty = properties.find(
-                            ele => ts.isPropertyAssignment(ele) && ts.isIdentifier(ele.name) && ele.name.text === 'configuration'
-                        );
-                        if (configurationProperty) {
-                            assert(ts.isPropertyAssignment(configurationProperty));
-                            dealWithConfiguration(configurationProperty.initializer as ts.ObjectLiteralExpression);
-                        }
+                        const { initializer } = declaration;
+                        assert(initializer);
+                        dealWithEntityDesc(initializer);
                     }
                     else {
                         throw new Error(`${moduleName}：不能理解的定义内容${(declaration.name as ts.Identifier).text}`);
@@ -1231,9 +1677,10 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
         toModi,
         actionType,
         static: _static,
-        hasRelationDef,
+        relations,
         enumAttributes,
-        additionalImports,
+        importAttrFrom,
+        extendsFrom,
     };
     if (hasFulltextIndex) {
         assign(schema, {
@@ -1302,7 +1749,7 @@ function constructSchema(statements: Array<ts.Statement>, entity: string) {
                 const { text } = typeName;
                 const text2 = text === 'Schema' ? entity : text;
                 const manyToOneItem = manyToOneSet && manyToOneSet.find(
-                    ([refEntity, attrName]) => refEntity === text2 && attrName === attrName
+                    ([refEntity, attrName2]) => refEntity === text2 && attrName2 === attrName
                 );
                 if (manyToOneItem) {
                     referenceEntities.push(text2);
@@ -3695,7 +4142,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                                     ),
                                     factory.createLiteralTypeNode(factory.createNull())
                                 ]
-                            ): factory.createTypeReferenceNode(
+                            ) : factory.createTypeReferenceNode(
                                 factory.createIdentifier("ForeignKey"),
                                 [factory.createLiteralTypeNode(factory.createStringLiteral(one[1]))]
                             ),
@@ -3865,10 +4312,10 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
                             !entityQuestionToken ? factory.createUnionTypeNode(
                                 [
                                     // 如果是作为lib，要包容更多可能的反指
-                                    factory.createUnionTypeNode(process.env.COMPLING_AS_LIB ? refEntityLitrals.concat(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)): refEntityLitrals),
+                                    factory.createUnionTypeNode(process.env.COMPLING_AS_LIB ? refEntityLitrals.concat(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)) : refEntityLitrals),
                                     factory.createLiteralTypeNode(factory.createNull())
                                 ]
-                            ) : factory.createUnionTypeNode(process.env.COMPLING_AS_LIB ? refEntityLitrals.concat(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)): refEntityLitrals)
+                            ) : factory.createUnionTypeNode(process.env.COMPLING_AS_LIB ? refEntityLitrals.concat(factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)) : refEntityLitrals)
                         ),
                         factory.createPropertySignature(
                             undefined,
@@ -4189,7 +4636,7 @@ function constructOperations(statements: Array<ts.Statement>, entity: string) {
             factory.createTypeReferenceNode('ParticularAction')
         );
     }
-    if (Schema[entity].hasRelationDef || entity === 'User') {
+    if (Schema[entity].relations || entity === 'User') {
         actionTypeNodes.push(
             factory.createTypeReferenceNode('RelationAction')
         );
@@ -4743,6 +5190,11 @@ const initialStatements = () => [
                     undefined,
                     factory.createIdentifier("AggregationResult")
                 ),
+                factory.createImportSpecifier(
+                    false,
+                    undefined,
+                    factory.createIdentifier("EntityShape")
+                ),
             ])
         ),
         factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN()}Entity`),
@@ -4951,40 +5403,28 @@ function outputEntityDict(outputDir: string, printer: ts.Printer) {
 
 function outputSchema(outputDir: string, printer: ts.Printer) {
     for (const entity in Schema) {
+        const { importAttrFrom } = Schema[entity];
         const statements: ts.Statement[] = initialStatements();
         if (ActionAsts[entity]) {
-            const { importedFrom, actionDefNames } = ActionAsts[entity];
-            const localActions: string[] = ['Action', 'ParticularAction'];
-            for (const a in importedFrom) {
-                assert(a.endsWith('Action'));
-                const s = a.slice(0, a.length - 6).concat('State');
-                if (importedFrom[a] === 'local' && actionDefNames.includes(firstLetterLowerCase(a.slice(0, a.length - 6)))) {
-                    localActions.push(s);
+            const { importStateFrom } = ActionAsts[entity];
+            const fromLocalActionSpecifiers: string[] = ['Action', 'ParticularAction'];
+            const fromExtenalStates: Record<string, [string, string | undefined][]> = {};
+            for (const state in importStateFrom) {
+                assert(state.endsWith('State'));
+                if (importStateFrom[state][0] === './') {
+                    // 本地定义的State从 ./Action 中获取
+                    fromLocalActionSpecifiers.push(state);
                 }
-                else if (actionDefNames.includes(firstLetterLowerCase(a.slice(0, a.length - 6)))) {
-                    // 现在源文件中的import语句保留下来了
-                    // const { moduleSpecifier } = importedFrom[a] as ts.ImportDeclaration;
-                    // statements.push(
-                    //     factory.createImportDeclaration(
-                    //         undefined,
-                    //         undefined,
-                    //         factory.createImportClause(
-                    //             false,
-                    //             undefined,
-                    //             factory.createNamedImports(
-                    //                 [
-                    //                     factory.createImportSpecifier(
-                    //                         false,
-                    //                         undefined,
-                    //                         factory.createIdentifier(s)
-                    //                     )
-                    //                 ]
-                    //             )
-                    //         ),
-                    //         moduleSpecifier,
-                    //         undefined
-                    //     )
-                    // );
+                else {
+                    // 否则从原来的import specifiers当中获取
+                    // todo 在additionalImports中如果有则去重
+                    const [from, propertyName] = importStateFrom[state];
+                    if (fromExtenalStates[from]) {
+                        fromExtenalStates[from].push([state, propertyName]);
+                    }
+                    else {
+                        fromExtenalStates[from] = [[state, propertyName]];
+                    }
                 }
             }
             statements.push(
@@ -4993,7 +5433,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     factory.createImportClause(
                         false,
                         undefined,
-                        factory.createNamedImports(localActions.map(
+                        factory.createNamedImports(fromLocalActionSpecifiers.map(
                             ele => factory.createImportSpecifier(
                                 false,
                                 undefined,
@@ -5021,6 +5461,28 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                     undefined
                 )
             );
+            for (const external in fromExtenalStates) {
+                statements.push(
+                    factory.createImportDeclaration(
+                        undefined,
+                        factory.createImportClause(
+                            false,
+                            undefined,
+                            factory.createNamedImports(
+                                fromExtenalStates[external].map(
+                                    ele => factory.createImportSpecifier(
+                                        false,
+                                        ele[1] === undefined ? undefined : factory.createIdentifier(ele[1]),
+                                        factory.createIdentifier(ele[0])
+                                    )
+                                )
+                            )
+                        ),
+                        factory.createStringLiteral(external),
+                        undefined
+                    )
+                )
+            }
         }
         else {
             statements.push(
@@ -5067,11 +5529,40 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 )
             );
         }
-        const { additionalImports } = Schema[entity];
-        if (additionalImports?.length > 0) {
-            statements.push(...additionalImports);
-        }
 
+        // 从外部引入的属性
+        const fromExternalImportAttrs: Record<string, [string, string | undefined][]> = {};
+        for (const attr in importAttrFrom) {
+            const [from, propertyName] = importAttrFrom[attr];
+            if (fromExternalImportAttrs[from]) {
+                fromExternalImportAttrs[from].push([attr, propertyName]);
+            }
+            else {
+                fromExternalImportAttrs[from] = [[attr, propertyName]];
+            }
+        }
+        for (const external in fromExternalImportAttrs) {
+            statements.push(
+                factory.createImportDeclaration(
+                    undefined,
+                    factory.createImportClause(
+                        false,
+                        undefined,
+                        factory.createNamedImports(
+                            fromExternalImportAttrs[external].map(
+                                ele => factory.createImportSpecifier(
+                                    false,
+                                    ele[1] === undefined ? undefined : factory.createIdentifier(ele[1]),
+                                    factory.createIdentifier(ele[0])
+                                )
+                            )
+                        )
+                    ),
+                    factory.createStringLiteral(external),
+                    undefined
+                )
+            );
+        }
         // Relation定义加入
         /* if (typeof Schema[entity].hasRelationDef === 'object' && ts.isTypeAliasDeclaration(Schema[entity].hasRelationDef as ts.Node)) {
             const node = Schema[entity].hasRelationDef as ts.TypeAliasDeclaration;
@@ -5107,7 +5598,7 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
                 )
             );
         }
-        if (Schema[entity].hasRelationDef || entity === 'User') {
+        if (Schema[entity].relations || entity === 'User') {
             makeActionArguments.push(
                 factory.createTypeReferenceNode('RelationAction')
             );
@@ -5255,7 +5746,9 @@ function outputSchema(outputDir: string, printer: ts.Printer) {
             )
         )
 
-        const result = printer.printList(ts.ListFormat.SourceFileStatements, factory.createNodeArray(statements), Schema[entity].sourceFile);
+        // 现在支持Schema extends，其继承的对象解析来自另一个文件，故不能再用原sourceFile来生成，否则printer会用sourceFile中的originText去取stringLiteral
+
+        const result = printer.printList(ts.ListFormat.SourceFileStatements, factory.createNodeArray(statements), undefined as any);
         const fileName = PathLib.join(outputDir, entity, 'Schema.ts');
         writeFileSync(fileName, result, { flag: 'w' });
     }
@@ -5265,20 +5758,67 @@ function outputAction(outputDir: string, printer: ts.Printer) {
     const actionDictStatements: ts.Statement[] = [];
     const propertyAssignments: ts.PropertyAssignment[] = [];
     for (const entity in ActionAsts) {
-        const { sourceFile, statements, importedFrom, actionDefNames } = ActionAsts[entity];
+        const { sourceFile, statements, importActionFrom, importStateFrom, importActionDefFrom, actionDefNames } = ActionAsts[entity];
         const importStatements: ts.Statement[] = [];
-        for (const k in importedFrom) {
-            assert(k.endsWith('Action'));
-            if (importedFrom[k] !== 'local') {
-                importStatements.push(
-                    importedFrom[k] as ts.ImportDeclaration
-                );
+        const fromExternalImports: Record<string, [string, string | undefined][]> = {};
+        for (const state in importStateFrom) {
+            assert(state.endsWith('State'));
+            const [from, propertyName] = importStateFrom[state];
+            if (from !== './') {
+                if (fromExternalImports[from]) {
+                    fromExternalImports[from].push([state, propertyName]);
+                }
+                else {
+                    fromExternalImports[from] = [[state, propertyName]];
+                }
             }
         }
-        /* const actionDiff = difference(actionNames, actionDefNames);
-        if (actionDiff.length > 0) {
-            throw new Error(`action not conform to actionDef: ${actionDiff.join(',')}, entity: ${entity}`);
-        } */
+        for (const action in importActionFrom) {
+            assert(action.endsWith('Action'));
+            const [from, propertyName] = importActionFrom[action];
+            if (from !== './') {
+                if (fromExternalImports[from]) {
+                    fromExternalImports[from].push([action, propertyName]);
+                }
+                else {
+                    fromExternalImports[from] = [[action, propertyName]];
+                }
+            }
+        }
+        for (const def in importActionDefFrom) {
+            assert(def.endsWith('ActionDef'));
+            const [from, propertyName] = importActionDefFrom[def];
+            if (from !== './') {
+                if (fromExternalImports[from]) {
+                    fromExternalImports[from].push([def, propertyName]);
+                }
+                else {
+                    fromExternalImports[from] = [[def, propertyName]];
+                }
+            }
+        }
+        for (const external in fromExternalImports) {
+            statements.splice(0, 0,
+                factory.createImportDeclaration(
+                    undefined,
+                    factory.createImportClause(
+                        false,
+                        undefined,
+                        factory.createNamedImports(
+                            fromExternalImports[external].map(
+                                ele => factory.createImportSpecifier(
+                                    false,
+                                    ele[1] === undefined ? undefined : factory.createIdentifier(ele[1]),
+                                    factory.createIdentifier(ele[0])
+                                )
+                            )
+                        )
+                    ),
+                    factory.createStringLiteral(external),
+                    undefined
+                )
+            );
+        }
         statements.push(
             factory.createVariableStatement(
                 [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -5848,7 +6388,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
 
     for (const entity in Schema) {
         const indexExpressions: ts.Expression[] = [];
-        const { sourceFile, inModi, indexes, toModi, actionType, static: _static, hasRelationDef } = Schema[entity];
+        const { sourceFile, inModi, indexes, toModi, actionType, static: _static, relations } = Schema[entity];
         const fromSchemaSpecifiers = [
             factory.createImportSpecifier(
                 false,
@@ -5955,7 +6495,7 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
             }
         }
 
-        if (Schema[entity].hasRelationDef || entity === 'User') {
+        if (Schema[entity].relations || entity === 'User') {
             needImportActions.push(
                 factory.createImportSpecifier(
                     false,
@@ -6061,40 +6601,15 @@ function outputStorage(outputDir: string, printer: ts.Printer) {
                 )
             );
         } */
-        if (hasRelationDef) {
-            const { type } = hasRelationDef;
-            if (ts.isUnionTypeNode(type)) {
-                const { types } = type;
-                const relationTexts = types.map(
-                    ele => {
-                        assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
-                        return ele.literal.text;
-                    }
+        if (relations) {
+            propertyAssignments.push(
+                factory.createPropertyAssignment(
+                    factory.createIdentifier("relation"),
+                    factory.createArrayLiteralExpression(relations.map(
+                        ele => factory.createStringLiteral(ele)
+                    )),
                 )
-                propertyAssignments.push(
-                    factory.createPropertyAssignment(
-                        factory.createIdentifier("relation"),
-                        factory.createArrayLiteralExpression(relationTexts.map(
-                            ele => factory.createStringLiteral(ele)
-                        )),
-                    )
-                );
-            }
-            else {
-                assert(ts.isLiteralTypeNode(type));
-                assert(ts.isStringLiteral(type.literal));
-
-                propertyAssignments.push(
-                    factory.createPropertyAssignment(
-                        factory.createIdentifier("relation"),
-                        factory.createArrayLiteralExpression(
-                            [
-                                type.literal
-                            ]
-                        ),
-                    )
-                );
-            }
+            );
         }
         const sdTypeArguments = [
             factory.createTypeReferenceNode(
@@ -6367,420 +6882,420 @@ export function registerDeducedRelationMap(map: Record<string, string>) {
  * 输出所有和User相关的对象的后继
  * 此函数不再使用
  */
-function outputRelation(outputDir: string, printer: ts.Printer) {
-    const ExcludedEntities = ['Oper', 'User', 'OperEntity', 'Modi', 'ModiEntity', 'UserRelation', 'Relation', 'RelationAuth', 'ActionAuth'];
-    const actionPath: [string, string, string, boolean, string[]][] = [];
-    const relationPath: [string, string, string, boolean][] = [];
-    const outputRecursively = (root: string, entity: string, path: string, paths: string[], isRelation: boolean) => {
-        if (ExcludedEntities.includes(entity)) {
-            return;
-        }
+// function outputRelation(outputDir: string, printer: ts.Printer) {
+//     const ExcludedEntities = ['Oper', 'User', 'OperEntity', 'Modi', 'ModiEntity', 'UserRelation', 'Relation', 'RelationAuth', 'ActionAuth'];
+//     const actionPath: [string, string, string, boolean, string[]][] = [];
+//     const relationPath: [string, string, string, boolean][] = [];
+//     const outputRecursively = (root: string, entity: string, path: string, paths: string[], isRelation: boolean) => {
+//         if (ExcludedEntities.includes(entity)) {
+//             return;
+//         }
 
-        if (IGNORED_RELATION_PATH_MAP[entity]?.find(
-            (ele) => path.includes(ele)
-        )) {
-            return;
-        }
+//         if (IGNORED_RELATION_PATH_MAP[entity]?.find(
+//             (ele) => path.includes(ele)
+//         )) {
+//             return;
+//         }
 
-        if (paths.length > 12) {
-            throw new Error('对象之间的关系深度过长，请优化设计加以避免');
-        }
+//         if (paths.length > 12) {
+//             throw new Error('对象之间的关系深度过长，请优化设计加以避免');
+//         }
 
-        actionPath.push([firstLetterLowerCase(entity), path, root, isRelation, paths]);
+//         actionPath.push([firstLetterLowerCase(entity), path, root, isRelation, paths]);
 
-        if (Schema[entity].hasRelationDef) {
-            // assert(!DEDUCED_RELATION_MAP[entity], `${entity}对象定义了deducedRelationMap，但它有relation`);
-            relationPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
-        }
-        const { [entity]: parent } = OneToMany;
-        if (parent) {
-            parent.forEach(
-                ([child, foreignKey]) => {
-                    const child2 = firstLetterLowerCase(child);
-                    if (child === entity) {
-                        // 如果有层级关系对象，最多找3层。同时这里只找本身存在relation关系的对象，因为如果对象上没有relation，则其上的公共路径应当可以维护住层级关系
-                        // 例如在jichuang项目中，house上没有relation，通过其park外键所维护的路径不需要遍历其父亲。而parkCluster因为有relation，所以必须构造以之为根的所有的可能路径
-                        // 如果不是以之为根的，同样可以根据其上的公共路径去查找，parkCluster.system和parkCluster.parent.system必然是一样的
-                        if (!Schema[entity].hasRelationDef) {
-                            return;
-                        }
-                        if (paths.find(ele => ele !== child2) || paths.length > 2) {
-                            return;
-                        }
-                    }
-                    else if (paths.indexOf(child2) >= 0) {
-                        // 除了层级之外的递归直接忽略
-                        return;
-                    }
-                    if (IGNORED_FOREIGN_KEY_MAP[child2]?.includes(foreignKey)) {
-                        // 忽略的路径放弃
-                        return;
-                    }
-                    if (DEDUCED_RELATION_MAP[child] === foreignKey) {
-                        // 如果子对象本身由父对象推定，也放弃
-                        return;
-                    }
+//         if (Schema[entity].hasRelationDef) {
+//             // assert(!DEDUCED_RELATION_MAP[entity], `${entity}对象定义了deducedRelationMap，但它有relation`);
+//             relationPath.push([firstLetterLowerCase(entity), path, root, isRelation]);
+//         }
+//         const { [entity]: parent } = OneToMany;
+//         if (parent) {
+//             parent.forEach(
+//                 ([child, foreignKey]) => {
+//                     const child2 = firstLetterLowerCase(child);
+//                     if (child === entity) {
+//                         // 如果有层级关系对象，最多找3层。同时这里只找本身存在relation关系的对象，因为如果对象上没有relation，则其上的公共路径应当可以维护住层级关系
+//                         // 例如在jichuang项目中，house上没有relation，通过其park外键所维护的路径不需要遍历其父亲。而parkCluster因为有relation，所以必须构造以之为根的所有的可能路径
+//                         // 如果不是以之为根的，同样可以根据其上的公共路径去查找，parkCluster.system和parkCluster.parent.system必然是一样的
+//                         if (!Schema[entity].hasRelationDef) {
+//                             return;
+//                         }
+//                         if (paths.find(ele => ele !== child2) || paths.length > 2) {
+//                             return;
+//                         }
+//                     }
+//                     else if (paths.indexOf(child2) >= 0) {
+//                         // 除了层级之外的递归直接忽略
+//                         return;
+//                     }
+//                     if (IGNORED_FOREIGN_KEY_MAP[child2]?.includes(foreignKey)) {
+//                         // 忽略的路径放弃
+//                         return;
+//                     }
+//                     if (DEDUCED_RELATION_MAP[child] === foreignKey) {
+//                         // 如果子对象本身由父对象推定，也放弃
+//                         return;
+//                     }
 
-                    const fk = foreignKey === 'entity' ? firstLetterLowerCase(entity) : foreignKey;
-                    const path2 = path ? `${fk}.${path}` : fk;
-                    outputRecursively(root, child, path2, paths.concat([firstLetterLowerCase(entity)]), isRelation);
-                }
-            );
-        }
-    };
-    // 所有属性中有指向user的对象
-    const { User } = OneToMany;
-    User.forEach(
-        ([entity3, foreignKey]) => {
-            const fk = foreignKey === 'entity' ? 'user' : foreignKey;
-            if (!IGNORED_FOREIGN_KEY_MAP[firstLetterLowerCase(entity3)]?.includes(foreignKey)) {
-                outputRecursively(firstLetterLowerCase(entity3), entity3, fk, [fk], false);
-            }
-        }
-    );
-    // 所有带relation的对象
-    const hasRelationEntities = Object.keys(Schema).filter(
-        (entity) => Schema[entity].hasRelationDef
-    );
-    hasRelationEntities.forEach(
-        (entity3) => {
-            outputRecursively(firstLetterLowerCase(entity3), entity3, '', [], true);
-        }
-    );
+//                     const fk = foreignKey === 'entity' ? firstLetterLowerCase(entity) : foreignKey;
+//                     const path2 = path ? `${fk}.${path}` : fk;
+//                     outputRecursively(root, child, path2, paths.concat([firstLetterLowerCase(entity)]), isRelation);
+//                 }
+//             );
+//         }
+//     };
+//     // 所有属性中有指向user的对象
+//     const { User } = OneToMany;
+//     User.forEach(
+//         ([entity3, foreignKey]) => {
+//             const fk = foreignKey === 'entity' ? 'user' : foreignKey;
+//             if (!IGNORED_FOREIGN_KEY_MAP[firstLetterLowerCase(entity3)]?.includes(foreignKey)) {
+//                 outputRecursively(firstLetterLowerCase(entity3), entity3, fk, [fk], false);
+//             }
+//         }
+//     );
+//     // 所有带relation的对象
+//     const hasRelationEntities = Object.keys(Schema).filter(
+//         (entity) => Schema[entity].hasRelationDef
+//     );
+//     hasRelationEntities.forEach(
+//         (entity3) => {
+//             outputRecursively(firstLetterLowerCase(entity3), entity3, '', [], true);
+//         }
+//     );
 
-    actionPath.sort(
-        (ele1, ele2) => {
-            // 先按sourceEntity来排序
-            if (ele1[0] > ele2[0]) {
-                return 1;
-            }
-            else if (ele1[0] < ele2[0]) {
-                return -1;
-            }
-            else {
-                // 再按destEntity
-                if (ele1[2] > ele2[2]) {
-                    return 1;
-                }
-                else if (ele1[2] < ele2[2]) {
-                    return -1;
-                }
-                else {
-                    // 最后按paths的长度倒排
-                    return ele1[4].length - ele2[4].length;
-                }
-            }
-        }
-    );
+//     actionPath.sort(
+//         (ele1, ele2) => {
+//             // 先按sourceEntity来排序
+//             if (ele1[0] > ele2[0]) {
+//                 return 1;
+//             }
+//             else if (ele1[0] < ele2[0]) {
+//                 return -1;
+//             }
+//             else {
+//                 // 再按destEntity
+//                 if (ele1[2] > ele2[2]) {
+//                     return 1;
+//                 }
+//                 else if (ele1[2] < ele2[2]) {
+//                     return -1;
+//                 }
+//                 else {
+//                     // 最后按paths的长度倒排
+//                     return ele1[4].length - ele2[4].length;
+//                 }
+//             }
+//         }
+//     );
 
-    const entityRelations: [string, string[]][] = [];
-    for (const entity in Schema) {
-        const { hasRelationDef } = Schema[entity];
-        if (hasRelationDef) {
-            const { type } = hasRelationDef;
-            if (ts.isUnionTypeNode(type)) {
-                const { types } = type;
-                const relations = types.map(
-                    ele => {
-                        assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
-                        return ele.literal.text;
-                    }
-                );
-                entityRelations.push([firstLetterLowerCase(entity), relations]);
-            }
-            else {
-                assert(ts.isLiteralTypeNode(type));
-                assert(ts.isStringLiteral(type.literal));
-                const relations = [type.literal.text];
-                entityRelations.push([firstLetterLowerCase(entity), relations]);
-            }
-        }
-    }
+//     const entityRelations: [string, string[]][] = [];
+//     for (const entity in Schema) {
+//         const { hasRelationDef } = Schema[entity];
+//         if (hasRelationDef) {
+//             const { type } = hasRelationDef;
+//             if (ts.isUnionTypeNode(type)) {
+//                 const { types } = type;
+//                 const relations = types.map(
+//                     ele => {
+//                         assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
+//                         return ele.literal.text;
+//                     }
+//                 );
+//                 entityRelations.push([firstLetterLowerCase(entity), relations]);
+//             }
+//             else {
+//                 assert(ts.isLiteralTypeNode(type));
+//                 assert(ts.isStringLiteral(type.literal));
+//                 const relations = [type.literal.text];
+//                 entityRelations.push([firstLetterLowerCase(entity), relations]);
+//             }
+//         }
+//     }
 
-    const stmts: ts.Statement[] = [
-        factory.createImportDeclaration(
-            undefined,
-            factory.createImportClause(
-                false,
-                undefined,
-                factory.createNamedImports([
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier("AuthCascadePath")
-                    ),
-                    factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        factory.createIdentifier("AuthDeduceRelationMap")
-                    )
-                ])
-            ),
-            factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(1)}Entity`),
-            undefined
-        ),
-        factory.createImportDeclaration(
-            undefined,
-            factory.createImportClause(
-                false,
-                undefined,
-                factory.createNamedImports([factory.createImportSpecifier(
-                    false,
-                    undefined,
-                    factory.createIdentifier("EntityDict")
-                )])
-            ),
-            factory.createStringLiteral("./EntityDict"),
-            undefined
-        ),
-        factory.createImportDeclaration(
-            undefined,
-            factory.createImportClause(
-                false,
-                undefined,
-                factory.createNamedImports([factory.createImportSpecifier(
-                    false,
-                    factory.createIdentifier("CreateOperationData"),
-                    factory.createIdentifier("Relation")
-                )])
-            ),
-            factory.createStringLiteral("./Relation/Schema"),
-            undefined
-        ),
-        factory.createVariableStatement(
-            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
-            factory.createVariableDeclarationList(
-                [factory.createVariableDeclaration(
-                    factory.createIdentifier("ActionCascadePathGraph"),
-                    undefined,
-                    factory.createArrayTypeNode(factory.createTypeReferenceNode(
-                        factory.createIdentifier("AuthCascadePath"),
-                        [factory.createTypeReferenceNode(
-                            factory.createIdentifier("EntityDict"),
-                            undefined
-                        )]
-                    )),
-                    factory.createArrayLiteralExpression(
-                        actionPath.map(
-                            ([entity, path, root, isRelation]) => factory.createArrayLiteralExpression(
-                                [
-                                    factory.createStringLiteral(entity),
-                                    factory.createStringLiteral(path),
-                                    factory.createStringLiteral(root),
-                                    isRelation ? factory.createTrue() : factory.createFalse()
-                                ],
-                                false
-                            )
-                        ),
-                        true
-                    )
-                )],
-                ts.NodeFlags.Const
-            )
-        ),
-        factory.createVariableStatement(
-            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
-            factory.createVariableDeclarationList(
-                [factory.createVariableDeclaration(
-                    factory.createIdentifier("RelationCascadePathGraph"),
-                    undefined,
-                    factory.createArrayTypeNode(factory.createTypeReferenceNode(
-                        factory.createIdentifier("AuthCascadePath"),
-                        [factory.createTypeReferenceNode(
-                            factory.createIdentifier("EntityDict"),
-                            undefined
-                        )]
-                    )),
-                    factory.createArrayLiteralExpression(
-                        relationPath.map(
-                            ([entity, path, root, isRelation]) => factory.createArrayLiteralExpression(
-                                [
-                                    factory.createStringLiteral(entity),
-                                    factory.createStringLiteral(path),
-                                    factory.createStringLiteral(root),
-                                    isRelation ? factory.createTrue() : factory.createFalse()
-                                ],
-                                false
-                            )
-                        ),
-                        true
-                    )
-                )],
-                ts.NodeFlags.Const
-            )
-        ),
-        factory.createVariableStatement(
-            [factory.createToken(ts.SyntaxKind.ExportKeyword)],
-            factory.createVariableDeclarationList(
-                [factory.createVariableDeclaration(
-                    factory.createIdentifier("relations"),
-                    undefined,
-                    factory.createArrayTypeNode(factory.createTypeReferenceNode(
-                        factory.createIdentifier("Relation"),
-                        undefined
-                    )),
-                    factory.createArrayLiteralExpression(
-                        flatten(entityRelations.map(
-                            ([entity, relations]) => relations.map(
-                                (relation) => factory.createObjectLiteralExpression(
-                                    [
-                                        factory.createPropertyAssignment(
-                                            factory.createIdentifier("id"),
-                                            factory.createStringLiteral(formUuid(entity, relation))
-                                        ),
-                                        factory.createPropertyAssignment(
-                                            factory.createIdentifier("entity"),
-                                            factory.createStringLiteral(entity)
-                                        ),
-                                        factory.createPropertyAssignment(
-                                            factory.createIdentifier("name"),
-                                            factory.createStringLiteral(relation)
-                                        )
-                                    ],
-                                    true
-                                )
-                            )
-                        )),
-                        true
-                    )
-                )],
-                ts.NodeFlags.Const
-            )
-        )
-    ];
+//     const stmts: ts.Statement[] = [
+//         factory.createImportDeclaration(
+//             undefined,
+//             factory.createImportClause(
+//                 false,
+//                 undefined,
+//                 factory.createNamedImports([
+//                     factory.createImportSpecifier(
+//                         false,
+//                         undefined,
+//                         factory.createIdentifier("AuthCascadePath")
+//                     ),
+//                     factory.createImportSpecifier(
+//                         false,
+//                         undefined,
+//                         factory.createIdentifier("AuthDeduceRelationMap")
+//                     )
+//                 ])
+//             ),
+//             factory.createStringLiteral(`${TYPE_PATH_IN_OAK_DOMAIN(1)}Entity`),
+//             undefined
+//         ),
+//         factory.createImportDeclaration(
+//             undefined,
+//             factory.createImportClause(
+//                 false,
+//                 undefined,
+//                 factory.createNamedImports([factory.createImportSpecifier(
+//                     false,
+//                     undefined,
+//                     factory.createIdentifier("EntityDict")
+//                 )])
+//             ),
+//             factory.createStringLiteral("./EntityDict"),
+//             undefined
+//         ),
+//         factory.createImportDeclaration(
+//             undefined,
+//             factory.createImportClause(
+//                 false,
+//                 undefined,
+//                 factory.createNamedImports([factory.createImportSpecifier(
+//                     false,
+//                     factory.createIdentifier("CreateOperationData"),
+//                     factory.createIdentifier("Relation")
+//                 )])
+//             ),
+//             factory.createStringLiteral("./Relation/Schema"),
+//             undefined
+//         ),
+//         factory.createVariableStatement(
+//             [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+//             factory.createVariableDeclarationList(
+//                 [factory.createVariableDeclaration(
+//                     factory.createIdentifier("ActionCascadePathGraph"),
+//                     undefined,
+//                     factory.createArrayTypeNode(factory.createTypeReferenceNode(
+//                         factory.createIdentifier("AuthCascadePath"),
+//                         [factory.createTypeReferenceNode(
+//                             factory.createIdentifier("EntityDict"),
+//                             undefined
+//                         )]
+//                     )),
+//                     factory.createArrayLiteralExpression(
+//                         actionPath.map(
+//                             ([entity, path, root, isRelation]) => factory.createArrayLiteralExpression(
+//                                 [
+//                                     factory.createStringLiteral(entity),
+//                                     factory.createStringLiteral(path),
+//                                     factory.createStringLiteral(root),
+//                                     isRelation ? factory.createTrue() : factory.createFalse()
+//                                 ],
+//                                 false
+//                             )
+//                         ),
+//                         true
+//                     )
+//                 )],
+//                 ts.NodeFlags.Const
+//             )
+//         ),
+//         factory.createVariableStatement(
+//             [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+//             factory.createVariableDeclarationList(
+//                 [factory.createVariableDeclaration(
+//                     factory.createIdentifier("RelationCascadePathGraph"),
+//                     undefined,
+//                     factory.createArrayTypeNode(factory.createTypeReferenceNode(
+//                         factory.createIdentifier("AuthCascadePath"),
+//                         [factory.createTypeReferenceNode(
+//                             factory.createIdentifier("EntityDict"),
+//                             undefined
+//                         )]
+//                     )),
+//                     factory.createArrayLiteralExpression(
+//                         relationPath.map(
+//                             ([entity, path, root, isRelation]) => factory.createArrayLiteralExpression(
+//                                 [
+//                                     factory.createStringLiteral(entity),
+//                                     factory.createStringLiteral(path),
+//                                     factory.createStringLiteral(root),
+//                                     isRelation ? factory.createTrue() : factory.createFalse()
+//                                 ],
+//                                 false
+//                             )
+//                         ),
+//                         true
+//                     )
+//                 )],
+//                 ts.NodeFlags.Const
+//             )
+//         ),
+//         factory.createVariableStatement(
+//             [factory.createToken(ts.SyntaxKind.ExportKeyword)],
+//             factory.createVariableDeclarationList(
+//                 [factory.createVariableDeclaration(
+//                     factory.createIdentifier("relations"),
+//                     undefined,
+//                     factory.createArrayTypeNode(factory.createTypeReferenceNode(
+//                         factory.createIdentifier("Relation"),
+//                         undefined
+//                     )),
+//                     factory.createArrayLiteralExpression(
+//                         flatten(entityRelations.map(
+//                             ([entity, relations]) => relations.map(
+//                                 (relation) => factory.createObjectLiteralExpression(
+//                                     [
+//                                         factory.createPropertyAssignment(
+//                                             factory.createIdentifier("id"),
+//                                             factory.createStringLiteral(formUuid(entity, relation))
+//                                         ),
+//                                         factory.createPropertyAssignment(
+//                                             factory.createIdentifier("entity"),
+//                                             factory.createStringLiteral(entity)
+//                                         ),
+//                                         factory.createPropertyAssignment(
+//                                             factory.createIdentifier("name"),
+//                                             factory.createStringLiteral(relation)
+//                                         )
+//                                     ],
+//                                     true
+//                                 )
+//                             )
+//                         )),
+//                         true
+//                     )
+//                 )],
+//                 ts.NodeFlags.Const
+//             )
+//         )
+//     ];
 
-    stmts.push(
-        factory.createVariableStatement(
-            [
-                factory.createToken(ts.SyntaxKind.ExportKeyword)
-            ],
-            factory.createVariableDeclarationList(
-                [
-                    factory.createVariableDeclaration(
-                        factory.createIdentifier("deducedRelationMap"),
-                        undefined,
-                        factory.createTypeReferenceNode(
-                            factory.createIdentifier("AuthDeduceRelationMap"),
-                            [factory.createTypeReferenceNode(
-                                factory.createIdentifier("EntityDict"),
-                                undefined
-                            )]
-                        ),
-                        factory.createObjectLiteralExpression(
-                            Object.keys(DEDUCED_RELATION_MAP).map(
-                                ele => factory.createPropertyAssignment(
-                                    factory.createIdentifier(firstLetterLowerCase(ele)),
-                                    factory.createStringLiteral(DEDUCED_RELATION_MAP[ele])
-                                )
-                            ),
-                            true
-                        )
-                    )
-                ],
-                ts.NodeFlags.Const
-            )
-        )
-    );
+//     stmts.push(
+//         factory.createVariableStatement(
+//             [
+//                 factory.createToken(ts.SyntaxKind.ExportKeyword)
+//             ],
+//             factory.createVariableDeclarationList(
+//                 [
+//                     factory.createVariableDeclaration(
+//                         factory.createIdentifier("deducedRelationMap"),
+//                         undefined,
+//                         factory.createTypeReferenceNode(
+//                             factory.createIdentifier("AuthDeduceRelationMap"),
+//                             [factory.createTypeReferenceNode(
+//                                 factory.createIdentifier("EntityDict"),
+//                                 undefined
+//                             )]
+//                         ),
+//                         factory.createObjectLiteralExpression(
+//                             Object.keys(DEDUCED_RELATION_MAP).map(
+//                                 ele => factory.createPropertyAssignment(
+//                                     factory.createIdentifier(firstLetterLowerCase(ele)),
+//                                     factory.createStringLiteral(DEDUCED_RELATION_MAP[ele])
+//                                 )
+//                             ),
+//                             true
+//                         )
+//                     )
+//                 ],
+//                 ts.NodeFlags.Const
+//             )
+//         )
+//     );
 
-    stmts.push(
-        factory.createVariableStatement(
-            [
-                factory.createToken(ts.SyntaxKind.ExportKeyword)
-            ],
-            factory.createVariableDeclarationList(
-                [factory.createVariableDeclaration(
-                    factory.createIdentifier("selectFreeEntities"),
-                    undefined,
-                    factory.createArrayTypeNode(
-                        factory.createParenthesizedType(
-                            factory.createTypeOperatorNode(
-                                ts.SyntaxKind.KeyOfKeyword,
-                                factory.createTypeReferenceNode(
-                                    factory.createIdentifier("EntityDict"),
-                                    undefined
-                                )
-                            )
-                        )
-                    ),
-                    factory.createArrayLiteralExpression(
-                        SELECT_FREE_ENTITIES.map(
-                            ele => factory.createStringLiteral(ele)
-                        ),
-                        false
-                    )
-                )],
-                ts.NodeFlags.Const
-            )
-        ),
-        factory.createVariableStatement(
-            [
-                factory.createToken(ts.SyntaxKind.ExportKeyword)
-            ],
-            factory.createVariableDeclarationList(
-                [factory.createVariableDeclaration(
-                    factory.createIdentifier("updateFreeEntities"),
-                    undefined,
-                    factory.createArrayTypeNode(
-                        factory.createParenthesizedType(
-                            factory.createTypeOperatorNode(
-                                ts.SyntaxKind.KeyOfKeyword,
-                                factory.createTypeReferenceNode(
-                                    factory.createIdentifier("EntityDict"),
-                                    undefined
-                                )
-                            )
-                        )
-                    ),
-                    factory.createArrayLiteralExpression(
-                        UPDATE_FREE_ENTITIES.map(
-                            ele => factory.createStringLiteral(ele)
-                        ),
-                        false
-                    )
-                )],
-                ts.NodeFlags.Const
-            )
-        ),
-        factory.createVariableStatement(
-            [
-                factory.createToken(ts.SyntaxKind.ExportKeyword)
-            ],
-            factory.createVariableDeclarationList(
-                [factory.createVariableDeclaration(
-                    factory.createIdentifier("createFreeEntities"),
-                    undefined,
-                    factory.createArrayTypeNode(
-                        factory.createParenthesizedType(
-                            factory.createTypeOperatorNode(
-                                ts.SyntaxKind.KeyOfKeyword,
-                                factory.createTypeReferenceNode(
-                                    factory.createIdentifier("EntityDict"),
-                                    undefined
-                                )
-                            )
-                        )
-                    ),
-                    factory.createArrayLiteralExpression(
-                        CREATE_FREE_ENTITIES.map(
-                            ele => factory.createStringLiteral(ele)
-                        ),
-                        false
-                    )
-                )],
-                ts.NodeFlags.Const
-            )
-        )
-    );
+//     stmts.push(
+//         factory.createVariableStatement(
+//             [
+//                 factory.createToken(ts.SyntaxKind.ExportKeyword)
+//             ],
+//             factory.createVariableDeclarationList(
+//                 [factory.createVariableDeclaration(
+//                     factory.createIdentifier("selectFreeEntities"),
+//                     undefined,
+//                     factory.createArrayTypeNode(
+//                         factory.createParenthesizedType(
+//                             factory.createTypeOperatorNode(
+//                                 ts.SyntaxKind.KeyOfKeyword,
+//                                 factory.createTypeReferenceNode(
+//                                     factory.createIdentifier("EntityDict"),
+//                                     undefined
+//                                 )
+//                             )
+//                         )
+//                     ),
+//                     factory.createArrayLiteralExpression(
+//                         SELECT_FREE_ENTITIES.map(
+//                             ele => factory.createStringLiteral(ele)
+//                         ),
+//                         false
+//                     )
+//                 )],
+//                 ts.NodeFlags.Const
+//             )
+//         ),
+//         factory.createVariableStatement(
+//             [
+//                 factory.createToken(ts.SyntaxKind.ExportKeyword)
+//             ],
+//             factory.createVariableDeclarationList(
+//                 [factory.createVariableDeclaration(
+//                     factory.createIdentifier("updateFreeEntities"),
+//                     undefined,
+//                     factory.createArrayTypeNode(
+//                         factory.createParenthesizedType(
+//                             factory.createTypeOperatorNode(
+//                                 ts.SyntaxKind.KeyOfKeyword,
+//                                 factory.createTypeReferenceNode(
+//                                     factory.createIdentifier("EntityDict"),
+//                                     undefined
+//                                 )
+//                             )
+//                         )
+//                     ),
+//                     factory.createArrayLiteralExpression(
+//                         UPDATE_FREE_ENTITIES.map(
+//                             ele => factory.createStringLiteral(ele)
+//                         ),
+//                         false
+//                     )
+//                 )],
+//                 ts.NodeFlags.Const
+//             )
+//         ),
+//         factory.createVariableStatement(
+//             [
+//                 factory.createToken(ts.SyntaxKind.ExportKeyword)
+//             ],
+//             factory.createVariableDeclarationList(
+//                 [factory.createVariableDeclaration(
+//                     factory.createIdentifier("createFreeEntities"),
+//                     undefined,
+//                     factory.createArrayTypeNode(
+//                         factory.createParenthesizedType(
+//                             factory.createTypeOperatorNode(
+//                                 ts.SyntaxKind.KeyOfKeyword,
+//                                 factory.createTypeReferenceNode(
+//                                     factory.createIdentifier("EntityDict"),
+//                                     undefined
+//                                 )
+//                             )
+//                         )
+//                     ),
+//                     factory.createArrayLiteralExpression(
+//                         CREATE_FREE_ENTITIES.map(
+//                             ele => factory.createStringLiteral(ele)
+//                         ),
+//                         false
+//                     )
+//                 )],
+//                 ts.NodeFlags.Const
+//             )
+//         )
+//     );
 
 
 
-    const result = printer.printList(
-        ts.ListFormat.SourceFileStatements,
-        factory.createNodeArray(stmts),
-        ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS));
-    const filename = PathLib.join(outputDir, 'Relation.ts');
-    writeFileSync(filename, result, { flag: 'w' });
-}
+//     const result = printer.printList(
+//         ts.ListFormat.SourceFileStatements,
+//         factory.createNodeArray(stmts),
+//         ts.createSourceFile("someFileName.ts", "", ts.ScriptTarget.Latest, /*setParentNodes*/ false, ts.ScriptKind.TS));
+//     const filename = PathLib.join(outputDir, 'Relation.ts');
+//     writeFileSync(filename, result, { flag: 'w' });
+// }
 
 /**
  * 输出oak-app-domain中的Relation.ts文件
@@ -6791,29 +7306,13 @@ function outputRelation(outputDir: string, printer: ts.Printer) {
 function outputRelation2(outputDir: string, printer: ts.Printer) {
     const entityRelations: [string, string[]][] = [];
     for (const entity in Schema) {
-        const { hasRelationDef } = Schema[entity];
-        if (hasRelationDef) {
-            const { type } = hasRelationDef;
-            if (ts.isUnionTypeNode(type)) {
-                const { types } = type;
-                const relations = types.map(
-                    ele => {
-                        assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal));
-                        return ele.literal.text;
-                    }
-                );
-                entityRelations.push([firstLetterLowerCase(entity), relations]);
-            }
-            else {
-                assert(ts.isLiteralTypeNode(type));
-                assert(ts.isStringLiteral(type.literal));
-                const relations = [type.literal.text];
-                entityRelations.push([firstLetterLowerCase(entity), relations]);
-            }
+        const { relations } = Schema[entity];
+        if (relations) {
+            entityRelations.push([firstLetterLowerCase(entity), relations]);
         }
     }
 
-    const stmts: ts.Statement[] = [        
+    const stmts: ts.Statement[] = [
         factory.createImportDeclaration(
             undefined,
             factory.createImportClause(
@@ -6928,6 +7427,7 @@ export function buildSchema(outputDir: string): void {
     outputStorage(outputDir, printer);
     outputRelation2(outputDir, printer);
     outputIndexTs(outputDir);
+
 
     if (!process.env.COMPLING_AS_LIB) {
         outputPackageJson(outputDir);

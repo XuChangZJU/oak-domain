@@ -10,7 +10,7 @@ export abstract class SyncContext<ED extends EntityDict> implements Context {
 
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
     abstract isRoot(): boolean;
-    abstract toString(): string;
+    abstract toString(): Promise<string>;
     
     begin(option?: TxnOption) {
         assert(!this.uuid, '事务不允许嵌套');

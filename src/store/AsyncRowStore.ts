@@ -220,7 +220,7 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
 
     // 此接口将上下文变成可以serialized的字符串
-    abstract toString(): string;
+    abstract toString(): Promise<string>;
 
     // 此接口将字符串parse成对象再进行初始化
     abstract initialize(data: any): Promise<void>;

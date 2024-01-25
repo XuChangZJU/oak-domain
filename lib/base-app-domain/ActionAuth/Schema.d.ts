@@ -1,9 +1,8 @@
 import { ForeignKey, JsonProjection } from "../../types/DataType";
 import { Q_DateValue, Q_NumberValue, Q_StringValue, NodeId, MakeFilter, ExprOp, ExpressionKey, JsonFilter, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult, EntityShape } from "../../types/Entity";
 import { GenericAction } from "../../actions/action";
-import { EntityShape } from "../../types/Entity";
 import * as Relation from "../Relation/Schema";
 import * as Path from "../Path/Schema";
 import * as ModiEntity from "../ModiEntity/Schema";
