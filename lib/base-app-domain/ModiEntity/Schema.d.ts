@@ -1,10 +1,9 @@
 import { ForeignKey } from "../../types/DataType";
 import { Q_DateValue, Q_NumberValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, ExprOp, ExpressionKey } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, EntityShape } from "../../types/Entity";
 import { AppendOnlyAction } from "../../actions/action";
 import { String } from "../../types/DataType";
-import { EntityShape } from "../../types/Entity";
 import * as Modi from "../Modi/Schema";
 import * as ActionAuth from "../ActionAuth/Schema";
 import * as I18n from "../I18n/Schema";

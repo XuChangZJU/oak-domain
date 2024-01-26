@@ -1,9 +1,8 @@
 import { Q_DateValue, Q_NumberValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, ExprOp, ExpressionKey, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult, EntityShape } from "../../types/Entity";
 import { Action, ParticularAction, IState } from "./Action";
 import { String } from "../../types/DataType";
-import { EntityShape } from "../../types/Entity";
 import * as ModiEntity from "../ModiEntity/Schema";
 export type OpSchema = EntityShape & {
     targetEntity: String<32>;

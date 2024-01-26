@@ -5,7 +5,7 @@ export declare abstract class SyncContext<ED extends EntityDict> implements Cont
     constructor(rowStore: SyncRowStore<ED, SyncContext<ED>>);
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
     abstract isRoot(): boolean;
-    abstract toString(): string;
+    abstract toString(): Promise<string>;
     begin(option?: TxnOption): void;
     commit(): void;
     rollback(): void;

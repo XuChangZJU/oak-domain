@@ -1,11 +1,10 @@
 import { ForeignKey } from "../../types/DataType";
 import { Q_DateValue, Q_NumberValue, Q_StringValue, Q_EnumValue, NodeId, MakeFilter, ExprOp, ExpressionKey, SubQueryPredicateMetadata } from "../../types/Demand";
 import { OneOf } from "../../types/Polyfill";
-import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult } from "../../types/Entity";
+import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult, EntityShape } from "../../types/Entity";
 import { Action, ParticularAction, UserState } from "./Action";
 import { RelationAction } from "../../actions/action";
 import { String, Text } from "../../types/DataType";
-import { EntityShape } from "../../types/Entity";
 import * as Oper from "../Oper/Schema";
 import * as UserEntityClaim from "../UserEntityClaim/Schema";
 import * as UserRelation from "../UserRelation/Schema";

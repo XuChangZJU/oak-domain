@@ -20,7 +20,7 @@ export declare class SimpleConnector<ED extends EntityDict, FrontCxt extends Syn
     private option;
     private makeException;
     constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>);
-    callAspect(name: string, params: any, context: FrontCxt): Promise<{
+    callAspect(name: string, params: any, context?: FrontCxt): Promise<{
         result: any;
         opRecords: any;
         message: string | null;

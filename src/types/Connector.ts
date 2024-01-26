@@ -9,7 +9,7 @@ export interface Connector<ED extends EntityDict, FrontCxt extends SyncContext<E
     callAspect: (
         name: string,
         params: any,
-        context: FrontCxt
+        context?: FrontCxt
     ) => Promise<{
         result: any;
         opRecords?: OpRecord<ED>[];

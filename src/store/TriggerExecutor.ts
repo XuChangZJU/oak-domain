@@ -300,7 +300,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                 const { f } = record as UpdateOpResult<ED, keyof ED>;
                 ids = f!.id!.$in;
             }
-            const cxtStr = context.toString();
+            const cxtStr = await context.toString();
             this.onVolatileTrigger(entity, trigger, ids, cxtStr, option);
         });
     }

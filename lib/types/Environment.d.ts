@@ -31,6 +31,9 @@ export type WechatMpEnv = {
     theme?: 'light' | 'dark';
     enableDebug: boolean;
     deviceOrientation: 'portrait' | 'landscape';
+    host: {
+        appId: string;
+    };
     localStorageEnabled: true;
 };
 export type WebEnv = {

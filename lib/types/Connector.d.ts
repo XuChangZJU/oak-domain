@@ -4,7 +4,7 @@ import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OpRecord } from "./Entity";
 import { OakException } from "./Exception";
 export interface Connector<ED extends EntityDict, FrontCxt extends SyncContext<ED>> {
-    callAspect: (name: string, params: any, context: FrontCxt) => Promise<{
+    callAspect: (name: string, params: any, context?: FrontCxt) => Promise<{
         result: any;
         opRecords?: OpRecord<ED>[];
         message?: string | null;
