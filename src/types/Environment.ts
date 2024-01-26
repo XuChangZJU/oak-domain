@@ -33,6 +33,9 @@ export type WechatMpEnv = {
     theme?: 'light' | 'dark';           // 主题
     enableDebug: boolean;               // 是否打开调试
     deviceOrientation: 'portrait' | 'landscape';        // 横屏还是竖屏
+    host: {
+        appId: string;                  // 	宿主 app 对应的 appId
+    };
     localStorageEnabled: true;
 };
 
