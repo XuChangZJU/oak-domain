@@ -904,7 +904,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         const opData: Record<string, any> = {};
         const beforeFns: Array<() => R> = [];
         const afterFns: Array<() => R> = [];
-        if (modiAttr && action !== 'remove' && !option.dontCreateModi) {
+        if (modiAttr && action !== 'remove') {
             // create/update具有modi对象的对象，对其子对象的update行为全部是create modi对象（缓存动作）
             // delete此对象，所有的modi子对象应该通过触发器作废，这个目前先通过系统的trigger来实现
             assert(!option2.modiParentId && !option2.modiParentEntity);
@@ -1414,13 +1414,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
 
                     if (!option.dontCollect) {
                         context.saveOpRecord(entity, operation);
-                        /* context.opRecords.push({
-                            a: 'c',
-                            e: entity,
-                            d: data as ED[T]['OpSchema'] | ED[T]['OpSchema'][],
-                        }); */
                     }
-                    if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
+                    if (!['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
                         // 按照框架要求生成Oper和OperEntity这两个内置的对象
                         assert(operId);
                         const operatorId = context.getCurrentUserId(true);
@@ -1460,7 +1455,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             const closeRootMode = context.openRootMode();
                             await this.cascadeUpdateAsync('oper', createOper, context, {
                                 dontCollect: true,
-                                dontCreateOper: true,
                             });
                             closeRootMode();
                         }
@@ -1585,7 +1579,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
                 else {
                     const createOper = async () => {
-                        if (!option?.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
+                        if (!['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
                             // 按照框架要求生成Oper和OperEntity这两个内置的对象
                             assert(operId);
                             const createOper: CreateSingleOperOperation = {
@@ -1614,7 +1608,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                             const closeRootMode = context.openRootMode();
                             await this.cascadeUpdateAsync('oper', createOper, context, {
                                 dontCollect: true,
-                                dontCreateOper: true,
                             });
                             closeRootMode();
                         }
@@ -1631,15 +1624,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     }
                                 }
                             });
-                            /* context.opRecords.push({
-                                a: 'r',
-                                e: entity,
-                                f: {
-                                    id: {
-                                        $in: ids,
-                                    }
-                                },
-                            }); */
                         }
                     }
                     else {
@@ -1660,16 +1644,6 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                         }
                                     },
                                 });
-                                /* context.opRecords.push({
-                                    a: 'u',
-                                    e: entity,
-                                    d: data as ED[T]['Update']['data'],
-                                    f: {
-                                        id: {
-                                            $in: ids,
-                                        }
-                                    },
-                                }); */
                             }
                         }
                         else if (action !== 'update') {

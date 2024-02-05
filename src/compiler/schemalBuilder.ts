@@ -787,7 +787,7 @@ function searchImportedPath(path: string, fileSpecifierPath: string, filename: s
                     return PathLib.join(pkgJsonPath, '..', dependentFilePath, ...(fileSpecifierPaths[0] ? fileSpecifierPaths.slice(1) : (fileSpecifierPaths.slice(2))));
                 }
                 else {
-                    return PathLib.join(pkgJsonPath, 'node_modules', fileSpecifierPath);
+                    return PathLib.join(pkgJsonPath, '..', 'node_modules', fileSpecifierPath);
                 }
             }
         }

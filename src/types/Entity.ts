@@ -40,8 +40,6 @@ export type SelectOption = {
 export type OperateOption = {
     blockTrigger?: true;
     dontCollect?: boolean;
-    dontCreateOper?: boolean;
-    dontCreateModi?: boolean;
     includedDeleted?: true;     // 是否更新已删除行
     allowExists?: boolean;      // 插入时允许已经存在唯一键值的行了，即insert / update逻辑
     modiParentId?: string;      // 如果是延时更新，相关modi要关联到一个父亲上统一应用
@@ -190,14 +188,14 @@ export type RemoveOperation = Operation<'remove', RemoveOperationData, Filter, S
 export type CUDOperation = CreateOperation | UpdateOperation | RemoveOperation;
 
 export type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
-    id?: string;
+    id: string;
     a: 'c';
     e: T;
     d: ED[T]['OpSchema'] | ED[T]['OpSchema'][];
 };
 
 export type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
-    id?: string;
+    id: string;
     a: 'u',
     e: T;
     d: UpdateOperationData;
@@ -205,7 +203,7 @@ export type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
 };
 
 export type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
-    id?: string;
+    id: string;
     a: 'r',
     e: T;
     f?: Filter;
