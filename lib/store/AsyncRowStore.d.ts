@@ -48,6 +48,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     getMessage(): string | undefined;
     abstract isRoot(): boolean;
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
+    abstract setCurrentUserId(userId: string | undefined): void;
     abstract toString(): Promise<string>;
     abstract initialize(data: any): Promise<void>;
     abstract allowUserUpdate(): boolean;
