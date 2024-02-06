@@ -34,6 +34,7 @@ export type SelectOption = {
 export type OperateOption = {
     blockTrigger?: true;
     dontCollect?: boolean;
+    dontCreateOper?: boolean;
     includedDeleted?: true;
     allowExists?: boolean;
     modiParentId?: string;

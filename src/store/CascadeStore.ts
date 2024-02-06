@@ -1415,7 +1415,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     if (!option.dontCollect) {
                         context.saveOpRecord(entity, operation);
                     }
-                    if (!['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
+                    if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string)) {
                         // 按照框架要求生成Oper和OperEntity这两个内置的对象
                         assert(operId);
                         const operatorId = context.getCurrentUserId(true);
@@ -1579,7 +1579,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 }
                 else {
                     const createOper = async () => {
-                        if (!['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
+                        if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
                             // 按照框架要求生成Oper和OperEntity这两个内置的对象
                             assert(operId);
                             const createOper: CreateSingleOperOperation = {
