@@ -54,6 +54,7 @@ export type Operation<A extends string, D extends Projection, F extends Filter |
     action: A;
     data: D;
     sorter?: S;
+    bornAt?: number;
 } & FilterPart<A, F>;
 export type Selection<A extends ReadOnlyAction, D extends Projection, F extends Filter | undefined = undefined, S extends Sorter | undefined = undefined> = {
     id?: string;

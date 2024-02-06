@@ -3,7 +3,7 @@ import { Q_DateValue, Q_NumberValue, Q_StringValue, NodeId, MakeFilter, ExprOp, 
 import { OneOf } from "../../types/Polyfill";
 import { FormCreateData, FormUpdateData, DeduceAggregation, Operation as OakOperation, Selection as OakSelection, MakeAction as OakMakeAction, AggregationResult, EntityShape } from "../../types/Entity";
 import { AppendOnlyAction } from "../../actions/action";
-import { String } from "../../types/DataType";
+import { String, Datetime } from "../../types/DataType";
 import * as User from "../User/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 export type OpSchema = EntityShape & {
@@ -13,6 +13,7 @@ export type OpSchema = EntityShape & {
     extra?: Object | null;
     operatorId?: ForeignKey<"user"> | null;
     targetEntity: String<32>;
+    bornAt: Datetime;
 };
 export type OpAttr = keyof OpSchema;
 export type Schema = EntityShape & {
@@ -22,6 +23,7 @@ export type Schema = EntityShape & {
     extra?: Object | null;
     operatorId?: ForeignKey<"user"> | null;
     targetEntity: String<32>;
+    bornAt: Datetime;
     operator?: User.Schema | null;
     operEntity$oper?: Array<OperEntity.Schema>;
     operEntity$oper$$aggr?: AggregationResult<OperEntity.Schema>;
@@ -40,6 +42,7 @@ type AttrFilter = {
     operatorId: Q_StringValue;
     operator: User.Filter;
     targetEntity: Q_StringValue;
+    bornAt: Q_DateValue;
     operEntity$oper: OperEntity.Filter & SubQueryPredicateMetadata;
 };
 export type Filter = MakeFilter<AttrFilter & ExprOp<OpAttr | string>>;
@@ -57,6 +60,7 @@ export type Projection = {
     operatorId?: number;
     operator?: User.Projection;
     targetEntity?: number;
+    bornAt?: number;
     operEntity$oper?: OperEntity.Selection & {
         $entity: "operEntity";
     };
@@ -86,6 +90,8 @@ export type SortAttr = {
     operator: User.SortAttr;
 } | {
     targetEntity: number;
+} | {
+    bornAt: number;
 } | {
     [k: string]: any;
 } | OneOf<ExprOp<OpAttr | string>>;

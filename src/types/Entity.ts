@@ -60,10 +60,11 @@ export type Operation<A extends string,
     D extends Projection,
     F extends Filter | undefined = undefined,
     S extends Sorter | undefined = undefined> = {
-        id: string;     // 为了一致性，每个operation也应当保证唯一id
+        id: string;                 // 为了一致性，每个operation也应当保证唯一id
         action: A;
         data: D;
         sorter?: S;
+        bornAt?: number;          // operation的实际诞生时间（分布式环境下用）
     } & FilterPart<A, F>;
 
 export type Selection<A extends ReadOnlyAction, 
