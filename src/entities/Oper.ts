@@ -30,5 +30,19 @@ const entityDesc: EntityDesc<Schema> = {
     },
     configuration: {
         actionType: 'appendOnly',
-    }
+    },
+    indexes: [
+        {
+            name: 'index_bornAt_operatorId',
+            attributes: [
+                {
+                    name: 'bornAt',
+                    direction: 'DESC',
+                },
+                {
+                    name: 'operator',
+                },
+            ]
+        }
+    ]
 };

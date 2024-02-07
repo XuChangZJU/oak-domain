@@ -1277,7 +1277,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         context: Cxt,
         option: OP
     ): Promise<OperationResult<ED>> {
-        const { data, action, id: operId, filter } = operation;
+        const { data, action, id: operId, filter, bornAt } = operation;
         const now = Date.now();
 
         switch (action) {
@@ -1429,6 +1429,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     data,
                                     operatorId,
                                     targetEntity: entity as string,
+                                    bornAt,
                                     operEntity$oper: data instanceof Array ? {
                                         id: 'dummy',
                                         action: 'create',
@@ -1590,6 +1591,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     action,
                                     data,
                                     targetEntity: entity as string,
+                                    bornAt,
                                     operEntity$oper: {
                                         id: 'dummy',
                                         action: 'create',
@@ -1631,7 +1633,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         if (updateAttrCount > 0) {
                             // 优化一下，如果不更新任何属性，则不实际执行
                             Object.assign(data, {
-                                $$updateAt$$: now,
+                                [UpdateAtAttribute]: now,
                             });
                             if (!option.dontCollect) {
                                 context.saveOpRecord(entity, {
