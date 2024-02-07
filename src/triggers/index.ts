@@ -14,9 +14,9 @@ function createOperTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends 
             when: 'before',
             fn({ operation }) {
                 const { data } = operation;
-                assert(!(data instanceof Array) && data.$$createAt$$);
+                assert(!(data instanceof Array));
                 if (!data.bornAt) {
-                    data.bornAt = data.$$createAt$$;
+                    data.bornAt = Date.now();
                 }
                 return 1;
             }            

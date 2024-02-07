@@ -1450,7 +1450,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             entityId: (data as ED[T]['CreateSingle']['data']).id,
                                             entity: entity as string,
                                         },
-                                    }]
+                                    }],
                                 },
                             };
                             const closeRootMode = context.openRootMode();
