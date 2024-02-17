@@ -42,3 +42,17 @@ export type ProjectConfiguration = {
         bridge?: string;
     }
 }
+
+
+/**
+ * 编译环境配置
+ */
+export type CompilerConfiguration = {
+    webpack?: {
+        resolve?: {
+            alias?: Record<string, string>;
+            fallback?: Record<string, string | false>;
+        },
+        extraOakModules?: (string | RegExp)[];      // 被标记的module也会和项目一起被oak编译plugin进行处理（注入getRender，处理i18n等）
+    },
+};

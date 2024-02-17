@@ -28,3 +28,15 @@ export type ProjectConfiguration = {
         bridge?: string;
     };
 };
+/**
+ * 编译环境配置
+ */
+export type CompilerConfiguration = {
+    webpack?: {
+        resolve?: {
+            alias?: Record<string, string>;
+            fallback?: Record<string, string | false>;
+        };
+        extraOakModules?: (string | RegExp)[];
+    };
+};
