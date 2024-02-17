@@ -1,4 +1,4 @@
-import { StorageSchema } from "..";
+import { StorageSchema } from '../types/Storage';
 import { EntityDict as BaseEntityDict } from "../base-app-domain";
 import { EntityDict } from "../types/Entity";
 export declare function destructRelationPath<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(schema: StorageSchema<ED>, entity: T, path: string, relationFilter: ED['userRelation']['Selection']['filter'], recursive?: boolean): {

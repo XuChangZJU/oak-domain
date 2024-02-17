@@ -1,4 +1,4 @@
-import { StorageSchema } from "..";
+import { StorageSchema } from '../types/Storage';
 import { EntityDict as BaseEntityDict } from "../base-app-domain";
 import { EntityDict } from "../types/Entity";
 
