@@ -1190,16 +1190,16 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                         }
                                     }, { dontCollect: true })
                                 }
-                            ).flat() as ED['actionAuth']['Schema'][] | Promise<ED['actionAuth']['Schema']>[];
+                            ) as ED['actionAuth']['Schema'][][] | Promise<ED['actionAuth']['Schema']>[][];
                             if (childLegalAuths[0] instanceof Promise) {
                                 return Promise.all(childLegalAuths).then(
                                     (clas) => child.map(
-                                        (c) => checkNode(c, clas)
+                                        (c) => checkNode(c, clas.flat() as ED['actionAuth']['Schema'][])
                                     )
                                 )
                             }
                             return child.map(
-                                (c) => checkNode(c, childLegalAuths as ED['actionAuth']['Schema'][])
+                                (c) => checkNode(c, childLegalAuths.flat() as ED['actionAuth']['Schema'][])
                             );
                         }
 
