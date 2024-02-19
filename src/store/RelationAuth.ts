@@ -33,7 +33,7 @@ type CheckRelationResult = {
     relativePath: string;
 };
 
-export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
+export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
     private authDeduceRelationMap: AuthDeduceRelationMap<ED>;
     private schema: StorageSchema<ED>;
     static SPECIAL_ENTITIES = SYSTEM_RESERVE_ENTITIES;
@@ -117,7 +117,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
         else {
             assert(action === 'remove');
             // 如果一次删除多个userRelation,接下来的流程判断是只有一个relationAuth满足就会通过，这样可能会有错判 by Xc 20231019
-            assert(typeof filter.id === 'string', '当前只支持指定id的用户关系删除');
+            // assert(typeof filter.id === 'string', '当前只支持指定id的用户关系删除');
         }
 
         const relationAuths = context.select('relationAuth', {
