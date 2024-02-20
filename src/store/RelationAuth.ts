@@ -172,9 +172,10 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
          * 检查对超过一个的relationId是否有操作资格
          * @param relationFilter 限定relationId的条件
          * @param intersection 是否交集（对每个relationId都得有权限）
+         * @param entityFilter 限定entity的条件
          * @returns 
          */
-        const checkOnMultipleRelations = (relationFilter: ED['relation']['Selection']['filter'], intersection: boolean) => {
+        const checkOnMultipleRelations = (relationFilter: ED['relation']['Selection']['filter'], intersection: boolean, entityFilter: ED[keyof ED]['Selection']['filter']) => {
             const relations = context.select('relation', {
                 data: {
                     id: 1,
@@ -188,9 +189,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                     (rs) => {
                         return Promise.all(
                             rs.map(
-                                ele => checkOnRelationId(ele.id!, ele.entity!, {
-                                    id: ele.entityId
-                                })
+                                ele => checkOnRelationId(ele.id!, ele.entity!, entityFilter)
                             )
                         ).then(
                             (value) => {
@@ -203,9 +202,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                     }
                 );
             }
-            const value = relations.map(ele => checkOnRelationId(ele.id!, ele.entity!, {
-                id: ele.entityId
-            })) as boolean[];
+            const value = relations.map(ele => checkOnRelationId(ele.id!, ele.entity!, entityFilter)) as boolean[];
             if (intersection) {
                 return !(value.includes(false));
             }
@@ -214,26 +211,38 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
         if (action === 'create') {
             const { entity, entityId, relationId } = filter;
             assert(typeof entity === 'string');
+
+            let entityFilter: ED[keyof ED]['Selection']['filter'];
+            if (entityId) {
+                entityFilter = {
+                    id: entityId,
+                };
+            }
+            else {
+                // userEntityGrant会有这种情况，限定某个对象的范围进行授权
+                entityFilter = (filter as any)[entity];
+            }
             if (relationId) {
                 // 如果指定relation，则测试该relation上是否可行
                 assert(typeof relationId === 'string');
-
-                let entityFilter: ED[keyof ED]['Selection']['filter'];
-                if (entityId) {
-                    entityFilter = {
-                        id: entityId,
-                    };
-                }
-                else {
-                    // userEntityGrant会有这种情况，限定某个对象的范围进行授权
-                    entityFilter = (filter as any)[entity];
-                }
                 return checkOnRelationId(relationId, entity, entityFilter);
             }
             else {
                 // 否则为测试“能否”有权限管理的资格，此时只要有一个就可以
                 // 这是为上层的menu所有，真正的创建不可能走到这里
-                return checkOnMultipleRelations({ entity }, false);
+                return checkOnMultipleRelations({ 
+                    entity,
+                    $or: [
+                        {
+                            entityId: {
+                                $exists: false,
+                            },
+                        },
+                        {
+                            [entity]: entityFilter,
+                        }
+                    ]
+                }, false, entityFilter);
             }
         }
         else {
@@ -241,7 +250,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
             // 有可能是删除多个userRelation，这时必须检查每一个relation都有对应的权限(有一个不能删除那就不能删除)
             return checkOnMultipleRelations({
                 userRelation$relation: filter,
-            }, false);
+            }, false, {
+                userRelation$entity: filter,
+            });
         }
     }
 
