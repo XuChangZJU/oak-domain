@@ -93,75 +93,58 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
         const userId = context.getCurrentUserId();
         let filter2: ED['relationAuth']['Selection']['filter'] = {
         };
-        if (action === 'create') {
-            const { entity, entityId, relationId } = filter;
-            if (relationId) {
-                // 如果指定relation，则测试该relation上是否可行
-                filter2 = {
-                    destRelationId: relationId,
-                };
-            }
-            else {
-                // 否则为测试“能否”有权限管理的资格，此时只要有一个就可以
-                assert(entity);
-                filter2 = {
+
+        const { entity, entityId, relationId } = filter;
+        assert(entity);
+        /**
+         * 检查对某一个relationId是否有操作资格
+         * @param destRelationId 
+         * @returns 
+         */
+        const checkOnRelationId = (destRelationId: string) => {
+            const filter2: ED['relationAuth']['Selection']['filter'] = {
+                destRelationId: relationId,
+            };
+
+            /**
+             * 找到能创建此relation的所有父级relation，只要user和其中一个有关联即可以通过
+             */
+            const relationAuths = context.select('relationAuth', {
+                data: {
+                    id: 1,
+                    path: {
+                        id: 1,
+                        sourceEntity: 1,
+                        destEntity: 1,
+                        value: 1,
+                        recursive: 1,
+                    },
+                    sourceRelationId: 1,
+                    sourceRelation: {
+                        id: 1,
+                        entity: 1,
+                        entityId: 1,
+                    },
+                    destRelationId: 1,
                     destRelation: {
-                        entity,
-                    }
-                }
-            }
-        }
-        else {
-            assert(action === 'remove');
-            // 如果一次删除多个userRelation，这里用all表示必须满足子查询中的每一项
-            filter2 = {
-                destRelation: {
-                    userRelation$relation: {
-                        '#sqp': 'all',
-                        ...filter,
+                        id: 1,
+                        entity: 1,
+                        entityId: 1,
                     },
                 },
-            }
-        }
-
-        const relationAuths = context.select('relationAuth', {
-            data: {
-                id: 1,
-                path: {
-                    id: 1,
-                    sourceEntity: 1,
-                    destEntity: 1,
-                    value: 1,
-                    recursive: 1,
-                },
-                sourceRelationId: 1,
-                sourceRelation: {
-                    id: 1,
-                    entity: 1,
-                    entityId: 1,
-                },
-                destRelationId: 1,
-                destRelation: {
-                    id: 1,
-                    entity: 1,
-                    entityId: 1,
-                },
-            },
-            filter: filter2,
-        }, { dontCollect: true });
+                filter: filter2,
+            }, { dontCollect: true });
 
 
-        const checkRelationAuth = (relationAuth: ED['relationAuth']['Schema']) => {
-            const { destRelation, sourceRelationId, path } = relationAuth;
-            let destEntityFilter = this.makePathFilter(destRelation.entity!, path, this.schema, {
-                userRelation$entity: {
-                    userId,
-                    relationId: sourceRelationId,
-                },
-            })!;
+            const checkRelationAuth = (relationAuth: ED['relationAuth']['Schema']) => {
+                const { destRelation, sourceRelationId, path } = relationAuth;
+                let destEntityFilter = this.makePathFilter(destRelation.entity!, path, this.schema, {
+                    userRelation$entity: {
+                        userId,
+                        relationId: sourceRelationId,
+                    },
+                })!;
 
-            if (action === 'create') {
-                const { entity, entityId } = filter;
                 assert(entity && typeof entity === 'string');
 
                 if (entityId) {
@@ -175,35 +158,91 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                     assert(entityFilter);
                     destEntityFilter = combineFilters(entity, this.schema, [destEntityFilter, entityFilter])!;
                 }
-            }
-            else {
-                destEntityFilter = combineFilters(destRelation.entity!, this.schema, [destEntityFilter, {
-                    userRelation$entity: filter,
-                }])!;
+
+                return context.count(destRelation.entity, {
+                    filter: destEntityFilter,
+                }, { ignoreAttrMiss: true });
+            };
+
+            if (relationAuths instanceof Promise) {
+                return relationAuths.then(
+                    (ras) => Promise.all(ras.map(
+                        ra => checkRelationAuth(ra as ED['relationAuth']['Schema'])
+                    ))
+                ).then(
+                    (result) => !!result.find(ele => {
+                        assert(typeof ele === 'number');
+                        return ele > 0;
+                    })
+                );
             }
 
-            return context.count(destRelation.entity, {
-                filter: destEntityFilter,
-            }, { ignoreAttrMiss: true });
+            const result = relationAuths.map(
+                ra => checkRelationAuth(ra as ED['relationAuth']['Schema'])
+            );
+            return !!(result as number[]).find(ele => ele > 0);
         };
 
-        if (relationAuths instanceof Promise) {
-            return relationAuths.then(
-                (ras) => Promise.all(ras.map(
-                    ra => checkRelationAuth(ra as ED['relationAuth']['Schema'])
-                ))
-            ).then(
-                (result) => !!result.find(ele => {
-                    assert(typeof ele === 'number');
-                    return ele > 0;
-                })
+        /**
+         * 检查对超过一个的relationId是否有操作资格
+         * @param relationFilter 限定relationId的条件
+         * @param intersection 是否交集（对每个relationId都得有权限）
+         * @returns 
+         */
+        const checkOnMultipleRelations = (relationFilter: ED['relation']['Selection']['filter'], intersection: boolean) => {
+            const relations = context.select('relation', {
+                data: {
+                    id: 1,
+                },
+                filter: relationFilter
+            }, { dontCollect: true });
+            if (relations instanceof Promise) {
+                return relations.then(
+                    (rs) => {
+                        const relationIds = rs.map(ele => ele.id!);
+                        return Promise.all(
+                            relationIds.map(
+                                ele => checkOnRelationId(ele)
+                            )
+                        ).then(
+                            (value) => {
+                                if (intersection) {
+                                    return !(value.includes(false));
+                                }
+                                return value.includes(true);
+                            }
+                        );
+                    }
+                );
+            }
+            const relationIds = relations.map(
+                ele => ele.id!
             );
+            const value = relationIds.map(ele => checkOnRelationId(ele)) as boolean[];
+            if (intersection) {
+                return !(value.includes(false));
+            }
+            return value.includes(true);
+        };
+        if (action === 'create') {
+            if (relationId) {
+                // 如果指定relation，则测试该relation上是否可行
+                assert(typeof relationId === 'string');
+                return checkOnRelationId(relationId);
+            }
+            else {
+                // 否则为测试“能否”有权限管理的资格，此时只要有一个就可以
+                // 这是为上层的menu所有，真正的创建不可能走到这里
+                return checkOnMultipleRelations({ entity }, false);
+            }
         }
-
-        const result = relationAuths.map(
-            ra => checkRelationAuth(ra as ED['relationAuth']['Schema'])
-        );
-        return !!(result as number[]).find(ele => ele > 0);
+        else {
+            assert(action === 'remove');
+            // 有可能是删除多个userRelation，这时必须检查每一个relation都有对应的权限(有一个不能删除那就不能删除)
+            return checkOnMultipleRelations({
+                userRelation$relation: filter,
+            }, false);
+        }
     }
 
     private checkOperateSpecialEntities2<Cxt extends AsyncContext<ED> | SyncContext<ED>>(entity2: keyof ED, action: ED[keyof ED]['Action'], filter: ED[keyof ED]['Selection']['filter'], context: Cxt): boolean | Promise<boolean> {
