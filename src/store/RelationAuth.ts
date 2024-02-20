@@ -92,9 +92,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
     private checkUserRelation<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, action: ED[keyof ED]['Action'], filter: NonNullable<ED['userRelation']['Selection']['filter']>) {
         const userId = context.getCurrentUserId();
         let filter2: ED['relationAuth']['Selection']['filter'] = {
-            destRelation: {
-                userRelation$relation: filter,
-            },
         };
         if (action === 'create') {
             const { entity, entityId, relationId } = filter;
@@ -116,8 +113,15 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
         }
         else {
             assert(action === 'remove');
-            // 如果一次删除多个userRelation,接下来的流程判断是只有一个relationAuth满足就会通过，这样可能会有错判 by Xc 20231019
-            // assert(typeof filter.id === 'string', '当前只支持指定id的用户关系删除');
+            // 如果一次删除多个userRelation，这里用all表示必须满足子查询中的每一项
+            filter2 = {
+                destRelation: {
+                    userRelation$relation: {
+                        '#sqp': 'all',
+                        ...filter,
+                    },
+                },
+            }
         }
 
         const relationAuths = context.select('relationAuth', {

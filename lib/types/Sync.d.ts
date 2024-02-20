@@ -22,16 +22,18 @@ export interface SyncEntityDef<ED extends EntityDict & BaseEntityDict, T extends
     path: string;
     recursive?: boolean;
     relationName?: string;
-    direction: 'pull' | 'push';
+    direction: 'pull' | 'push' | 'bio';
 }
 export interface SyncRemoteConfigBase<ED extends EntityDict & BaseEntityDict> {
     entity: keyof ED;
     endpoint?: string;
+    pathToUser?: string;
+    relationName?: string;
     syncEntities: Array<SyncEntityDef<ED, keyof ED>>;
 }
 interface SyncRemoteConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncRemoteConfigBase<ED> {
-    getRemotePushInfo: (userId: string, context: Cxt) => Promise<RemotePushInfo>;
-    getRemotePullInfo: (id: string, context: Cxt) => Promise<RemotePullInfo>;
+    getPushInfo: (userId: string, context: Cxt) => Promise<RemotePushInfo>;
+    getPullInfo: (id: string, context: Cxt) => Promise<RemotePullInfo>;
 }
 export interface SyncSelfConfigBase<ED extends EntityDict & BaseEntityDict> {
     endpoint?: string;

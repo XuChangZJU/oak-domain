@@ -1203,21 +1203,28 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                     assert(node.type.literal.text.length < STRING_LITERAL_MAX_LENGTH, `Relation定义的字符串长度不长于${STRING_LITERAL_MAX_LENGTH}（${filename}，${node.type.literal.text}）`);
                     relationValues.push(node.type.literal.text);
                 }
-                else if (ts.isUnionTypeNode(node.type)) {
-                    assert(ts.isUnionTypeNode(node.type), `Relation的定义只能是string类型（${filename}）`);
-                    relationValues.push(...node.type.types.map(
-                        (ele) => {
-                            assert(ts.isLiteralTypeNode(ele) && ts.isStringLiteral(ele.literal), `Relation的定义只能是string类型（${filename}）`);
-                            assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `Relation定义的字符串长度不长于${STRING_LITERAL_MAX_LENGTH}（${filename}，${ele.literal.text}）`);
-                            return ele.literal.text;
-                        }
-                    ));
-                }
-                else {
-                    assert(ts.isTypeReferenceNode(node.type));
+                else if (ts.isTypeReferenceNode(node.type)){
                     const relationStrings = tryGetStringLiteralValues(moduleName, filename, 'relation', node.type, program);
                     assert(relationStrings.length > 0);
                     relationValues.push(...relationStrings);
+                }
+                else {
+                    assert (ts.isUnionTypeNode(node.type), `Relation的定义只能是string类型，或者string union类型，或者两者的union（${filename}）`);
+                    node.type.types.forEach(
+                        (ele) => {
+                            if (ts.isLiteralTypeNode(ele)) {
+                                assert(ts.isStringLiteral(ele.literal), `Relation的定义只能是string类型（${filename}）`);
+                                assert(ele.literal.text.length < STRING_LITERAL_MAX_LENGTH, `Relation定义的字符串长度不长于${STRING_LITERAL_MAX_LENGTH}（${filename}，${ele.literal.text}）`);
+                                relationValues.push(ele.literal.text);
+                            }
+                            else {
+                                assert (ts.isTypeReferenceNode(ele), `Relation的定义只能是string类型，或者string union类型，或者两者的union（${filename}）`); 
+                                const relationStrings = tryGetStringLiteralValues(moduleName, filename, 'relation', ele, program);
+                                assert(relationStrings.length > 0);
+                                relationValues.push(...relationStrings);
+                            }
+                        }
+                    );
                 }
 
                 // 对UserEntityGrant对象，建立相应的反指关系
