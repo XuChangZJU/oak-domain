@@ -219,6 +219,8 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
 
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
 
+    abstract setCurrentUserId(userId: string | undefined): void;            // 设置上下文userId，必须在root模式下才能调用
+
     // 此接口将上下文变成可以serialized的字符串
     abstract toString(): Promise<string>;
 

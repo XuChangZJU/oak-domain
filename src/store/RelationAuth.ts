@@ -9,6 +9,7 @@ import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
 import { difference, intersection, set, uniq, cloneDeep, groupBy } from '../utils/lodash';
 import { SYSTEM_RESERVE_ENTITIES } from "../compiler/entities";
+import { destructDirectPath, destructRelationPath } from "../utils/relationPath";
 
 
 type OperationTree<ED extends EntityDict & BaseEntityDict> = {
@@ -32,7 +33,7 @@ type CheckRelationResult = {
     relativePath: string;
 };
 
-export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
+export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
     private authDeduceRelationMap: AuthDeduceRelationMap<ED>;
     private schema: StorageSchema<ED>;
     static SPECIAL_ENTITIES = SYSTEM_RESERVE_ENTITIES;
@@ -90,115 +91,169 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
      */
     private checkUserRelation<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, action: ED[keyof ED]['Action'], filter: NonNullable<ED['userRelation']['Selection']['filter']>) {
         const userId = context.getCurrentUserId();
-        let filter2: ED['relationAuth']['Selection']['filter'] = {
-            destRelation: {
-                userRelation$relation: filter,
-            },
+        
+        /**
+         * 检查对某一个relationId是否有操作资格
+         * @param destRelationId 
+         * @returns 
+         */
+        const checkOnRelationId = <T extends keyof ED>(destRelationId: string, entity: T, filter: ED[T]['Selection']['filter']) => {
+            /**
+             * 找到能创建此relation的所有父级relation，只要user和其中一个有关联即可以通过
+             */
+            const relationAuths = context.select('relationAuth', {
+                data: {
+                    id: 1,
+                    path: {
+                        id: 1,
+                        sourceEntity: 1,
+                        destEntity: 1,
+                        value: 1,
+                        recursive: 1,
+                    },
+                    sourceRelationId: 1,
+                    sourceRelation: {
+                        id: 1,
+                        entity: 1,
+                        entityId: 1,
+                    },
+                    destRelationId: 1,
+                    destRelation: {
+                        id: 1,
+                        entity: 1,
+                        entityId: 1,
+                    },
+                },
+                filter: {
+                    destRelationId,
+                },
+            }, { dontCollect: true });
+
+
+            const checkRelationAuth = (relationAuth: ED['relationAuth']['Schema']) => {
+                const { destRelation, sourceRelationId, path } = relationAuth;
+                assert(entity === destRelation.entity);
+                let destEntityFilter = this.makePathFilter(entity, path, this.schema, {
+                    userRelation$entity: {
+                        userId,
+                        relationId: sourceRelationId,
+                    },
+                })!;
+
+                if (filter) {
+                    destEntityFilter = combineFilters(entity, this.schema, [destEntityFilter, filter])!;
+                }
+
+                return context.count(destRelation.entity, {
+                    filter: destEntityFilter,
+                }, { ignoreAttrMiss: true });
+            };
+
+            if (relationAuths instanceof Promise) {
+                return relationAuths.then(
+                    (ras) => Promise.all(ras.map(
+                        ra => checkRelationAuth(ra as ED['relationAuth']['Schema'])
+                    ))
+                ).then(
+                    (result) => !!result.find(ele => {
+                        assert(typeof ele === 'number');
+                        return ele > 0;
+                    })
+                );
+            }
+
+            const result = relationAuths.map(
+                ra => checkRelationAuth(ra as ED['relationAuth']['Schema'])
+            );
+            return !!(result as number[]).find(ele => ele > 0);
+        };
+
+        /**
+         * 检查对超过一个的relationId是否有操作资格
+         * @param relationFilter 限定relationId的条件
+         * @param intersection 是否交集（对每个relationId都得有权限）
+         * @param entityFilter 限定entity的条件
+         * @returns 
+         */
+        const checkOnMultipleRelations = (relationFilter: ED['relation']['Selection']['filter'], intersection: boolean, entityFilter: ED[keyof ED]['Selection']['filter']) => {
+            const relations = context.select('relation', {
+                data: {
+                    id: 1,
+                    entity: 1,
+                    entityId: 1,
+                },
+                filter: relationFilter
+            }, { dontCollect: true });
+            if (relations instanceof Promise) {
+                return relations.then(
+                    (rs) => {
+                        return Promise.all(
+                            rs.map(
+                                ele => checkOnRelationId(ele.id!, ele.entity!, entityFilter)
+                            )
+                        ).then(
+                            (value) => {
+                                if (intersection) {
+                                    return !(value.includes(false));
+                                }
+                                return value.includes(true);
+                            }
+                        );
+                    }
+                );
+            }
+            const value = relations.map(ele => checkOnRelationId(ele.id!, ele.entity!, entityFilter)) as boolean[];
+            if (intersection) {
+                return !(value.includes(false));
+            }
+            return value.includes(true);
         };
         if (action === 'create') {
             const { entity, entityId, relationId } = filter;
-            if (relationId) {
-                // 如果指定relation，则测试该relation上是否可行
-                filter2 = {
-                    destRelationId: relationId,
+            assert(typeof entity === 'string');
+
+            let entityFilter: ED[keyof ED]['Selection']['filter'];
+            if (entityId) {
+                entityFilter = {
+                    id: entityId,
                 };
             }
             else {
+                // userEntityGrant会有这种情况，限定某个对象的范围进行授权
+                entityFilter = (filter as any)[entity];
+            }
+            if (relationId) {
+                // 如果指定relation，则测试该relation上是否可行
+                assert(typeof relationId === 'string');
+                return checkOnRelationId(relationId, entity, entityFilter);
+            }
+            else {
                 // 否则为测试“能否”有权限管理的资格，此时只要有一个就可以
-                assert(entity);
-                filter2 = {
-                    destRelation: {
-                        entity,
-                    }
-                }
+                // 这是为上层的menu所有，真正的创建不可能走到这里
+                return checkOnMultipleRelations({ 
+                    entity,
+                    $or: [
+                        {
+                            entityId: {
+                                $exists: false,
+                            },
+                        },
+                        {
+                            [entity]: entityFilter,
+                        }
+                    ]
+                }, false, entityFilter);
             }
         }
         else {
             assert(action === 'remove');
-            // 如果一次删除多个userRelation,接下来的流程判断是只有一个relationAuth满足就会通过，这样可能会有错判 by Xc 20231019
-            assert(typeof filter.id === 'string', '当前只支持指定id的用户关系删除');
+            // 有可能是删除多个userRelation，这时必须检查每一个relation都有对应的权限(有一个不能删除那就不能删除)
+            return checkOnMultipleRelations({
+                userRelation$relation: filter,
+            }, false, {
+                userRelation$entity: filter,
+            });
         }
-
-        const relationAuths = context.select('relationAuth', {
-            data: {
-                id: 1,
-                path: {
-                    id: 1,
-                    sourceEntity: 1,
-                    destEntity: 1,
-                    value: 1,
-                    recursive: 1,
-                },
-                sourceRelationId: 1,
-                sourceRelation: {
-                    id: 1,
-                    entity: 1,
-                    entityId: 1,
-                },
-                destRelationId: 1,
-                destRelation: {
-                    id: 1,
-                    entity: 1,
-                    entityId: 1,
-                },
-            },
-            filter: filter2,
-        }, { dontCollect: true });
-
-
-        const checkRelationAuth = (relationAuth: ED['relationAuth']['Schema']) => {
-            const { destRelation, sourceRelationId, path } = relationAuth;
-            let destEntityFilter = this.makePathFilter(destRelation.entity!, path, this.schema, {
-                userRelation$entity: {
-                    userId,
-                    relationId: sourceRelationId,
-                },
-            })!;
-
-            if (action === 'create') {
-                const { entity, entityId } = filter;
-                assert(entity && typeof entity === 'string');
-
-                if (entityId) {
-                    Object.assign(destEntityFilter, {
-                        id: entityId,
-                    });
-                }
-                else {
-                    // userEntityGrant会有这种情况，限定某个对象的范围进行授权
-                    const { [entity]: entityFilter } = filter as any;
-                    assert(entityFilter);
-                    destEntityFilter = combineFilters(entity, this.schema, [destEntityFilter, entityFilter])!;
-                }
-            }
-            else {
-                destEntityFilter = combineFilters(destRelation.entity!, this.schema, [destEntityFilter, {
-                    userRelation$entity: filter,
-                }])!;
-            }
-
-            return context.count(destRelation.entity, {
-                filter: destEntityFilter,
-            }, { ignoreAttrMiss: true });
-        };
-
-        if (relationAuths instanceof Promise) {
-            return relationAuths.then(
-                (ras) => Promise.all(ras.map(
-                    ra => checkRelationAuth(ra as ED['relationAuth']['Schema'])
-                ))
-            ).then(
-                (result) => !!result.find(ele => {
-                    assert(typeof ele === 'number');
-                    return ele > 0;
-                })
-            );
-        }
-
-        const result = relationAuths.map(
-            ra => checkRelationAuth(ra as ED['relationAuth']['Schema'])
-        );
-        return !!(result as number[]).find(ele => ele > 0);
     }
 
     private checkOperateSpecialEntities2<Cxt extends AsyncContext<ED> | SyncContext<ED>>(entity2: keyof ED, action: ED[keyof ED]['Action'], filter: ED[keyof ED]['Selection']['filter'], context: Cxt): boolean | Promise<boolean> {
@@ -1190,16 +1245,16 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict>{
                                         }
                                     }, { dontCollect: true })
                                 }
-                            ).flat() as ED['actionAuth']['Schema'][] | Promise<ED['actionAuth']['Schema']>[];
+                            ) as ED['actionAuth']['Schema'][][] | Promise<ED['actionAuth']['Schema']>[][];
                             if (childLegalAuths[0] instanceof Promise) {
                                 return Promise.all(childLegalAuths).then(
                                     (clas) => child.map(
-                                        (c) => checkNode(c, clas)
+                                        (c) => checkNode(c, clas.flat() as ED['actionAuth']['Schema'][])
                                     )
                                 )
                             }
                             return child.map(
-                                (c) => checkNode(c, childLegalAuths as ED['actionAuth']['Schema'][])
+                                (c) => checkNode(c, childLegalAuths.flat() as ED['actionAuth']['Schema'][])
                             );
                         }
 
@@ -1421,114 +1476,6 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
     }, { dontCollect: true });
 
     const getUserRelations = async (urAuths: Partial<ED['actionAuth']['Schema']>[]) => {
-        const makeRelationIterator = (path: string, relationIds: string[], recursive: boolean) => {
-            assert(!recursive, 'recursive的情况还没处理，等跑出来再说， by Xc');
-            if (path === '') {
-                return {
-                    projection: {
-                        id: 1,
-                        userRelation$entity: {
-                            $entity: 'userRelation',
-                            data: {
-                                id: 1,
-                                relationId: 1,
-                                relation: {
-                                    id: 1,
-                                    name: 1,
-                                },
-                                entity: 1,
-                                entityId: 1,
-                                userId: 1,
-                            },
-                            filter: {
-                                relationId: {
-                                    $in: relationIds,
-                                },
-                            },
-                        } as ED['userRelation']['Selection'],
-                    } as ED[keyof ED]['Selection']['data'],
-                    getData: (d: Partial<ED[keyof ED]['Schema']>) => {
-                        return d.userRelation$entity;
-                    },
-                };
-            }
-            const paths = path.split('.');
-
-            const makeIter = (e: keyof ED, idx: number): {
-                projection: ED[keyof ED]['Selection']['data'];
-                getData: (d: Partial<ED[keyof ED]['Schema']>) => any;
-            } => {
-                if (idx === paths.length) {
-                    return {
-                        projection: {
-                            id: 1,
-                            userRelation$entity: {
-                                $entity: 'userRelation',
-                                data: {
-                                    id: 1,
-                                    relationId: 1,
-                                    relation: {
-                                        id: 1,
-                                        name: 1,
-                                    },
-                                    entity: 1,
-                                    entityId: 1,
-                                    userId: 1,
-                                },
-                                filter: {
-                                    relationId: {
-                                        $in: relationIds,
-                                    },
-                                },
-                            } as ED['userRelation']['Selection']
-                        } as ED[keyof ED]['Selection']['data'],
-                        getData: (d: Partial<ED[keyof ED]['Schema']>) => {
-                            return d.userRelation$entity;
-                        },
-                    };
-                }
-                const attr = paths[idx];
-                const rel = judgeRelation(context.getSchema(), e, attr);
-                if (rel === 2) {
-                    const { projection, getData } = makeIter(attr, idx + 1);
-                    return {
-                        projection: {
-                            id: 1,
-                            [attr]: projection,
-                        },
-                        getData: (d) => d[attr] && getData(d[attr]!),
-                    };
-                }
-                else if (typeof rel === 'string') {
-                    const { projection, getData } = makeIter(rel, idx + 1);
-                    return {
-                        projection: {
-                            id: 1,
-                            [attr]: projection,
-                        },
-                        getData: (d) => d[attr] && getData(d[attr]!),
-                    };
-                }
-                else {
-                    assert(rel instanceof Array);
-                    const [e2, fk] = rel;
-                    const { projection, getData } = makeIter(e2, idx + 1);
-                    return {
-                        projection: {
-                            id: 1,
-                            [attr]: {
-                                $entity: e2,
-                                data: projection,
-                            },
-                        },
-                        getData: (d) => d[attr] && d[attr]!.map((ele: any) => getData(ele)),
-                    }
-                }
-            };
-
-            return makeIter(entity, 0);
-        };
-
         // 相同的path可以groupBy掉
         const urAuthDict2: Record<string, [string[], boolean]> = {};
         urAuths.forEach(
@@ -1544,12 +1491,16 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
                     urAuthDict2[value][0].push(relationId!);
                 }
             }
-        )
+        );
 
         const userRelations = await Promise.all(Object.keys(urAuthDict2).map(
             async (path) => {
                 const [relationIds, recursive] = urAuthDict2[path];
-                const { projection, getData } = makeRelationIterator(path, relationIds, recursive);
+                const { projection, getData } = destructRelationPath(context.getSchema(), entity, path, {
+                    relationId: {
+                        $in: relationIds,
+                    },
+                }, recursive);
                 const rows = await context.select(entity, {
                     data: projection,
                     filter,
@@ -1563,99 +1514,12 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
     };
 
     const getDirectUserEntities = async (directAuths: Partial<ED['actionAuth']['Schema']>[]) => {
-        const makeRelationIterator = (path: string) => {
-            const paths = path.split('.');
-
-            const makeIter = (e: keyof ED, idx: number): {
-                projection: ED[keyof ED]['Selection']['data'];
-                getData: (d: Partial<ED[keyof ED]['Schema']>) => any;
-            } => {
-                const attr = paths[idx];
-                const rel = judgeRelation(context.getSchema(), e, attr);
-                if (idx === paths.length - 1) {
-                    if (rel === 2) {
-                        assert(attr === 'user');
-                        return {
-                            projection: {
-                                id: 1,
-                                entity: 1,
-                                entityId: 1,
-                            },
-                            getData: (d) => {
-                                if (d) {
-                                    return {
-                                        entity: e,
-                                        entityId: d.id,
-                                        userId: d.entityId,
-                                    };
-                                }
-                            },
-                        };
-                    }
-                    else {
-                        assert(rel === 'user');
-                        return {
-                            projection: {
-                                id: 1,
-                                [`${attr}Id`]: 1,
-                            },
-                            getData: (d) => {
-                                if (d) {
-                                    return {
-                                        entity: e,
-                                        entityId: d.id,
-                                        userId: d[`${attr}Id`]
-                                    }
-                                }
-                            },
-                        };
-                    }
-                }
-                if (rel === 2) {
-                    const { projection, getData } = makeIter(attr, idx + 1);
-                    return {
-                        projection: {
-                            id: 1,
-                            [attr]: projection,
-                        },
-                        getData: (d) => d[attr] && getData(d[attr]!),
-                    };
-                }
-                else if (typeof rel === 'string') {
-                    const { projection, getData } = makeIter(rel, idx + 1);
-                    return {
-                        projection: {
-                            id: 1,
-                            [attr]: projection,
-                        },
-                        getData: (d) => d[attr] && getData(d[attr]!),
-                    };
-                }
-                else {
-                    assert(rel instanceof Array);
-                    const [e2, fk] = rel;
-                    const { projection, getData } = makeIter(e2, idx + 1);
-                    return {
-                        projection: {
-                            id: 1,
-                            [attr]: {
-                                $entity: e2,
-                                data: projection,
-                            },
-                        },
-                        getData: (d) => d[attr] && d[attr]!.map((ele: any) => getData(ele)),
-                    }
-                }
-            };
-
-            return makeIter(entity, 0);
-        };
         const userEntities = await Promise.all(
             directAuths.map(
                 async ({ path }) => {
                     const { value, recursive } = path!;
                     assert(!recursive);
-                    const { getData, projection } = makeRelationIterator(value!);
+                    const { getData, projection } = destructDirectPath(context.getSchema(), entity, value!, recursive);
 
                     const rows = await context.select(entity, {
                         data: projection,

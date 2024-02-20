@@ -1,4 +1,4 @@
-import { String } from '../types/DataType';
+import { String, Datetime } from '../types/DataType';
 import { EntityShape } from '../types/Entity';
 import { Schema as User } from './User';
 export interface Schema extends EntityShape {
@@ -8,4 +8,5 @@ export interface Schema extends EntityShape {
     extra?: Object;
     operator?: User;
     targetEntity: String<32>;
+    bornAt: Datetime;
 }

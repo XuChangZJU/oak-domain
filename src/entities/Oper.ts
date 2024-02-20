@@ -10,6 +10,7 @@ export interface Schema extends EntityShape {
     extra?: Object;
     operator?: User;
     targetEntity: String<32>;
+    bornAt: Datetime;
 };
 
 const entityDesc: EntityDesc<Schema> = {
@@ -23,10 +24,25 @@ const entityDesc: EntityDesc<Schema> = {
                 extra: '其它',
                 operator: '操作者',
                 targetEntity: '关联对象',
+                bornAt: '诞生时间'
             },
         },
     },
     configuration: {
         actionType: 'appendOnly',
-    }
+    },
+    indexes: [
+        {
+            name: 'index_bornAt_operatorId',
+            attributes: [
+                {
+                    name: 'bornAt',
+                    direction: 'DESC',
+                },
+                {
+                    name: 'operator',
+                },
+            ]
+        }
+    ]
 };

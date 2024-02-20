@@ -35,7 +35,6 @@ export type OperateOption = {
     blockTrigger?: true;
     dontCollect?: boolean;
     dontCreateOper?: boolean;
-    dontCreateModi?: boolean;
     includedDeleted?: true;
     allowExists?: boolean;
     modiParentId?: string;
@@ -55,6 +54,7 @@ export type Operation<A extends string, D extends Projection, F extends Filter |
     action: A;
     data: D;
     sorter?: S;
+    bornAt?: number;
 } & FilterPart<A, F>;
 export type Selection<A extends ReadOnlyAction, D extends Projection, F extends Filter | undefined = undefined, S extends Sorter | undefined = undefined> = {
     id?: string;
@@ -146,20 +146,20 @@ type RemoveOperationData = {
 export type RemoveOperation = Operation<'remove', RemoveOperationData, Filter, Sorter>;
 export type CUDOperation = CreateOperation | UpdateOperation | RemoveOperation;
 export type CreateOpResult<ED extends EntityDict, T extends keyof ED> = {
-    id?: string;
+    id: string;
     a: 'c';
     e: T;
     d: ED[T]['OpSchema'] | ED[T]['OpSchema'][];
 };
 export type UpdateOpResult<ED extends EntityDict, T extends keyof ED> = {
-    id?: string;
+    id: string;
     a: 'u';
     e: T;
     d: UpdateOperationData;
     f?: Filter;
 };
 export type RemoveOpResult<ED extends EntityDict, T extends keyof ED> = {
-    id?: string;
+    id: string;
     a: 'r';
     e: T;
     f?: Filter;

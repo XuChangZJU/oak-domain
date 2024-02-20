@@ -13,16 +13,16 @@ export interface Schema extends EntityShape {
 type UserAction = 'mergeTo';
 type UserState = 'normal' | 'merged';
 
-type Action = UserAction;
+export type Action = UserAction;
 
 
-const UserActionDef: ActionDef<UserAction, UserState> = {
+export const UserActionDef: ActionDef<UserAction, UserState> = {
     stm: {
         mergeTo: ['normal', 'merged'],
     },
 };
 
-const entityDesc: EntityDesc<Schema, Action, '', {
+export const entityDesc: EntityDesc<Schema, Action, '', {
     userState: UserState,
 }> = {
     locales: {

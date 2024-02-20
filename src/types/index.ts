@@ -24,3 +24,4 @@ export * from './EntityDesc';
 export * from './Environment';
 export * from './Locale';
 export * from './Cluster';
+export * from './Sync';
