@@ -91,21 +91,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      */
     private checkUserRelation<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, action: ED[keyof ED]['Action'], filter: NonNullable<ED['userRelation']['Selection']['filter']>) {
         const userId = context.getCurrentUserId();
-        let filter2: ED['relationAuth']['Selection']['filter'] = {
-        };
-
-        const { entity, entityId, relationId } = filter;
-        assert(entity);
+        
         /**
          * 检查对某一个relationId是否有操作资格
          * @param destRelationId 
          * @returns 
          */
-        const checkOnRelationId = (destRelationId: string) => {
-            const filter2: ED['relationAuth']['Selection']['filter'] = {
-                destRelationId: relationId,
-            };
-
+        const checkOnRelationId = <T extends keyof ED>(destRelationId: string, entity: T, filter: ED[T]['Selection']['filter']) => {
             /**
              * 找到能创建此relation的所有父级relation，只要user和其中一个有关联即可以通过
              */
@@ -132,31 +124,24 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                         entityId: 1,
                     },
                 },
-                filter: filter2,
+                filter: {
+                    destRelationId,
+                },
             }, { dontCollect: true });
 
 
             const checkRelationAuth = (relationAuth: ED['relationAuth']['Schema']) => {
                 const { destRelation, sourceRelationId, path } = relationAuth;
-                let destEntityFilter = this.makePathFilter(destRelation.entity!, path, this.schema, {
+                assert(entity === destRelation.entity);
+                let destEntityFilter = this.makePathFilter(entity, path, this.schema, {
                     userRelation$entity: {
                         userId,
                         relationId: sourceRelationId,
                     },
                 })!;
 
-                assert(entity && typeof entity === 'string');
-
-                if (entityId) {
-                    Object.assign(destEntityFilter, {
-                        id: entityId,
-                    });
-                }
-                else {
-                    // userEntityGrant会有这种情况，限定某个对象的范围进行授权
-                    const { [entity]: entityFilter } = filter as any;
-                    assert(entityFilter);
-                    destEntityFilter = combineFilters(entity, this.schema, [destEntityFilter, entityFilter])!;
+                if (filter) {
+                    destEntityFilter = combineFilters(entity, this.schema, [destEntityFilter, filter])!;
                 }
 
                 return context.count(destRelation.entity, {
@@ -193,16 +178,19 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
             const relations = context.select('relation', {
                 data: {
                     id: 1,
+                    entity: 1,
+                    entityId: 1,
                 },
                 filter: relationFilter
             }, { dontCollect: true });
             if (relations instanceof Promise) {
                 return relations.then(
                     (rs) => {
-                        const relationIds = rs.map(ele => ele.id!);
                         return Promise.all(
-                            relationIds.map(
-                                ele => checkOnRelationId(ele)
+                            rs.map(
+                                ele => checkOnRelationId(ele.id!, ele.entity!, {
+                                    id: ele.entityId
+                                })
                             )
                         ).then(
                             (value) => {
@@ -215,20 +203,32 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                     }
                 );
             }
-            const relationIds = relations.map(
-                ele => ele.id!
-            );
-            const value = relationIds.map(ele => checkOnRelationId(ele)) as boolean[];
+            const value = relations.map(ele => checkOnRelationId(ele.id!, ele.entity!, {
+                id: ele.entityId
+            })) as boolean[];
             if (intersection) {
                 return !(value.includes(false));
             }
             return value.includes(true);
         };
         if (action === 'create') {
+            const { entity, entityId, relationId } = filter;
+            assert(typeof entity === 'string');
             if (relationId) {
                 // 如果指定relation，则测试该relation上是否可行
                 assert(typeof relationId === 'string');
-                return checkOnRelationId(relationId);
+
+                let entityFilter: ED[keyof ED]['Selection']['filter'];
+                if (entityId) {
+                    entityFilter = {
+                        id: entityId,
+                    };
+                }
+                else {
+                    // userEntityGrant会有这种情况，限定某个对象的范围进行授权
+                    entityFilter = (filter as any)[entity];
+                }
+                return checkOnRelationId(relationId, entity, entityFilter);
             }
             else {
                 // 否则为测试“能否”有权限管理的资格，此时只要有一个就可以
