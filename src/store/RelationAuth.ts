@@ -91,15 +91,13 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
      */
     private checkUserRelation<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, action: ED[keyof ED]['Action'], filter: NonNullable<ED['userRelation']['Selection']['filter']>) {
         const userId = context.getCurrentUserId();
-        
-        const { entity } = filter;
-        assert(typeof entity === 'string');
+
         /**
          * 检查对某一个relationId是否有操作资格
          * @param destRelationId 
          * @returns 
          */
-        const checkOnRelationId = (destRelationId: string, filter: ED[keyof ED]['Selection']['filter']) => {
+        const checkOnRelationId = (entity: keyof ED, destRelationId: string, filter: ED[keyof ED]['Selection']['filter']) => {
             /**
              * 找到能创建此relation的所有父级relation，只要user和其中一个有关联即可以通过
              */
@@ -175,9 +173,17 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
          * @param relationFilter 限定relationId的条件
          * @param intersection 是否交集（对每个relationId都得有权限）
          * @param entityFilter 限定entity的条件
+         * @param entity 对应的entity
+         * @attention 这里为了代码复用，有可能是要通过本函数内部来查询确定entity；所以要保证，如果传入的relationFilter就可以确定relationId，则这里的entity参数必传。
          * @returns 
          */
-        const checkOnMultipleRelations = (relationFilter: ED['relation']['Selection']['filter'], intersection: boolean, entityFilter: ED[keyof ED]['Selection']['filter']) => {
+        const checkOnMultipleRelations = (
+            relationFilter: ED['relation']['Selection']['filter'],
+            intersection: boolean,
+            entityFilter: ED[keyof ED]['Selection']['filter'],
+            entity?: keyof ED
+        ) => {
+            let entity2 = entity;
             const getRelationIds = () => {
                 const relevantIds = getRelevantIds(relationFilter);
                 if (relevantIds.length > 0) {
@@ -195,8 +201,23 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
 
                 if (relations instanceof Promise) {
                     return relations.then(
-                        (rs) => rs.map(ele => ele.id!)
+                        (rs) => {
+                            if (!entity2) {
+                                entity2 = rs[0]?.entity;
+                            }
+                            else {
+                                assert(entity2 === rs[0]?.entity);
+                            }
+
+                            return rs.map(ele => ele.id!);
+                        }
                     );
+                }
+                if (!entity2) {
+                    entity2 = relations[0]?.entity;
+                }
+                else {
+                    assert(entity2 === relations[0]?.entity);
                 }
                 return relations.map(ele => ele.id!);
             }
@@ -207,7 +228,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                     (ids) => {
                         return Promise.all(
                             ids.map(
-                                ele => checkOnRelationId(ele, entityFilter)
+                                ele => checkOnRelationId(entity2!, ele, entityFilter)
                             )
                         ).then(
                             (value) => {
@@ -220,14 +241,15 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                     }
                 );
             }
-            const value = relationIds.map(ele => checkOnRelationId(ele, entityFilter)) as boolean[];
+            const value = relationIds.map(ele => checkOnRelationId(entity2!, ele, entityFilter)) as boolean[];
             if (intersection) {
                 return !(value.includes(false));
             }
             return value.includes(true);
         };
         if (action === 'create') {
-            const { entityId, relationId } = filter;
+            const { entity, entityId, relationId } = filter;
+            assert(typeof entity === 'string');
 
             let entityFilter: ED[keyof ED]['Selection']['filter'];
             if (entityId) {
@@ -242,7 +264,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
             if (relationId) {
                 // 如果指定relation，则测试该relation上是否可行
                 // 目前可能会有多个relationIds传入（userEntityGrant做测试），但一定是可以确定的relationId集合                
-                return checkOnMultipleRelations({ id: relationId }, true, entityFilter);
+                return checkOnMultipleRelations({ id: relationId }, true, entityFilter, entity);
             }
             else {
                 // 否则为测试“能否”有权限管理的资格，此时只要有一个就可以
@@ -250,7 +272,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
 
                 // bug fixed，目前框架不支持entityId为null，所以这里暂时只支持entityId一种方式的测试
                 assert(entityId);
-                return checkOnMultipleRelations({ 
+                return checkOnMultipleRelations({
                     entity,
                     $or: [
                         {
@@ -262,7 +284,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                             entityId,
                         }
                     ]
-                }, false, entityFilter);
+                }, false, entityFilter, entity);
             }
         }
         else {
@@ -272,7 +294,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                 userRelation$relation: filter,
             }, false, {
                 userRelation$entity: filter,
-            });
+            }, filter.entity as string);
         }
     }
 
