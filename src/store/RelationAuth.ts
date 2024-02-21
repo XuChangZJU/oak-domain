@@ -839,14 +839,11 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
             (ele) => {
                 const { path, relation, relationId } = ele;
                 if (relationId) {
-                    assert(relation);
-                    const { userRelation$relation: userRelations } = relation;
-                    assert(userRelations!.length > 0);
-                    const entityIds = uniq(userRelations!.map(ele => ele.entityId));
                     const pathFilter = this.makePathFilter(entity, path, this.schema, {
-                        id: entityIds.length > 0 ? {
-                            $in: entityIds,
-                        } : entityIds[0],
+                        userRelation$entity: {
+                            userId: context.getCurrentUserId()!,
+                            relationId,
+                        }
                     });
                     return pathFilter;
                 }
@@ -924,20 +921,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                         recursive: 1,
                     },
                     deActions: 1,
-                    relation: {
-                        id: 1,
-                        userRelation$relation: {
-                            $entity: 'userRelation',
-                            data: {
-                                id: 1,
-                                entity: 1,
-                                entityId: 1,
-                            },
-                            filter: {
-                                userId: context.getCurrentUserId(),
-                            },
-                        },
-                    },
+                    relationId: 1,
                 },
                 filter: {
                     deActions: {
@@ -948,20 +932,6 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                             $in: allEntities as string[],
                         },
                     },
-                    $or: [
-                        {
-                            relation: {
-                                userRelation$relation: {
-                                    userId: context.getCurrentUserId(),
-                                },
-                            }
-                        },
-                        {
-                            relationId: {
-                                $exists: false,
-                            },
-                        }
-                    ]
                 }
             }, { dontCollect: true, ignoreAttrMiss: true });
 
