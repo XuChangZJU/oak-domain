@@ -3,7 +3,7 @@ import { EntityDict } from "../base-app-domain";
 import { OakUnloggedInException, OakUserInvisibleException, OakUserUnpermittedException, StorageSchema } from "../types";
 import { EntityDict as BaseEntityDict, AuthDeduceRelationMap } from "../types/Entity";
 import { AsyncContext } from "./AsyncRowStore";
-import { checkFilterContains, combineFilters } from "./filter";
+import { checkFilterContains, combineFilters, getRelevantIds } from "./filter";
 import { judgeRelation } from "./relation";
 import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
@@ -92,12 +92,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
     private checkUserRelation<Cxt extends AsyncContext<ED> | SyncContext<ED>>(context: Cxt, action: ED[keyof ED]['Action'], filter: NonNullable<ED['userRelation']['Selection']['filter']>) {
         const userId = context.getCurrentUserId();
         
+        const { entity } = filter;
+        assert(typeof entity === 'string');
         /**
          * 检查对某一个relationId是否有操作资格
          * @param destRelationId 
          * @returns 
          */
-        const checkOnRelationId = <T extends keyof ED>(destRelationId: string, entity: T, filter: ED[T]['Selection']['filter']) => {
+        const checkOnRelationId = (destRelationId: string, filter: ED[keyof ED]['Selection']['filter']) => {
             /**
              * 找到能创建此relation的所有父级relation，只要user和其中一个有关联即可以通过
              */
@@ -176,20 +178,36 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
          * @returns 
          */
         const checkOnMultipleRelations = (relationFilter: ED['relation']['Selection']['filter'], intersection: boolean, entityFilter: ED[keyof ED]['Selection']['filter']) => {
-            const relations = context.select('relation', {
-                data: {
-                    id: 1,
-                    entity: 1,
-                    entityId: 1,
-                },
-                filter: relationFilter
-            }, { dontCollect: true });
-            if (relations instanceof Promise) {
-                return relations.then(
-                    (rs) => {
+            const getRelationIds = () => {
+                const relevantIds = getRelevantIds(relationFilter);
+                if (relevantIds.length > 0) {
+                    return relevantIds;
+                }
+
+                const relations = context.select('relation', {
+                    data: {
+                        id: 1,
+                        entity: 1,
+                        entityId: 1,
+                    },
+                    filter: relationFilter
+                }, { dontCollect: true });
+
+                if (relations instanceof Promise) {
+                    return relations.then(
+                        (rs) => rs.map(ele => ele.id!)
+                    );
+                }
+                return relations.map(ele => ele.id!);
+            }
+
+            const relationIds = getRelationIds();
+            if (relationIds instanceof Promise) {
+                return relationIds.then(
+                    (ids) => {
                         return Promise.all(
-                            rs.map(
-                                ele => checkOnRelationId(ele.id!, ele.entity!, entityFilter)
+                            ids.map(
+                                ele => checkOnRelationId(ele, entityFilter)
                             )
                         ).then(
                             (value) => {
@@ -202,15 +220,14 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                     }
                 );
             }
-            const value = relations.map(ele => checkOnRelationId(ele.id!, ele.entity!, entityFilter)) as boolean[];
+            const value = relationIds.map(ele => checkOnRelationId(ele, entityFilter)) as boolean[];
             if (intersection) {
                 return !(value.includes(false));
             }
             return value.includes(true);
         };
         if (action === 'create') {
-            const { entity, entityId, relationId } = filter;
-            assert(typeof entity === 'string');
+            const { entityId, relationId } = filter;
 
             let entityFilter: ED[keyof ED]['Selection']['filter'];
             if (entityId) {
@@ -224,8 +241,8 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
             }
             if (relationId) {
                 // 如果指定relation，则测试该relation上是否可行
-                assert(typeof relationId === 'string');
-                return checkOnRelationId(relationId, entity, entityFilter);
+                // 目前可能会有多个relationIds传入（userEntityGrant做测试），但一定是可以确定的relationId集合                
+                return checkOnMultipleRelations({ id: relationId }, true, entityFilter);
             }
             else {
                 // 否则为测试“能否”有权限管理的资格，此时只要有一个就可以
