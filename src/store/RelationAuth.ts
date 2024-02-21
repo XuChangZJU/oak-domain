@@ -230,6 +230,9 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
             else {
                 // 否则为测试“能否”有权限管理的资格，此时只要有一个就可以
                 // 这是为上层的menu所有，真正的创建不可能走到这里
+
+                // bug fixed，目前框架不支持entityId为null，所以这里暂时只支持entityId一种方式的测试
+                assert(entityId);
                 return checkOnMultipleRelations({ 
                     entity,
                     $or: [
@@ -239,7 +242,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
                             },
                         },
                         {
-                            [entity]: entityFilter,
+                            entityId,
                         }
                     ]
                 }, false, entityFilter);
