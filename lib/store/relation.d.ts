@@ -9,4 +9,4 @@ import { StorageSchema } from "../types/Storage";
  * @param row
  * @returns
  */
-export declare function judgeRelation<ED extends EntityDict & BaseEntityDict>(schema: StorageSchema<ED>, entity: keyof ED, attr: string): string | 1 | 2 | string[] | 0;
+export declare function judgeRelation<ED extends EntityDict & BaseEntityDict>(schema: StorageSchema<ED>, entity: keyof ED, attr: string, allowUnrecoganized?: boolean): string | 1 | 2 | string[] | 0 | -1;

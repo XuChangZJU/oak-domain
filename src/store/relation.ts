@@ -12,7 +12,7 @@ import { StorageSchema } from "../types/Storage";
  * @param row 
  * @returns 
  */
-export function judgeRelation<ED extends EntityDict & BaseEntityDict>(schema: StorageSchema<ED>, entity: keyof ED, attr: string) {
+export function judgeRelation<ED extends EntityDict & BaseEntityDict>(schema: StorageSchema<ED>, entity: keyof ED, attr: string, allowUnrecoganized?: boolean) {
     const { [entity]: { attributes } } = schema;
 
     if (attr.startsWith(EXPRESSION_PREFIX) || attr.startsWith('#')) {
@@ -62,8 +62,15 @@ export function judgeRelation<ED extends EntityDict & BaseEntityDict>(schema: St
         // 反向指针的外键
         return 2;
     }
-    else {
-        assert(initinctiveAttributes.includes(attr), `${entity as string}对象中的${attr}属性找不到`);
-        return 1;
+    else {        
+        if(initinctiveAttributes.includes(attr)) {
+            return 1;
+        }
+        else if (allowUnrecoganized) {
+            return -1;
+        }
+        else {
+            throw new Error(`${entity as string}对象中的${attr}属性找不到`);
+        }
     }
 }

@@ -22,29 +22,57 @@ export type SelfEncryptInfo = {
     algorithm: Algorithm;
 };
 
-export interface SyncEntityDef<ED extends EntityDict & BaseEntityDict, T extends keyof ED> {
+export interface PullEntityDef<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>> {
+    direction: 'pull';
     entity: T;                              // 需要同步的entity
     path: string;                           // 此entity到需要同步到的根entity的路径（如果根entity和remote user之间不是relation关系，其最后指向user的路径在pathToUser中指定）
     recursive?: boolean;                    // 表明path的最后一项是递归的(暂时无用)
     relationName?: string;                  // 要同步的user与根对象的relation名称（为空说明是userId)
-    direction: 'pull' | 'push' | 'bio';     // pull说明是从远端拉过来，push说明是从本地推过去，bio是双向
+
+    // 可能两个结点的数据有异构，需要加工？但目前应该没有这种情况，除了一种：push的结点可能会多一些属性，此时在pull结点中实际操作前处理一下
+    process?: <A extends ED[T]['Action']>(action: A, data: ED[T]['Operation']['data'], context: Cxt) => Promise<void>;
 };
 
-export interface SyncRemoteConfigBase<ED extends EntityDict & BaseEntityDict> {
+export interface PushEntityDef<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>> {
+    direction: 'push';
+    entity: T;                              // 需要同步的entity
+    path: string;                           // 此entity到需要同步到的根entity的路径（如果根entity和remote user之间不是relation关系，其最后指向user的路径在pathToUser中指定）
+    recursive?: boolean;                    // 表明path的最后一项是递归的(暂时无用)
+    relationName?: string;                  // 要同步的user与根对象的relation名称（为空说明是userId)
+    actions?: ED[T]['Action'][];
+
+    // 同步结果回调，一行可能要向多个syncEntity上去同步，因此返回结果是一个数组(表示向某个userId上同步了rowIds相关的数据，如果有失败则返回error)
+    // 如果不定义，则认为同步一定会成功。若失败则会反复同步直到成功为止
+    onSynchronized?: (result: {
+        action: ED[T]['Action'],
+        data: ED[T]['Operation']['data'];
+        result: Array<{
+            userId: string;
+            rowIds: string[];
+            error?: Error;
+        }>
+    }, context: Cxt) => Promise<void>,
+};
+
+
+export interface SyncRemoteConfigBase<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> {
     entity: keyof ED;                                   // 对方结点所关联的entity名称
+    entitySelf?: keyof ED;                              // 自己在对方结点上所定义的entity名称（如果不配置则使用selfConfigBase上的entitySelf）
     endpoint?: string;                                  // 对方结点同步数据的endpoint，默认为/sync/:entity
     pathToUser?: string;                                // entity到对应remote user的路径（如果remote user和enitity之间是relation关系则为空）
     relationName?: string;                              // 如果remote user和entity之间是relation关系，此处表达的是relation名称）
-    syncEntities: Array<SyncEntityDef<ED, keyof ED>>;   // 在这个entity上需要同步的entities
+    pushEntities?: Array<PushEntityDef<ED, keyof ED, Cxt>>;     // 在这个entity上需要同步的entities
+    pullEntities?: Array<PullEntityDef<ED, keyof ED, Cxt>>;     // 从这个entity上可能会接收到的同步entites
 };
 
-interface SyncRemoteConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncRemoteConfigBase<ED> {
+interface SyncRemoteConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncRemoteConfigBase<ED, Cxt> {
     getPushInfo: (userId: string, context: Cxt) => Promise<RemotePushInfo>;
     getPullInfo: (id: string, context: Cxt) => Promise<RemotePullInfo>;
 };
 
 export interface SyncSelfConfigBase<ED extends EntityDict & BaseEntityDict> {
     endpoint?: string;              // 本结点同步数据的endpoint，默认为/sync
+    entitySelf: keyof ED;           // 自己在对方结点上的默认entity名称
 };
 
 interface SyncSelfConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncSelfConfigBase<ED>{

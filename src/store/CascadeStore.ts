@@ -896,7 +896,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             operation: ED[T2]['Operation'],
             context: Cxt,
             option: OP) => R,
-        filter?: ED[T]['Update']['filter']
+        filter?: ED[T]['Update']['filter'],
+        bornAt?: number
     ) {
         const modiAttr = this.getSchema()[entity].toModi;
         const option2 = Object.assign({}, option);
@@ -920,7 +921,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
             }
         }
         for (const attr in data) {
-            const relation = judgeRelation(this.storageSchema, entity, attr);
+            const relation = judgeRelation(this.storageSchema, entity, attr, !!bornAt);
             if (relation === 1) {
                 Object.assign(opData, {
                     [attr]: data[attr],
@@ -1046,8 +1047,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     () => cascadeUpdate.call(this, relation, operationMto, context, option2)
                 );
             }
-            else {
-                assert(relation instanceof Array);
+            else if (relation instanceof Array){
                 const [entityOtm, foreignKey] = relation;
                 const otmOperations = data[attr];
                 const dealWithOneToMany = (otm: ED[keyof ED]['Update'] | ED[keyof ED]['Create']) => {
@@ -1212,6 +1212,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 else {
                     dealWithOneToMany(otmOperations);
                 }
+            }
+            else {
+                console.warn(`接收到不合法的属性「${attr}」`);
             }
         }
 
@@ -1746,7 +1749,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         context: Cxt,
         option: OP): OperationResult<ED> {
 
-        const { action, data, filter, id } = operation;
+        const { action, data, filter, id, bornAt } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => any> = [];
         const wholeAfterFns: Array<() => any> = [];
@@ -1810,7 +1813,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): Promise<OperationResult<ED>> {
-        const { action, data, filter, id } = operation;
+        const { action, data, filter, id, bornAt } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => Promise<OperationResult<ED>>> = [];
         const wholeAfterFns: Array<() => Promise<OperationResult<ED>>> = [];
@@ -1825,6 +1828,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                     context,
                     option,
                     this.cascadeUpdateAsync,
+                    undefined,
+                    bornAt
                 );
                 opData.push(od);
                 wholeBeforeFns.push(...beforeFns);
@@ -1839,7 +1844,8 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                 context,
                 option,
                 this.cascadeUpdateAsync,
-                filter
+                filter,
+                bornAt
             );
             opData = od;
             wholeBeforeFns.push(...beforeFns);
