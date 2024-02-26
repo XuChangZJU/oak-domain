@@ -20,7 +20,7 @@ export function destructRelationPath<ED extends EntityDict & BaseEntityDict, T e
     recursive?: boolean
 ): {
     projection: ED[T]['Selection']['data'];
-    getData: (d: Partial<ED[T]['Schema']>) => ED['userRelation']['Schema'][];
+    getData: (d: Partial<ED[T]['Schema']>) => ED['userRelation']['Schema'][] | undefined;
 } {
     assert(!recursive, 'recursive的情况还没处理，等跑出来再说， by Xc');
     if (path === '') {
@@ -41,9 +41,9 @@ export function destructRelationPath<ED extends EntityDict & BaseEntityDict, T e
                         userId: 1,
                     },
                     filter: relationFilter,
-                } as ED['userRelation']['Selection'],
+                },
             } as ED[keyof ED]['Selection']['data'],
-            getData: (d: Partial<ED[keyof ED]['Schema']>) => {
+            getData: (d) => {
                 return d.userRelation$entity!;
             },
         };
@@ -52,7 +52,7 @@ export function destructRelationPath<ED extends EntityDict & BaseEntityDict, T e
 
     const makeIter = (e: keyof ED, idx: number): {
         projection: ED[keyof ED]['Selection']['data'];
-        getData: (d: Partial<ED[keyof ED]['Schema']>) => any;
+        getData: (d: Partial<ED[keyof ED]['Schema']>) => ED['userRelation']['Schema'][] | undefined;
     } => {
         if (idx === paths.length) {
             return {
@@ -72,9 +72,9 @@ export function destructRelationPath<ED extends EntityDict & BaseEntityDict, T e
                             userId: 1,
                         },
                         filter: relationFilter,
-                    } as ED['userRelation']['Selection']
-                } as ED[keyof ED]['Selection']['data'],
-                getData: (d: Partial<ED[keyof ED]['Schema']>) => {
+                    } // as ED['userRelation']['Selection']
+                }, // as ED[keyof ED]['Selection']['data'],
+                getData: (d) => {
                     return d.userRelation$entity;
                 },
             };
@@ -113,7 +113,7 @@ export function destructRelationPath<ED extends EntityDict & BaseEntityDict, T e
                         data: projection,
                     },
                 },
-                getData: (d) => d[attr] && d[attr]!.map((ele: any) => getData(ele)),
+                getData: (d) => d[attr] && (d[attr]! as Partial<ED[keyof ED]['Schema']>[]).map(ele => getData(ele)).flat().filter(ele => !!ele) as ED['userRelation']['Schema'][] ,
             }
         }
     };
@@ -140,7 +140,7 @@ export function destructDirectPath<ED extends EntityDict & BaseEntityDict, T ext
         entity: keyof ED,
         entityId: string,
         userId: string,
-    }[];
+    }[] | undefined;
 } {
     assert(!recursive, '直接对象上不可能有recursive');
     assert(path, '直接对象的路径最终要指向user对象，不可能为空');
@@ -149,7 +149,11 @@ export function destructDirectPath<ED extends EntityDict & BaseEntityDict, T ext
 
     const makeIter = (e: keyof ED, idx: number): {
         projection: ED[keyof ED]['Selection']['data'];
-        getData: (d: Partial<ED[keyof ED]['Schema']>) => any;
+        getData: (d: Partial<ED[keyof ED]['Schema']>) => {
+            entity: keyof ED,
+            entityId: string,
+            userId: string,
+        }[] | undefined;
     } => {
         const attr = paths[idx];
         const rel = judgeRelation(schema, e, attr);
@@ -164,11 +168,11 @@ export function destructDirectPath<ED extends EntityDict & BaseEntityDict, T ext
                     },
                     getData: (d) => {
                         if (d) {
-                            return {
-                                entity: e,
-                                entityId: d.id,
-                                userId: d.entityId,
-                            };
+                            return [{
+                                entity: e as string,
+                                entityId: d.id!,
+                                userId: d.entityId!,
+                            }];
                         }
                     },
                 };
@@ -182,11 +186,11 @@ export function destructDirectPath<ED extends EntityDict & BaseEntityDict, T ext
                     },
                     getData: (d) => {
                         if (d) {
-                            return {
-                                entity: e,
-                                entityId: d.id,
-                                userId: d[`${attr}Id`]
-                            }
+                            return [{
+                                entity: e as string,
+                                entityId: d.id!,
+                                userId: d[`${attr}Id`] as string,
+                            }]
                         }
                     },
                 };
@@ -224,7 +228,11 @@ export function destructDirectPath<ED extends EntityDict & BaseEntityDict, T ext
                         data: projection,
                     },
                 },
-                getData: (d) => d[attr] && d[attr]!.map((ele: any) => getData(ele)),
+                getData: (d) => d[attr] && (d[attr]! as Partial<ED[keyof ED]['Schema']>[]).map(ele => getData(ele)).flat().filter(ele => !!ele) as {
+                    entity: keyof ED,
+                    entityId: string,
+                    userId: string,
+                }[],
             }
         }
     };
