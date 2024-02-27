@@ -41,16 +41,13 @@ export interface PushEntityDef<ED extends EntityDict & BaseEntityDict, T extends
     relationName?: string;                  // 要同步的user与根对象的relation名称（为空说明是userId)
     actions?: ED[T]['Action'][];
 
-    // 同步结果回调，一行可能要向多个syncEntity上去同步，因此返回结果是一个数组(表示向某个userId上同步了rowIds相关的数据，如果有失败则返回error)
-    // 如果不定义，则认为同步一定会成功。若失败则会反复同步直到成功为止
+    /**
+     * 同步结果回调，根据接口的幂等原理，同步一定要完全成功再回调
+     */
     onSynchronized?: (result: {
         action: ED[T]['Action'],
         data: ED[T]['Operation']['data'];
-        result: Array<{
-            userId: string;
-            rowIds: string[];
-            error?: Error;
-        }>
+        rowIds: string[];
     }, context: Cxt) => Promise<void>,
 };
 
