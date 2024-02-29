@@ -62,29 +62,32 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         this.makeException = makeException;
     }
 
-    async callAspect(name: string, params: any, context?: FrontCxt) {
+    protected async makeHeadersAndBody(name: string, data: any, context?: FrontCxt) {
         const cxtStr = context ? await context.toString() : '{}';
-
-        const { contentType, body } = makeContentTypeAndBody(params);
-        let response: Response;
-        try {
-            response = await global.fetch(this.serverAspectUrl, {
-                method: 'POST',
-                headers: Object.assign(
-                    {
-                        'oak-cxt': cxtStr,
-                        'oak-aspect': name as string,
-                    },
-                    contentType && {
-                        'Content-Type': contentType as string,
-                    }
-                ) as RequestInit['headers'],
-                body,
-            });
-        } catch (err) {
-            // fetch返回异常一定是网络异常
-            throw new OakNetworkException(`请求[${this.serverAspectUrl}]，发生网络异常`);
+        const headers: HeadersInit = {
+            'oak-cxt': cxtStr,
+            'oak-aspect': name,
+        };
+        if (process.env.OAK_PLATFORM !== 'wechatMp') {
+            if (data instanceof FormData) {
+                return {
+                    // contentType: 'multipart/form-data',
+                    headers,
+                    body: data,
+                };
+            }
         }
+
+        return {
+            headers: {                
+                contentType: 'application/json',
+                ...headers,
+            } as HeadersInit,
+            body: JSON.stringify(data),
+        };
+    };
+
+    protected async parseAspectResult(response: Response) {
         if (response.status > 299) {
             const err = new OakServerProxyException(
                 `网络请求返回status是${response.status}`
@@ -120,6 +123,24 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         } else {
             throw new Error(`尚不支持的content-type类型${responseType}`);
         }
+
+    }
+
+    async callAspect(name: string, params: any, context?: FrontCxt) {
+        const { headers, body } = await this.makeHeadersAndBody(name, params, context);
+        let response: Response;
+        try {
+            response = await global.fetch(this.serverAspectUrl, {
+                method: 'POST',
+                headers,
+                body,
+            });
+        } catch (err) {
+            // fetch返回异常一定是网络异常
+            throw new OakNetworkException(`请求[${this.serverAspectUrl}]，发生网络异常`);
+        }
+
+        return this.parseAspectResult(response);
     }
 
     getRouter(): string {
@@ -177,13 +198,18 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         return SimpleConnector.ENDPOINT_ROUTER;
     }
 
-    parseRequestHeaders(headers: IncomingHttpHeaders) {
+    parseRequest(headers: IncomingHttpHeaders, body?: any, files?: any) {
         const { 'oak-cxt': oakCxtStr, 'oak-aspect': aspectName } = headers;
         assert(typeof oakCxtStr === 'string' || oakCxtStr === undefined);
         assert(typeof aspectName === 'string');
         return {
             contextString: oakCxtStr,
             aspectName,
+           /*  data: !files ? body : {
+                data: body,
+                files,
+            }, */   // 下个版本再改
+            data: Object.assign({}, body, files),
         };
     }
 
@@ -244,7 +270,7 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
 
         return `${this.serverBridgeUrl}?url=${encodeUrl}`;
     }
-    
+
     parseBridgeRequestQuery(urlParams: string): {
         url: string;
         headers?: Record<string, string> | undefined;

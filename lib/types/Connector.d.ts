@@ -10,9 +10,10 @@ export interface Connector<ED extends EntityDict, FrontCxt extends SyncContext<E
         message?: string | null;
     }>;
     getRouter: () => string;
-    parseRequestHeaders: (headers: IncomingHttpHeaders) => {
+    parseRequest: (headers: IncomingHttpHeaders, body?: any, files?: any) => {
         contextString?: string;
         aspectName: string;
+        data?: any;
     };
     serializeResult: (result: any, opRecords: OpRecord<ED>[], headers: IncomingHttpHeaders, body: any, message?: string) => Promise<{
         body: any;
