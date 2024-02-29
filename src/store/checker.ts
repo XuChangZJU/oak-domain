@@ -176,7 +176,7 @@ export function translateCheckerInSyncContext<
                 if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter, true)) {
                     return;
                 }
-                const e = new OakRowInconsistencyException(undefined, errMsg);
+                const e = new OakRowInconsistencyException(undefined, errMsg || 'row checker condition illegal');
                 throw e;
             };
             return {
@@ -446,7 +446,7 @@ function checkAttributeLegal<ED extends EntityDict & BaseEntityDict>(
                 case 'enum': {
                     assert(enumeration);
                     if (!enumeration.includes((data as ED[keyof ED]['CreateSingle']['data'])[attr])) {
-                        throw new OakInputIllegalException(entity, [attr], 'not in enumberation');
+                        throw new OakInputIllegalException(entity, [attr], 'not in enumeration');
                     }
                     break;
                 }

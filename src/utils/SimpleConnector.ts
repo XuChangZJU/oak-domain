@@ -5,22 +5,6 @@ import URL from 'url';
 import { SyncContext } from '../store/SyncRowStore';
 import { Connector, EntityDict, OakException, OakNetworkException, OakServerProxyException, OpRecord } from "../types";
 
-function makeContentTypeAndBody(data: any) {
-    if (process.env.OAK_PLATFORM !== 'wechatMp') {
-        if (data instanceof FormData) {
-            return {
-                // contentType: 'multipart/form-data',
-                body: data,
-            };
-        }
-    }
-
-    return {
-        contentType: 'application/json',
-        body: JSON.stringify(data),
-    };
-}
-
 type ServerOption = {
     protocol: string;
     hostname: string;
@@ -71,7 +55,6 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
         if (process.env.OAK_PLATFORM !== 'wechatMp') {
             if (data instanceof FormData) {
                 return {
-                    // contentType: 'multipart/form-data',
                     headers,
                     body: data,
                 };
@@ -80,7 +63,7 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
 
         return {
             headers: {                
-                contentType: 'application/json',
+                'Content-Type': 'application/json',
                 ...headers,
             } as HeadersInit,
             body: JSON.stringify(data),
