@@ -20,6 +20,22 @@ export declare class SimpleConnector<ED extends EntityDict, FrontCxt extends Syn
     private option;
     private makeException;
     constructor(option: ServerOption, makeException: (exceptionData: any) => OakException<ED>);
+    protected makeHeadersAndBody(name: string, data: any, context?: FrontCxt): Promise<{
+        headers: Record<string, string>;
+        body: FormData;
+    } | {
+        headers: HeadersInit;
+        body: string;
+    }>;
+    protected parseAspectResult(response: Response): Promise<{
+        result: any;
+        opRecords: any;
+        message: string | null;
+    } | {
+        result: ArrayBuffer;
+        message: string | null;
+        opRecords?: undefined;
+    }>;
     callAspect(name: string, params: any, context?: FrontCxt): Promise<{
         result: any;
         opRecords: any;
@@ -37,9 +53,10 @@ export declare class SimpleConnector<ED extends EntityDict, FrontCxt extends Syn
         path: any;
     }>;
     getEndpointRouter(): string;
-    parseRequestHeaders(headers: IncomingHttpHeaders): {
+    parseRequest(headers: IncomingHttpHeaders, body?: any, files?: any): {
         contextString: string | undefined;
         aspectName: string;
+        data: any;
     };
     serializeResult(result: any, opRecords: OpRecord<ED>[], headers: IncomingHttpHeaders, body: any, message?: string): Promise<{
         body: any;

@@ -1586,6 +1586,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                         if (!option.dontCreateOper && !['oper', 'operEntity', 'modiEntity', 'modi'].includes(entity as string) && ids.length > 0) {
                             // 按照框架要求生成Oper和OperEntity这两个内置的对象
                             assert(operId);
+                            const operatorId = context.getCurrentUserId(true);
                             const createOper: CreateSingleOperOperation = {
                                 id: 'dummy',
                                 action: 'create',
@@ -1595,6 +1596,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     data,
                                     targetEntity: entity as string,
                                     bornAt,
+                                    operatorId,
                                     operEntity$oper: {
                                         id: 'dummy',
                                         action: 'create',

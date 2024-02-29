@@ -32,14 +32,13 @@ export interface PushEntityDef<ED extends EntityDict & BaseEntityDict, T extends
     recursive?: boolean;
     relationName?: string;
     actions?: ED[T]['Action'][];
+    /**
+     * 同步结果回调，根据接口的幂等原理，同步一定要完全成功再回调
+     */
     onSynchronized?: (result: {
         action: ED[T]['Action'];
         data: ED[T]['Operation']['data'];
-        result: Array<{
-            userId: string;
-            rowIds: string[];
-            error?: Error;
-        }>;
+        rowIds: string[];
     }, context: Cxt) => Promise<void>;
 }
 export interface SyncRemoteConfigBase<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> {

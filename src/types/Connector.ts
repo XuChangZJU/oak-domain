@@ -1,6 +1,4 @@
 import { IncomingHttpHeaders } from "http";
-import { RowStore } from ".";
-import { AsyncContext, AsyncRowStore } from "../store/AsyncRowStore";
 import { SyncContext } from "../store/SyncRowStore";
 import { EntityDict, OpRecord } from "./Entity";
 import { OakException } from "./Exception";
@@ -18,9 +16,10 @@ export interface Connector<ED extends EntityDict, FrontCxt extends SyncContext<E
 
     getRouter: () => string;
 
-    parseRequestHeaders: (headers: IncomingHttpHeaders) => {
+    parseRequest: (headers: IncomingHttpHeaders, body?: any, files?: any) => {
         contextString?: string;
         aspectName: string;
+        data?: any;
     };
 
     serializeResult: (
