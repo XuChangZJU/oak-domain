@@ -192,7 +192,7 @@ export class SimpleConnector<ED extends EntityDict, FrontCxt extends SyncContext
                 data: body,
                 files,
             }, */   // 下个版本再改
-            data: Object.assign({}, body, files),
+            data: files ? Object.assign({}, body, files) : body,
         };
     }
 
