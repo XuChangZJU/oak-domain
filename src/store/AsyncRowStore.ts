@@ -225,7 +225,8 @@ export abstract class AsyncContext<ED extends EntityDict> implements Context {
     abstract toString(): Promise<string>;
 
     // 此接口将字符串parse成对象再进行初始化
-    abstract initialize(data: any): Promise<void>;
+    // later表示允许延时状态，上下文要处理在时间维度上可能的异常（比如用户token已经注销等）
+    abstract initialize(data: any, later?: boolean): Promise<void>;
 
     abstract allowUserUpdate(): boolean;
 

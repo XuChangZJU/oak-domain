@@ -50,7 +50,7 @@ export declare abstract class AsyncContext<ED extends EntityDict> implements Con
     abstract getCurrentUserId(allowUnloggedIn?: boolean): string | undefined;
     abstract setCurrentUserId(userId: string | undefined): void;
     abstract toString(): Promise<string>;
-    abstract initialize(data: any): Promise<void>;
+    abstract initialize(data: any, later?: boolean): Promise<void>;
     abstract allowUserUpdate(): boolean;
     abstract openRootMode(): () => void;
 }

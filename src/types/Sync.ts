@@ -14,6 +14,7 @@ export type RemotePullInfo = {
     publicKey: string;
     algorithm: Algorithm;
     userId: string;
+    cxtInfo?: any;
 };
 
 export type SelfEncryptInfo = {
@@ -53,8 +54,7 @@ export interface PushEntityDef<ED extends EntityDict & BaseEntityDict, T extends
 
 
 export interface SyncRemoteConfigBase<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> {
-    entity: keyof ED;                                   // 对方结点所关联的entity名称
-    entitySelf?: keyof ED;                              // 自己在对方结点上所定义的entity名称（如果不配置则使用selfConfigBase上的entitySelf）
+    entity: keyof ED;                                   // 对方结点所关联的entity名称（两边一致）    
     endpoint?: string;                                  // 对方结点同步数据的endpoint，默认为/sync/:entity
     pathToUser?: string;                                // entity到对应remote user的路径（如果remote user和enitity之间是relation关系则为空）
     relationName?: string;                              // 如果remote user和entity之间是relation关系，此处表达的是relation名称）
@@ -63,13 +63,19 @@ export interface SyncRemoteConfigBase<ED extends EntityDict & BaseEntityDict, Cx
 };
 
 interface SyncRemoteConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncRemoteConfigBase<ED, Cxt> {
-    getPushInfo: (userId: string, context: Cxt) => Promise<RemotePushInfo>;
-    getPullInfo: (id: string, context: Cxt) => Promise<RemotePullInfo>;
+    getPushInfo: (context: Cxt, option: {
+        remoteEntityId: string;
+        userId: string;
+    }) => Promise<RemotePushInfo>;
+    getPullInfo: (context: Cxt, option: {
+        selfId: string, 
+        remoteEntityId: string,
+    }) => Promise<RemotePullInfo>;
 };
 
 export interface SyncSelfConfigBase<ED extends EntityDict & BaseEntityDict> {
     endpoint?: string;              // 本结点同步数据的endpoint，默认为/sync
-    entitySelf: keyof ED;           // 自己在对方结点上的默认entity名称
+    entity: keyof ED;               // 本方结点所关联的entity名称（两边一致）
 };
 
 interface SyncSelfConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncSelfConfigBase<ED>{

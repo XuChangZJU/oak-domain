@@ -26,7 +26,7 @@ export type SelectOption = {
     dontCollect?: boolean;
     blockTrigger?: true;
     obscure?: boolean;
-    forUpdate?: true;
+    forUpdate?: true | 'skip locked' | 'no wait';
     includedDeleted?: true;
     ignoreAttrMiss?: true;
     dummy?: 1;

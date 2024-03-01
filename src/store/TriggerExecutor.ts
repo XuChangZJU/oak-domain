@@ -206,7 +206,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         assert(trigger.when === 'commit');
         if (trigger.strict === 'makeSure') {
             const uuid = await generateNewIdAsync();
-            const cxtStr = context.toString();
+            const cxtStr = await context.toString();
             const { data } = operation;
             switch (operation.action) {
                 case 'create': {
@@ -251,7 +251,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                         Object.assign(d, {
                             [TriggerDataAttribute]: {
                                 name: trigger.name,
-                                cxtStr: context.toString(),
+                                cxtStr,
                                 option,
                             },
                             [TriggerUuidAttribute]: uuid,
@@ -554,7 +554,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                 } as any, {
                     includedDeleted: true,
                     dontCollect: true,
-                    forUpdate: true,
+                    forUpdate: 'skip locked',           // 防止某个跨事务trigger的逻辑执行周期太长
                 });
 
                 const grouped = groupBy(rows, TriggerUuidAttribute);
@@ -563,7 +563,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     const rs = grouped[uuid];
                     const { [TriggerDataAttribute]: triggerData } = rs[0];
                     const { name, cxtStr, option } = triggerData!;
-                    // await context.initialize(JSON.parse(cxtStr));        // 这里token有可能过期（用户注销），先用root态模拟吧
+                    await context.initialize(JSON.parse(cxtStr), true);
                     await this.execVolatileTrigger(entity, name, rs.map(ele => ele.id!), context, option);
                 }
                 await context.commit();
