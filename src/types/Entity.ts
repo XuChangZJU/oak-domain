@@ -30,11 +30,11 @@ type FilterPart<A extends string, F extends Object | undefined> = {
 export type SelectOption = {
     dontCollect?: boolean;
     blockTrigger?: true;
-    obscure?: boolean;              // 如果为置为true，则在filter过程中因数据不完整而不能判断为真的时候都假设为真（前端缓存专用）
-    forUpdate?: true;
-    includedDeleted?: true;         // 是否包含删除行的信息
-    ignoreAttrMiss?: true;        // 作为cache时是否允许属性缺失
-    dummy?: 1;                      // 无用，为了继承Option通过编译
+    obscure?: boolean;                                  // 如果为置为true，则在filter过程中因数据不完整而不能判断为真的时候都假设为真（前端缓存专用）
+    forUpdate?: true | 'skip locked' | 'nowait';       // mysql 8.0以上支持的加锁方式
+    includedDeleted?: true;                             // 是否包含删除行的信息
+    ignoreAttrMiss?: true;                              // 作为cache时是否允许属性缺失
+    dummy?: 1;                                          // 无用，为了继承Option通过编译
 };
 
 export type OperateOption = {

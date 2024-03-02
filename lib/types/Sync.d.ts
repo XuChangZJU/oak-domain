@@ -11,6 +11,7 @@ export type RemotePullInfo = {
     publicKey: string;
     algorithm: Algorithm;
     userId: string;
+    cxtInfo?: any;
 };
 export type SelfEncryptInfo = {
     id: string;
@@ -43,7 +44,6 @@ export interface PushEntityDef<ED extends EntityDict & BaseEntityDict, T extends
 }
 export interface SyncRemoteConfigBase<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> {
     entity: keyof ED;
-    entitySelf?: keyof ED;
     endpoint?: string;
     pathToUser?: string;
     relationName?: string;
@@ -51,12 +51,18 @@ export interface SyncRemoteConfigBase<ED extends EntityDict & BaseEntityDict, Cx
     pullEntities?: Array<PullEntityDef<ED, keyof ED, Cxt>>;
 }
 interface SyncRemoteConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncRemoteConfigBase<ED, Cxt> {
-    getPushInfo: (userId: string, context: Cxt) => Promise<RemotePushInfo>;
-    getPullInfo: (id: string, context: Cxt) => Promise<RemotePullInfo>;
+    getPushInfo: (context: Cxt, option: {
+        remoteEntityId: string;
+        userId: string;
+    }) => Promise<RemotePushInfo>;
+    getPullInfo: (context: Cxt, option: {
+        selfId: string;
+        remoteEntityId: string;
+    }) => Promise<RemotePullInfo>;
 }
 export interface SyncSelfConfigBase<ED extends EntityDict & BaseEntityDict> {
     endpoint?: string;
-    entitySelf: keyof ED;
+    entity: keyof ED;
 }
 interface SyncSelfConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncSelfConfigBase<ED> {
     getSelfEncryptInfo: (context: Cxt) => Promise<SelfEncryptInfo>;
