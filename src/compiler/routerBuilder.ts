@@ -352,11 +352,12 @@ function judgeUseOakRouterBuilder(statements: ts.NodeArray<ts.Statement>) {
 
 function outputInWebAppDir(appDir: string) {
     const routerFileName = join(appDir, 'router', 'allRouters.ts');
-    if (existsSync(routerFileName)) {
-        const program = ts.createProgram([routerFileName], {
+    const templateFileName = join(appDir, 'router', 'allRouterTemplate.ts');
+    if (existsSync(templateFileName)) {
+        const program = ts.createProgram([templateFileName], {
             removeComments: false,
         });
-        const routerFile = program.getSourceFile(routerFileName);
+        const routerFile = program.getSourceFile(templateFileName);
         assert(routerFile);
         const namespaceDir = join(appDir, 'namespaces');
         const { statements } = routerFile;
@@ -369,7 +370,7 @@ function outputInWebAppDir(appDir: string) {
                         );
                         if (declaration) {
                             Object.assign(declaration, {
-                                initializer: makeWebAllRouters(namespaceDir, join(appDir, '../../../..'), dirname(routerFileName))
+                                initializer: makeWebAllRouters(namespaceDir, join(appDir, '../../../..'), dirname(templateFileName))
                             });
                         }
                     }
@@ -388,7 +389,7 @@ function outputInWebAppDir(appDir: string) {
         }
     }
     else {
-        console.warn(`${appDir}的目录结构未按照标准建立，缺少了${routerFileName}`);
+        console.warn(`${appDir}的目录结构未按照标准建立，缺少了${templateFileName}，请从模板中补充`);
     }
 }
 
@@ -436,7 +437,6 @@ function watchDir(projectDir: string, startupDir: string, type: 'native' | 'web'
             const ns = relativeDir.split('\\')[0];
             const relativePath = relative(ns, dirname(relativeDir));
             const { pages } = NameSpaceDescDict[ns];
-            console.log(filepath, dir, ns);
             if (evt === 'remove') {
                 if (existsSync(dir)) {
                     const { changed } = checkPageDir(dir, relativePath, ns, type);
