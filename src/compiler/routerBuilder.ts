@@ -352,7 +352,7 @@ function judgeUseOakRouterBuilder(statements: ts.NodeArray<ts.Statement>) {
 
 function outputInWebAppDir(appDir: string) {
     const routerFileName = join(appDir, 'router', 'allRouters.ts');
-    const templateFileName = join(appDir, 'router', 'allRouterTemplate.ts');
+    const templateFileName = join(appDir, 'router', 'allRoutersTemplate.ts');
     if (existsSync(templateFileName)) {
         const program = ts.createProgram([templateFileName], {
             removeComments: false,
