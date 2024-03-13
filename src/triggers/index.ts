@@ -5,7 +5,7 @@ import { createModiRelatedTriggers } from '../store/modi';
 import { AsyncContext } from '../store/AsyncRowStore';
 import { SyncContext } from '../store/SyncRowStore';
 
-function createOperTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>() {
+/* function createOperTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>() {
     return [
         {
             name: 'assign initial bornAt for local oper',
@@ -22,8 +22,8 @@ function createOperTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends 
             }            
         } as CreateTrigger<ED, 'oper', Cxt>
     ] as Trigger<ED, keyof ED, Cxt>[];
-}
+} */
 
 export function createDynamicTriggers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED> | SyncContext<ED>>(schema: StorageSchema<ED>) {
-    return createModiRelatedTriggers<ED, Cxt>(schema).concat(createOperTriggers());
+    return createModiRelatedTriggers<ED, Cxt>(schema);
 }

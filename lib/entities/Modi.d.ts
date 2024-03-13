@@ -4,7 +4,7 @@ export interface Schema extends EntityShape {
     targetEntity: String<32>;
     entity: String<32>;
     entityId: String<64>;
-    action: String<16>;
+    action: String<24>;
     data: Object;
     filter?: Object;
     extra?: Object;

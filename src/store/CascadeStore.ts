@@ -1432,7 +1432,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     data,
                                     operatorId,
                                     targetEntity: entity as string,
-                                    bornAt,
+                                    bornAt: bornAt || now,
                                     operEntity$oper: data instanceof Array ? {
                                         id: 'dummy',
                                         action: 'create',
@@ -1595,7 +1595,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     action,
                                     data,
                                     targetEntity: entity as string,
-                                    bornAt,
+                                    bornAt: bornAt || now,
                                     operatorId,
                                     operEntity$oper: {
                                         id: 'dummy',
