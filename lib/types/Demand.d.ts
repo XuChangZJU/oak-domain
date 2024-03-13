@@ -79,9 +79,9 @@ export declare function isRefAttrNode<A>(node: any): node is RefAttr<A>;
 export type JsonFilter<O extends any> = O extends Array<infer P> ? (JsonFilter<P> | undefined)[] | {
     $contains?: P | P[];
     $overlaps?: P | P[];
-} : O extends number ? Q_NumberValue : O extends string ? Q_StringValue : O extends boolean ? Q_BooleanValue : O extends Record<string, any> ? {
+} | Q_ExistsValue : O extends number ? Q_NumberValue : O extends string ? Q_StringValue : O extends boolean ? Q_BooleanValue : O extends Record<string, any> ? {
     [A in keyof O]?: JsonFilter<O[A]>;
-} : never;
+} | Q_ExistsValue : never;
 export type SubQueryPredicateMetadata = {
     '#sqp'?: 'in' | 'not in' | 'all' | 'not all';
 };

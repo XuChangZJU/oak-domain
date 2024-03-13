@@ -7,7 +7,7 @@ import { String, Datetime } from "../../types/DataType";
 import * as User from "../User/Schema";
 import * as OperEntity from "../OperEntity/Schema";
 export type OpSchema = EntityShape & {
-    action: String<16>;
+    action: String<24>;
     data: Object;
     filter?: Object | null;
     extra?: Object | null;
@@ -17,7 +17,7 @@ export type OpSchema = EntityShape & {
 };
 export type OpAttr = keyof OpSchema;
 export type Schema = EntityShape & {
-    action: String<16>;
+    action: String<24>;
     data: Object;
     filter?: Object | null;
     extra?: Object | null;

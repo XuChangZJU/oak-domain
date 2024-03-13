@@ -1315,6 +1315,8 @@ function analyzeEntity(filename: string, path: string, program: ts.Program, rela
                 const [actionNode, stateNode] = typeArguments!;
 
                 assert(ts.isTypeReferenceNode(actionNode));
+                // 这里有可能引用的Action不是本文件的定义，要调用这个函数加到importFrom中
+                tryGetStringLiteralValues(moduleName, filename, 'action', actionNode, program);
                 assert(ts.isTypeReferenceNode(stateNode));
                 const enumStateValues = tryGetStringLiteralValues(moduleName, filename, 'state', stateNode, program);
                 assert(enumStateValues.length > 0, `文件${filename}中的state${(<ts.Identifier>stateNode.typeName).text}定义不是字符串类型`)

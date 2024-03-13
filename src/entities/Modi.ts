@@ -7,7 +7,7 @@ export interface Schema extends EntityShape {
     targetEntity: String<32>;       // 要操作的目标对象
     entity: String<32>;             // 关联的目标对象
     entityId: String<64>;           // 关联的目标对象id
-    action: String<16>;
+    action: String<24>;
     data: Object;
     filter?: Object;
     extra?: Object;
