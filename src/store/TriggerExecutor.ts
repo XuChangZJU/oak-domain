@@ -10,6 +10,7 @@ import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
 import { translateCheckerInAsyncContext } from './checker';
 import { generateNewIdAsync } from '../utils/uuid';
+import { readOnlyActions } from '../actions/action';
 
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
@@ -197,7 +198,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
 
     private async preCommitTrigger<T extends keyof ED>(
         entity: T,
-        operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
+        operation: ED[T]['Operation'],
         trigger: Trigger<ED, T, Cxt>,
         context: Cxt,
         option: OperateOption
@@ -274,24 +275,28 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
 
     private postCommitTrigger<T extends keyof ED>(
         entity: T,
-        operation: ED[T]['Operation'] | ED[T]['Selection'] & { action: 'select' },
+        operation: ED[T]['Operation'],
         trigger: VolatileTrigger<ED, T, Cxt>,
         context: Cxt,
         option: OperateOption
     ) {        
         context.on('commit', async () => {
             let ids = [] as string[];
+            let cxtStr = await context.toString();
             const { opRecords } = context;
+            const { data } = operation;
             if (operation.action === 'create') {
-                const { data } = operation;
                 if (data instanceof Array) {
                     ids = data.map(ele => ele.id!);
+                    cxtStr = data[0].$$triggerData$$.cxtStr;
                 }
                 else {
                     ids = [data.id!];
+                    cxtStr = data.$$triggerData$$.cxtStr;
                 }
             }
             else {
+                cxtStr = (<ED[T]['Update']['data']>data).$$triggerData$$.cxtStr;
                 const record = opRecords.find(
                     ele => (ele as CreateOpResult<ED, keyof ED>).id === operation.id,
                 );
@@ -300,7 +305,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                 const { f } = record as UpdateOpResult<ED, keyof ED>;
                 ids = f!.id!.$in;
             }
-            const cxtStr = await context.toString();
+            // 此时项目的上下文，和执行此trigger时的上下文可能不一致（rootMode），采用当时的上下文cxtStr来执行
             this.onVolatileTrigger(entity, trigger, ids, cxtStr, option);
         });
     }
@@ -374,6 +379,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     if (idx >= commitTriggers.length) {
                         return;
                     }
+                    assert(!readOnlyActions.includes(operation.action), '当前应该不支持select的跨事务trigger');
                     const trigger = commitTriggers[idx];
                     if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
                         assert(operation.action !== 'create');
@@ -384,7 +390,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                             return execCommitTrigger(idx + 1);
                         }
                     }
-                    await this.preCommitTrigger(entity, operation, trigger, context, option as OperateOption);
+                    await this.preCommitTrigger(entity, operation as ED[T]['Operation'], trigger, context, option as OperateOption);
                     return execCommitTrigger(idx + 1);
                 };
                 return execPreTrigger(0)
@@ -503,6 +509,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                     if (idx >= commitTriggers.length) {
                         return;
                     }
+                    assert(!readOnlyActions.includes(operation.action), '当前应该不支持select的跨事务trigger');
                     const trigger = commitTriggers[idx];
                     if ((trigger as UpdateTrigger<ED, T, Cxt>).filter) {
                         assert(operation.action !== 'create');
@@ -513,7 +520,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
                             return execCommitTrigger(idx + 1);
                         }
                     }
-                    this.postCommitTrigger(entity, operation, trigger, context, option as OperateOption);
+                    this.postCommitTrigger(entity, operation as ED[T]['Operation'], trigger, context, option as OperateOption);
                     return execCommitTrigger(idx + 1);
                 };
                 return execPostTrigger(0)
