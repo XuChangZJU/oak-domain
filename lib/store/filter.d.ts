@@ -2,6 +2,7 @@ import { EntityDict as BaseEntityDict, StorageSchema } from '../types';
 import { EntityDict } from "../base-app-domain";
 import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
+export declare function translateCreateDataToFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(schema: StorageSchema<ED>, entity: T, data: ED[T]['CreateSingle']['data']): ED[T]["Selection"]["filter"];
 export declare function combineFilters<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>, filters: Array<ED[T]['Selection']['filter']>, union?: true): ED[T]["Selection"]["filter"] | undefined;
 /**
  * 在以下判断相容或相斥的过程中，相容/相斥的事实标准是：满足两个条件的查询集合是否被包容/互斥，但如果两个filter在逻辑上相容或者相斥，在事实上不一定相容或者相斥

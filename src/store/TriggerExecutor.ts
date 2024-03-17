@@ -4,13 +4,14 @@ import { checkFilterRepel, combineFilters } from "../store/filter";
 import { CreateOpResult, EntityDict, OperateOption, SelectOption, TriggerDataAttribute, TriggerUuidAttribute, UpdateAtAttribute, UpdateOpResult } from "../types/Entity";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { Logger } from "../types/Logger";
-import { Checker, CheckerType, LogicalChecker, RelationChecker } from '../types/Auth';
+import { Checker, CheckerType, LogicalChecker, RowChecker } from '../types/Auth';
 import { Trigger, CreateTriggerCrossTxn, CreateTrigger, CreateTriggerInTxn, SelectTriggerAfter, UpdateTrigger, TRIGGER_DEFAULT_PRIORITY, CHECKER_PRIORITY_MAP, CHECKER_MAX_PRIORITY, TRIGGER_MIN_PRIORITY, VolatileTrigger } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
 import { SyncContext } from './SyncRowStore';
 import { translateCheckerInAsyncContext } from './checker';
 import { generateNewIdAsync } from '../utils/uuid';
 import { readOnlyActions } from '../actions/action';
+import { StorageSchema } from '../types';
 
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
@@ -87,10 +88,10 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         this.onVolatileTrigger = onVolatileTrigger;
     }
 
-    registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void {
-        const { entity, action, type, conditionalFilter, mt } = checker;
+    registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>, schema: StorageSchema<ED>): void {
+        const { entity, action, type, mt } = checker;
         const triggerName = `${String(entity)}${action}权限检查-${this.counter++}`;
-        const { fn, when } = translateCheckerInAsyncContext(checker);
+        const { fn, when } = translateCheckerInAsyncContext(checker, schema);
 
         const trigger = {
             checkerType: type,
@@ -101,7 +102,7 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
             fn,
             when,
             mt,
-            filter: conditionalFilter,
+            filter: (checker as RowChecker<ED, T, Cxt>).conditionalFilter,
         } as UpdateTrigger<ED, T, Cxt>;
         this.registerTrigger(trigger);
     }

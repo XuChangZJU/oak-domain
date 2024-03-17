@@ -1,59 +1,13 @@
-import { ActionDictOfEntityDict, BBWatcher, Checker, EntityDict, StorageSchema, Trigger, RowChecker, OakDataException, OakUniqueViolationException, UpdateTrigger, CHECKER_MAX_PRIORITY } from "../types";
+import { ActionDictOfEntityDict, Checker, EntityDict, StorageSchema, RowChecker, OakUniqueViolationException, CHECKER_MAX_PRIORITY, AttrUpdateMatrix, LogicalChecker, OakAttrCantUpdateException } from "../types";
 import { SyncContext } from "./SyncRowStore";
 import { AsyncContext } from "./AsyncRowStore";
-import { uniqBy, pick, intersection } from '../utils/lodash';
-import { combineFilters } from "./filter";
-import { createDynamicCheckers } from '../checkers';
-import { createDynamicTriggers } from '../triggers';
+import { pick, intersection, difference } from '../utils/lodash';
+import { checkFilterContains, combineFilters } from "./filter";
 import { EntityDict as BaseEntityDict } from '../base-app-domain/EntityDict';
-import { triggers as ActionAuthTriggers } from './actionAuth';
+import { createModiRelatedCheckers } from "./modi";
+import { createCreateCheckers, createRemoveCheckers } from "./checker";
+import { readOnlyActions } from "../actions/action";
 
-export function getFullProjection<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>) {
-    const { attributes } = schema[entity];
-    const projection: ED[T]['Selection']['data'] = {
-        id: 1,
-        $$createAt$$: 1,
-        $$updateAt$$: 1,
-        $$deleteAt$$: 1,
-    };
-    Object.keys(attributes).forEach(
-        (k) => Object.assign(projection, {
-            [k]: 1,
-        })
-    );
-
-    return projection;
-}
-
-function makeIntrinsicWatchers<ED extends EntityDict & BaseEntityDict>(schema: StorageSchema<ED>) {
-    const watchers: BBWatcher<ED, keyof ED>[] = [];
-    for (const entity in schema) {
-        const { attributes } = schema[entity];
-
-        const { expiresAt, expired } = attributes;
-        if (expiresAt && expiresAt.type === 'datetime' && expired && expired.type === 'boolean') {
-            // 如果有定义expiresAt和expired，则自动生成一个检查的watcher
-            watchers.push({
-                entity,
-                name: `对象${entity}上的过期自动watcher`,
-                filter: () => {
-                    return {
-                        expired: false,
-                        expiresAt: {
-                            $lte: Date.now(),
-                        },
-                    };
-                },
-                action: 'update',
-                actionData: {
-                    expired: true,
-                } as ED[keyof ED]['Update']['data'],
-            })
-        }
-    }
-
-    return watchers;
-}
 
 function checkUniqueBetweenRows(rows: Record<string, any>[], uniqAttrs: string[]) {
     // 先检查这些行本身之间有无unique冲突
@@ -101,7 +55,7 @@ function checkCountLessThan(count: number | Promise<number>, uniqAttrs: string[]
     }
 }
 
-function checkUnique<ED extends EntityDict& BaseEntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
+function checkUnique<ED extends EntityDict & BaseEntityDict, Cxt extends SyncContext<ED> | AsyncContext<ED>>(
     entity: keyof ED,
     row: Record<string, any>,
     context: Cxt,
@@ -123,77 +77,8 @@ function checkUnique<ED extends EntityDict& BaseEntityDict, Cxt extends SyncCont
     return checkCountLessThan(count, uniqAttrs, 0, row.id)
 }
 
-export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>>(schema: StorageSchema<ED>, actionDefDict: ActionDictOfEntityDict<ED>) {
-    const checkers: Array<Checker<ED, keyof ED, Cxt | FrontCxt>> = createDynamicCheckers<ED, Cxt | FrontCxt>(schema);
-    const triggers: Array<Trigger<ED, keyof ED, Cxt>> = createDynamicTriggers<ED, Cxt>(schema);
-
-    // action状态转换矩阵相应的checker
-    for (const entity in actionDefDict) {
-        for (const attr in actionDefDict[entity]) {
-            const def = actionDefDict[entity]![attr];
-            const { stm, is } = def!;
-            for (const action in stm) {
-                const actionStm = stm[action]!;
-                const conditionalFilter = typeof actionStm[0] === 'string' ? {
-                    [attr]: actionStm[0],
-                } : {
-                    [attr]: {
-                        $in: actionStm[0],
-                    },
-                };
-                checkers.push({
-                    action: action as any,
-                    type: 'row',
-                    entity,
-                    filter: conditionalFilter,
-                    errMsg: '',
-                } as RowChecker<ED, keyof ED, Cxt>);
-
-                // 这里用data类型的checker改数据了不太好，先这样
-                checkers.push({
-                    action: action as any,
-                    type: 'data',
-                    entity,
-                    checker: (data) => {
-                        Object.assign(data, {
-                            [attr]: stm[action][1],
-                        });
-                    }
-                });
-            }
-
-            if (is) {
-                checkers.push({
-                    action: 'create' as any,
-                    type: 'data',
-                    entity,
-                    priority: 10,       // 优先级要高，先于真正的data检查进行
-                    checker: (data) => {
-                        if (data instanceof Array) {
-                            data.forEach(
-                                ele => {
-                                    if (!ele[attr]) {
-                                        Object.assign(ele, {
-                                            [attr]: is,
-                                        });
-                                    }
-                                }
-                            );
-                        }
-                        else {
-                            if (!(data as ED[keyof ED]['CreateSingle']['data'])[attr]) {
-                                Object.assign(data, {
-                                    [attr]: is,
-                                });
-                            }
-                        }
-                    }
-                });
-            }
-        }
-    }
-
-    // unique索引相应的checker
+function createUniqueCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>>(schema: StorageSchema<ED>) {
+    const checkers: Array<Checker<ED, keyof ED, Cxt | FrontCxt>> = [];
     for (const entity in schema) {
         const { indexes } = schema[entity];
         if (indexes) {
@@ -233,7 +118,7 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
                             const { data, filter: operationFilter } = operation as ED[keyof ED]['Update'];
                             if (data) {
                                 const attrs = Object.keys(data);
-    
+
                                 const refAttrs = intersection(attrs, uniqAttrs);
                                 if (refAttrs.length === 0) {
                                     // 如果本次更新和unique约束的属性之间没有交集则直接返回
@@ -248,7 +133,7 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
                                 if (refAttrs.length === uniqAttrs.length) {
                                     // 如果更新了全部属性，直接检查
                                     const filter = pick(data, refAttrs);
-    
+
                                     // 在这些行以外的行不和更新后的键值冲突
                                     const count = context.count(entity, {
                                         filter: combineFilters(entity, context.getSchema(), [filter, {
@@ -256,13 +141,13 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
                                         }]),
                                     }, { dontCollect: true });
                                     const checkCount = checkCountLessThan(count, uniqAttrs, 0, operationFilter?.id);
-    
+
                                     // 更新的行只能有一行
                                     const rowCount = context.count(entity, {
                                         filter: operationFilter,
                                     }, { dontCollect: true });
                                     const checkRowCount = checkCountLessThan(rowCount, uniqAttrs, 1, operationFilter?.id);
-    
+
                                     // 如果更新的行数为零似乎也可以，但这应该不可能出现吧，by Xc 20230131
                                     if (checkRowCount instanceof Promise) {
                                         return Promise.all([checkCount, checkRowCount]).then(
@@ -277,7 +162,7 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
                                         [attr]: 1,
                                     });
                                 }
-    
+
                                 const checkWithRows = (rows2: ED[keyof ED]['Schema'][]) => {
                                     const rows22 = rows2.map(
                                         ele => Object.assign(ele, data)
@@ -295,7 +180,7 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
                                         );
                                     }
                                 };
-    
+
                                 const currentRows = context.select(entity, {
                                     data: projection,
                                     filter: operationFilter,
@@ -313,11 +198,147 @@ export function makeIntrinsicCTWs<ED extends EntityDict & BaseEntityDict, Cxt ex
             }
         }
     }
+    return checkers;
+}
 
-    triggers.push(...(ActionAuthTriggers as Array<Trigger<ED, keyof ED, Cxt>>));
-    return {
-        triggers,
-        checkers,
-        watchers: makeIntrinsicWatchers(schema),
-    };
+function createActionTransformerCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>>(
+    actionDefDict: ActionDictOfEntityDict<ED>
+) {
+    const checkers: Array<Checker<ED, keyof ED, Cxt | FrontCxt>> = [];
+    for (const entity in actionDefDict) {
+        for (const attr in actionDefDict[entity]) {
+            const def = actionDefDict[entity]![attr];
+            const { stm, is } = def!;
+            for (const action in stm) {
+                const actionStm = stm[action]!;
+                const conditionalFilter = typeof actionStm[0] === 'string' ? {
+                    [attr]: actionStm[0],
+                } : {
+                    [attr]: {
+                        $in: actionStm[0],
+                    },
+                };
+                checkers.push({
+                    action: action as any,
+                    type: 'row',
+                    entity,
+                    filter: conditionalFilter,
+                    errMsg: '',
+                } as RowChecker<ED, keyof ED, Cxt>);
+
+                // 这里用data类型的checker改数据了不太好，先这样
+                checkers.push({
+                    action: action as any,
+                    type: 'data',
+                    entity,
+                    checker: (data) => {
+                        Object.assign(data, {
+                            [attr]: stm[action][1],
+                        });
+                    }
+                });
+            }
+
+            if (is) {
+                checkers.push({
+                    action: 'create' as ED[keyof ED]['Action'],
+                    type: 'data',
+                    entity,
+                    priority: 10,       // 优先级要高，先于真正的data检查进行
+                    checker: (data) => {
+                        if (data instanceof Array) {
+                            (data as Readonly<ED[keyof ED]['CreateMulti']['data']>).forEach(
+                                ele => {
+                                    if (!ele[attr]) {
+                                        Object.assign(ele, {
+                                            [attr]: is,
+                                        });
+                                    }
+                                }
+                            );
+                        }
+                        else {
+                            if (!(data as Readonly<ED[keyof ED]['CreateSingle']['data']>)[attr]) {
+                                Object.assign(data, {
+                                    [attr]: is,
+                                });
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    return checkers;
+}
+
+function createAttrUpdateCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>>(
+    schema: StorageSchema<ED>,
+    attrUpdateMatrix: AttrUpdateMatrix<ED>
+) {
+    const checkers: Checker<ED, keyof ED, Cxt | FrontCxt>[] = [];
+    for (const entity in attrUpdateMatrix) {
+        const matrix = attrUpdateMatrix[entity]!;
+        const updateAttrs = Object.keys(matrix) as string[];
+        const { actions } = schema[entity];
+        const updateActions = actions.filter(
+            (a) => !readOnlyActions.concat(['create', 'remove']).includes(a)
+        );
+
+        /**
+         * 如果一个entity定义了attrUpdateMatrix，则必须严格遵循定义，未出现在matrix中的属性不允许更新
+         */
+        const updateChecker: LogicalChecker<ED, keyof ED, Cxt | FrontCxt> = {
+            entity,
+            action: updateActions,
+            type: 'logicalData',
+            checker({ data, filter }, context) {
+                const attrs = Object.keys(data);
+                const extras = difference(attrs, updateAttrs);
+                if (extras.length > 0) {
+                    throw new OakAttrCantUpdateException(entity, extras, '更新了不允许的属性');
+                }
+                const filters = attrs.map(ele => matrix[ele]!);
+                const conditionalFilter = combineFilters(entity, schema, filters);
+                const result = checkFilterContains(entity, context, conditionalFilter, filter, true);
+                if (result instanceof Promise) {
+                    return result.then(
+                        (v) => {
+                            if (!v) {
+                                throw new OakAttrCantUpdateException(entity, attrs, '更新的行当前属性不满足约束，请仔细检查数据');
+                            }
+                        }
+                    );
+                }
+                if (!result) {
+                    throw new OakAttrCantUpdateException(entity, attrs, '更新的行当前属性不满足约束，请仔细检查数据');
+                }
+            }
+        };
+        checkers.push(updateChecker);
+    }
+
+    return checkers;
+}
+
+export function makeIntrinsicCheckers<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>, FrontCxt extends SyncContext<ED>>(
+    schema: StorageSchema<ED>,
+    actionDefDict: ActionDictOfEntityDict<ED>,
+    attrUpdateMatrix?: AttrUpdateMatrix<ED>,
+) {
+    const checkers: Checker<ED, keyof ED, Cxt | FrontCxt>[] = [];
+    checkers.push(...createModiRelatedCheckers<ED, Cxt>(schema));
+    checkers.push(...createRemoveCheckers<ED, Cxt | FrontCxt>(schema));
+    checkers.push(...createCreateCheckers<ED, Cxt | FrontCxt>(schema));
+    // action状态转换矩阵相应的checker
+    checkers.push(...createActionTransformerCheckers(actionDefDict));
+    // unique索引相应的checker
+    checkers.push(...createUniqueCheckers<ED, Cxt, FrontCxt>(schema));
+    if (attrUpdateMatrix) {
+        // attrUpdateMatrix相应的checker
+        checkers.push(...createAttrUpdateCheckers<ED, Cxt, FrontCxt>(schema, attrUpdateMatrix));
+    }
+
+    return checkers;
 }

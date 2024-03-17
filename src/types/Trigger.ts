@@ -25,8 +25,6 @@ export const CHECKER_PRIORITY_MAP: Record<CheckerType, number> = {
     row: 51,
     data: 61,
     logicalData: 61,
-    relation: 71,
-    logicalRelation: 71,
 };
 
 interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
