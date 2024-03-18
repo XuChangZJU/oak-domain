@@ -1615,6 +1615,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             )
                                         )
                                     },
+                                    filter: {
+                                        id: { $in: ids },
+                                    }
                                 },
                             }
                             const closeRootMode = context.openRootMode();
