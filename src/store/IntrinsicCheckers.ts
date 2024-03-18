@@ -293,26 +293,40 @@ function createAttrUpdateCheckers<ED extends EntityDict & BaseEntityDict, Cxt ex
             entity,
             action: updateActions,
             type: 'logicalData',
-            checker({ data, filter }, context) {
+            checker({ data, filter, action }, context) {
                 const attrs = Object.keys(data);
                 const extras = difference(attrs, updateAttrs);
                 if (extras.length > 0) {
                     throw new OakAttrCantUpdateException(entity, extras, '更新了不允许的属性');
                 }
-                const filters = attrs.map(ele => matrix[ele]!);
-                const conditionalFilter = combineFilters(entity, schema, filters);
-                const result = checkFilterContains(entity, context, conditionalFilter, filter, true);
-                if (result instanceof Promise) {
-                    return result.then(
-                        (v) => {
-                            if (!v) {
-                                throw new OakAttrCantUpdateException(entity, attrs, '更新的行当前属性不满足约束，请仔细检查数据');
-                            }
-                        }
-                    );
+                const condition = attrs.map(ele => matrix[ele]!);
+                const actions = condition.map(ele => ele.action).filter(ele => !!ele);
+                const filters = condition.map(ele => ele.filter).filter(ele => !!ele);
+                const a = actions.length > 0 && intersection(actions.flat());
+                const f = filters.length > 0 && combineFilters(entity, schema, filters);
+                if (a) {
+                    if (!a.includes(action)) {
+                        // 找到不满足的那个attr
+                        const attrsIllegal = attrs.filter(
+                            (attr) => matrix[attr]?.action && !matrix[attr]?.action?.includes(action!)
+                        );
+                        throw new OakAttrCantUpdateException(entity, attrsIllegal, `${attrsIllegal}不允许被${action}动作更新`);
+                    }
                 }
-                if (!result) {
-                    throw new OakAttrCantUpdateException(entity, attrs, '更新的行当前属性不满足约束，请仔细检查数据');
+                if (f) {
+                    const result = checkFilterContains<ED, keyof ED, Cxt>(entity, context as any, f, filter, true);
+                    if (result instanceof Promise) {
+                        return result.then(
+                            (v) => {
+                                if (!v) {
+                                    throw new OakAttrCantUpdateException(entity, attrs, '更新的行当前属性不满足约束，请仔细检查数据');
+                                }
+                            }
+                        );
+                    }
+                    if (!result) {
+                        throw new OakAttrCantUpdateException(entity, attrs, '更新的行当前属性不满足约束，请仔细检查数据');
+                    }
                 }
             }
         };
