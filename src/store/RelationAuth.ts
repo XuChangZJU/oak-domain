@@ -569,7 +569,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
             const { data, filter } = operation;
             assert(!(data instanceof Array));
             if (data) {
-                return translateCreateDataToFilter(this.schema, entity2, data);
+                return translateCreateDataToFilter(this.schema, entity, data);
             }
             return filter;
         };
