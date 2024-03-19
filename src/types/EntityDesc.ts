@@ -17,8 +17,8 @@ export type EntityDesc<
 // 定义对象的更新约束，在什么状态下可以(通过什么动作)更新什么属性
 export type AttrUpdateMatrix<ED extends EntityDict> = {
     [T in keyof ED]?: {
-        [A in keyof ED[T]['OpSchema']]?: {
-            action?: ED[T]['Action'][];
+        [A in keyof ED[T]['Update']['data']]?: {
+            actions?: ED[T]['Action'][];
             filter?: NonNullable<ED[T]['Selection']['filter']>;
         };
     };

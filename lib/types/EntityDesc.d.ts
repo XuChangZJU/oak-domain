@@ -9,8 +9,8 @@ export type EntityDesc<Schema extends EntityShape, Action extends string = '', R
 };
 export type AttrUpdateMatrix<ED extends EntityDict> = {
     [T in keyof ED]?: {
-        [A in keyof ED[T]['OpSchema']]?: {
-            action?: ED[T]['Action'][];
+        [A in keyof ED[T]['Update']['data']]?: {
+            actions?: ED[T]['Action'][];
             filter?: NonNullable<ED[T]['Selection']['filter']>;
         };
     };

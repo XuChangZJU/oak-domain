@@ -300,7 +300,7 @@ function createAttrUpdateCheckers<ED extends EntityDict & BaseEntityDict, Cxt ex
                     throw new OakAttrCantUpdateException(entity, extras, '更新了不允许的属性');
                 }
                 const condition = attrs.map(ele => matrix[ele]!);
-                const actions = condition.map(ele => ele.action).filter(ele => !!ele);
+                const actions = condition.map(ele => ele.actions).filter(ele => !!ele);
                 const filters = condition.map(ele => ele.filter).filter(ele => !!ele);
                 const a = actions.length > 0 && intersection(actions.flat());
                 const f = filters.length > 0 && combineFilters(entity, schema, filters);
@@ -308,7 +308,7 @@ function createAttrUpdateCheckers<ED extends EntityDict & BaseEntityDict, Cxt ex
                     if (!a.includes(action)) {
                         // 找到不满足的那个attr
                         const attrsIllegal = attrs.filter(
-                            (attr) => matrix[attr]?.action && !matrix[attr]?.action?.includes(action!)
+                            (attr) => matrix[attr]?.actions && !matrix[attr]?.actions?.includes(action!)
                         );
                         throw new OakAttrCantUpdateException(entity, attrsIllegal, `${attrsIllegal}不允许被${action}动作更新`);
                     }

@@ -289,15 +289,20 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
             if (operation.action === 'create') {
                 if (data instanceof Array) {
                     ids = data.map(ele => ele.id!);
-                    cxtStr = data[0].$$triggerData$$.cxtStr;
+                    cxtStr = data[0].$$triggerData$$?.cxtStr || await context.toString();
                 }
                 else {
                     ids = [data.id!];
-                    cxtStr = data.$$triggerData$$.cxtStr;
+                    cxtStr = data.$$triggerData$$?.cxtStr || await context.toString();
                 }
             }
             else {
-                cxtStr = (<ED[T]['Update']['data']>data).$$triggerData$$.cxtStr;
+                /**
+                 * 若trigger是makeSure，则应使用当时缓存的cxt（有可能是checkpoint反复调用）
+                 * 若trigger是takeEasy，只会在事务提交时做一次，使用当前context应也无大问题
+                 * 暂时先这样设计，若当前提交事务中改变了cxt内容，也许会有问题。by Xc 20240319
+                 */
+                cxtStr = (<ED[T]['Update']['data']>data).$$triggerData$$?.cxtStr || await context.toString();
                 const record = opRecords.find(
                     ele => (ele as CreateOpResult<ED, keyof ED>).id === operation.id,
                 );
