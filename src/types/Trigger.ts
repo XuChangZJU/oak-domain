@@ -49,7 +49,8 @@ interface TriggerCrossTxn<ED extends EntityDict, Cxt extends AsyncContext<ED> | 
     when: 'commit',
     strict?: 'takeEasy' | 'makeSure';
     cs?: true;        // cluster sensative，集群敏感的，需要由对应的集群进程统一处理
-    fn: (event: { ids: string[] }, context: Cxt, option: OperateOption) => Promise<number> | number;
+    fn: (event: { ids: string[] }, context: Cxt, option: OperateOption) => 
+        Promise<((context: Cxt, option: OperateOption) => Promise<any>) | void>;      // 跨事务的trigger可能紧接着下来就要触发另一个跨事务trigger，这里只能用回调的方式进行
 }
 
 export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> 

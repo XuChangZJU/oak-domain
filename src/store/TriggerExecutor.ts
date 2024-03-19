@@ -418,26 +418,25 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
         assert(trigger && trigger.when === 'commit');
         assert(ids.length > 0);
         const { fn } = trigger as VolatileTrigger<ED, T, Cxt>;
-        await fn({ ids }, context, option);
+        const callback = await fn({ ids }, context, option);
         if (trigger.strict === 'makeSure') {
-            try {
-                await context.operate(entity, {
-                    id: await generateNewIdAsync(),
-                    action: 'update',
-                    data: {
-                        [TriggerDataAttribute]: null,
-                        [TriggerUuidAttribute]: null,
-                    },
-                    filter: {
-                        id: {
-                            $in: ids,
-                        }
+            await context.operate(entity, {
+                id: await generateNewIdAsync(),
+                action: 'update',
+                data: {
+                    [TriggerDataAttribute]: null,
+                    [TriggerUuidAttribute]: null,
+                },
+                filter: {
+                    id: {
+                        $in: ids,
                     }
-                }, { includedDeleted: true, blockTrigger: true });
-            }
-            catch (err) {
-                throw err;
-            }
+                }
+            }, { includedDeleted: true, blockTrigger: true });
+        }
+
+        if (typeof callback === 'function') {
+            await callback(context, option);
         }
     }
 

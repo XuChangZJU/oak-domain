@@ -39,7 +39,7 @@ interface TriggerCrossTxn<ED extends EntityDict, Cxt extends AsyncContext<ED> | 
     cs?: true;
     fn: (event: {
         ids: string[];
-    }, context: Cxt, option: OperateOption) => Promise<number> | number;
+    }, context: Cxt, option: OperateOption) => Promise<((context: Cxt, option: OperateOption) => Promise<any>) | void>;
 }
 export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt>, TriggerCrossTxn<ED, Cxt> {
 }
