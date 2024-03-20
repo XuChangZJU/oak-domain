@@ -33,7 +33,6 @@ export type RowChecker<ED extends EntityDict, T extends keyof ED, Cxt extends As
 export type LogicalChecker<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> = {
     priority?: number;
     type: 'logical' | 'logicalData';
-    when?: 'after';
     mt?: ModiTurn;
     entity: T;
     action: ED[T]['Action'] | Array<ED[T]['Action']>;
