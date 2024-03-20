@@ -1454,6 +1454,11 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             entity: entity as string,
                                         },
                                     }],
+                                    filter: {
+                                        id: data instanceof Array ? {
+                                            id: { $in: data.map(ele => ele.id!) },
+                                        } : data.id!,
+                                    }
                                 },
                             };
                             const closeRootMode = context.openRootMode();
@@ -1610,6 +1615,9 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                             )
                                         )
                                     },
+                                    filter: {
+                                        id: { $in: ids },
+                                    }
                                 },
                             }
                             const closeRootMode = context.openRootMode();

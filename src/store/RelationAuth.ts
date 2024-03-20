@@ -3,7 +3,7 @@ import { EntityDict } from "../base-app-domain";
 import { OakUnloggedInException, OakUserInvisibleException, OakUserUnpermittedException, StorageSchema } from "../types";
 import { EntityDict as BaseEntityDict, AuthDeduceRelationMap } from "../types/Entity";
 import { AsyncContext } from "./AsyncRowStore";
-import { checkFilterContains, combineFilters, getRelevantIds } from "./filter";
+import { checkFilterContains, combineFilters, getRelevantIds, translateCreateDataToFilter } from "./filter";
 import { judgeRelation } from "./relation";
 import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
@@ -569,21 +569,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
             const { data, filter } = operation;
             assert(!(data instanceof Array));
             if (data) {
-                const data2: ED[T2]['Selection']['filter'] = {};
-                for (const attr in data) {
-                    const rel = judgeRelation(this.schema, entity, attr);
-                    if (rel === 1) {
-                        // 只需要记住id和各种外键属性，不这样处理有些古怪的属性比如coordinate，其作为createdata和作为filter并不同构
-                        /* if ((['id', 'entity', 'entityId'].includes(attr) || this.schema[entity].attributes[attr as any]?.type === 'ref') && typeof data[attr] === 'string') {
-                            data2[attr] = data[attr];
-                        } */
-                        // 假设不再成立，userEntityGrant需要relationEntity这样的属性
-                        if (!['geometry', 'geography', 'st_geometry', 'st_point'].includes(this.schema[entity].attributes[attr as any]?.type!)) {
-                            data2[attr] = data[attr];
-                        }
-                    }
-                }
-                return data2;
+                return translateCreateDataToFilter(this.schema, entity, data);
             }
             return filter;
         };

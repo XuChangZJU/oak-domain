@@ -205,7 +205,16 @@ export class OakInputIllegalException<ED extends EntityDict> extends OakUserExce
  */
 export class OakAttrNotNullException<ED extends EntityDict> extends OakInputIllegalException<ED> {
     constructor(entity: keyof ED, attributes: string[], message?: string) {
-        super(entity, attributes, message || '属性不允许为空');
+        super(entity, attributes, message || `属性[${attributes.join(',')}]不允许为空`);
+    }
+}
+
+/**
+ * 属性不允许更新抛的异常，前端可以用这个异常来处理update时对应属性的露出
+ */
+export class OakAttrCantUpdateException<ED extends EntityDict> extends OakInputIllegalException<ED> {
+    constructor(entity: keyof ED, attributes: string[], message?: string) {
+        super(entity, attributes, message || `属性[${attributes.join(',')}]不允许更新`);
     }
 }
 
@@ -371,86 +380,75 @@ export function makeException<ED extends EntityDict>(data: {
     [A: string]: any;
 }) {
     const { name } = data;
+    let e: OakException<ED> | undefined = undefined;
     switch (name) {
         case 'OakException': {
-            const e = new OakException(data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            e = new OakException(data.message);
+            break;
         }
         case 'OakUserException': {
             const e = new OakUserException(data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakRowInconsistencyException': {
             const e = new OakRowInconsistencyException(data.data, data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakInputIllegalException': {
             const e = new OakInputIllegalException(data.entity, data.attributes, data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
+        }
+        case 'OakAttrCantUpdateException': {
+            const e = new OakAttrCantUpdateException(data.entity, data.attributes, data.message);
+            break;
         }
         case 'OakUserUnpermittedException': {
             const e = new OakUserUnpermittedException(data.entity, data.operation, data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakUserInvisibleException': {
             const e = new OakUserInvisibleException(data.entity, data.operation, data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakUnloggedInException': {
             const e = new OakUnloggedInException(data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakCongruentRowExists': {
             const e = new OakCongruentRowExists(data.entity, data.data, data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakRowLockedException': {
             const e = new OakRowLockedException(data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakRowUnexistedException': {
             const e = new OakRowUnexistedException(data.rows);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakDeadlock': {
             const e = new OakDeadlock(data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakDataException': {
             const e = new OakDataException(data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakNoRelationDefException': {
             const e = new OakNoRelationDefException(data.entity, data.action, data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakUniqueViolationException': {
             const e = new OakUniqueViolationException(data.rows, data.message);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakImportDataParseException': {
             const e = new OakImportDataParseException(data.message!, data.line, data.header);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakPreConditionUnsetException': {
             const e = new OakPreConditionUnsetException(data.message, data.entity, data.code);
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakAttrNotNullException': {
             const e = new OakAttrNotNullException(
@@ -458,22 +456,25 @@ export function makeException<ED extends EntityDict>(data: {
                 data.attributes,
                 data.message
             );
-            e.setOpRecords(data.opRecords);
-            return e;
+            break;
         }
         case 'OakExternalException': {
             const e = new OakExternalException(data.source, data.code, data.message, data.data);
-            return e;
+            break;
         }
         case 'OakNetworkException': {
             const e = new OakNetworkException(data.message);
-            return e;
+            break;
         }
         case 'OakServerProxyException': {
             const e = new OakServerProxyException(data.message);
-            return e;
+            break;
         }
         default:
             return;
+    }
+    if (e) {
+        e.setOpRecords(data.opRecords);
+        return e;
     }
 }

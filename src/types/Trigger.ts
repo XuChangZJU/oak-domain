@@ -18,15 +18,14 @@ export const TRIGGER_MAX_PRIORITY = 50;
 export const CHECKER_MAX_PRIORITY = 99;
 
 /**
- * logical可能会更改row和data的值，应当最先执行，data和row不能修改相关的值，如果要修改，手动置priority小一点以确保安全
+ * logical可能会更改row和data的值，应当最先执行，data和row不能修改相关的值
+ * 允许logicalData去改data中的值
  */
 export const CHECKER_PRIORITY_MAP: Record<CheckerType, number> = {
+    logicalData: 31,
     logical: 33,
     row: 51,
     data: 61,
-    logicalData: 61,
-    relation: 71,
-    logicalRelation: 71,
 };
 
 interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
@@ -51,7 +50,8 @@ interface TriggerCrossTxn<ED extends EntityDict, Cxt extends AsyncContext<ED> | 
     when: 'commit',
     strict?: 'takeEasy' | 'makeSure';
     cs?: true;        // cluster sensative，集群敏感的，需要由对应的集群进程统一处理
-    fn: (event: { ids: string[] }, context: Cxt, option: OperateOption) => Promise<number> | number;
+    fn: (event: { ids: string[] }, context: Cxt, option: OperateOption) => 
+        Promise<((context: Cxt, option: OperateOption) => Promise<any>) | void>;      // 跨事务的trigger可能紧接着下来就要触发另一个跨事务trigger，这里只能用回调的方式进行
 }
 
 export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> 

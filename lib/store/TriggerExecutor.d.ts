@@ -4,6 +4,7 @@ import { Logger } from "../types/Logger";
 import { Checker } from '../types/Auth';
 import { Trigger, VolatileTrigger } from "../types/Trigger";
 import { AsyncContext } from './AsyncRowStore';
+import { StorageSchema } from '../types';
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
  */
@@ -17,7 +18,7 @@ export declare class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt
     private onVolatileTrigger;
     constructor(contextBuilder: (cxtString?: string) => Promise<Cxt>, logger?: Logger, onVolatileTrigger?: <T extends keyof ED>(entity: T, trigger: VolatileTrigger<ED, T, Cxt>, ids: string[], cxtStr: string, option: OperateOption) => Promise<void>);
     setOnVolatileTrigger(onVolatileTrigger: <T extends keyof ED>(entity: T, trigger: VolatileTrigger<ED, T, Cxt>, ids: string[], cxtStr: string, option: OperateOption) => Promise<void>): void;
-    registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>): void;
+    registerChecker<T extends keyof ED>(checker: Checker<ED, T, Cxt>, schema: StorageSchema<ED>): void;
     registerTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
     unregisterTrigger<T extends keyof ED>(trigger: Trigger<ED, T, Cxt>): void;
     private preCommitTrigger;

@@ -13,7 +13,8 @@ export declare const TRIGGER_DEFAULT_PRIORITY = 25;
 export declare const TRIGGER_MAX_PRIORITY = 50;
 export declare const CHECKER_MAX_PRIORITY = 99;
 /**
- * logical可能会更改row和data的值，应当最先执行，data和row不能修改相关的值，如果要修改，手动置priority小一点以确保安全
+ * logical可能会更改row和data的值，应当最先执行，data和row不能修改相关的值
+ * 允许logicalData去改data中的值
  */
 export declare const CHECKER_PRIORITY_MAP: Record<CheckerType, number>;
 interface TriggerBase<ED extends EntityDict, T extends keyof ED> {
@@ -39,7 +40,7 @@ interface TriggerCrossTxn<ED extends EntityDict, Cxt extends AsyncContext<ED> | 
     cs?: true;
     fn: (event: {
         ids: string[];
-    }, context: Cxt, option: OperateOption) => Promise<number> | number;
+    }, context: Cxt, option: OperateOption) => Promise<((context: Cxt, option: OperateOption) => Promise<any>) | void>;
 }
 export interface CreateTriggerCrossTxn<ED extends EntityDict, T extends keyof ED, Cxt extends AsyncContext<ED> | SyncContext<ED>> extends CreateTriggerBase<ED, T, Cxt>, TriggerCrossTxn<ED, Cxt> {
 }

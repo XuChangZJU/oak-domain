@@ -82,6 +82,12 @@ export declare class OakAttrNotNullException<ED extends EntityDict> extends OakI
     constructor(entity: keyof ED, attributes: string[], message?: string);
 }
 /**
+ * 属性不允许更新抛的异常，前端可以用这个异常来处理update时对应属性的露出
+ */
+export declare class OakAttrCantUpdateException<ED extends EntityDict> extends OakInputIllegalException<ED> {
+    constructor(entity: keyof ED, attributes: string[], message?: string);
+}
+/**
  * 用户权限不够时抛的异常
  */
 export declare class OakUserUnpermittedException<ED extends EntityDict, T extends keyof ED> extends OakUserException<ED> {
@@ -152,4 +158,4 @@ export declare function makeException<ED extends EntityDict>(data: {
     message?: string;
     opRecords: SelectOpResult<ED>;
     [A: string]: any;
-}): OakException<EntityDict> | undefined;
+}): OakException<ED> | undefined;

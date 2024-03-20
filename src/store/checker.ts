@@ -1,20 +1,31 @@
 import assert from 'assert';
-import { checkFilterContains, combineFilters } from "../store/filter";
+import { checkFilterContains, combineFilters, translateCreateDataToFilter } from "../store/filter";
 import { OakAttrNotNullException, OakInputIllegalException, OakRowInconsistencyException, OakUserUnpermittedException } from '../types/Exception';
 import {
-    AuthDefDict, CascadeRelationItem, Checker, CreateTriggerInTxn,
-    EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, UpdateTriggerInTxn, RelationHierarchy, SelectOpResult, SyncOrAsync, CascadeRemoveDefDict, CHECKER_MAX_PRIORITY
-} from "../types";
+    Checker, CreateTriggerInTxn, EntityDict, OperateOption, SelectOption, StorageSchema, Trigger, 
+    UpdateTriggerInTxn, SelectOpResult, CHECKER_MAX_PRIORITY } from "../types";
 import { EntityDict as BaseEntityDict } from '../base-app-domain';
 import { AsyncContext } from "./AsyncRowStore";
-import { getFullProjection } from './actionDef';
 import { SyncContext } from './SyncRowStore';
-import { firstLetterUpperCase } from '../utils/string';
-import { union, uniq, difference } from '../utils/lodash';
-import { judgeRelation } from './relation';
-import { generateNewId } from '../utils/uuid';
+import { union, difference } from '../utils/lodash';
 import { excludeUpdateActions } from '../actions/action';
 
+function getFullProjection<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(entity: T, schema: StorageSchema<ED>) {
+    const { attributes } = schema[entity];
+    const projection: ED[T]['Selection']['data'] = {
+        id: 1,
+        $$createAt$$: 1,
+        $$updateAt$$: 1,
+        $$deleteAt$$: 1,
+    };
+    Object.keys(attributes).forEach(
+        (k) => Object.assign(projection, {
+            [k]: 1,
+        })
+    );
+
+    return projection;
+}
 /**
  * 
  * @param checker 要翻译的checker
@@ -25,7 +36,7 @@ export function translateCheckerInAsyncContext<
     ED extends EntityDict & BaseEntityDict,
     T extends keyof ED,
     Cxt extends AsyncContext<ED>
->(checker: Checker<ED, T, Cxt>): {
+>(checker: Checker<ED, T, Cxt>, schema: StorageSchema<ED>): {
     fn: Trigger<ED, T, Cxt>['fn'];
     when: 'before' | 'after';
 } {
@@ -36,7 +47,7 @@ export function translateCheckerInAsyncContext<
             const { checker: checkerFn } = checker;
             const fn = (async ({ operation }, context) => {
                 const { data } = operation;
-                await checkerFn(data, context);
+                await checkerFn(data as Readonly<ED[T]['Create']['data']>, context);
                 return 0;
             }) as CreateTriggerInTxn<ED, keyof ED, Cxt>['fn'];
             return {
@@ -47,78 +58,62 @@ export function translateCheckerInAsyncContext<
         case 'row': {
             const { filter, errMsg, inconsistentRows } = checker;
             const fn = (async ({ operation }, context, option) => {
-                const { filter: operationFilter, action } = operation;
-                const filter2 = typeof filter === 'function' ? await (filter as Function)(operation, context, option) : filter;
+                const { filter: operationFilter, data, action } = operation;
+                const filter2 = typeof filter === 'function' ? await filter(operation, context, option) : filter;
                 if (['select', 'count', 'stat'].includes(action)) {
                     operation.filter = combineFilters(entity, context.getSchema(), [operationFilter, filter2]);
                     return 0;
                 }
                 else {
-                    if (await checkFilterContains<ED, keyof ED, Cxt>(entity, context, filter2, operationFilter || {}, true)) {
-                        return 0;
-                    }
-                    if (inconsistentRows) {
-                        const { entity: entity2, selection: selection2 } = inconsistentRows;
-                        const rows2 = await context.select(entity2, selection2(operationFilter), {
-                            dontCollect: true,
-                            blockTrigger: true,
-                        });
-
-                        const e = new OakRowInconsistencyException<ED>(undefined, errMsg);
-                        e.addData(entity2, rows2);
-                        throw e;
-                    }
-                    else {
-                        const rows2 = await context.select(entity, {
-                            data: getFullProjection(entity, context.getSchema()),
-                            filter: Object.assign({}, operationFilter, {
-                                $not: filter2,
-                            })
-                        }, {
-                            dontCollect: true,
-                            blockTrigger: true,
-                        });
-
-                        const e = new OakRowInconsistencyException<ED>(undefined, errMsg);
-                        e.addData(entity, rows2);
-                        throw e;
-                    }
-                }
-            }) as UpdateTriggerInTxn<ED, T, Cxt>['fn'];
-            return {
-                fn,
-                when,
-            };
-        }
-        case 'relation': {
-            const { relationFilter, errMsg } = checker;
-            const fn = (async ({ operation }, context, option) => {
-                if (context.isRoot()) {
-                    return 0;
-                }
-                // assert(operation.action !== 'create', `${entity as string}上的create动作定义了relation类型的checker,请使用expressionRelation替代`);
-                // 对后台而言，将生成的relationFilter加到filter之上(select可以在此加以权限的过滤)
-
-                const result = typeof relationFilter === 'function' ? await relationFilter(operation, context, option) : relationFilter;
-
-                if (result) {
-                    const { filter, action } = operation;
+                    const checkSingle = async (f: ED[T]['Update']['filter']) => {
+                        if (await checkFilterContains<ED, keyof ED, Cxt>(entity, context, filter2, f, true)) {
+                            return;
+                        }
+                        if (inconsistentRows) {
+                            const { entity: entity2, selection: selection2 } = inconsistentRows;
+                            const rows2 = await context.select(entity2, selection2(operationFilter), {
+                                dontCollect: true,
+                                blockTrigger: true,
+                            });
+    
+                            const e = new OakRowInconsistencyException<ED>(undefined, errMsg);
+                            e.addData(entity2, rows2);
+                            throw e;
+                        }
+                        else {
+                            const rows2 = await context.select(entity, {
+                                data: getFullProjection(entity, context.getSchema()),
+                                filter: Object.assign({}, operationFilter, {
+                                    $not: filter2,
+                                })
+                            }, {
+                                dontCollect: true,
+                                blockTrigger: true,
+                            });
+    
+                            const e = new OakRowInconsistencyException<ED>(undefined, errMsg);
+                            e.addData(entity, rows2);
+                            throw e;
+                        }
+                    };
+                    let operationFilter2 = operationFilter;
                     if (action === 'create') {
-                        console.warn(`${entity as string}对象的create类型的checker中，存在无法转换为表达式形式的情况，请尽量使用authDef格式定义这类checker`);
-                        return 0;
-                    }
-                    if (['select', 'count', 'stat'].includes(action)) {
-                        operation.filter = combineFilters(entity, context.getSchema(), [filter, result]);
-                        return 0;
-                    }
-                    assert(filter);
-                    if (await checkFilterContains<ED, T, Cxt>(entity, context, result, filter, true)) {
+                        // 后台进行创建检查时，以传入的data为准
+                        assert(data);
+                        if (data instanceof Array) {
+                            for (const d of <ED[T]['CreateMulti']['data']>data) {
+                                await checkSingle(translateCreateDataToFilter(schema, entity, d))
+                            }
+                        }
+                        else {
+                            await checkSingle(translateCreateDataToFilter(schema, entity, <ED[T]['CreateSingle']['data']><unknown>data))
+                        }
                         return;
                     }
-                    const errMsg2 = typeof errMsg === 'function' ? errMsg(operation, context, option) : errMsg;
-                    throw new OakUserUnpermittedException<ED, T>(entity, operation, errMsg2);
+                    assert(operationFilter2, 'row类型的checker遇到了操作的filter未定义');
+                    await checkSingle(operationFilter2);
+                    return 0;
                 }
-                return 0;
             }) as UpdateTriggerInTxn<ED, T, Cxt>['fn'];
             return {
                 fn,
@@ -126,13 +121,9 @@ export function translateCheckerInAsyncContext<
             };
         }
         case 'logical':
-        case 'logicalRelation':
         case 'logicalData': {
             const { checker: checkerFn } = checker;
             const fn = (async ({ operation }, context, option) => {
-                if (context.isRoot() && type === 'logicalRelation') {
-                    return 0;
-                }
                 await checkerFn(operation, context, option);
                 return 0;
             }) as UpdateTriggerInTxn<ED, T, Cxt>['fn'];
@@ -151,7 +142,7 @@ export function translateCheckerInSyncContext<
     ED extends EntityDict & BaseEntityDict,
     T extends keyof ED,
     Cxt extends SyncContext<ED>
->(checker: Checker<ED, T, Cxt>): {
+>(checker: Checker<ED, T, Cxt>, schema: StorageSchema<ED>): {
     fn: (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => void;
     when: 'before' | 'after';
 } {
@@ -160,20 +151,29 @@ export function translateCheckerInSyncContext<
     switch (type) {
         case 'data': {
             const { checker: checkerFn } = checker;
-            const fn = (operation: ED[T]['Operation'], context: Cxt) => checkerFn(operation.data, context);
+            const fn = (operation: ED[T]['Operation'], context: Cxt) => checkerFn(operation.data as Readonly<ED[T]['Create']['data']>, context);
             return {
                 fn,
                 when,
             }
         }
         case 'row': {
-            const { filter, errMsg } = checker;
+            const { filter, errMsg, entity } = checker;
             const fn = (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => {
-                const { filter: operationFilter, action } = operation;
-                const filter2 = typeof filter === 'function' ? (filter as Function)(operation, context, option) : filter;
-                assert(operationFilter);
+                const { filter: operationFilter, data, action } = operation;
+                const filter2 = typeof filter === 'function' ? filter(operation, context, option) : filter;
+                let operationFilter2 = operationFilter;
+                if (action === 'create') {
+                    if (data) {
+                        // 前端的策略是，有data用data，无data用filter
+                        // 目前前端应该不可能制造出来createMultiple
+                        assert(!(data instanceof Array));
+                        operationFilter2 = translateCreateDataToFilter(schema, entity, data as ED[T]['CreateSingle']['data']);                        
+                    }
+                }                
                 assert(!(filter2 instanceof Promise));
-                if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter, true)) {
+                assert(operationFilter2, '定义了row类型的checker但却进行了无filter操作')
+                if (checkFilterContains<ED, T, Cxt>(entity, context, filter2, operationFilter2, true)) {
                     return;
                 }
                 const e = new OakRowInconsistencyException(undefined, errMsg || 'row checker condition illegal');
@@ -184,42 +184,10 @@ export function translateCheckerInSyncContext<
                 when,
             };
         }
-        case 'relation': {
-            const { relationFilter, errMsg } = checker;
-            const fn = (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => {
-                if (context.isRoot()) {
-                    return;
-                }
-                const result = typeof relationFilter === 'function' ? relationFilter(operation, context, option) : relationFilter;
-
-                assert(!(result instanceof Promise));
-                if (result) {
-                    const { filter, action } = operation;
-                    if (action === 'create') {
-                        console.warn(`${entity as string}对象的create类型的checker中，存在无法转换为表达式形式的情况，请尽量使用authDef格式定义这类checker`);
-                        return;
-                    }
-                    assert(filter);
-                    if (checkFilterContains<ED, T, Cxt>(entity, context, result as ED[T]['Selection']['filter'], filter, true)) {
-                        return;
-                    }
-                    const errMsg2 = typeof errMsg === 'function' ? errMsg(operation, context, option) : errMsg;
-                    throw new OakUserUnpermittedException<ED, T>(entity, operation, errMsg2);
-                }
-            };
-            return {
-                fn,
-                when,
-            };
-        }
         case 'logical':
-        case 'logicalRelation':
         case 'logicalData': {
             const { checker: checkerFn } = checker;
-            const fn = (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => {
-                if (context.isRoot() && type === 'logicalRelation') {
-                    return;
-                }
+            const fn = (operation: ED[T]['Operation'], context: Cxt, option: OperateOption | SelectOption) => {               
                 checkerFn(operation, context, option);
             };
             return {
@@ -517,12 +485,12 @@ export function createCreateCheckers<ED extends EntityDict & BaseEntityDict, Cxt
                     checkAttributeLegal(schema, entity, data2);
                 };
                 if (data instanceof Array) {
-                    data.forEach(
+                    (data as Readonly<ED[keyof ED]['CreateMulti']['data']>).forEach(
                         ele => checkData(ele)
                     );
                 }
                 else {
-                    checkData(data as ED[keyof ED]['CreateSingle']['data']);
+                    checkData(data as Readonly<ED[keyof ED]['CreateSingle']['data']>);
                 }
             }
         }, {

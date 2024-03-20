@@ -6,29 +6,23 @@ import { AsyncContext } from './AsyncRowStore';
 import { judgeRelation } from './relation';
 import { SyncContext } from './SyncRowStore';
 
-/* function getFilterAttributes(filter: Record<string, any>) {
-    const attributes = [] as string[];
-
-    for (const attr in filter) {
-        if (attr.startsWith('$') || attr.startsWith('#')) {
-            if (['$and', '$or'].includes(attr)) {
-                for (const f of filter[attr]) {
-                    const a = getFilterAttributes(f);
-                    attributes.push(...a);
-                }
+export function translateCreateDataToFilter<ED extends EntityDict & BaseEntityDict, T extends keyof ED> (
+    schema: StorageSchema<ED>,
+    entity: T,
+    data: ED[T]['CreateSingle']['data'],
+) {
+    const data2: ED[T]['Selection']['filter'] = {};
+    for (const attr in data) {
+        const rel = judgeRelation(schema, entity, attr);
+        if (rel === 1) {
+            // 只需要记住id和各种外键属性，不这样处理有些古怪的属性比如coordinate，其作为createdata和作为filter并不同构
+            if (!['geometry', 'geography', 'st_geometry', 'st_point'].includes(schema[entity].attributes[attr as any]?.type!)) {
+                data2[attr] = data[attr];
             }
-            else if (attr === '$not') {
-                const a = getFilterAttributes(filter[attr]);
-                attributes.push(...a);
-            }
-        }
-        else {
-            attributes.push(attr);
         }
     }
-
-    return uniq(attributes);
-} */
+    return data2;
+}
 
 /**
  * 尽量合并外键的连接，防止在数据库中join的对象过多
