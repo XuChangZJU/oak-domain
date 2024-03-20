@@ -29,7 +29,8 @@ export interface PullEntityDef<ED extends EntityDict & BaseEntityDict, T extends
 export interface PushEntityDef<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>> {
     direction: 'push';
     entity: T;
-    path: string;
+    pathToRemoteEntity: string;
+    pathToSelfEntity: string;
     recursive?: boolean;
     relationName?: string;
     actions?: ED[T]['Action'][];
@@ -65,7 +66,7 @@ export interface SyncSelfConfigBase<ED extends EntityDict & BaseEntityDict> {
     entity: keyof ED;
 }
 interface SyncSelfConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncSelfConfigBase<ED> {
-    getSelfEncryptInfo: (context: Cxt) => Promise<SelfEncryptInfo>;
+    getSelfEncryptInfo: (context: Cxt, selfEntityId: string) => Promise<SelfEncryptInfo>;
 }
 export interface SyncConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> {
     self: SyncSelfConfig<ED, Cxt>;

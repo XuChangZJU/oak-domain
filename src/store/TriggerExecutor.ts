@@ -11,7 +11,7 @@ import { SyncContext } from './SyncRowStore';
 import { translateCheckerInAsyncContext } from './checker';
 import { generateNewIdAsync } from '../utils/uuid';
 import { readOnlyActions } from '../actions/action';
-import { StorageSchema } from '../types';
+import { OakMakeSureByMySelfException, StorageSchema } from '../types';
 
 /**
  * update可能会传入多种不同的action，此时都需要检查update trigger
@@ -604,7 +604,9 @@ export class TriggerExecutor<ED extends EntityDict & BaseEntityDict, Cxt extends
             }
             catch (err) {
                 await context.rollback();
-                this.logger.error(`执行checkpoint时出错，对象是「${entity as string}」，异常是`, err);
+                if (!(err instanceof OakMakeSureByMySelfException)) {
+                    this.logger.error(`执行checkpoint时出错，对象是「${entity as string}」，异常是`, err);
+                }
             }
         }
         return result;

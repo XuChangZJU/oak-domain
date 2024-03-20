@@ -122,74 +122,119 @@ export function destructRelationPath<ED extends EntityDict & BaseEntityDict, T e
 }
 
 /**
- * 根据entity的相对path，找到对应的根结点对象上的直接userId
+ * 根据entity的相对path，找到其根结点以及相应的user对象
+ * @param schema 
+ * @param entity 
+ * @param path path的最后一项一定指向user。'aa.bb.cc.dd.user'
+ * @returns 
+ */
+export function destructDirectUserPath<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
+    schema: StorageSchema<ED>,
+    entity: T,
+    path: string): {
+        projection: ED[T]['Selection']['data'];
+        getData: (d: Partial<ED[T]['Schema']>) => {
+            entity: keyof ED,
+            entityId: string,
+            userId: string,
+        }[] | undefined;
+    } {
+    const paths = path.split('.');
+    const last = paths.pop();
+    const path2 = paths.join('.');
+    const { projection, getData } = destructDirectPath<ED, T>(schema, entity, path);
+    return {
+        projection,
+        getData: (d) => {
+            const userInfo = getData(d, path2);
+            return userInfo?.map(
+                ({ entity, data }) => ({
+                    entity,
+                    entityId: data.id!,
+                    userId: (data[`${last}Id`] || data.entityId) as string
+                })
+            );
+        }
+    }
+}
+/**
+ * 根据entity的相对path，找到对应的根结点对象数据行
  * @param schema 
  * @param entity 
  * @param path 
- * @param recursive 
  * @returns 
  */
 export function destructDirectPath<ED extends EntityDict & BaseEntityDict, T extends keyof ED>(
     schema: StorageSchema<ED>,
     entity: T,
-    path: string,
-    recursive?: boolean
+    path: string
 ): {
     projection: ED[T]['Selection']['data'];
-    getData: (d: Partial<ED[T]['Schema']>) => {
-        entity: keyof ED,
-        entityId: string,
-        userId: string,
+    getData: (d: Partial<ED[keyof ED]['Schema']>, path2?: string) => {
+        entity: keyof ED;
+        data: Partial<ED[keyof ED]['Schema']>;
     }[] | undefined;
 } {
-    assert(!recursive, '直接对象上不可能有recursive');
     assert(path, '直接对象的路径最终要指向user对象，不可能为空');
 
     const paths = path.split('.');
 
     const makeIter = (e: keyof ED, idx: number): {
         projection: ED[keyof ED]['Selection']['data'];
-        getData: (d: Partial<ED[keyof ED]['Schema']>) => {
-            entity: keyof ED,
-            entityId: string,
-            userId: string,
+        getData: (d: Partial<ED[keyof ED]['Schema']>, path2?: string) => {
+            entity: keyof ED;
+            data: Partial<ED[keyof ED]['Schema']>;
         }[] | undefined;
     } => {
         const attr = paths[idx];
         const rel = judgeRelation(schema, e, attr);
         if (idx === paths.length - 1) {
             if (rel === 2) {
-                assert(attr === 'user');
                 return {
                     projection: {
                         id: 1,
                         entity: 1,
                         entityId: 1,
                     },
-                    getData: (d) => {
+                    getData: (d, p) => {
                         if (d) {
+                            if (!p) {
+                                return [{
+                                    entity: e,
+                                    data: d,
+                                }];
+                            }
+                            assert(p === attr);
                             return [{
-                                entity: e as string,
-                                entityId: d.id!,
-                                userId: d.entityId!,
+                                entity: attr,
+                                data: {
+                                    id: d.entityId as string,
+                                } as Partial<ED[keyof ED]['Schema']>,
                             }];
                         }
                     },
                 };
             }
             else {
-                assert(rel === 'user');
                 return {
                     projection: {
                         id: 1,
                         [`${attr}Id`]: 1,
                     },
-                    getData: (d) => {
+                    getData: (d, p) => {
                         if (d) {
+                            if (!p) {
+                                return [{
+                                    entity: e,
+                                    data: d,
+                                }];
+                            }
+                            assert(p === attr);
                             return [{
-                                entity: e as string,
-                                entityId: d.id!,
-                                userId: d[`${attr}Id`] as string,
+                                entity: rel as keyof ED,
+                                data: {
+                                    id: d[`${attr}Id`] as string,
+                                } as Partial<ED[keyof ED]['Schema']>,
                             }]
                         }
                     },
@@ -203,7 +248,19 @@ export function destructDirectPath<ED extends EntityDict & BaseEntityDict, T ext
                     id: 1,
                     [attr]: projection,
                 },
-                getData: (d) => d[attr] && getData(d[attr]!),
+                getData: (d, p) => {
+                    if (d) {
+                        if (!p) {
+                            return [{
+                                entity: e,
+                                data: d,
+                            }];
+                        }
+                        const ps = p.split('.');
+                        assert(ps[0] === attr);
+                        return d[attr] && getData(d[attr]!, ps.slice(1).join('.'));
+                    }
+                },
             };
         }
         else if (typeof rel === 'string') {
@@ -213,7 +270,19 @@ export function destructDirectPath<ED extends EntityDict & BaseEntityDict, T ext
                     id: 1,
                     [attr]: projection,
                 },
-                getData: (d) => d[attr] && getData(d[attr]!),
+                getData: (d, p) => {
+                    if (d) {
+                        if (!p) {
+                            return [{
+                                entity: e,
+                                data: d,
+                            }];
+                        }
+                        const ps = p.split('.');
+                        assert(ps[0] === attr);
+                        return d[attr] && getData(d[attr]!, ps.slice(1).join('.'));
+                    }
+                },
             };
         }
         else {
@@ -228,11 +297,20 @@ export function destructDirectPath<ED extends EntityDict & BaseEntityDict, T ext
                         data: projection,
                     },
                 },
-                getData: (d) => d[attr] && (d[attr]! as Partial<ED[keyof ED]['Schema']>[]).map(ele => getData(ele)).flat().filter(ele => !!ele) as {
-                    entity: keyof ED,
-                    entityId: string,
-                    userId: string,
-                }[],
+                getData: (d, p) => {
+                    if (!p) {
+                        return [{
+                            entity: e,
+                            data: d,
+                        }];
+                    }
+                    const ps = p.split('.');
+                    assert(ps[0] === attr);
+                    return d[attr] && (d[attr]! as Partial<ED[keyof ED]['Schema']>[]).map(ele => getData(ele, ps.slice(1).join('.'))).flat().filter(ele => !!ele) as {
+                        entity: keyof ED;
+                        data: Partial<ED[keyof ED]['Schema']>;
+                    }[];
+                }
             }
         }
     };

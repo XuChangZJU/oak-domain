@@ -6,6 +6,8 @@ export declare class OakException<ED extends EntityDict> extends Error {
     setOpRecords(opRecord: SelectOpResult<ED>): void;
     toString(): string;
 }
+export declare class OakMakeSureByMySelfException<ED extends EntityDict> extends OakException<ED> {
+}
 export declare class OakDataException<ED extends EntityDict> extends OakException<ED> {
 }
 export declare class OakUniqueViolationException<ED extends EntityDict> extends OakException<ED> {

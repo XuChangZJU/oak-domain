@@ -86,7 +86,6 @@ export declare class RelationAuth<ED extends EntityDict & BaseEntityDict> {
  * 获取有对entity进行actions操作权限的userRelation关系
  * @param params
  * @param context
- * todo paths改成复数以后这里还未充分测试过
  */
 export declare function getUserRelationsByActions<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(params: {
     entity: T;
