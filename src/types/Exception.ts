@@ -52,6 +52,11 @@ export class OakException<ED extends EntityDict> extends Error {
     }
 }
 
+// 这个异常表示模块自己处理跨事务一致性，框架pass（在分布式数据传递时会用到）
+export class OakMakeSureByMySelfException<ED extends EntityDict> extends OakException<ED> {
+
+}
+
 export class OakDataException<ED extends EntityDict> extends OakException<ED> {
     // 表示由数据层发现的异常
 }

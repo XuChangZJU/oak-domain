@@ -9,7 +9,7 @@ import { SyncContext } from "./SyncRowStore";
 import { readOnlyActions } from '../actions/action';
 import { difference, intersection, set, uniq, cloneDeep, groupBy } from '../utils/lodash';
 import { SYSTEM_RESERVE_ENTITIES } from "../compiler/entities";
-import { destructDirectPath, destructRelationPath } from "../utils/relationPath";
+import { destructDirectUserPath, destructRelationPath } from "../utils/relationPath";
 
 
 type OperationTree<ED extends EntityDict & BaseEntityDict> = {
@@ -1425,8 +1425,7 @@ export class RelationAuth<ED extends EntityDict & BaseEntityDict> {
 /**
  * 获取有对entity进行actions操作权限的userRelation关系
  * @param params 
- * @param context 
- * todo paths改成复数以后这里还未充分测试过
+ * @param context
  */
 export async function getUserRelationsByActions<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>>(params: {
     entity: T;
@@ -1517,7 +1516,7 @@ export async function getUserRelationsByActions<ED extends EntityDict & BaseEnti
                 async ({ path }) => {
                     const { value, recursive } = path!;
                     assert(!recursive);
-                    const { getData, projection } = destructDirectPath(context.getSchema(), entity, value!, recursive);
+                    const { getData, projection } = destructDirectUserPath(context.getSchema(), entity, value!);
 
                     const rows = await context.select(entity, {
                         data: projection,

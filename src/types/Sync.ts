@@ -37,7 +37,8 @@ export interface PullEntityDef<ED extends EntityDict & BaseEntityDict, T extends
 export interface PushEntityDef<ED extends EntityDict & BaseEntityDict, T extends keyof ED, Cxt extends AsyncContext<ED>> {
     direction: 'push';
     entity: T;                              // 需要同步的entity
-    path: string;                           // 此entity到需要同步到的根entity的路径（如果根entity和remote user之间不是relation关系，其最后指向user的路径在pathToUser中指定）
+    pathToRemoteEntity: string;             // 此entity到需要同步到的根entity的路径（如果根entity和remote user之间不是relation关系，其最后指向user的路径在pathToUser中指定）
+    pathToSelfEntity: string;               // 此entity到selfEntity之间的路径
     recursive?: boolean;                    // 表明path的最后一项是递归的(暂时无用)
     relationName?: string;                  // 要同步的user与根对象的relation名称（为空说明是userId)
     actions?: ED[T]['Action'][];
@@ -79,7 +80,7 @@ export interface SyncSelfConfigBase<ED extends EntityDict & BaseEntityDict> {
 };
 
 interface SyncSelfConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> extends SyncSelfConfigBase<ED>{
-    getSelfEncryptInfo: (context: Cxt) => Promise<SelfEncryptInfo>;
+    getSelfEncryptInfo: (context: Cxt, selfEntityId: string) => Promise<SelfEncryptInfo>;
 };
 
 export interface SyncConfig<ED extends EntityDict & BaseEntityDict, Cxt extends AsyncContext<ED>> {
