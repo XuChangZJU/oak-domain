@@ -9,7 +9,7 @@ import { StorageSchema } from '../types/Storage';
 import { combineFilters } from "./filter";
 import { judgeRelation } from "./relation";
 import { EXPRESSION_PREFIX, getAttrRefInExpression, OakRowUnexistedException } from "../types";
-import { unset, uniq, cloneDeep, pick } from '../utils/lodash';
+import { unset, uniq, cloneDeep, pick, difference } from '../utils/lodash';
 import { SyncContext } from "./SyncRowStore";
 import { AsyncContext } from "./AsyncRowStore";
 import { getRelevantIds } from "./filter";
@@ -526,7 +526,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                                 data: projection2[attr],
                                                 filter: {
                                                     id: {
-                                                        $in: entityIds
+                                                        $in: difference(entityIds, subRows.map(ele => ele.id!)),
                                                     },
                                                 },
                                             },
@@ -635,7 +635,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                                 data: projection2[attr],
                                                 filter: {
                                                     id: {
-                                                        $in: ids
+                                                        $in: difference(ids, subRows.map(ele => ele.id!))
                                                     },
                                                 },
                                             }
