@@ -229,12 +229,22 @@ function createActionTransformerCheckers<ED extends EntityDict & BaseEntityDict,
                 // 这里用data类型的checker改数据了不太好，先这样
                 checkers.push({
                     action: action as any,
-                    type: 'data',
+                    type: 'logicalData',
                     entity,
-                    checker: (data) => {
-                        Object.assign(data, {
-                            [attr]: stm[action][1],
-                        });
+                    checker: (operation) => {
+                        const { data } = operation;
+                        if (data instanceof Array) {
+                            data.forEach(
+                                (d) => Object.assign(d, {
+                                    [attr]: stm[action][1],
+                                })
+                            );
+                        }
+                        else {
+                            Object.assign(data, {
+                                [attr]: stm[action][1],
+                            });
+                        }
                     }
                 });
             }
@@ -242,10 +252,11 @@ function createActionTransformerCheckers<ED extends EntityDict & BaseEntityDict,
             if (is) {
                 checkers.push({
                     action: 'create' as ED[keyof ED]['Action'],
-                    type: 'data',
+                    type: 'logicalData',
                     entity,
                     priority: 10,       // 优先级要高，先于真正的data检查进行
-                    checker: (data) => {
+                    checker: (operation) => {
+                        const { data } = operation;
                         if (data instanceof Array) {
                             (data as Readonly<ED[keyof ED]['CreateMulti']['data']>).forEach(
                                 ele => {
