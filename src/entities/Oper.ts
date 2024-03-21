@@ -10,7 +10,7 @@ export interface Schema extends EntityShape {
     extra?: Object;
     operator?: User;
     targetEntity: String<32>;
-    bornAt: Datetime;
+    bornAt?: Datetime;
 };
 
 const entityDesc: EntityDesc<Schema> = {

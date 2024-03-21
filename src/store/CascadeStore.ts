@@ -1432,7 +1432,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     data,
                                     operatorId,
                                     targetEntity: entity as string,
-                                    bornAt: typeof bornAt === 'number' ? bornAt : now,
+                                    bornAt,
                                     operEntity$oper: data instanceof Array ? {
                                         id: 'dummy',
                                         action: 'create',
@@ -1600,7 +1600,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
                                     action,
                                     data,
                                     targetEntity: entity as string,
-                                    bornAt: typeof bornAt === 'number' ? bornAt : now,
+                                    bornAt,
                                     operatorId,
                                     operEntity$oper: {
                                         id: 'dummy',
@@ -1759,7 +1759,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         context: Cxt,
         option: OP): OperationResult<ED> {
 
-        const { action, data, filter, id, bornAt } = operation;
+        const { action, data, filter } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => any> = [];
         const wholeAfterFns: Array<() => any> = [];
@@ -1823,7 +1823,7 @@ export abstract class CascadeStore<ED extends EntityDict & BaseEntityDict> exten
         operation: ED[T]['Operation'],
         context: Cxt,
         option: OP): Promise<OperationResult<ED>> {
-        const { action, data, filter, id, bornAt } = operation;
+        const { action, data, filter, bornAt } = operation;
         let opData: any;
         const wholeBeforeFns: Array<() => Promise<OperationResult<ED>>> = [];
         const wholeAfterFns: Array<() => Promise<OperationResult<ED>>> = [];
