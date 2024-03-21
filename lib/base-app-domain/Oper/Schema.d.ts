@@ -13,7 +13,7 @@ export type OpSchema = EntityShape & {
     extra?: Object | null;
     operatorId?: ForeignKey<"user"> | null;
     targetEntity: String<32>;
-    bornAt: Datetime;
+    bornAt?: Datetime | null;
 };
 export type OpAttr = keyof OpSchema;
 export type Schema = EntityShape & {
@@ -23,7 +23,7 @@ export type Schema = EntityShape & {
     extra?: Object | null;
     operatorId?: ForeignKey<"user"> | null;
     targetEntity: String<32>;
-    bornAt: Datetime;
+    bornAt?: Datetime | null;
     operator?: User.Schema | null;
     operEntity$oper?: Array<OperEntity.Schema>;
     operEntity$oper$$aggr?: AggregationResult<OperEntity.Schema>;
